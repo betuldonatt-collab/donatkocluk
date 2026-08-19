@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { href: "/student", label: "Ana Sayfa", icon: Home },
   { href: "/student/odevler", label: "Ödevler", icon: ClipboardList },
-  { href: "/student/problem-takibi", label: "Paragraf/Problem Takibi", icon: Target },
+  { href: "/student/paragraf-problem", label: "Paragraf/Problem Takibi", icon: Target },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", icon: BarChart3 },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", icon: Library },
 ];
