@@ -28,8 +28,8 @@ import type { Course } from "../_data/courses";
 export type Resource = { id: string; name: string };
 export type ProgressMap = Record<string, { solved: boolean; reviewed: boolean }>;
 
-function progressKey(topic: string, resourceId: string) {
-  return `${topic}::${resourceId}`;
+function progressKey(topicId: string, resourceId: string) {
+  return `${topicId}::${resourceId}`;
 }
 
 export function CourseTable({
@@ -43,7 +43,7 @@ export function CourseTable({
   resources: Resource[];
   progress: ProgressMap;
   onAddResource: (name: string) => void;
-  onToggle: (topic: string, resourceId: string, field: "solved" | "reviewed") => void;
+  onToggle: (topicId: string, resourceId: string, field: "solved" | "reviewed") => void;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newResourceName, setNewResourceName] = useState("");
@@ -95,25 +95,25 @@ export function CourseTable({
           </TableHeader>
           <TableBody>
             {course.topics.map((topic) => (
-              <TableRow key={topic}>
-                <TableCell className="font-medium whitespace-normal">{topic}</TableCell>
+              <TableRow key={topic.id}>
+                <TableCell className="font-medium whitespace-normal">{topic.name}</TableCell>
                 {resources.map((resource) => {
-                  const key = progressKey(topic, resource.id);
+                  const key = progressKey(topic.id, resource.id);
                   const state = progress[key] ?? { solved: false, reviewed: false };
                   return (
                     <Fragment key={resource.id}>
                       <TableCell className="border-l text-center">
                         <Checkbox
                           checked={state.solved}
-                          onCheckedChange={() => onToggle(topic, resource.id, "solved")}
-                          aria-label={`${course.name} - ${topic} - ${resource.name} - Soru Çözümü`}
+                          onCheckedChange={() => onToggle(topic.id, resource.id, "solved")}
+                          aria-label={`${course.name} - ${topic.name} - ${resource.name} - Soru Çözümü`}
                         />
                       </TableCell>
                       <TableCell className="text-center">
                         <Checkbox
                           checked={state.reviewed}
-                          onCheckedChange={() => onToggle(topic, resource.id, "reviewed")}
-                          aria-label={`${course.name} - ${topic} - ${resource.name} - Yanlışlara Dönüş`}
+                          onCheckedChange={() => onToggle(topic.id, resource.id, "reviewed")}
+                          aria-label={`${course.name} - ${topic.name} - ${resource.name} - Yanlışlara Dönüş`}
                         />
                       </TableCell>
                     </Fragment>

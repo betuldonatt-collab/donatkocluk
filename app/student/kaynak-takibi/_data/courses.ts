@@ -1,34 +1,491 @@
-// Konu listeleri henüz resmi müfredattan gelmedi. "Asla kafandan konu
-// uydurma" kuralı gereği, kullanıcının mesajında birebir verdiği örnekler
-// dışında hiçbir konu adı uydurulmadı — geri kalanı PLACEHOLDER olarak
-// işaretli. Gerçek liste paylaşılınca yalnızca bu dosya güncellenecek.
+// Resmi müfredat — kullanıcının paylaştığı tam liste birebir aktarıldı.
+//
+// Not (şeffaflık için): Kaynak metin düz yazı olduğundan bazı konu grupları
+// parantez içinde alt konularla verilmişti (örn. "Üçgenler (Üçgenlerde Temel
+// Kavramlar, ...)"). Tablo satırlarının kullanışlı/granüler olması için bu
+// gruplar alt konulara açıldı; üst kategori adı ayrı bir satır olarak
+// eklenmedi. Hiçbir konu adı değiştirilmedi/uydurulmadı — sadece gruplama
+// düzleştirildi. Tek istisna: AYT Coğrafya-2'de "İklim Değiği̇kli̇ği̇" ifadesi
+// bariz bir yazım/karakter bozulmasıydı; aynı mesajda Coğrafya-1'de doğru
+// yazılan "İklim Değişikliği" ile değiştirildi.
+//
+// "Felsefe Grubu" kaynak metinde tek başlık altında 4 ayrı ders (Felsefe,
+// Psikoloji, Sosyoloji, Mantık) olarak, her biri kendi konu listesiyle
+// verilmişti — bu yüzden Sözel alanında 4 ayrı ders sekmesi olarak eklendi.
+export type Topic = { id: string; name: string };
 export type Course = {
   id: string;
   name: string;
-  topics: string[];
+  topics: Topic[];
 };
 
-const PLACEHOLDER_TOPICS = ["PLACEHOLDER Konu 1", "PLACEHOLDER Konu 2", "PLACEHOLDER Konu 3"];
-
-function course(id: string, name: string, topics: string[] = PLACEHOLDER_TOPICS): Course {
-  return { id, name, topics };
+function course(id: string, name: string, topicNames: string[]): Course {
+  return {
+    id,
+    name,
+    topics: topicNames.map((topicName, i) => ({ id: `${id}-t${i}`, name: topicName })),
+  };
 }
 
-// Kullanıcının mesajında verilen sabit TYT ders listesi.
-export const TYT_COURSES: Course[] = [
-  // Konular kullanıcının mesajında birebir örnek olarak verildi.
-  course("tyt-turkce", "Türkçe", ["Sözcükte Anlam", "Cümlede Anlam", "Paragrafta Anlam"]),
-  course("tyt-matematik", "Matematik", ["Temel Kavramlar", "Bölme-Bölünebilme"]),
-  // Konu listesi verilmedi — PLACEHOLDER.
-  course("tyt-geometri", "Geometri"),
-  course("tyt-fizik", "Fizik"),
-  course("tyt-kimya", "Kimya"),
-  course("tyt-biyoloji", "Biyoloji"),
-  course("tyt-tarih", "Tarih"),
-  course("tyt-cografya", "Coğrafya"),
-  course("tyt-felsefe", "Felsefe"),
-  course("tyt-din", "Din Kültürü ve Ahlak Bilgisi"),
+// TYT+AYT Geometri — kaynak metinde tek, ortak liste olarak verildi; hem TYT
+// hem de Sayısal/Eşit Ağırlık AYT listesinde aynı ders nesnesi kullanılıyor.
+const GEOMETRI_TOPICS = [
+  "Üçgenlerde Temel Kavramlar",
+  "Üçgenlerde Eşlik ve Benzerlik",
+  "Üçgenin Yardımcı Elemanları",
+  "Dik Üçgen ve Trigonometri",
+  "Üçgenin Alanı/ Üçgenin Alanı ile İlgili Uygulamalar",
+  "Çokgenler/ Dörtgenler ve Özellikleri",
+  "Özel Dörtgenler",
+  "Katı Cisimler",
+  "Çember ve Daire",
+  "Doğrunun Analitik İncelenmesi",
+  "Çemberin Analitik İncelenmesi",
+  "Dönüşümler",
 ];
+const geometriCourse = (id: string) => course(id, "Geometri", GEOMETRI_TOPICS);
+
+export const TYT_COURSES: Course[] = [
+  course("tyt-turkce", "Türkçe", [
+    "Sözcükte Anlam",
+    "Cümlede Anlam",
+    "Paragrafta Anlam",
+    "Paragrafın Yapısı",
+    "Sözcükte Yapı/ Biçim Bilgisi",
+    "Ses Bilgisi",
+    "Yazım Kuralları",
+    "Noktalama İşaretleri",
+    "İsimler",
+    "Sıfatlar",
+    "Zamirler",
+    "Zarflar",
+    "Edatlar",
+    "Ünlemler ve Bağlaçlar",
+    "Fiillerde Kip ve Kişi",
+    "Fiilde Yapı",
+    "Ek Fiil",
+    "Fiilimsi",
+    "Fiilde Çatı",
+    "Cümlenin Ögeleri",
+    "Cümle Türleri",
+    "Anlatım Bozuklukları",
+  ]),
+  course("tyt-matematik", "Matematik", [
+    "Temel Kavramlar",
+    "Sayı Basamakları",
+    "Bölme Bölünebilme Kuralları",
+    "EBOB-EKOK",
+    "Rasyonel Sayılar",
+    "Basit Eşitsizlikler",
+    "Mutlak Değer",
+    "Üslü Sayılar",
+    "Köklü Sayılar",
+    "Çarpanlara Ayırma",
+    "Oran Orantı",
+    "Birinci Dereceden Denklemler",
+    "Sayı Kesir Problemleri",
+    "Yaş Problemleri",
+    "İşçi Problemleri",
+    "Hız Problemleri",
+    "Karışım Problemleri",
+    "Yüzde Kâr-Zarar Problemleri",
+    "Grafik Problemleri",
+    "Rutin Olmayan Problemler",
+    "Kümeler Kartezyen Çarpım",
+    "Mantık",
+    "Fonksiyonlar",
+    "Polinomlar",
+    "Permütasyon Kombinasyon",
+    "Olasılık",
+    "Veri İstatistik",
+  ]),
+  geometriCourse("tyt-geometri"),
+  course("tyt-fizik", "Fizik", [
+    "Fizik Bilimine Giriş",
+    "Madde ve Özellikleri",
+    "Hareket ve Kuvvet",
+    "İş, Güç, Enerji",
+    "Isı, Sıcaklık ve Genleşme",
+    "Elektrostatik",
+    "Elektrik Akımı ve Devreler",
+    "Mıknatıslar ve Manyetizma",
+    "Basınç",
+    "Kaldırma Kuvveti",
+    "Dalgalara Giriş",
+    "Yay Dalgaları",
+    "Su Dalgaları",
+    "Ses Dalgaları",
+    "Deprem Dalgaları",
+    "Aydınlanma",
+    "Gölge Yansıma",
+    "Düzlem Aynalar",
+    "Küresel Aynalar",
+    "Işığın Kırılması ve Renkler",
+    "Mercekler ve Optik Araçlar/ Prizmalar",
+  ]),
+  course("tyt-kimya", "Kimya", [
+    "Kimya Bilimi",
+    "Atom ve Periyodik Sistem",
+    "Kimyasal Türler Arası Etkileşimler",
+    "Maddenin Halleri",
+    "Kimyanın Temel Kanunları Kimyasal Hesaplamalar",
+    "Karışımlar",
+    "Asitler, Bazlar ve Tuzlar",
+    "Kimya Her Yerde",
+  ]),
+  course("tyt-biyoloji", "Biyoloji", [
+    "Canlıların Ortak Özellikleri",
+    "Su, Tuz ve Mineraller",
+    "Karbonhidratlar",
+    "Lipitler",
+    "Proteinler",
+    "Enzimler",
+    "Vitaminler",
+    "Nükleik Asitler",
+    "ATP",
+    "Hücre, Çekirdek ve Sitoplazma",
+    "Organeller",
+    "Hücre İskeleti",
+    "Hücre Zarı ve Hücre Duvarı",
+    "Hücre Zarından Madde Geçişleri",
+    "Canlılığın Çeşitliliği ve Sınıflandırılması",
+    "Bakteriler",
+    "Arkeler",
+    "Protistalar",
+    "Bitkiler",
+    "Mantarlar",
+    "Hayvanlar",
+    "Virüsler",
+    "Mitoz",
+    "Eşeysiz Üreme",
+    "Mayoz",
+    "Eşeyli Üreme",
+    "Kalıtım",
+    "Ekolojik Kavramlar",
+    "Madde Döngüleri",
+    "Güncel Çevre Sorunları",
+  ]),
+  course("tyt-tarih", "Tarih", [
+    "İlk ve Orta Çağlarda Türk Dünyası",
+    "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+    "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+    "Beylikten Devlete Osmanlı Siyaseti (1302-1453)",
+    "Sultan ve Osmanlı Merkez Teşkilatı",
+    "Değişen Dünya Dengeleri Karşısında Osmanlı Siyaseti (1595-1774)",
+    "Uluslararası İlişkilerde Denge Stratejisi (1774-1914)",
+    "XIX. ve XX. Yüzyılda Değişen Sosyoekonomik Hayat",
+    "Milli Mücadele",
+    "Atatürkçülük ve Türk İnkılabı",
+  ]),
+  course("tyt-cografya", "Coğrafya", [
+    "Doğa ve İnsan Etkileşimi",
+    "Coğrafya Bilimi ve Bölümlenmesi",
+    "Dünya'nın Şekli ve Hareketleri",
+    "Coğrafi Koordinat Sistemi",
+    "Harita Okuryazarlığı",
+    "Atmosfer ve İklim Bilgisi",
+    "Dünya'nın Yapısı ve Oluşum Süreci",
+    "Su Kaynakları",
+    "Topraklar",
+    "Bitkiler",
+    "Yerleşmeler",
+    "Nüfus ve Güç",
+    "Ekonomik Faaliyetler",
+    "Bölgeler",
+    "Uluslararası Ulaşım Hatları",
+    "Afetler",
+  ]),
+  course("tyt-felsefe", "Felsefe", [
+    "Felsefenin Alanı",
+    "Bilgi Felsefesi",
+    "Bilim Felsefesi",
+    "Varlık Felsefesi",
+    "Ahlak Felsefesi",
+    "Siyaset Felsefesi",
+    "Din Felsefesi",
+    "Sanat Felsefesi",
+  ]),
+  course("tyt-din", "Din Kültürü ve Ahlak Bilgisi", [
+    "Bilgi ve İnanç",
+    "İbadetler",
+    "Ahlak ve Değerler",
+    "Hz. Muhammed (S.A.V)",
+    "Vahiy ve Akıl",
+    "İslam Düşüncesinde Yorumlar",
+    "Mezhepler",
+    "Din, Kültür ve Medeniyet",
+  ]),
+];
+
+const aytMatematik = course("ayt-matematik", "Matematik", [
+  "Denklem ve Eşitsizlikler",
+  "Mantık",
+  "Kümeler",
+  "Fonksiyonlar",
+  "Polinomlar",
+  "2. Dereceden Denklemler/ Denklem ve Eşitsizlik Sistemleri",
+  "Permütasyon Kombinasyon",
+  "Binom",
+  "Olasılık",
+  "Yönlü Açılar",
+  "Trigonometrik Fonksiyonlar",
+  "Cos-Sin Teoremleri",
+  "Ters Trigonometrik Fonksiyonlar",
+  "Toplam-Fark ve İki Kat Açı Formülleri",
+  "Trigonometrik Denklemler",
+  "Logaritma",
+  "Diziler",
+  "Limit ve Süreklilik",
+  "Türev",
+  "İntegral",
+]);
+
+const aytFizik = course("ayt-fizik", "Fizik", [
+  "Vektörler",
+  "Bağıl Hareket",
+  "Newton'un Hareket Yasaları",
+  "Bir Boyutta Sabit İvmeli Hareket",
+  "İki Boyutta Hareket",
+  "Enerji ve Hareket",
+  "İtme ve Çizgisel Momentum",
+  "Tork",
+  "Denge",
+  "Basit Makineler",
+  "Elektrik",
+  "Manyetizma",
+  "Alternatif Akım",
+  "Transformatörler",
+  "Düzgün Çembersel Hareket",
+  "Dönerek Öteleme Hareketi",
+  "Açısal Momentum",
+  "Kütle Çekim Kuvveti",
+  "Kepler Kanunları",
+  "Basit Harmonik Hareket",
+  "Dalga Mekaniği",
+  "Atom Fiziğine Giriş ve Radyoaktivite",
+  "Modern Fizik",
+  "Modern Fiziğin Teknolojideki Uygulamaları",
+]);
+
+const aytKimya = course("ayt-kimya", "Kimya", [
+  "Atomun Kuantum Modeli",
+  "Periyodik Özellikler",
+  "Yükseltgenme Basamakları",
+  "Gazlar",
+  "Derişim Birimleri",
+  "Koligatif Özellikler",
+  "Çözünürlük",
+  "Tepkimelerde Isı Değişimi",
+  "Oluşum Entalpisi",
+  "Tepkime Isılarının Toplanabilirliği",
+  "Kimyasal Denge",
+  "Dengeyi Etkileyen Faktörler",
+  "Sulu Çözelti Dengeleri",
+  "İndirgenme Yükseltgenme Tepkimelerinde Elektrik Akımı",
+  "Elektrotlar ve Elektrokimyasal Hücreler",
+  "Elektrot Potansiyelleri",
+  "Elektroliz",
+  "Korozyon",
+  "Karbon Kimyasına Giriş",
+  "Hidrokarbonlar",
+  "Fonksiyonel Gruplar",
+  "Alkoller Eterler",
+  "Karbonil Bileşikleri",
+  "Karboksilik Asitler",
+  "Esterler",
+]);
+
+const aytBiyoloji = course("ayt-biyoloji", "Biyoloji", [
+  "Sinir Sistemi",
+  "Endokrin Sistem",
+  "Duyu Organları",
+  "Destek ve Hareket Sistemi",
+  "Sindirim Sistemi",
+  "Dolaşım ve Bağışıklık Sistemi",
+  "Solunum Sistemi",
+  "Üriner Sistem",
+  "Üreme Sistemi ve Embriyonik Gelişim",
+  "Komünite ve Popülasyon Ekolojisi",
+  "Nükleik Asitlerin Keşfi ve Önemi",
+  "Genetik Şifre ve Protein Sentezi",
+  "Canlılık ve Enerji",
+  "Fotosentez",
+  "Kemosentez",
+  "Hücresel Solunum",
+  "Bitkilerin Yapısı",
+  "Bitkilerde Madde Taşınması",
+  "Bitkilerde Eşeyli Üreme",
+  "Canlılar ve Çevre",
+]);
+
+const aytEdebiyat = course("ayt-edebiyat", "Edebiyat", [
+  "Sözcükte Anlam",
+  "Cümlede Anlam",
+  "Paragrafta Anlam",
+  "Şiir Bilgisi",
+  "Söz Sanatları",
+  "Nesir Bilgisi",
+  "İslamiyet Öncesi Türk Edebiyatı / Geçiş Dönemi Türk Edebiyatı",
+  "Anonim Halk Edebiyatı",
+  "Aşık Tarzı Halk Edebiyatı",
+  "Tekke Edebiyatı",
+  "Nazım Şekilleri",
+  "Nazım Türleri",
+  "Akımlar",
+  "Sanatçılar",
+  "Tanzimat Dönemi Türk Edebiyatı",
+  "Servetifünun Dönemi Türk Edebiyatı",
+  "Fecriati Dönemi Türk Edebiyatı",
+  "Şiir, Roman ve Hikaye",
+  "Beş Hececiler",
+  "Dönem Sanatçıları",
+  "Bağımsızlar",
+  "Öğretici Metinler (Milli Edebiyat)",
+  "Şiir",
+  "Hikaye",
+  "Roman",
+  "Tiyatro",
+  "Öğretici Metinler (Cumhuriyet Edebiyatı)",
+  "Geleneksel Türk Tiyatrosu",
+  "Masal / Fabl / Destan / Halk Hikayesi",
+  "Edebi Akımlar",
+]);
+
+const aytTarih1 = course("ayt-tarih1", "Tarih-1", [
+  "Tarih ve Zaman",
+  "İnsanlığın İlk Dönemleri",
+  "İlk ve Orta Çağlarda Türk Dünyası",
+  "İslam Medeniyetinin Doğuşu",
+  "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+  "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+  "Beylikten Devlete Osmanlı Siyaseti",
+  "Devletleşme Sürecinde Savaşçılar ve Askerler",
+  "Dünya Gücü Osmanlı",
+  "Sultan ve Osmanlı Merkez Teşkilatı",
+  "Değişim Çağında Avrupa ve Osmanlı",
+  "Devrimler Çağında Değişen Devlet - Toplum İlişkileri",
+  "Uluslararası İlişkilerde Denge Stratejisi",
+  "XIX. ve XX. Yüzyılda Değişen Sosyoekonomik Hayat",
+  "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
+  "Milli Mücadele",
+  "Atatürkçülük ve Türk İnkılabı",
+  "İki Savaş Arası Dönemde Türkiye ve Dünya",
+  "II. Dünya Savaşı Sürecinde Türkiye ve Dünya",
+]);
+
+const aytCografya1 = course("ayt-cografya1", "Coğrafya-1", [
+  "Ekosistemlerin Özellikleri ve İşleyişi",
+  "Ekstrem Doğa Olayları",
+  "Küresel İklim Değişikliği",
+  "Nüfus Politikaları",
+  "Şehirler ve Kırsal Yerleşmeler",
+  "Dünyada Doğal Kaynak ve Ekonomi",
+  "Türkiye'de Tarım, Sanayi, Maden ve Enerji",
+  "Göç ve Kentleşme",
+  "Bölgesel Kalkınma Projeleri",
+  "Ulaşım ve Ticaret",
+  "Turizm",
+  "Kültür Bölgeleri",
+  "Küreselleşen Dünya",
+  "Uluslararası Örgütler",
+  "Jeopolitik Konum",
+  "Çevre Sorunları ve Geri Dönüşüm",
+]);
+
+const aytTarih2 = course("ayt-tarih2", "Tarih-2", [
+  "Tarih ve Zaman",
+  "İnsanlığın İlk Dönemleri",
+  "İlk ve Orta Çağlarda Türk Dünyası",
+  "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+  "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+  "Beylikten Devlete Osmanlı Siyaseti",
+  "Savaşçılar ve Askerler",
+  "Osmanlı Medeniyeti",
+  "Dünya Gücü Osmanlı",
+  "Merkez Teşkilatı",
+  "Klasik Çağda Toplum Düzeni",
+  "Osmanlı Siyaseti",
+  "Avrupa ve Osmanlı",
+  "Değişen Devlet-Toplum İlişkileri",
+  "Denge Stratejisi",
+  "20. Yüzyıl Başları",
+  "Milli Mücadele",
+  "Atatürkçülük ve İnkılaplar",
+  "II. Dünya Savaşı",
+  "II. Dünya Savaşı Sonrası",
+  "Toplumsal Devrim Çağı",
+  "21. Yüzyılın Eşiğinde Türkiye ve Dünya",
+]);
+
+const aytCografya2 = course("ayt-cografya2", "Coğrafya-2", [
+  "Ekosistemler",
+  "Ekstrem Olaylar",
+  // Kaynak metinde "İklim Değiği̇kli̇ği̇" olarak geçiyordu — aynı mesajda
+  // Coğrafya-1'de doğru yazılan "İklim Değişikliği" ile düzeltildi.
+  "İklim Değişikliği",
+  "Nüfus Politikaları",
+  "Yerleşmeler",
+  "Ekonomik Faaliyetler",
+  "Türkiye Ekonomisi",
+  "Ulaşım ve Ticaret",
+  "Turizm",
+  "Kültür Bölgeleri",
+  "Uluslararası Örgütler",
+  "Jeopolitik",
+  "Çevre Sorunları ve Çözümleri",
+]);
+
+const aytFelsefe = course("ayt-felsefe", "Felsefe", [
+  "Felsefeyi Tanıma",
+  "Felsefe ile Düşünme",
+  "Varlık",
+  "Bilgi",
+  "Bilim",
+  "Ahlak",
+  "Din",
+  "Siyaset",
+  "Sanat",
+  "Felsefi Okuma ve Yazma",
+]);
+
+const aytPsikoloji = course("ayt-psikoloji", "Psikoloji", [
+  "Psikoloji Bilimini Tanıyalım",
+  "Temel Süreçler",
+  "Öğrenme",
+  "Bellek",
+  "Düşünme",
+  "Ruh Sağlığının Temelleri",
+]);
+
+const aytSosyoloji = course("ayt-sosyoloji", "Sosyoloji", [
+  "Sosyolojiye Giriş",
+  "Birey ve Toplum",
+  "Toplumsal Yapı, Değişme ve Gelişme",
+  "Toplum ve Kültür",
+  "Toplumsal Kurumlar",
+]);
+
+const aytMantik = course("ayt-mantik", "Mantık", [
+  "Mantığa Giriş",
+  "Klasik Mantık",
+  "Mantık ve Dil",
+  "Sembolik Mantık",
+]);
+
+const aytDin = course("ayt-din", "Din", [
+  "Allah-İnsan İlişkisi",
+  "Dünya ve Ahiret",
+  "Kur'an'a Göre Hz. Muhammed",
+  "Kur'an'da Bazı Kavramlar",
+  "Kur'an'dan Mesajlar",
+  "İnançla İlgili Meseleler",
+  "Yahudilik ve Hristiyanlık",
+  "İslam ve Bilim",
+  "Anadolu'da İslam",
+  "Tasavvufi Yorumlar ve Mezhepler",
+  "Güncel Dini Meseleler",
+  "Hint ve Çin Dinleri",
+]);
 
 export type Track = "sayisal" | "ea" | "sozel";
 
@@ -38,21 +495,19 @@ export const TRACK_LABELS: Record<Track, string> = {
   sozel: "Sözel",
 };
 
-// Kullanıcının mesajındaki örnekler kullanıldı (Sayısal, Sözel). Eşit
-// Ağırlık için hiç örnek verilmedi — tek PLACEHOLDER ders ile bekletiliyor.
-// Konu listelerinin tamamı PLACEHOLDER; kullanıcı "tam listeyi ben
-// vereceğim" dedi.
 export const AYT_COURSES_BY_TRACK: Record<Track, Course[]> = {
-  sayisal: [
-    course("ayt-say-matematik", "Matematik"),
-    course("ayt-say-fizik", "Fizik"),
-    course("ayt-say-kimya", "Kimya"),
-    course("ayt-say-biyoloji", "Biyoloji"),
-  ],
+  sayisal: [aytMatematik, geometriCourse("ayt-say-geometri"), aytFizik, aytKimya, aytBiyoloji],
+  ea: [aytMatematik, geometriCourse("ayt-ea-geometri"), aytEdebiyat, aytTarih1, aytCografya1],
   sozel: [
-    course("ayt-soz-edebiyat", "Edebiyat"),
-    course("ayt-soz-tarih1", "Tarih-1"),
-    course("ayt-soz-cografya1", "Coğrafya-1"),
+    aytEdebiyat,
+    aytTarih1,
+    aytCografya1,
+    aytTarih2,
+    aytCografya2,
+    aytFelsefe,
+    aytPsikoloji,
+    aytSosyoloji,
+    aytMantik,
+    aytDin,
   ],
-  ea: [course("ayt-ea-placeholder", "PLACEHOLDER Ders")],
 };
