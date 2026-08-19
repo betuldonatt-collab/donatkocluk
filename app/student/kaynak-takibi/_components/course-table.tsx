@@ -23,13 +23,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Course } from "../_data/courses";
+import { cn } from "@/lib/utils";
+import type { Course, Topic } from "../_data/courses";
 
 export type Resource = { id: string; name: string };
 export type ProgressMap = Record<string, { solved: boolean; reviewed: boolean }>;
 
 function progressKey(topicId: string, resourceId: string) {
   return `${topicId}::${resourceId}`;
+}
+
+type Row = { topic: Topic; unitLabel: string; unitRowSpan: number | null };
+
+// "-" (ünitesiz/bağımsız konu) satırları birleştirilmez — her biri kendi
+// tek satırlık "-" hücresini alır. Gerçek bir ünite adı olan gruplarda ise
+// ardışık konular tek bir rowSpan'lı hücrede birleşir.
+function flattenRows(course: Course): Row[] {
+  const rows: Row[] = [];
+  for (const group of course.units) {
+    if (group.unit === "-") {
+      for (const topic of group.topics) {
+        rows.push({ topic, unitLabel: "-", unitRowSpan: 1 });
+      }
+    } else {
+      group.topics.forEach((topic, i) => {
+        rows.push({ topic, unitLabel: group.unit, unitRowSpan: i === 0 ? group.topics.length : null });
+      });
+    }
+  }
+  return rows;
 }
 
 export function CourseTable({
@@ -56,6 +78,8 @@ export function CourseTable({
     setDialogOpen(false);
   }
 
+  const rows = flattenRows(course);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -69,6 +93,9 @@ export function CourseTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead rowSpan={2} className="w-12 align-bottom">
+                Ünite
+              </TableHead>
               <TableHead rowSpan={2} className="align-bottom">
                 Konu
               </TableHead>
@@ -94,26 +121,42 @@ export function CourseTable({
             )}
           </TableHeader>
           <TableBody>
-            {course.topics.map((topic) => (
-              <TableRow key={topic.id}>
-                <TableCell className="font-medium whitespace-normal">{topic.name}</TableCell>
+            {rows.map((row) => (
+              <TableRow key={row.topic.id}>
+                {row.unitRowSpan !== null && (
+                  <TableCell
+                    rowSpan={row.unitRowSpan}
+                    className={cn("border-r p-0 text-center align-middle", row.unitRowSpan === 1 && "text-muted-foreground")}
+                  >
+                    {row.unitLabel === "-" ? (
+                      "-"
+                    ) : (
+                      <div className="flex h-full items-center justify-center py-2">
+                        <span className="[writing-mode:vertical-rl] rotate-180 font-medium">
+                          {row.unitLabel}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
+                )}
+                <TableCell className="font-medium whitespace-normal">{row.topic.name}</TableCell>
                 {resources.map((resource) => {
-                  const key = progressKey(topic.id, resource.id);
+                  const key = progressKey(row.topic.id, resource.id);
                   const state = progress[key] ?? { solved: false, reviewed: false };
                   return (
                     <Fragment key={resource.id}>
                       <TableCell className="border-l text-center">
                         <Checkbox
                           checked={state.solved}
-                          onCheckedChange={() => onToggle(topic.id, resource.id, "solved")}
-                          aria-label={`${course.name} - ${topic.name} - ${resource.name} - Soru Çözümü`}
+                          onCheckedChange={() => onToggle(row.topic.id, resource.id, "solved")}
+                          aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Soru Çözümü`}
                         />
                       </TableCell>
                       <TableCell className="text-center">
                         <Checkbox
                           checked={state.reviewed}
-                          onCheckedChange={() => onToggle(topic.id, resource.id, "reviewed")}
-                          aria-label={`${course.name} - ${topic.name} - ${resource.name} - Yanlışlara Dönüş`}
+                          onCheckedChange={() => onToggle(row.topic.id, resource.id, "reviewed")}
+                          aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Yanlışlara Dönüş`}
                         />
                       </TableCell>
                     </Fragment>
