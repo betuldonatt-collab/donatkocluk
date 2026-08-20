@@ -197,9 +197,14 @@
               "2024": 2,
               "2025": 0
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-matematik-u2-t4",
+            "id": "ayt-matematik-u3-t0",
             "name": "Logaritma",
             "frequency": {
               "2018": 2,
@@ -213,7 +218,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t5",
+            "id": "ayt-matematik-u3-t1",
             "name": "Diziler",
             "frequency": {
               "2018": 1,
@@ -227,7 +232,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t6",
+            "id": "ayt-matematik-u3-t2",
             "name": "Limit ve Süreklilik",
             "frequency": {
               "2018": 2,
@@ -241,7 +246,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t7",
+            "id": "ayt-matematik-u3-t3",
             "name": "Türev",
             "frequency": {
               "2018": 3,
@@ -255,7 +260,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t8",
+            "id": "ayt-matematik-u3-t4",
             "name": "İntegral",
             "frequency": {
               "2018": 3,
@@ -339,9 +344,14 @@
               "2024": 1,
               "2025": 2
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-geometri-sayisal-u1-t2",
+            "id": "ayt-geometri-sayisal-u2-t0",
             "name": "Dönüşümler",
             "frequency": {
               "2018": 1,
@@ -360,7 +370,7 @@
         "unit": "Uzay Geometri",
         "topics": [
           {
-            "id": "ayt-geometri-sayisal-u2-t0",
+            "id": "ayt-geometri-sayisal-u3-t0",
             "name": "Katı Cisimler",
             "frequency": {
               "2018": 1,
@@ -645,9 +655,14 @@
               "2024": 1,
               "2025": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-fizik-u2-t4",
+            "id": "ayt-fizik-u3-t0",
             "name": "Basit Harmonik Hareket",
             "frequency": {
               "2018": 1,
@@ -661,7 +676,7 @@
             }
           },
           {
-            "id": "ayt-fizik-u2-t5",
+            "id": "ayt-fizik-u3-t1",
             "name": "Dalga Mekaniği",
             "frequency": {
               "2018": 2,
@@ -675,7 +690,7 @@
             }
           },
           {
-            "id": "ayt-fizik-u2-t6",
+            "id": "ayt-fizik-u3-t2",
             "name": "Atom Fiziğine Giriş ve Radyoaktivite",
             "frequency": {
               "2018": 1,
@@ -689,7 +704,7 @@
             }
           },
           {
-            "id": "ayt-fizik-u2-t7",
+            "id": "ayt-fizik-u3-t3",
             "name": "Modern Fizik",
             "frequency": {
               "2018": 1,
@@ -703,7 +718,7 @@
             }
           },
           {
-            "id": "ayt-fizik-u2-t8",
+            "id": "ayt-fizik-u3-t4",
             "name": "Modern Fiziğin Teknolojideki Uygulamaları",
             "frequency": {
               "2018": 0,
@@ -768,9 +783,14 @@
               "2024": 0,
               "2025": 0
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-kimya-u0-t3",
+            "id": "ayt-kimya-u1-t0",
             "name": "Gazlar",
             "frequency": {
               "2018": 1,
@@ -789,7 +809,7 @@
         "unit": "Sıvı Çözeltiler ve Çözünürlük",
         "topics": [
           {
-            "id": "ayt-kimya-u1-t0",
+            "id": "ayt-kimya-u2-t0",
             "name": "Derişim Birimleri",
             "frequency": {
               "2018": 1,
@@ -803,7 +823,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u1-t1",
+            "id": "ayt-kimya-u2-t1",
             "name": "Koligatif Özellikler",
             "frequency": {
               "2018": 0,
@@ -817,7 +837,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u1-t2",
+            "id": "ayt-kimya-u2-t2",
             "name": "Çözünürlük",
             "frequency": {
               "2018": 0,
@@ -836,7 +856,7 @@
         "unit": "Kimyasal Tepkimelerde Enerji",
         "topics": [
           {
-            "id": "ayt-kimya-u2-t0",
+            "id": "ayt-kimya-u3-t0",
             "name": "Tepkimelerde Isı Değişimi",
             "frequency": {
               "2018": 0,
@@ -850,7 +870,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u2-t1",
+            "id": "ayt-kimya-u3-t1",
             "name": "Oluşum Entalpisi",
             "frequency": {
               "2018": 0,
@@ -864,7 +884,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u2-t2",
+            "id": "ayt-kimya-u3-t2",
             "name": "Tepkime Isılarının Toplanabilirliği",
             "frequency": {
               "2018": 0,
@@ -883,7 +903,7 @@
         "unit": "Denge",
         "topics": [
           {
-            "id": "ayt-kimya-u3-t0",
+            "id": "ayt-kimya-u4-t0",
             "name": "Kimyasal Denge",
             "frequency": {
               "2018": 0,
@@ -897,7 +917,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u3-t1",
+            "id": "ayt-kimya-u4-t1",
             "name": "Dengeyi Etkileyen Faktörler",
             "frequency": {
               "2018": 0,
@@ -911,7 +931,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u3-t2",
+            "id": "ayt-kimya-u4-t2",
             "name": "Sulu Çözelti Dengeleri",
             "frequency": {
               "2018": 1,
@@ -930,7 +950,7 @@
         "unit": "Kimya ve Elektrik",
         "topics": [
           {
-            "id": "ayt-kimya-u4-t0",
+            "id": "ayt-kimya-u5-t0",
             "name": "İndirgenme - Yükseltgenme Tepkimelerinde Elektrik Akımı",
             "frequency": {
               "2018": 0,
@@ -944,7 +964,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u4-t1",
+            "id": "ayt-kimya-u5-t1",
             "name": "Elektrotlar ve Elektrokimyasal Hücreler",
             "frequency": {
               "2018": 1,
@@ -958,7 +978,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u4-t2",
+            "id": "ayt-kimya-u5-t2",
             "name": "Elektrot Potansiyelleri",
             "frequency": {
               "2018": 1,
@@ -972,7 +992,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u4-t3",
+            "id": "ayt-kimya-u5-t3",
             "name": "Elektroliz",
             "frequency": {
               "2018": 0,
@@ -986,7 +1006,7 @@
             }
           },
           {
-            "id": "ayt-kimya-u4-t4",
+            "id": "ayt-kimya-u5-t4",
             "name": "Korozyon",
             "frequency": {
               "2018": 0,
@@ -1005,7 +1025,7 @@
         "unit": "Organik Kimya",
         "topics": [
           {
-            "id": "ayt-kimya-u5-t0",
+            "id": "ayt-kimya-u6-t0",
             "name": "Karbon Kimyasına Giriş",
             "frequency": {
               "2018": 2,
@@ -1019,27 +1039,27 @@
             }
           },
           {
-            "id": "ayt-kimya-u5-t1",
+            "id": "ayt-kimya-u6-t1",
             "name": "Hirokarbonlar"
           },
           {
-            "id": "ayt-kimya-u5-t2",
+            "id": "ayt-kimya-u6-t2",
             "name": "Fonksiyonel Gruplar"
           },
           {
-            "id": "ayt-kimya-u5-t3",
+            "id": "ayt-kimya-u6-t3",
             "name": "Alkoller - Eterler"
           },
           {
-            "id": "ayt-kimya-u5-t4",
+            "id": "ayt-kimya-u6-t4",
             "name": "Karbonil Bileşikleri"
           },
           {
-            "id": "ayt-kimya-u5-t5",
+            "id": "ayt-kimya-u6-t5",
             "name": "Karboksilik Asitler"
           },
           {
-            "id": "ayt-kimya-u5-t6",
+            "id": "ayt-kimya-u6-t6",
             "name": "Esterler"
           }
         ]
@@ -1158,9 +1178,14 @@
               "2024": 0,
               "2025": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-biyoloji-u0-t9",
+            "id": "ayt-biyoloji-u1-t0",
             "name": "Komünite ve Popülasyon Eklojisi",
             "frequency": {
               "2018": 1,
@@ -1179,7 +1204,7 @@
         "unit": "Genden Proteine",
         "topics": [
           {
-            "id": "ayt-biyoloji-u1-t0",
+            "id": "ayt-biyoloji-u2-t0",
             "name": "Nükleik Asitlerin Keşfi ve Önemi",
             "frequency": {
               "2018": 1,
@@ -1193,7 +1218,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u1-t1",
+            "id": "ayt-biyoloji-u2-t1",
             "name": "Genetik Şifre ve Protein Sentezi",
             "frequency": {
               "2018": 1,
@@ -1212,7 +1237,7 @@
         "unit": "Canlılarda Enerji Dönüşümleri",
         "topics": [
           {
-            "id": "ayt-biyoloji-u2-t0",
+            "id": "ayt-biyoloji-u3-t0",
             "name": "Canlılık ve Enerji",
             "frequency": {
               "2018": 0,
@@ -1226,7 +1251,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u2-t1",
+            "id": "ayt-biyoloji-u3-t1",
             "name": "Fotosentez",
             "frequency": {
               "2018": 1,
@@ -1240,7 +1265,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u2-t2",
+            "id": "ayt-biyoloji-u3-t2",
             "name": "Kemosentez",
             "frequency": {
               "2018": 0,
@@ -1254,7 +1279,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u2-t3",
+            "id": "ayt-biyoloji-u3-t3",
             "name": "Hücresel Solunum",
             "frequency": {
               "2018": 1,
@@ -1273,7 +1298,7 @@
         "unit": "Bitki Biyolojisi",
         "topics": [
           {
-            "id": "ayt-biyoloji-u3-t0",
+            "id": "ayt-biyoloji-u4-t0",
             "name": "Bitkilerin Yapısı",
             "frequency": {
               "2018": 1,
@@ -1286,7 +1311,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u3-t1",
+            "id": "ayt-biyoloji-u4-t1",
             "name": "Bitkilerde Madde Taşınması",
             "frequency": {
               "2018": 0,
@@ -1300,7 +1325,7 @@
             }
           },
           {
-            "id": "ayt-biyoloji-u3-t2",
+            "id": "ayt-biyoloji-u4-t2",
             "name": "Bitkilerde Eşeyli Üreme",
             "frequency": {
               "2018": 1,
@@ -1312,9 +1337,14 @@
               "2024": 0,
               "2025": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-biyoloji-u3-t3",
+            "id": "ayt-biyoloji-u5-t0",
             "name": "Canılar ve Çevre",
             "frequency": {
               "2018": 1,

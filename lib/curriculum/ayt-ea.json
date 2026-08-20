@@ -153,9 +153,14 @@
           {
             "id": "ayt-edebiyat-u2-t3",
             "name": "Divan Edebiyatı Sanatçıları"
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-edebiyat-u2-t4",
+            "id": "ayt-edebiyat-u3-t0",
             "name": "Tanzimat Dönemi Türk Edebiyatı",
             "frequency": {
               "2018": 2,
@@ -169,7 +174,7 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u2-t5",
+            "id": "ayt-edebiyat-u3-t1",
             "name": "Servetifünun Dönemi Türk Edebiyatı",
             "frequency": {
               "2018": 1,
@@ -182,7 +187,7 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u2-t6",
+            "id": "ayt-edebiyat-u3-t2",
             "name": "Fecriati Dönemi Türk Edebiyatı"
           }
         ]
@@ -191,7 +196,7 @@
         "unit": "Milli Edebiyat",
         "topics": [
           {
-            "id": "ayt-edebiyat-u3-t0",
+            "id": "ayt-edebiyat-u4-t0",
             "name": "Milli Edebiyat Şiiri",
             "frequency": {
               "2018": 1,
@@ -202,32 +207,32 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u3-t1",
+            "id": "ayt-edebiyat-u4-t1",
             "name": "Milli Edebiyat Roman ve Hikayesi"
           },
           {
-            "id": "ayt-edebiyat-u3-t2",
+            "id": "ayt-edebiyat-u4-t2",
             "name": "Beş Hececiler"
           },
           {
-            "id": "ayt-edebiyat-u3-t3",
+            "id": "ayt-edebiyat-u4-t3",
             "name": "Dönem Sanatçıları"
           },
           {
-            "id": "ayt-edebiyat-u3-t4",
+            "id": "ayt-edebiyat-u4-t4",
             "name": "Bağımsız Sanatçılar"
           },
           {
-            "id": "ayt-edebiyat-u3-t5",
+            "id": "ayt-edebiyat-u4-t5",
             "name": "Öğretici Metinler"
           }
         ]
       },
       {
-        "unit": "Cumhuriyet Edebiyatı",
+        "unit": "Cumhuriyet Şiiri",
         "topics": [
           {
-            "id": "ayt-edebiyat-u4-t0",
+            "id": "ayt-edebiyat-u5-t0",
             "name": "Saf (Öz) Şiir",
             "frequency": {
               "2018": 5,
@@ -241,39 +246,39 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u4-t1",
+            "id": "ayt-edebiyat-u5-t1",
             "name": "Yedi Meşaleciler"
           },
           {
-            "id": "ayt-edebiyat-u4-t2",
+            "id": "ayt-edebiyat-u5-t2",
             "name": "Toplumcu Eğilimi Yansıtan Şiir"
           },
           {
-            "id": "ayt-edebiyat-u4-t3",
+            "id": "ayt-edebiyat-u5-t3",
             "name": "Milli Edebiyat Zevk ve Anlayışını Sürdüren Şiir"
           },
           {
-            "id": "ayt-edebiyat-u4-t4",
+            "id": "ayt-edebiyat-u5-t4",
             "name": "Garip Hareketi"
           },
           {
-            "id": "ayt-edebiyat-u4-t5",
+            "id": "ayt-edebiyat-u5-t5",
             "name": "İkinci Yeni Şiiri"
           },
           {
-            "id": "ayt-edebiyat-u4-t6",
+            "id": "ayt-edebiyat-u5-t6",
             "name": "Dini Değerleri, Geleneksel Duyarlığı ve Metafizik Anlayışı Öne Çıkaran Modern Şiir"
           },
           {
-            "id": "ayt-edebiyat-u4-t7",
+            "id": "ayt-edebiyat-u5-t7",
             "name": "1960 Sonrası Toplumcu Eğilimleri Yansıtan Şiir"
           },
           {
-            "id": "ayt-edebiyat-u4-t8",
+            "id": "ayt-edebiyat-u5-t8",
             "name": "1960 Sonrası Türk Şiiri"
           },
           {
-            "id": "ayt-edebiyat-u4-t9",
+            "id": "ayt-edebiyat-u5-t9",
             "name": "Cumhuriyet Sonrası Halk Şiiri"
           }
         ]
@@ -282,19 +287,19 @@
         "unit": "Cumhuriyet Hikayesi",
         "topics": [
           {
-            "id": "ayt-edebiyat-u5-t0",
+            "id": "ayt-edebiyat-u6-t0",
             "name": "Bireyin İç Dünyasını Esas Alan Hikaye"
           },
           {
-            "id": "ayt-edebiyat-u5-t1",
+            "id": "ayt-edebiyat-u6-t1",
             "name": "Toplumcu Gerçekçi Hikaye"
           },
           {
-            "id": "ayt-edebiyat-u5-t2",
+            "id": "ayt-edebiyat-u6-t2",
             "name": "Milli - Dini Duyarlılığı Yansıtan Hikaye"
           },
           {
-            "id": "ayt-edebiyat-u5-t3",
+            "id": "ayt-edebiyat-u6-t3",
             "name": "Modernist Hikaye"
           }
         ]
@@ -303,31 +308,36 @@
         "unit": "Cumhuriyet Romanı",
         "topics": [
           {
-            "id": "ayt-edebiyat-u6-t0",
+            "id": "ayt-edebiyat-u7-t0",
             "name": "Milli - Dini Duyarlılığı Yansıtan Roman"
           },
           {
-            "id": "ayt-edebiyat-u6-t1",
+            "id": "ayt-edebiyat-u7-t1",
             "name": "Bireyin İç Dünyasını Esas Alan Roman"
           },
           {
-            "id": "ayt-edebiyat-u6-t2",
+            "id": "ayt-edebiyat-u7-t2",
             "name": "Toplumcu Gerçekçi Roman"
           },
           {
-            "id": "ayt-edebiyat-u6-t3",
+            "id": "ayt-edebiyat-u7-t3",
             "name": "Modernist Roman"
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-edebiyat-u6-t4",
+            "id": "ayt-edebiyat-u8-t0",
             "name": "Cumhuriyet Dönemi Türk Tiyatrosu"
           },
           {
-            "id": "ayt-edebiyat-u6-t5",
+            "id": "ayt-edebiyat-u8-t1",
             "name": "Cumhuriyet Dönemi Öğretici Metinler"
           },
           {
-            "id": "ayt-edebiyat-u6-t6",
+            "id": "ayt-edebiyat-u8-t2",
             "name": "Geleneksel Türk Tiyatrosu",
             "frequency": {
               "2019": 1,
@@ -337,7 +347,7 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u6-t7",
+            "id": "ayt-edebiyat-u8-t3",
             "name": "Masal / Fabl / Destan / Halk Hikayesi",
             "frequency": {
               "2018": 1,
@@ -350,7 +360,7 @@
             }
           },
           {
-            "id": "ayt-edebiyat-u6-t8",
+            "id": "ayt-edebiyat-u8-t4",
             "name": "Edebi Akımlar",
             "frequency": {
               "2018": 1,
@@ -522,9 +532,14 @@
               "2020": 1,
               "2022": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-tarih-1-u6-t2",
+            "id": "ayt-tarih-1-u7-t0",
             "name": "Devletleşme Sürecinde Savaşçılar ve Askerler",
             "frequency": {
               "2018": 1,
@@ -532,7 +547,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u6-t3",
+            "id": "ayt-tarih-1-u7-t1",
             "name": "Dünya Gücü Osmanlı",
             "frequency": {
               "2018": 1,
@@ -540,21 +555,21 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u6-t4",
+            "id": "ayt-tarih-1-u7-t2",
             "name": "Sultan ve Osmanlı Merkez Teşkilatı",
             "frequency": {
               "2022": 1
             }
           },
           {
-            "id": "ayt-tarih-1-u6-t5",
+            "id": "ayt-tarih-1-u7-t3",
             "name": "Değişim Çağında Avrupa ve Osmanlı",
             "frequency": {
               "2021": 1
             }
           },
           {
-            "id": "ayt-tarih-1-u6-t6",
+            "id": "ayt-tarih-1-u7-t4",
             "name": "Devrimler Çağında Değişen Devlet - Toplum İlişkileri",
             "frequency": {
               "2024": 1
@@ -566,22 +581,27 @@
         "unit": "Uluslararası İlişkilerde Denge Stratejisi",
         "topics": [
           {
-            "id": "ayt-tarih-1-u7-t0",
+            "id": "ayt-tarih-1-u8-t0",
             "name": "Osmanlı Devletine Yönelik Tehditler",
             "frequency": {
               "2021": 1
             }
           },
           {
-            "id": "ayt-tarih-1-u7-t1",
+            "id": "ayt-tarih-1-u8-t1",
             "name": "Osmanlı Devletinde Demokratikleşme Hareketleri",
             "frequency": {
               "2023": 1,
               "2025": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-tarih-1-u7-t2",
+            "id": "ayt-tarih-1-u9-t0",
             "name": "XIX. ve XX. Yüzyılda Değişen Sosyoekonomik Hayat",
             "frequency": {
               "2019": 1,
@@ -594,14 +614,14 @@
         "unit": "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
         "topics": [
           {
-            "id": "ayt-tarih-1-u8-t0",
+            "id": "ayt-tarih-1-u10-t0",
             "name": "Mustafa Kemal'in Lider Olarak Yetişmesinde Etkili Koşullar",
             "frequency": {
               "2018": 1
             }
           },
           {
-            "id": "ayt-tarih-1-u8-t1",
+            "id": "ayt-tarih-1-u10-t1",
             "name": "I. Dünya Savaşı Sürecinde Osmanlı Devleti",
             "frequency": {
               "2019": 1,
@@ -612,7 +632,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u8-t2",
+            "id": "ayt-tarih-1-u10-t2",
             "name": "I. Dünya Savaşı'nın Sonuçları",
             "frequency": {
               "2021": 1
@@ -624,7 +644,7 @@
         "unit": "Milli Mücadele",
         "topics": [
           {
-            "id": "ayt-tarih-1-u9-t0",
+            "id": "ayt-tarih-1-u11-t0",
             "name": "Milli Mücadeleye Hazırlık Dönemi",
             "frequency": {
               "2018": 1,
@@ -637,7 +657,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u9-t1",
+            "id": "ayt-tarih-1-u11-t1",
             "name": "Doğu ve Güney Cepheleri ile Bu Cephelerde Öne Çıkan Şahsiyetler",
             "frequency": {
               "2019": 1,
@@ -645,7 +665,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u9-t2",
+            "id": "ayt-tarih-1-u11-t2",
             "name": "Batı Cephesi ve Bu Cephede Öne Çıkan Şahsiyetler",
             "frequency": {
               "2018": 1,
@@ -657,7 +677,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u9-t3",
+            "id": "ayt-tarih-1-u11-t3",
             "name": "Milli Mücadelenin Sona Ermesi ve Lozan Barış Antlaşması",
             "frequency": {
               "2023": 1
@@ -669,7 +689,7 @@
         "unit": "Atatürkçülük ve Türk İnkılabı",
         "topics": [
           {
-            "id": "ayt-tarih-1-u10-t0",
+            "id": "ayt-tarih-1-u12-t0",
             "name": "Atatürk İlkeleri",
             "frequency": {
               "2018": 1,
@@ -677,7 +697,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u10-t1",
+            "id": "ayt-tarih-1-u12-t1",
             "name": "Siyasi Alandaki Gelişmeler",
             "frequency": {
               "2020": 1,
@@ -685,7 +705,7 @@
             }
           },
           {
-            "id": "ayt-tarih-1-u10-t2",
+            "id": "ayt-tarih-1-u12-t2",
             "name": "Toplumsal Alandaki İnkılaplar",
             "frequency": {
               "2024": 1
@@ -697,14 +717,19 @@
         "unit": "İki Savaş Arası Dönemde Türkiye ve Dünya",
         "topics": [
           {
-            "id": "ayt-tarih-1-u11-t0",
+            "id": "ayt-tarih-1-u13-t0",
             "name": "Atatürk Dönemi Dış Politikası",
             "frequency": {
               "2025": 1
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-tarih-1-u11-t1",
+            "id": "ayt-tarih-1-u14-t0",
             "name": "II. Dünya Savaşı Sürecinde Türkiye ve Dünya",
             "frequency": {
               "2023": 1
@@ -1074,9 +1099,14 @@
               "2023": 1,
               "2024": 2
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-matematik-u2-t4",
+            "id": "ayt-matematik-u3-t0",
             "name": "Logaritma",
             "frequency": {
               "2018": 2,
@@ -1090,7 +1120,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t5",
+            "id": "ayt-matematik-u3-t1",
             "name": "Diziler",
             "frequency": {
               "2018": 1,
@@ -1104,7 +1134,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t6",
+            "id": "ayt-matematik-u3-t2",
             "name": "Limit ve Süreklilik",
             "frequency": {
               "2018": 2,
@@ -1116,7 +1146,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t7",
+            "id": "ayt-matematik-u3-t3",
             "name": "Türev",
             "frequency": {
               "2018": 3,
@@ -1128,7 +1158,7 @@
             }
           },
           {
-            "id": "ayt-matematik-u2-t8",
+            "id": "ayt-matematik-u3-t4",
             "name": "İntegral",
             "frequency": {
               "2018": 3,
@@ -1210,9 +1240,14 @@
               "2024": 1,
               "2025": 2
             }
-          },
+          }
+        ]
+      },
+      {
+        "unit": "-",
+        "topics": [
           {
-            "id": "ayt-geometri-ea-u1-t2",
+            "id": "ayt-geometri-ea-u2-t0",
             "name": "Dönüşümler",
             "frequency": {
               "2018": 1,
@@ -1231,7 +1266,7 @@
         "unit": "Uzay Geometri",
         "topics": [
           {
-            "id": "ayt-geometri-ea-u2-t0",
+            "id": "ayt-geometri-ea-u3-t0",
             "name": "Katı Cisimler",
             "frequency": {
               "2018": 1,

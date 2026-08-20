@@ -184,6 +184,148 @@ function stripPrefix(courses) {
   return courses.map(({ id, name, units }) => ({ id, name, units }));
 }
 
+// The source sheets only mark a unit's name on its first row and leave the
+// column blank on every continuation row (a manual rowspan) — which is
+// genuinely ambiguous where a *second*, unrelated block of topics follows
+// with no unit name of its own: nothing in the row data distinguishes
+// "still part of the named unit above" from "an unnamed block that just
+// happens to come next". A handful of spots parse as one oversized unit
+// as a result. These boundaries were confirmed against the previously
+// hand-verified course data, so they're corrected explicitly here rather
+// than guessed at structurally.
+function splitUnitAt(course, unitName, splitIndex) {
+  const idx = course.units.findIndex((u) => u.unit === unitName);
+  if (idx === -1) throw new Error(`splitUnitAt: no unit "${unitName}" in ${course.id}`);
+  const unit = course.units[idx];
+  if (unit.topics.length <= splitIndex) return; // already short enough — no-op
+  const head = { unit: unit.unit, topics: unit.topics.slice(0, splitIndex) };
+  const tail = { unit: "-", topics: unit.topics.slice(splitIndex) };
+  course.units.splice(idx, 1, head, tail);
+  // Topic ids encode their unit index (u{ui}-t{ti}); renumber every unit
+  // from here on so ids stay internally consistent after the split.
+  course.units = course.units.map((u, ui) => ({
+    unit: u.unit,
+    topics: u.topics.map((t, ti) => ({ ...t, id: `${course.id}-u${ui}-t${ti}` })),
+  }));
+}
+
+// Every boundary below was hand-verified against the source workbooks and
+// given as an explicit ground-truth mapping — not re-derived structurally.
+const UNIT_SPLIT_CORRECTIONS = {
+  "tyt-turkce": [
+    ["Anlam Bilgisi", 3],
+    ["Fiiller", 5],
+  ],
+  "tyt-matematik": [["Problemler", 8]],
+  "ayt-matematik": [["Trigonometri", 4]],
+  "ayt-geometri": [["Analitik Geometri", 2]],
+  "ayt-fizik": [["Çembersel Hareket", 4]],
+  "ayt-kimya": [["Modern Atom Teorisi", 3]],
+  "ayt-biyoloji": [
+    ["İnsan Fizyolojisi", 9],
+    ["Bitki Biyolojisi", 3],
+  ],
+  "ayt-edebiyat": [
+    ["Divan Edebiyatı", 4],
+    ["Cumhuriyet Romanı", 4],
+  ],
+  "ayt-tarih-1": [
+    ["Beylikten Devlete Osmanlı Siyaseti", 2],
+    ["Uluslararası İlişkilerde Denge Stratejisi", 2],
+    ["İki Savaş Arası Dönemde Türkiye ve Dünya", 1],
+  ],
+};
+
+// A unit that just carries the wrong name (no boundary problem) — the
+// source's actual label for this 10-topic poetry cluster is "Cumhuriyet
+// Şiiri"; the parser picked up "Cumhuriyet Edebiyatı" instead.
+const UNIT_RENAME_CORRECTIONS = {
+  "ayt-edebiyat": [["Cumhuriyet Edebiyatı", "Cumhuriyet Şiiri"]],
+};
+
+function renameUnit(course, oldName, newName) {
+  const unit = course.units.find((u) => u.unit === oldName);
+  if (!unit) throw new Error(`renameUnit: no unit "${oldName}" in ${course.id}`);
+  unit.unit = newName;
+}
+
+function applyUnitSplitCorrections(course) {
+  for (const [unitName, splitIndex] of UNIT_SPLIT_CORRECTIONS[course.id] ?? []) {
+    splitUnitAt(course, unitName, splitIndex);
+  }
+  for (const [oldName, newName] of UNIT_RENAME_CORRECTIONS[course.id] ?? []) {
+    renameUnit(course, oldName, newName);
+  }
+  return course;
+}
+
+// Frequency-only patch — orthogonal to the unit/grouping corrections above
+// and must stay that way: this never adds, removes, renames, or reorders a
+// unit or topic, it only fills in the per-year question-count numbers for
+// topics that already exist. These four courses (AYT Felsefe/Psikoloji/
+// Sosyoloji/Mantık — the "AYT Felsefe Grubu" section of the Sözel sheet)
+// sit in a part of the source sheet where the year-column header detection
+// found nothing, so every topic parsed with no frequency at all. Values
+// below were hand-transcribed from the source workbook and are given in
+// PAST_QUESTION_YEARS order: [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018].
+const OVERRIDE_YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
+
+const FREQUENCY_OVERRIDES = {
+  "ayt-felsefe": {
+    "Felsefeyi Tanıma": [1, 1, 1, 2, 0, 0, 1, 0],
+    "Felsefe ile Düşünme": [0, 1, 0, 0, 0, 0, 0, 0],
+    "Varlık Felsefesi": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Bilgi Felsefesi": [0, 1, 0, 1, 1, 0, 1, 0],
+    "Bilim Felsefesi": [0, 0, 0, 0, 0, 0, 0, 1],
+    "Ahlak Felsefesi": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Din Felsefesi": [0, 1, 0, 0, 0, 0, 0, 0],
+    "Siyaset Felsefesi": [0, 0, 1, 0, 0, 0, 1, 0],
+    "Sanat Felsefesi": [1, 1, 0, 0, 0, 0, 1, 1],
+    "Felsefi Okuma ve Yazma": [0, 0, 1, 0, 0, 0, 0, 0],
+  },
+  "ayt-psikoloji": {
+    "Psikoloji Bilimini Tanıyalım": [1, 1, 1, 2, 1, 2, 1, 1],
+    "Psikolojinin Temel Süreçleri": [1, 1, 2, 1, 1, 2, 1, 1],
+    "Öğrenme, Bellek, Düşünme": [1, 1, 0, 1, 1, 0, 1, 1],
+    "Ruh Sağlığının Temelleri": [1, 1, 1, 1, 0, 0, 1, 1],
+  },
+  "ayt-sosyoloji": {
+    "Sosyolojiye Giriş": [1, 2, 1, 1, 1, 0, 1, 0],
+    "Birey ve Toplum": [1, 2, 2, 1, 1, 1, 3, 1],
+    "Toplumsal Yapı": [1, 0, 1, 0, 0, 2, 0, 1],
+    "Toplumsal Değişme ve Gelişme": [1, 1, 1, 1, 2, 1, 0, 1],
+    "Toplum ve Kültür": [0, 0, 0, 1, 1, 0, 0, 1],
+    "Toplumsal Kurumlar": [1, 0, 0, 1, 0, 1, 1, 1],
+  },
+  "ayt-mantik": {
+    "Mantığa Giriş": [1, 1, 2, 1, 1, 2, 2, 2],
+    "Klasik Mantık": [1, 2, 2, 1, 1, 2, 0, 1],
+    "Mantık ve Dil": [1, 0, 0, 0, 1, 0, 0, 0],
+    "Sembolik Mantık": [1, 1, 0, 2, 1, 0, 2, 1],
+  },
+};
+
+function applyFrequencyOverrides(course) {
+  const overrides = FREQUENCY_OVERRIDES[course.id];
+  if (!overrides) return course;
+
+  const remaining = new Set(Object.keys(overrides));
+  for (const unit of course.units) {
+    for (const topic of unit.topics) {
+      const values = overrides[topic.name];
+      if (!values) continue;
+      remaining.delete(topic.name);
+      topic.frequency = Object.fromEntries(OVERRIDE_YEARS.map((year, i) => [year, values[i]]));
+    }
+  }
+  if (remaining.size > 0) {
+    throw new Error(
+      `applyFrequencyOverrides: ${course.id} has no topic matching: ${[...remaining].join(", ")}`,
+    );
+  }
+  return course;
+}
+
 // Regenerates topic ids from a course's own id so a clone (see below) gets
 // ids namespaced to itself instead of reusing the source course's ids.
 function withId(course, id) {
@@ -220,11 +362,14 @@ const sozelWb = loadWorkbook("Mezun Sözel - Taslak Dosyası.xlsx");
 // — neither AYT Kaynak Takibi sheet (Sayısal or EA) repeats it. It applies
 // to both tracks, so it's cloned into each below rather than parsed twice.
 const tytSheetCourses = parseKaynakTakibiSheet(sayisalWb.Sheets["TYT Kaynak Takibi"]);
-const tytCourses = stripPrefix(tytSheetCourses.filter((c) => c.prefix === "tyt"));
-const sharedAytGeometri = tytSheetCourses.find((c) => c.prefix === "ayt");
-if (!sharedAytGeometri) {
+const tytCourses = stripPrefix(tytSheetCourses.filter((c) => c.prefix === "tyt")).map(
+  applyUnitSplitCorrections,
+);
+const sharedAytGeometriRaw = tytSheetCourses.find((c) => c.prefix === "ayt");
+if (!sharedAytGeometriRaw) {
   throw new Error("Expected an AYT Geometri block inside the TYT Kaynak Takibi sheet");
 }
+const sharedAytGeometri = applyUnitSplitCorrections(sharedAytGeometriRaw);
 
 function withGeometri(courses) {
   const matIndex = courses.findIndex((c) => /matemat/i.test(c.name));
@@ -234,11 +379,17 @@ function withGeometri(courses) {
 }
 
 // ---- AYT per track ----
-const aytSayisal = withGeometri(parseKaynakTakibiSheet(sayisalWb.Sheets["AYT Kaynak Takibi"]));
-const aytEa = withGeometri(parseKaynakTakibiSheet(eaWb.Sheets["AYT Kaynak Takibi"]));
+const aytSayisal = withGeometri(
+  parseKaynakTakibiSheet(sayisalWb.Sheets["AYT Kaynak Takibi"]).map(applyUnitSplitCorrections),
+);
+const aytEa = withGeometri(
+  parseKaynakTakibiSheet(eaWb.Sheets["AYT Kaynak Takibi"]).map(applyUnitSplitCorrections),
+);
 const aytSozel = [
-  ...parseKaynakTakibiSheet(sozelWb.Sheets["AYT SOS 1 Kaynak Takibi"]),
-  ...parseKaynakTakibiSheet(sozelWb.Sheets["AYT SOS 2 Kaynak Takibi"]),
+  ...parseKaynakTakibiSheet(sozelWb.Sheets["AYT SOS 1 Kaynak Takibi"]).map(applyUnitSplitCorrections),
+  ...parseKaynakTakibiSheet(sozelWb.Sheets["AYT SOS 2 Kaynak Takibi"])
+    .map(applyUnitSplitCorrections)
+    .map(applyFrequencyOverrides),
 ];
 
 const trackCourseLists = disambiguateAcrossTracks({

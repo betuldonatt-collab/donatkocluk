@@ -12,47 +12,96 @@ import type { Course, Topic } from "@/lib/curriculum";
 
 export const PAST_QUESTION_YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
 
-// Some multi-topic clusters in the source spreadsheets track ONE combined
-// question count for the whole cluster rather than one per sub-topic (a
-// merged-cell pattern in the original Excel, or simply how these
-// sub-topics are conventionally studied/tested as a unit). Showing each
-// sub-topic's number separately would either repeat one aggregate as if
-// it belonged to a single sub-topic, or fragment a genuinely-combined
-// concept — so these listed topic ids get summed and shown as one
-// spanning cell instead of one row each. Every other topic renders
-// individually, unchanged.
-const FREQUENCY_GROUPS: Record<string, string[][]> = {
-  "tyt-turkce": [
-    ["tyt-turkce-u0-t0", "tyt-turkce-u0-t1", "tyt-turkce-u0-t2"], // Anlam Bilgisi (first 3)
-    [
-      "tyt-turkce-u2-t0",
-      "tyt-turkce-u2-t1",
-      "tyt-turkce-u2-t2",
-      "tyt-turkce-u2-t3",
-      "tyt-turkce-u2-t4",
-    ], // Fiiller (5, starting from Fiillerde Kip ve Kişi)
+// Explicit, hand-verified source of truth for which (course, unit) pairs
+// get a single spanning question-count total instead of one number per
+// sub-topic. Nothing here is derived or guessed from course.units at
+// render time — every boundary was confirmed against the source workbooks.
+// A course with no entry here (TYT Kimya/Tarih/Felsefe/Din, AYT Tarih 2/
+// Psikoloji/Sosyoloji/Mantık/Din, ...) renders fully flat regardless of
+// whatever unit labels its curriculum data happens to carry.
+//
+// "*" = every named (non-"-") unit in this course is a group — used for
+// courses confirmed to be grouped end to end, with no flat leftover
+// topics (TYT Geometri/Biyoloji/Coğrafya, AYT Coğrafya 1/2).
+//
+// Everywhere else, an explicit unit-name list — a course can be a MIX of
+// grouped units and flat individual topics, so only the units named here
+// span; every other topic in that same course still renders as its own
+// row. The underlying unit boundaries these names resolve against were
+// corrected in scripts/parse-curriculum.mjs (splitUnitAt/renameUnit) to
+// match this exact mapping, so the Ünite column's rowSpan and the
+// frequency total's rowSpan always cover the same rows.
+const FREQUENCY_GROUP_UNITS: Record<string, "*" | string[]> = {
+  "tyt-turkce": ["Anlam Bilgisi", "İsim Soylu Sözcükler", "Fiiller"],
+  "tyt-matematik": ["Problemler"],
+  "tyt-geometri": "*",
+  "tyt-fizik": ["Dalgalar", "Optik"],
+  "tyt-biyoloji": "*",
+  "tyt-cografya": "*",
+  "ayt-matematik-sayisal": ["Sayma ve Olasılık", "Trigonometri"],
+  "ayt-matematik-ea": ["Sayma ve Olasılık", "Trigonometri"],
+  "ayt-geometri-sayisal": ["Geometri", "Analitik Geometri", "Uzay Geometri"],
+  "ayt-geometri-ea": ["Geometri", "Analitik Geometri", "Uzay Geometri"],
+  "ayt-fizik": ["Kuvvet ve Hareket", "Elektrik ve Manyetizma", "Çembersel Hareket"],
+  "ayt-kimya": [
+    "Modern Atom Teorisi",
+    "Sıvı Çözeltiler ve Çözünürlük",
+    "Kimyasal Tepkimelerde Enerji",
+    "Denge",
+    "Kimya ve Elektrik",
+    "Organik Kimya",
   ],
-  "tyt-matematik": [
-    [
-      "tyt-matematik-u1-t0",
-      "tyt-matematik-u1-t1",
-      "tyt-matematik-u1-t2",
-      "tyt-matematik-u1-t3",
-      "tyt-matematik-u1-t4",
-      "tyt-matematik-u1-t5",
-      "tyt-matematik-u1-t6",
-      "tyt-matematik-u1-t7",
-    ], // Problemler (Sayı-Kesir .. Rutin Olmayan Problemler)
+  "ayt-biyoloji": [
+    "İnsan Fizyolojisi",
+    "Genden Proteine",
+    "Canlılarda Enerji Dönüşümleri",
+    "Bitki Biyolojisi",
   ],
-  "ayt-matematik-sayisal": [
-    ["ayt-matematik-u2-t0", "ayt-matematik-u2-t1", "ayt-matematik-u2-t2", "ayt-matematik-u2-t3"], // Trigonometri
+  "ayt-edebiyat-ea": [
+    "Halk Edebiyatı",
+    "Divan Edebiyatı",
+    "Milli Edebiyat",
+    "Cumhuriyet Şiiri",
+    "Cumhuriyet Hikayesi",
+    "Cumhuriyet Romanı",
   ],
-  "ayt-matematik-ea": [
-    ["ayt-matematik-u2-t0", "ayt-matematik-u2-t1", "ayt-matematik-u2-t2", "ayt-matematik-u2-t3"], // Trigonometri
+  "ayt-edebiyat-sozel": [
+    "Halk Edebiyatı",
+    "Divan Edebiyatı",
+    "Milli Edebiyat",
+    "Cumhuriyet Şiiri",
+    "Cumhuriyet Hikayesi",
+    "Cumhuriyet Romanı",
   ],
-  "ayt-fizik": [
-    ["ayt-fizik-u2-t0", "ayt-fizik-u2-t1", "ayt-fizik-u2-t2", "ayt-fizik-u2-t3"], // Çembersel Hareket
+  "ayt-tarih-1-ea": [
+    "İnsanlığın İlk Dönemleri",
+    "İlk ve Orta Çağlarda Türk Dünyası",
+    "İslam Medeniyetinin Doğuşu",
+    "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+    "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+    "Beylikten Devlete Osmanlı Siyaseti",
+    "Uluslararası İlişkilerde Denge Stratejisi",
+    "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
+    "Milli Mücadele",
+    "Atatürkçülük ve Türk İnkılabı",
+    "İki Savaş Arası Dönemde Türkiye ve Dünya",
   ],
+  "ayt-tarih-1-sozel": [
+    "İnsanlığın İlk Dönemleri",
+    "İlk ve Orta Çağlarda Türk Dünyası",
+    "İslam Medeniyetinin Doğuşu",
+    "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+    "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+    "Beylikten Devlete Osmanlı Siyaseti",
+    "Uluslararası İlişkilerde Denge Stratejisi",
+    "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
+    "Milli Mücadele",
+    "Atatürkçülük ve Türk İnkılabı",
+    "İki Savaş Arası Dönemde Türkiye ve Dünya",
+  ],
+  "ayt-cografya-1-ea": "*",
+  "ayt-cografya-1-sozel": "*",
+  "ayt-cografya-2": "*",
 };
 
 type Row = {
@@ -62,17 +111,21 @@ type Row = {
   group: { members: string[]; isFirst: boolean } | null;
 };
 
-function flattenRows(course: Course): Row[] {
-  const groupByTopicId = new Map<string, { members: string[]; isFirst: boolean }>();
-  for (const members of FREQUENCY_GROUPS[course.id] ?? []) {
-    members.forEach((id, i) => groupByTopicId.set(id, { members, isFirst: i === 0 }));
-  }
+function isGroupedUnitName(course: Course, unitName: string): boolean {
+  const config = FREQUENCY_GROUP_UNITS[course.id];
+  if (!config) return false;
+  return config === "*" ? true : config.includes(unitName);
+}
 
+function flattenRows(course: Course): Row[] {
   const rows: Row[] = [];
   for (const group of course.units) {
+    const isGroupedUnit = group.unit !== "-" && isGroupedUnitName(course, group.unit);
+    const members = isGroupedUnit ? group.topics.map((t) => t.id) : null;
+
     if (group.unit === "-") {
       for (const topic of group.topics) {
-        rows.push({ topic, unitLabel: "-", unitRowSpan: 1, group: groupByTopicId.get(topic.id) ?? null });
+        rows.push({ topic, unitLabel: "-", unitRowSpan: 1, group: null });
       }
     } else {
       group.topics.forEach((topic, i) => {
@@ -80,7 +133,7 @@ function flattenRows(course: Course): Row[] {
           topic,
           unitLabel: group.unit,
           unitRowSpan: i === 0 ? group.topics.length : null,
-          group: groupByTopicId.get(topic.id) ?? null,
+          group: members ? { members, isFirst: i === 0 } : null,
         });
       });
     }
