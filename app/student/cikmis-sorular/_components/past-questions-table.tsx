@@ -1,6 +1,3 @@
-"use client";
-
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,7 +9,8 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { Course, Topic } from "@/lib/curriculum";
-import { PAST_QUESTION_YEARS, pastQuestionKey, type PastQuestionMap } from "../_lib/shared";
+
+export const PAST_QUESTION_YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
 
 type Row = { topic: Topic; unitLabel: string; unitRowSpan: number | null };
 
@@ -32,16 +30,31 @@ function flattenRows(course: Course): Row[] {
   return rows;
 }
 
-export function PastQuestionsTable({
-  course,
-  progress,
-  onToggle,
-}: {
-  course: Course;
-  progress: PastQuestionMap;
-  onToggle: (topicId: string, year: number) => void;
-}) {
+// Sums each topic's historical per-year question count (captured from the
+// source workbooks' year columns during curriculum parsing). Not every
+// topic has this data — grammar-level sub-topics like "Sıfatlar" have no
+// year columns at all in the source, so this total only reflects topics
+// that were tracked, not a guaranteed exam-wide count.
+function yearTotals(course: Course, years: number[]) {
+  const totals: Record<number, number> = {};
+  for (const year of years) totals[year] = 0;
+  for (const group of course.units) {
+    for (const topic of group.topics) {
+      for (const year of years) {
+        totals[year] += topic.frequency?.[String(year)] ?? 0;
+      }
+    }
+  }
+  return totals;
+}
+
+// A pure reference table — no student state, nothing to save. Just how
+// many questions came from each topic in each year, straight from the
+// curriculum data, so a student can see which topics carry the most
+// exam weight.
+export function PastQuestionsTable({ course }: { course: Course }) {
   const rows = flattenRows(course);
+  const totals = yearTotals(course, PAST_QUESTION_YEARS);
 
   return (
     <Card>
@@ -56,7 +69,10 @@ export function PastQuestionsTable({
               <TableHead className="align-bottom">Konu</TableHead>
               {PAST_QUESTION_YEARS.map((year) => (
                 <TableHead key={year} className="border-l text-center">
-                  {year}
+                  <div>{year}</div>
+                  <div className="text-muted-foreground text-[10px] font-normal tabular-nums">
+                    {totals[year]} soru
+                  </div>
                 </TableHead>
               ))}
             </TableRow>
@@ -82,14 +98,21 @@ export function PastQuestionsTable({
                 )}
                 <TableCell className="font-medium whitespace-normal">{row.topic.name}</TableCell>
                 {PAST_QUESTION_YEARS.map((year) => {
-                  const solved = progress[pastQuestionKey(row.topic.id, year)] ?? false;
+                  const count = row.topic.frequency?.[String(year)];
                   return (
-                    <TableCell key={year} className="border-l text-center">
-                      <Checkbox
-                        checked={solved}
-                        onCheckedChange={() => onToggle(row.topic.id, year)}
-                        aria-label={`${course.name} - ${row.topic.name} - ${year}`}
-                      />
+                    <TableCell
+                      key={year}
+                      className="border-l text-center tabular-nums"
+                    >
+                      {count === undefined ? (
+                        <span className="text-muted-foreground/40" title="Bu konu için kayıt yok">
+                          –
+                        </span>
+                      ) : count === 0 ? (
+                        <span className="text-muted-foreground">0</span>
+                      ) : (
+                        <span className="font-medium">{count}</span>
+                      )}
                     </TableCell>
                   );
                 })}
