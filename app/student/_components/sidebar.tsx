@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpenCheck,
+  CalendarClock,
   ClipboardList,
   GraduationCap,
   Home,
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/student/odevler", label: "Ödevler", icon: ClipboardList },
   { href: "/student/paragraf-problem", label: "Paragraf/Problem Takibi", icon: Target },
   { href: "/student/kaynak-takibi", label: "Kaynak Takibi", icon: BookOpenCheck },
+  { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", icon: CalendarClock },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", icon: BarChart3 },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", icon: Library },
 ];
