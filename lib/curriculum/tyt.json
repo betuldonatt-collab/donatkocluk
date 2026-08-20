@@ -1,0 +1,1890 @@
+[
+  {
+    "id": "tyt-turkce",
+    "name": "Türkçe",
+    "units": [
+      {
+        "unit": "Anlam Bilgisi",
+        "topics": [
+          {
+            "id": "tyt-turkce-u0-t0",
+            "name": "Sözcükte Anlam",
+            "frequency": {
+              "2018": 3,
+              "2019": 3,
+              "2020": 4,
+              "2021": 4,
+              "2022": 4,
+              "2023": 3,
+              "2024": 4,
+              "2025": 4
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t1",
+            "name": "Cümlede Anlam",
+            "frequency": {
+              "2018": 3,
+              "2019": 3,
+              "2020": 3,
+              "2021": 3,
+              "2022": 3,
+              "2023": 4,
+              "2024": 3,
+              "2025": 3
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t2",
+            "name": "Paragrafta Anlam",
+            "frequency": {
+              "2018": 18,
+              "2019": 18,
+              "2020": 21,
+              "2021": 22,
+              "2022": 20,
+              "2023": 21,
+              "2024": 23,
+              "2025": 21
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t3",
+            "name": "Paragrafın Yapısı",
+            "frequency": {
+              "2018": 4,
+              "2019": 4,
+              "2020": 5,
+              "2021": 4,
+              "2022": 6,
+              "2023": 5,
+              "2024": 3,
+              "2025": 5
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t4",
+            "name": "Sözcükte Yapı/ Biçim Bilgisi",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t5",
+            "name": "Ses Bilgisi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t6",
+            "name": "Yazım Kuralları",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 2,
+              "2021": 2,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "tyt-turkce-u0-t7",
+            "name": "Noktalama İşaretleri",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 2,
+              "2021": 2,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          }
+        ]
+      },
+      {
+        "unit": "İsim Soylu Sözcükler",
+        "topics": [
+          {
+            "id": "tyt-turkce-u1-t0",
+            "name": "İsimler",
+            "frequency": {
+              "2018": 0,
+              "2019": 3,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-turkce-u1-t1",
+            "name": "Sıfatlar"
+          },
+          {
+            "id": "tyt-turkce-u1-t2",
+            "name": "Zamirler"
+          },
+          {
+            "id": "tyt-turkce-u1-t3",
+            "name": "Zarflar"
+          },
+          {
+            "id": "tyt-turkce-u1-t4",
+            "name": "Edatlar, Ünlemler ve Bağlaçlar"
+          }
+        ]
+      },
+      {
+        "unit": "Fiiller",
+        "topics": [
+          {
+            "id": "tyt-turkce-u2-t0",
+            "name": "Fiillerde Kip ve Kişi",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-turkce-u2-t1",
+            "name": "Fiilde Yapı"
+          },
+          {
+            "id": "tyt-turkce-u2-t2",
+            "name": "Ek Fiil"
+          },
+          {
+            "id": "tyt-turkce-u2-t3",
+            "name": "Fiilimsi"
+          },
+          {
+            "id": "tyt-turkce-u2-t4",
+            "name": "Fiilde Çatı"
+          },
+          {
+            "id": "tyt-turkce-u2-t5",
+            "name": "Cümlenin Ögeleri",
+            "frequency": {
+              "2018": 3,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-turkce-u2-t6",
+            "name": "Cümle Türleri",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-turkce-u2-t7",
+            "name": "Anlatım Bozuklukları",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-matematik",
+    "name": "Matematik",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-matematik-u0-t0",
+            "name": "Temel Kavramlar",
+            "frequency": {
+              "2018": 4,
+              "2019": 4,
+              "2020": 1,
+              "2021": 3,
+              "2022": 3,
+              "2023": 2,
+              "2024": 1,
+              "2025": 3
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t1",
+            "name": "Sayı Basamakları",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 2,
+              "2022": 1,
+              "2023": 1,
+              "2024": 2,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t2",
+            "name": "Bölme Bölünebilme Kuralları",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t3",
+            "name": "EBOB-EKOK",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t4",
+            "name": "Rasyonel Sayılar",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 3,
+              "2021": 0,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t5",
+            "name": "Basit Eşitsizlikler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 3,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t6",
+            "name": "Mutlak Değer",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 2,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t7",
+            "name": "Üslü Sayılar",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t8",
+            "name": "Köklü Sayılar",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t9",
+            "name": "Çarpanlara Ayırma",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t10",
+            "name": "Oran Orantı",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u0-t11",
+            "name": "Birinci Dereceden Denklemler",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 0,
+              "2021": 2,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Problemler",
+        "topics": [
+          {
+            "id": "tyt-matematik-u1-t0",
+            "name": "Sayı-Kesir Problemleri",
+            "frequency": {
+              "2018": 11,
+              "2019": 12,
+              "2020": 13,
+              "2021": 11,
+              "2022": 13,
+              "2023": 10,
+              "2024": 11,
+              "2025": 12
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t1",
+            "name": "Yaş Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t2",
+            "name": "İşçi Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t3",
+            "name": "Hız Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t4",
+            "name": "Karışım Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t5",
+            "name": "Yüzde-Kâr-Zarar Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t6",
+            "name": "Grafik Problemleri"
+          },
+          {
+            "id": "tyt-matematik-u1-t7",
+            "name": "Rutin Olmayan Problemler"
+          },
+          {
+            "id": "tyt-matematik-u1-t8",
+            "name": "Kümeler - Kartezyen Çarpım",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t9",
+            "name": "Mantık",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t10",
+            "name": "Fonksiyonlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t11",
+            "name": "Polinomlar",
+            "frequency": {
+              "2018": 2,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t12",
+            "name": "Permütasyon - Kombinasyon",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 2,
+              "2022": 0,
+              "2023": 1,
+              "2024": 3,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t13",
+            "name": "Olasılık",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-matematik-u1-t14",
+            "name": "Veri İstatistik",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-geometri",
+    "name": "Geometri",
+    "units": [
+      {
+        "unit": "Üçgenler",
+        "topics": [
+          {
+            "id": "tyt-geometri-u0-t0",
+            "name": "Üçgenlerde Temel Kavramlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 3,
+              "2022": 2,
+              "2023": 3,
+              "2024": 1,
+              "2025": 3
+            }
+          },
+          {
+            "id": "tyt-geometri-u0-t1",
+            "name": "Üçgenlerde Eşlik ve Benzerlik",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-geometri-u0-t2",
+            "name": "Üçgenin Yardımcı Elemanları",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-geometri-u0-t3",
+            "name": "Dik Üçgen ve Trigonometri",
+            "frequency": {
+              "2018": 3,
+              "2019": 2,
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-geometri-u0-t4",
+            "name": "Üçgenin Alanı/ Üçgenin Alanı ile İlgili Uygulamalar",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Dörtgenler ve Çokgenler",
+        "topics": [
+          {
+            "id": "tyt-geometri-u1-t0",
+            "name": "Çokgenler/ Dörtgenler ve Özellikleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 2,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-geometri-u1-t1",
+            "name": "Özel Dörtgenler",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 4,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Uzay Geometri",
+        "topics": [
+          {
+            "id": "tyt-geometri-u2-t0",
+            "name": "Katı Cisimler",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 2,
+              "2021": 2,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-fizik",
+    "name": "Fizik",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-fizik-u0-t0",
+            "name": "Fizik Bilimine Giriş",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t1",
+            "name": "Madde ve Özellikleri",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t2",
+            "name": "Hareket ve Kuvvet",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t3",
+            "name": "İş, Güç, Enerji",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t4",
+            "name": "Isı, Sıcaklık ve Genleşme",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t5",
+            "name": "Elektrostatik",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t6",
+            "name": "Elektrik Akımı ve Devreler",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 2,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t7",
+            "name": "Mıknatıslar ve Manyetizma",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t8",
+            "name": "Basınç",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-fizik-u0-t9",
+            "name": "Kaldırma Kuvveti",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Dalgalar",
+        "topics": [
+          {
+            "id": "tyt-fizik-u1-t0",
+            "name": "Dalgalara Giriş",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u1-t1",
+            "name": "Yay Dalgaları"
+          },
+          {
+            "id": "tyt-fizik-u1-t2",
+            "name": "Su dalgaları"
+          },
+          {
+            "id": "tyt-fizik-u1-t3",
+            "name": "Ses Dalgaları"
+          },
+          {
+            "id": "tyt-fizik-u1-t4",
+            "name": "Deprem Dalgaları"
+          }
+        ]
+      },
+      {
+        "unit": "Optik",
+        "topics": [
+          {
+            "id": "tyt-fizik-u2-t0",
+            "name": "Aydınlanma",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-fizik-u2-t1",
+            "name": "Gölge - Yansıma"
+          },
+          {
+            "id": "tyt-fizik-u2-t2",
+            "name": "Düzlem aynalar"
+          },
+          {
+            "id": "tyt-fizik-u2-t3",
+            "name": "Küresel Aynalar"
+          },
+          {
+            "id": "tyt-fizik-u2-t4",
+            "name": "Işığın Kırılması ve Renkler"
+          },
+          {
+            "id": "tyt-fizik-u2-t5",
+            "name": "Mercekler ve Optik Araçlar/ Prizmalar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-kimya",
+    "name": "Kimya",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-kimya-u0-t0",
+            "name": "Kimya Bilimi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t1",
+            "name": "Atom ve Periyodik Sistem",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t2",
+            "name": "Kimyasal Türler Arası Etkileşimler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t3",
+            "name": "Maddenin Halleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t4",
+            "name": "Kimyanın Temel Kanunları - Kimyasal Hesaplamalar",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t5",
+            "name": "Karışımlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t6",
+            "name": "Asitler, Bazlar ve Tuzlar",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-kimya-u0-t7",
+            "name": "Kimya Her Yerde",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-biyoloji",
+    "name": "Biyoloji",
+    "units": [
+      {
+        "unit": "Temel Bileşenler/ Yaşam Bilimi Biyoloji",
+        "topics": [
+          {
+            "id": "tyt-biyoloji-u0-t0",
+            "name": "Canlıların Ortak Özellikleri",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-biyoloji-u0-t1",
+            "name": "Su"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t2",
+            "name": "Tuz ve Mineraller"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t3",
+            "name": "Karbonhidratlar"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t4",
+            "name": "Lipitler"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t5",
+            "name": "Proteinler"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t6",
+            "name": "Enzimler"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t7",
+            "name": "Vitaminler"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t8",
+            "name": "Nükleik Asitler"
+          },
+          {
+            "id": "tyt-biyoloji-u0-t9",
+            "name": "ATP"
+          }
+        ]
+      },
+      {
+        "unit": "Hücre",
+        "topics": [
+          {
+            "id": "tyt-biyoloji-u1-t0",
+            "name": "Hücre, Çekirdek ve Sitoplazma",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-biyoloji-u1-t1",
+            "name": "Organeller"
+          },
+          {
+            "id": "tyt-biyoloji-u1-t2",
+            "name": "Hücre İskeleti"
+          },
+          {
+            "id": "tyt-biyoloji-u1-t3",
+            "name": "Hücre Zarı ve Hücre Duvarı"
+          },
+          {
+            "id": "tyt-biyoloji-u1-t4",
+            "name": "Hücre Zarından Madde Geçişleri"
+          }
+        ]
+      },
+      {
+        "unit": "Canlılar Dünyası",
+        "topics": [
+          {
+            "id": "tyt-biyoloji-u2-t0",
+            "name": "Canlılığın Çeşitliliği ve Sınıflandırılması",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-biyoloji-u2-t1",
+            "name": "Bakteriler"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t2",
+            "name": "Arkeler"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t3",
+            "name": "Protistalar"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t4",
+            "name": "Bitkiler"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t5",
+            "name": "Mantarlar"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t6",
+            "name": "Hayvanlar"
+          },
+          {
+            "id": "tyt-biyoloji-u2-t7",
+            "name": "Virüsler"
+          }
+        ]
+      },
+      {
+        "unit": "Hücre Bölünmeleri",
+        "topics": [
+          {
+            "id": "tyt-biyoloji-u3-t0",
+            "name": "Mitoz",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-biyoloji-u3-t1",
+            "name": "Eşeysiz Üreme"
+          },
+          {
+            "id": "tyt-biyoloji-u3-t2",
+            "name": "Mayoz"
+          },
+          {
+            "id": "tyt-biyoloji-u3-t3",
+            "name": "Eşeyli Üreme"
+          },
+          {
+            "id": "tyt-biyoloji-u3-t4",
+            "name": "Kalıtım",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Ekosistem Ekolojisi",
+        "topics": [
+          {
+            "id": "tyt-biyoloji-u4-t0",
+            "name": "Ekolojik Kavramlar",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-biyoloji-u4-t1",
+            "name": "Madde Döngüleri"
+          },
+          {
+            "id": "tyt-biyoloji-u4-t2",
+            "name": "Güncel Çevre Sorunları"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-tarih",
+    "name": "Tarih",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-tarih-u0-t0",
+            "name": "İlk ve Orta Çağlarda Türk Dünyası",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t1",
+            "name": "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t2",
+            "name": "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t3",
+            "name": "Beylikten Devlete Osmanlı Siyaseti (1302-1453)",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t4",
+            "name": "Sultan ve Osmanlı Merkez Teşkilatı",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t5",
+            "name": "Değişen Dünya Dengeleri Karşısında Osmanlı Siyaseti (1595-1774)",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t6",
+            "name": "Uluslararası İlişkilerde Denge Stratejisi (1774-1914)",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t7",
+            "name": "XIX VE XX. Yüzyılda Değişen Sosyoekonomik Hayat",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t8",
+            "name": "Milli Mücadele",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 2,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "tyt-tarih-u0-t9",
+            "name": "Atatürkçülük ve Türk İnkılabı",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-cografya",
+    "name": "Coğrafya",
+    "units": [
+      {
+        "unit": "Doğal Sistemler",
+        "topics": [
+          {
+            "id": "tyt-cografya-u0-t0",
+            "name": "Doğa ve İnsan Etkileşimi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t1",
+            "name": "Coğrafya Bilimi ve Bölümlenmesi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t2",
+            "name": "Dünya'nın Şekli ve Hareketleri",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t3",
+            "name": "Coğrafi Koordinat Sistemi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t4",
+            "name": "Harita Okuryazarlığı",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t5",
+            "name": "Atmosfer ve İklim Bilgisi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t6",
+            "name": "Dünya'nın Yapısı ve Oluşum Süreci",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t7",
+            "name": "Su Kaynakları",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t8",
+            "name": "Topraklar",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u0-t9",
+            "name": "Bitkiler",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Beşeri Sistemler",
+        "topics": [
+          {
+            "id": "tyt-cografya-u1-t0",
+            "name": "Yerleşmeler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-cografya-u1-t1",
+            "name": "Nüfus ve Güç",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-cografya-u1-t2",
+            "name": "Ekonomik Faaliyetler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Küresel Ortam: Bölgeler ve Ülkeler",
+        "topics": [
+          {
+            "id": "tyt-cografya-u2-t0",
+            "name": "Bölgeler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-cografya-u2-t1",
+            "name": "Uluslararası Ulaşım Hatları",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Çevre ve Toplum",
+        "topics": [
+          {
+            "id": "tyt-cografya-u3-t0",
+            "name": "Afetler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-felsefe",
+    "name": "Felsefe",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-felsefe-u0-t0",
+            "name": "Felsefenin Alanı",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t1",
+            "name": "Bilgi Felsefesi",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 2,
+              "2023": 2,
+              "2024": 1,
+              "2025": 3
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t2",
+            "name": "Bilim Felsefesi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t3",
+            "name": "Varlık Felsefesi",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t4",
+            "name": "Ahlak Felsefesi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 2,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t5",
+            "name": "Siyaset Felsefesi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t6",
+            "name": "Din Felsefesi",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-felsefe-u0-t7",
+            "name": "Sanat Felsefesi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tyt-din",
+    "name": "Din",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "tyt-din-u0-t0",
+            "name": "Bilgi ve İnanç",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-din-u0-t1",
+            "name": "İbadetler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-din-u0-t2",
+            "name": "Ahlak ve Değerler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-din-u0-t3",
+            "name": "Hz. Muhammed (S.A.V)",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-din-u0-t4",
+            "name": "Vahiy ve Akıl",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "tyt-din-u0-t5",
+            "name": "İslam Düşüncesinde Yorumlar, Mezhepler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "tyt-din-u0-t6",
+            "name": "Din, Kültür ve Medeniyet",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

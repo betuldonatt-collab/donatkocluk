@@ -12,25 +12,25 @@ import { Button } from "@/components/ui/button";
 
 const PANELS = [
   {
-    href: "/student",
+    href: "/login?role=student",
     label: "Öğrenci Girişi",
     description: "Ödevlerini ve gelişimini takip et.",
     icon: GraduationCap,
   },
   {
-    href: "/parent",
+    href: "/login?role=parent",
     label: "Veli Girişi",
     description: "Çocuğunun ilerlemesini izle.",
     icon: Users,
   },
   {
-    href: "/coach",
+    href: "/login?role=coach",
     label: "Koç Girişi",
     description: "Öğrencilerini yönet ve koçluk yap.",
     icon: ClipboardList,
   },
   {
-    href: "/admin",
+    href: "/login?role=admin",
     label: "Admin Girişi",
     description: "Platformu yönet.",
     icon: ShieldCheck,

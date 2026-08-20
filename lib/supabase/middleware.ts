@@ -54,9 +54,25 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== routeRole) {
+    // Admins may browse every panel (to preview each role's UI from the
+    // admin panel's view switcher) without being bounced to their own home.
+    if (profile?.role !== routeRole && profile?.role !== "admin") {
       const home = profile?.role ? ROLE_HOME[profile.role] : "/";
       return NextResponse.redirect(new URL(home, request.url));
+    }
+
+    if (profile?.role) {
+      // Forward the role downstream via a request header so the panel
+      // layouts (student/parent/coach/admin) don't need a second profile
+      // query just to decide whether to show the admin view switcher.
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-user-role", profile.role);
+      const nextResponse = NextResponse.next({ request: { headers: requestHeaders } });
+      // Carry over any Set-Cookie already queued by the auth-refresh
+      // callback above — building a new NextResponse here would otherwise
+      // silently drop a refreshed session cookie.
+      supabaseResponse.cookies.getAll().forEach((c) => nextResponse.cookies.set(c));
+      supabaseResponse = nextResponse;
     }
   }
 

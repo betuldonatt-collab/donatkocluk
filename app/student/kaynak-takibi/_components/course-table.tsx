@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { Course, Topic } from "../_data/courses";
+import type { Course, Topic } from "@/lib/curriculum";
 
 export type Resource = { id: string; name: string };
 export type ProgressMap = Record<string, { solved: boolean; reviewed: boolean }>;

@@ -12,15 +12,35 @@ create table public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- New tables are no longer auto-exposed to the Data API roles; grant access
+-- explicitly so the RLS policies below actually get evaluated instead of
+-- being blocked upfront by a permission-denied at the grant level.
+grant select, update on public.profiles to authenticated;
+
+-- A policy on profiles can't query profiles directly in its USING clause --
+-- Postgres re-evaluates the same policy for that inner query, which
+-- recurses forever (error 42P17). Routing the "is admin" check through a
+-- security-definer function (owned by postgres, which has BYPASSRLS)
+-- breaks the recursion: the function's internal select skips RLS entirely.
+create function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
 create policy "profiles_select_own_or_admin"
   on public.profiles for select
   to authenticated
   using (
     id = (select auth.uid())
-    or exists (
-      select 1 from public.profiles p
-      where p.id = (select auth.uid()) and p.role = 'admin'
-    )
+    or public.is_admin()
   );
 
 create policy "profiles_update_own"
@@ -37,10 +57,7 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  if new.role <> old.role and not exists (
-    select 1 from public.profiles p
-    where p.id = (select auth.uid()) and p.role = 'admin'
-  ) then
+  if new.role <> old.role and not public.is_admin() then
     raise exception 'Only an admin can change a user role';
   end if;
   return new;

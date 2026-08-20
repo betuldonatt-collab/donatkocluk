@@ -1,18 +1,14 @@
 import { headers } from "next/headers";
 
 import { AdminViewSwitcher } from "@/components/admin-view-switcher";
-import { StudentSidebar } from "./_components/sidebar";
 
-export default async function StudentLayout({ children }: LayoutProps<"/student">) {
+export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const role = (await headers()).get("x-user-role");
 
   return (
     <div className="flex flex-1 flex-col">
       {role === "admin" && <AdminViewSwitcher />}
-      <div className="flex flex-1">
-        <StudentSidebar />
-        <main className="flex-1 md:ml-64">{children}</main>
-      </div>
+      <div className="flex flex-1">{children}</div>
     </div>
   );
 }

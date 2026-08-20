@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Supabase CLI's local runtime scratch dir — generated, not ours.
+    "supabase/.temp/**",
   ]),
 ]);
 

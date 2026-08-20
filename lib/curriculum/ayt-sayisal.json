@@ -1,0 +1,1334 @@
+[
+  {
+    "id": "ayt-matematik-sayisal",
+    "name": "Matematik",
+    "units": [
+      {
+        "unit": "-",
+        "topics": [
+          {
+            "id": "ayt-matematik-u0-t0",
+            "name": "Denklem ve Eşitsizlikler",
+            "frequency": {
+              "2018": 3,
+              "2019": 5,
+              "2020": 7,
+              "2021": 3,
+              "2022": 4,
+              "2023": 6,
+              "2024": 3,
+              "2025": 6
+            }
+          },
+          {
+            "id": "ayt-matematik-u0-t1",
+            "name": "Mantık",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u0-t2",
+            "name": "Kümeler",
+            "frequency": {
+              "2018": 0,
+              "2019": 2,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u0-t3",
+            "name": "Fonksiyonlar",
+            "frequency": {
+              "2018": 2,
+              "2019": 3,
+              "2020": 3,
+              "2021": 2,
+              "2022": 2,
+              "2023": 3,
+              "2024": 4,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-matematik-u0-t4",
+            "name": "Polinomlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 3,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u0-t5",
+            "name": "2. Dereceden Denklemler/ Denklem ve Eşitsizlik Sistemleri",
+            "frequency": {
+              "2018": 2,
+              "2019": 0,
+              "2020": 1,
+              "2021": 3,
+              "2022": 2,
+              "2023": 3,
+              "2024": 3,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Sayma ve Olasılık",
+        "topics": [
+          {
+            "id": "ayt-matematik-u1-t0",
+            "name": "Permütasyon - Kombinasyon",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u1-t1",
+            "name": "Binom",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u1-t2",
+            "name": "Olasılık",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Trigonometri",
+        "topics": [
+          {
+            "id": "ayt-matematik-u2-t0",
+            "name": "Yönlü Açılar, Trigonometrik Fonksiyonlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 3,
+              "2020": 3,
+              "2021": 1,
+              "2022": 2,
+              "2023": 1,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t1",
+            "name": "Cos-Sin Teoremleri, Ters Trigonometrik Fonksiyonlar",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t2",
+            "name": "Toplam-Fark ve İki Kat Açı Formülleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 2,
+              "2022": 2,
+              "2023": 3,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t3",
+            "name": "Trigonometrik Denklemler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 2,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t4",
+            "name": "Logaritma",
+            "frequency": {
+              "2018": 2,
+              "2019": 3,
+              "2020": 4,
+              "2021": 1,
+              "2022": 2,
+              "2023": 4,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t5",
+            "name": "Diziler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t6",
+            "name": "Limit ve Süreklilik",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 0,
+              "2021": 2,
+              "2022": 2,
+              "2023": 0,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t7",
+            "name": "Türev",
+            "frequency": {
+              "2018": 3,
+              "2019": 4,
+              "2020": 0,
+              "2021": 4,
+              "2022": 4,
+              "2023": 0,
+              "2024": 3,
+              "2025": 3
+            }
+          },
+          {
+            "id": "ayt-matematik-u2-t8",
+            "name": "İntegral",
+            "frequency": {
+              "2018": 3,
+              "2019": 4,
+              "2020": 0,
+              "2021": 4,
+              "2022": 4,
+              "2023": 0,
+              "2024": 4,
+              "2025": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ayt-geometri-sayisal",
+    "name": "Geometri",
+    "units": [
+      {
+        "unit": "Geometri",
+        "topics": [
+          {
+            "id": "ayt-geometri-sayisal-u0-t0",
+            "name": "Üçgen, Çokgen, Dörtgen, Özel Dörtgenler",
+            "frequency": {
+              "2018": 2,
+              "2019": 2,
+              "2020": 4,
+              "2021": 0,
+              "2022": 1,
+              "2023": 3,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-geometri-sayisal-u0-t1",
+            "name": "Çember ve Daire",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 2,
+              "2021": 3,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 2
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Analitik Geometri",
+        "topics": [
+          {
+            "id": "ayt-geometri-sayisal-u1-t0",
+            "name": "Doğrunun Analitik İncelenmesi",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 2,
+              "2021": 3,
+              "2022": 2,
+              "2023": 2,
+              "2024": 3,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-geometri-sayisal-u1-t1",
+            "name": "Çemberin Analitik İncelenmesi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-geometri-sayisal-u1-t2",
+            "name": "Dönüşümler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Uzay Geometri",
+        "topics": [
+          {
+            "id": "ayt-geometri-sayisal-u2-t0",
+            "name": "Katı Cisimler",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 2,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ayt-fizik",
+    "name": "Fizik",
+    "units": [
+      {
+        "unit": "Kuvvet ve Hareket",
+        "topics": [
+          {
+            "id": "ayt-fizik-u0-t0",
+            "name": "Vektörler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t1",
+            "name": "Bağıl Hareket",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t2",
+            "name": "Newton'un Hareket Yasaları",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 2,
+              "2021": 0,
+              "2022": 2,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t3",
+            "name": "Bir Boyutta Sabit İvmeli Hareket",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t4",
+            "name": "İki Boyutta Hareket",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 2,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t5",
+            "name": "Enerji ve Hareket",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t6",
+            "name": "İtme ve Çizgisel Momentum",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t7",
+            "name": "Tork",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t8",
+            "name": "Denge",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u0-t9",
+            "name": "Basit Makineler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Elektrik ve Manyetizma",
+        "topics": [
+          {
+            "id": "ayt-fizik-u1-t0",
+            "name": "Elektrik",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 2,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u1-t1",
+            "name": "Manyetizma",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u1-t2",
+            "name": "Alternatif Akım",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u1-t3",
+            "name": "Transformatörler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Çembersel Hareket",
+        "topics": [
+          {
+            "id": "ayt-fizik-u2-t0",
+            "name": "Düzgün Çembersel Hareket",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t1",
+            "name": "Dönerek Öteleme Hareketi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t2",
+            "name": "Açısal Momentum",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t3",
+            "name": "Kütle Çekim Kuvveti - Kepler Kanunları",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t4",
+            "name": "Basit Harmonik Hareket",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t5",
+            "name": "Dalga Mekaniği",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t6",
+            "name": "Atom Fiziğine Giriş ve Radyoaktivite",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t7",
+            "name": "Modern Fizik",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 2,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-fizik-u2-t8",
+            "name": "Modern Fiziğin Teknolojideki Uygulamaları",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ayt-kimya",
+    "name": "Kimya",
+    "units": [
+      {
+        "unit": "Modern Atom Teorisi",
+        "topics": [
+          {
+            "id": "ayt-kimya-u0-t0",
+            "name": "Atomun Kuantum Modeli",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 2,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u0-t1",
+            "name": "Periyodik Özellikler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u0-t2",
+            "name": "Yükseltgenme Basamakları",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u0-t3",
+            "name": "Gazlar",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Sıvı Çözeltiler ve Çözünürlük",
+        "topics": [
+          {
+            "id": "ayt-kimya-u1-t0",
+            "name": "Derişim Birimleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u1-t1",
+            "name": "Koligatif Özellikler",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u1-t2",
+            "name": "Çözünürlük",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Kimyasal Tepkimelerde Enerji",
+        "topics": [
+          {
+            "id": "ayt-kimya-u2-t0",
+            "name": "Tepkimelerde Isı Değişimi",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u2-t1",
+            "name": "Oluşum Entalpisi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u2-t2",
+            "name": "Tepkime Isılarının Toplanabilirliği",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Denge",
+        "topics": [
+          {
+            "id": "ayt-kimya-u3-t0",
+            "name": "Kimyasal Denge",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u3-t1",
+            "name": "Dengeyi Etkileyen Faktörler",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u3-t2",
+            "name": "Sulu Çözelti Dengeleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 2,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Kimya ve Elektrik",
+        "topics": [
+          {
+            "id": "ayt-kimya-u4-t0",
+            "name": "İndirgenme - Yükseltgenme Tepkimelerinde Elektrik Akımı",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u4-t1",
+            "name": "Elektrotlar ve Elektrokimyasal Hücreler",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-kimya-u4-t2",
+            "name": "Elektrot Potansiyelleri",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u4-t3",
+            "name": "Elektroliz",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-kimya-u4-t4",
+            "name": "Korozyon",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Organik Kimya",
+        "topics": [
+          {
+            "id": "ayt-kimya-u5-t0",
+            "name": "Karbon Kimyasına Giriş",
+            "frequency": {
+              "2018": 2,
+              "2019": 3,
+              "2020": 1,
+              "2021": 3,
+              "2022": 3,
+              "2023": 1,
+              "2024": 3,
+              "2025": 4
+            }
+          },
+          {
+            "id": "ayt-kimya-u5-t1",
+            "name": "Hirokarbonlar"
+          },
+          {
+            "id": "ayt-kimya-u5-t2",
+            "name": "Fonksiyonel Gruplar"
+          },
+          {
+            "id": "ayt-kimya-u5-t3",
+            "name": "Alkoller - Eterler"
+          },
+          {
+            "id": "ayt-kimya-u5-t4",
+            "name": "Karbonil Bileşikleri"
+          },
+          {
+            "id": "ayt-kimya-u5-t5",
+            "name": "Karboksilik Asitler"
+          },
+          {
+            "id": "ayt-kimya-u5-t6",
+            "name": "Esterler"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ayt-biyoloji",
+    "name": "Biyoloji",
+    "units": [
+      {
+        "unit": "İnsan Fizyolojisi",
+        "topics": [
+          {
+            "id": "ayt-biyoloji-u0-t0",
+            "name": "Sinir Sistemi",
+            "frequency": {
+              "2018": 2,
+              "2019": 1,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 3,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t1",
+            "name": "Endokrin Sistem"
+          },
+          {
+            "id": "ayt-biyoloji-u0-t2",
+            "name": "Duyu Organları"
+          },
+          {
+            "id": "ayt-biyoloji-u0-t3",
+            "name": "Destek ve Hareket Sistemi",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t4",
+            "name": "Sindirim Sistemi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t5",
+            "name": "Dolaşım ve Bağışıklık Sistemi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t6",
+            "name": "Solunum Sistemi",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t7",
+            "name": "Üriner Sistem",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t8",
+            "name": "Üreme Sistemi ve Embriyonik Gelişim",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u0-t9",
+            "name": "Komünite ve Popülasyon Eklojisi",
+            "frequency": {
+              "2018": 1,
+              "2019": 0,
+              "2020": 2,
+              "2021": 2,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Genden Proteine",
+        "topics": [
+          {
+            "id": "ayt-biyoloji-u1-t0",
+            "name": "Nükleik Asitlerin Keşfi ve Önemi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u1-t1",
+            "name": "Genetik Şifre ve Protein Sentezi",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Canlılarda Enerji Dönüşümleri",
+        "topics": [
+          {
+            "id": "ayt-biyoloji-u2-t0",
+            "name": "Canlılık ve Enerji",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u2-t1",
+            "name": "Fotosentez",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u2-t2",
+            "name": "Kemosentez",
+            "frequency": {
+              "2018": 0,
+              "2019": 0,
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u2-t3",
+            "name": "Hücresel Solunum",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "Bitki Biyolojisi",
+        "topics": [
+          {
+            "id": "ayt-biyoloji-u3-t0",
+            "name": "Bitkilerin Yapısı",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u3-t1",
+            "name": "Bitkilerde Madde Taşınması",
+            "frequency": {
+              "2018": 0,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u3-t2",
+            "name": "Bitkilerde Eşeyli Üreme",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "ayt-biyoloji-u3-t3",
+            "name": "Canılar ve Çevre",
+            "frequency": {
+              "2018": 1,
+              "2019": 1,
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          }
+        ]
+      }
+    ]
+  }
+]
