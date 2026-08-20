@@ -155,24 +155,6 @@ function sumFrequency(topics: Topic[], memberIds: string[], year: number): numbe
   return hasAny ? sum : undefined;
 }
 
-// Sums each topic's historical per-year question count (captured from the
-// source workbooks' year columns during curriculum parsing). Not every
-// topic has this data — grammar-level sub-topics like "Sıfatlar" have no
-// year columns at all in the source, so this total only reflects topics
-// that were tracked, not a guaranteed exam-wide count.
-function yearTotals(course: Course, years: number[]) {
-  const totals: Record<number, number> = {};
-  for (const year of years) totals[year] = 0;
-  for (const group of course.units) {
-    for (const topic of group.topics) {
-      for (const year of years) {
-        totals[year] += topic.frequency?.[String(year)] ?? 0;
-      }
-    }
-  }
-  return totals;
-}
-
 function FrequencyCell({ count }: { count: number | undefined }) {
   return (
     <div className="flex h-full items-center justify-center">
@@ -196,7 +178,6 @@ function FrequencyCell({ count }: { count: number | undefined }) {
 export function PastQuestionsTable({ course }: { course: Course }) {
   const rows = flattenRows(course);
   const allTopics = rows.map((r) => r.topic);
-  const totals = yearTotals(course, PAST_QUESTION_YEARS);
 
   return (
     <Card>
@@ -211,10 +192,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
               <TableHead className="align-bottom">Konu</TableHead>
               {PAST_QUESTION_YEARS.map((year) => (
                 <TableHead key={year} className="border-l text-center">
-                  <div>{year}</div>
-                  <div className="text-muted-foreground text-[10px] font-normal tabular-nums">
-                    {totals[year]} soru
-                  </div>
+                  {year}
                 </TableHead>
               ))}
             </TableRow>
