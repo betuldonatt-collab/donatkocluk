@@ -114,7 +114,7 @@ export function CourseTable({
                 {resources.map((resource) => (
                   <Fragment key={resource.id}>
                     <TableHead className="border-l text-center">Soru Çözümü</TableHead>
-                    <TableHead className="text-center">Yanlışlara Dönüş</TableHead>
+                    <TableHead className="text-center">Kaynak Taraması Yapıldı</TableHead>
                   </Fragment>
                 ))}
               </TableRow>
@@ -156,7 +156,7 @@ export function CourseTable({
                         <Checkbox
                           checked={state.reviewed}
                           onCheckedChange={() => onToggle(row.topic.id, resource.id, "reviewed")}
-                          aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Yanlışlara Dönüş`}
+                          aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Kaynak Taraması Yapıldı`}
                         />
                       </TableCell>
                     </Fragment>
