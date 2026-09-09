@@ -1,0 +1,522 @@
+"use client";
+
+import { useState } from "react";
+import { Loader2, Plus, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import {
+  AYT_COURSES_BY_TRACK,
+  BRANCH_EXAM_MACRO_COURSES,
+  isBranchExamMacroCourseId,
+  ROUTINE_COURSES,
+  TYT_COURSES,
+  topicsForCourse,
+  type Course,
+} from "@/lib/curriculum";
+import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
+import type { DetailTask } from "../../types";
+import type { CourseResourceData } from "../kaynak-takibi-tab";
+import { ResourceCombobox } from "./resource-combobox";
+import { SmartCombobox } from "./smart-combobox";
+
+export const ALL_COURSES: Course[] = [
+  ...TYT_COURSES,
+  ...AYT_COURSES_BY_TRACK.sayisal,
+  ...AYT_COURSES_BY_TRACK.ea,
+  ...AYT_COURSES_BY_TRACK.sozel,
+  ...ROUTINE_COURSES,
+  ...BRANCH_EXAM_MACRO_COURSES,
+];
+
+// Macro branch-exam courses ("TYT Fen") already carry their full display
+// name -- unlike every atomic course, which stores a bare name ("Fizik")
+// and relies on this prefix. Prefixing a macro course's name too would
+// double up ("TYT TYT Fen").
+export function courseLabel(course: Course) {
+  if (isBranchExamMacroCourseId(course.id)) return course.name;
+  return `${course.id.startsWith("tyt-") ? "TYT " : course.id.startsWith("ayt-") ? "AYT " : ""}${course.name}`;
+}
+
+// "Video İzleme" used to be its own selectable type; it's now folded
+// into "Konu Çalışması" (see valueFromTask's legacy normalization below)
+// since the two always shared the exact same field-visibility logic
+// here anyway -- a topic study can optionally carry a video link, or
+// several, or none.
+export const TASK_TYPE_OPTIONS: { value: AssignableTaskType; label: string }[] = [
+  { value: "question_bank", label: "Soru Çözümü" },
+  { value: "topic_study", label: "Konu Çalışması / Video" },
+  { value: "branch_exam", label: "Branş Denemesi" },
+  { value: "general_exam", label: "Genel Deneme" },
+];
+
+const GENERAL_EXAM_TRACK_OPTIONS = [
+  { value: "tyt", label: "TYT" },
+  { value: "ayt", label: "AYT" },
+] as const;
+
+export type TaskFormVideoLink = { url: string; title: string };
+
+// One row in the dynamic resource list -- a task can hold 0..N of these
+// (e.g. "Soru Çözümü A", "Soru Çözümü B", ...), each independently
+// either an existing student_resources row (resourceId set) or a
+// not-yet-created name the coach is typing (resourceId empty).
+export type TaskFormResource = {
+  resourceId: string;
+  resourceName: string;
+  // Whether a brand-new resourceName (no matching resourceId) should be
+  // persisted to student_resources at save time, or just left unlinked.
+  addToLibrary: boolean;
+};
+
+export type TaskFormValue = {
+  taskType: AssignableTaskType;
+  courseId: string;
+  topicId: string;
+  resources: TaskFormResource[];
+  totalCount: string;
+  durationMinutes: string;
+  videoLinks: TaskFormVideoLink[];
+  // "Genel Deneme" only -- no course/topic exists for a general exam, so
+  // these two live only in form state and get folded into the saved
+  // title string (buildGeneralExamTitle in actions.ts), never persisted
+  // as their own columns.
+  generalExamTrack: "tyt" | "ayt";
+  generalExamPublisher: string;
+  // "Branş Denemesi" only -- same "lives only in the title, never its own
+  // column" convention as generalExamPublisher above.
+  branchExamPublisher: string;
+};
+
+function emptyResourceRow(): TaskFormResource {
+  return { resourceId: "", resourceName: "", addToLibrary: true };
+}
+
+export function defaultTaskFormValue(): TaskFormValue {
+  return {
+    taskType: "question_bank",
+    courseId: ALL_COURSES[0].id,
+    topicId: "",
+    resources: [],
+    totalCount: "",
+    durationMinutes: "",
+    videoLinks: [],
+    generalExamTrack: "tyt",
+    generalExamPublisher: "",
+    branchExamPublisher: "",
+  };
+}
+
+// Reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
+// editing an existing general-exam task pre-fills the track/publisher
+// fields instead of showing them blank.
+function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt"; publisher: string } {
+  const match = title.match(/^(TYT|AYT)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
+  return { track: match?.[1].toLowerCase() === "ayt" ? "ayt" : "tyt", publisher: match?.[2]?.trim() ?? "" };
+}
+
+// Reverses buildBranchExamTitle's " - Yayınevi" suffix (app/coach/actions.ts)
+// so editing an existing branch-exam task pre-fills the publisher field.
+// Course/topic themselves come straight from the task's own course_id/
+// topic_id columns, not from the title text.
+function parseBranchExamPublisher(title: string): string {
+  const match = title.match(/ - ([^-]+)$/);
+  return match?.[1]?.trim() ?? "";
+}
+
+function isAssignableType(t: string): t is AssignableTaskType {
+  return t === "question_bank" || t === "topic_study" || t === "branch_exam" || t === "general_exam" || t === "video";
+}
+
+export function valueFromTask(task: DetailTask | null, courseResourceData?: CourseResourceData): TaskFormValue {
+  if (!task) return defaultTaskFormValue();
+  const courseId = task.course_id ?? ALL_COURSES[0].id;
+  const libraryResources = courseResourceData?.[courseId]?.resources ?? [];
+  const resources: TaskFormResource[] = task.resource_ids.map((id) => ({
+    resourceId: id,
+    resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
+    addToLibrary: true,
+  }));
+  // Legacy rows saved before the video/topic_study merge: normalize to
+  // topic_study on load so the (now single) dropdown option matches, and
+  // any later save of this task naturally completes the migration.
+  const rawTaskType = isAssignableType(task.task_type) ? task.task_type : "question_bank";
+  const taskType = rawTaskType === "video" ? "topic_study" : rawTaskType;
+  const generalExam = taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt" as const, publisher: "" };
+  const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
+  return {
+    taskType,
+    courseId,
+    topicId: task.topic_id ?? "",
+    resources,
+    totalCount: task.total_count?.toString() ?? "",
+    durationMinutes: task.duration_minutes?.toString() ?? "",
+    videoLinks: (task.video_links ?? []).map((v) => ({ url: v.url, title: v.title ?? "" })),
+    generalExamTrack: generalExam.track,
+    generalExamPublisher: generalExam.publisher,
+    branchExamPublisher,
+  };
+}
+
+function numberOrNull(s: string): number | null {
+  return s.trim() ? Number(s) : null;
+}
+
+// Does not include resourceIds -- that requires resolving not-yet-created
+// resource names into real ids first (async), which the caller does
+// separately (see task-drawer.tsx's resolveResourceIds) and merges in.
+export function taskFormValueToPayload(value: TaskFormValue) {
+  if (value.taskType === "general_exam") {
+    return {
+      taskType: value.taskType,
+      courseId: null,
+      topicId: null,
+      totalCount: null,
+      durationMinutes: null,
+      videoLinks: [],
+      generalExamTrack: value.generalExamTrack,
+      generalExamPublisher: value.generalExamPublisher.trim() || null,
+    };
+  }
+
+  const videoLinks = value.videoLinks
+    .filter((v) => v.url.trim())
+    .map((v) => ({ url: v.url.trim(), title: v.title.trim() || null }));
+
+  return {
+    taskType: value.taskType,
+    courseId: value.courseId || null,
+    topicId: value.topicId || null,
+    totalCount: numberOrNull(value.totalCount),
+    durationMinutes: numberOrNull(value.durationMinutes),
+    videoLinks,
+    branchExamPublisher: value.taskType === "branch_exam" ? value.branchExamPublisher.trim() || null : null,
+  };
+}
+
+function selectClassName() {
+  return "border-input bg-background flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+}
+
+function VideoLinkRow({
+  link,
+  onChange,
+  onRemove,
+}: {
+  link: TaskFormVideoLink;
+  onChange: (next: TaskFormVideoLink) => void;
+  onRemove: () => void;
+}) {
+  const [fetching, setFetching] = useState(false);
+
+  // Automatic, no extra click: fires when the coach pastes a link and
+  // then moves on (blur). Guarded on a title already being resolved so
+  // repeatedly tabbing through the field doesn't re-fetch every time --
+  // onChange above always clears title back to "" the moment the url
+  // text itself changes, so a non-empty title here reliably means "this
+  // exact url was already fetched."
+  async function handleBlur() {
+    const url = link.url.trim();
+    if (!url || link.title || fetching) return;
+    setFetching(true);
+    try {
+      const title = await fetchYoutubeTitle(url);
+      onChange({ url, title: title ?? "" });
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            value={link.url}
+            onChange={(e) => onChange({ url: e.target.value, title: "" })}
+            onBlur={handleBlur}
+            placeholder="https://youtube.com/watch?v=..."
+            className={fetching ? "pr-9" : undefined}
+          />
+          {fetching && (
+            <Loader2 className="text-muted-foreground absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin" />
+          )}
+        </div>
+        <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label="Videoyu kaldır">
+          <X className="size-4" />
+        </Button>
+      </div>
+      {link.title && <p className="text-muted-foreground text-xs break-words">Başlık: {link.title}</p>}
+    </div>
+  );
+}
+
+// Shared field set for the "Smart Task Form" -- searchable course/topic
+// comboboxes (topic list always includes "Karma"), question count front
+// and center, duration de-emphasized/optional, and any number of YouTube
+// smart links, each fetched independently. Reused by the drawer's create
+// and edit modes -- only the surrounding chrome differs between them.
+export function TaskFormFields({
+  value,
+  onChange,
+  courseResourceData,
+  hideCourseTopic,
+}: {
+  value: TaskFormValue;
+  onChange: (next: TaskFormValue) => void;
+  courseResourceData?: CourseResourceData;
+  // The routine drawer already fixes the course to Paragraf/Problem
+  // before this renders -- showing the Ders/Konu pickers again would
+  // just invite the coach to accidentally pick something else.
+  hideCourseTopic?: boolean;
+}) {
+  const course = ALL_COURSES.find((c) => c.id === value.courseId) ?? ALL_COURSES[0];
+  const topics = topicsForCourse(course);
+  const isGeneralExam = value.taskType === "general_exam";
+  const isBranchExam = value.taskType === "branch_exam";
+  // Macro ("whole fruit") subjects lead the Ders picker, atomic ("sliced")
+  // ones follow -- ALL_COURSES itself stays atomic-first (its [0] is the
+  // universal fallback default for every OTHER task type), so the reorder
+  // happens only here, in the branch_exam-only display list.
+  const atomicCourseOptions = ALL_COURSES.filter((c) => !isBranchExamMacroCourseId(c.id));
+  const courseOptions = (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomicCourseOptions] : atomicCourseOptions).map((c) => ({
+    id: c.id,
+    label: courseLabel(c),
+  }));
+  // A course's resources are split by kind (0044) -- branch_exam tasks
+  // only ever offer that course's branch-trial inventory, question_bank
+  // tasks only ever offer its plain study resources. The two pools are
+  // never mixed in one picker.
+  const allResources = courseResourceData?.[value.courseId]?.resources ?? [];
+  const branchExamResources = courseResourceData?.[value.courseId]?.branchExamResources ?? [];
+  const resources = isBranchExam
+    ? branchExamResources.map((r) => ({ id: r.id, name: r.name, is_active: true }))
+    : allResources;
+  // Shown for Paragraf/Problem too (hideCourseTopic no longer excludes
+  // it) -- their resources live under course_id "paragraf"/"problem" in
+  // student_resources, same lookup as any real course. Also shown for
+  // "Konu Çalışması / Video" -- a study/video task can point the student
+  // at specific books to solve questions from, same as a pure Soru
+  // Bankası task.
+  const showResource =
+    (value.taskType === "question_bank" || value.taskType === "topic_study" || isBranchExam) && !!courseResourceData;
+
+  // "Genel Deneme" has no course/topic/count/duration/video at all --
+  // replaced by the Sınav Türü + Yayınevi fields below. The merged
+  // "Konu Çalışması / Video" keeps everything (course/topic/count/
+  // duration/video), all optional except course. "Branş Denemesi" never
+  // asks for a topic (a trial isn't scoped to one topic) and repurposes
+  // the count field as a trial-copy quantity instead of a question count.
+  const showCourse = !hideCourseTopic && !isGeneralExam;
+  const showTopic = !hideCourseTopic && !isGeneralExam && !isBranchExam;
+  const showCount = !isGeneralExam;
+  const showDuration = !isGeneralExam;
+  const showVideoLinks = !isGeneralExam;
+
+  function set(patch: Partial<TaskFormValue>) {
+    onChange({ ...value, ...patch });
+  }
+
+  function updateVideoLink(i: number, next: TaskFormVideoLink) {
+    set({ videoLinks: value.videoLinks.map((v, idx) => (idx === i ? next : v)) });
+  }
+
+  function removeVideoLink(i: number) {
+    set({ videoLinks: value.videoLinks.filter((_, idx) => idx !== i) });
+  }
+
+  function addVideoLink() {
+    set({ videoLinks: [...value.videoLinks, { url: "", title: "" }] });
+  }
+
+  function addResourceRow() {
+    set({ resources: [...value.resources, emptyResourceRow()] });
+  }
+
+  function updateResourceRow(i: number, next: TaskFormResource) {
+    set({ resources: value.resources.map((r, idx) => (idx === i ? next : r)) });
+  }
+
+  function removeResourceRow(i: number) {
+    set({ resources: value.resources.filter((_, idx) => idx !== i) });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="task-form-type">Görev Türü</Label>
+        <select
+          id="task-form-type"
+          className={selectClassName()}
+          value={value.taskType}
+          onChange={(e) => {
+            const taskType = e.target.value as AssignableTaskType;
+            set({
+              taskType,
+              resources: [],
+              totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
+            });
+          }}
+        >
+          {TASK_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isGeneralExam && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Sınav Türü</Label>
+            <div className="flex gap-1.5">
+              {GENERAL_EXAM_TRACK_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set({ generalExamTrack: opt.value })}
+                  className={cn(
+                    "flex-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    value.generalExamTrack === opt.value
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-card text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="task-form-publisher">Yayınevi</Label>
+            <Input
+              id="task-form-publisher"
+              value={value.generalExamPublisher}
+              onChange={(e) => set({ generalExamPublisher: e.target.value })}
+              placeholder="Örn: 3D Yayınları"
+            />
+          </div>
+        </div>
+      )}
+
+      {isBranchExam && (
+        <div className="space-y-1.5">
+          <Label htmlFor="task-form-branch-publisher">Yayınevi</Label>
+          <Input
+            id="task-form-branch-publisher"
+            value={value.branchExamPublisher}
+            onChange={(e) => set({ branchExamPublisher: e.target.value })}
+            placeholder="Örn: 3D Yayınları"
+          />
+        </div>
+      )}
+
+      {(showCourse || showTopic) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {showCourse && (
+            <div className="space-y-1.5">
+              <Label>Ders</Label>
+              <SmartCombobox
+                options={courseOptions}
+                value={value.courseId}
+                onChange={(courseId) => set({ courseId, topicId: "", resources: [] })}
+                placeholder="Ders ara..."
+                ariaLabel="Ders seç"
+              />
+            </div>
+          )}
+          {showTopic && (
+            <div className="space-y-1.5">
+              <Label>Konu</Label>
+              <SmartCombobox
+                options={topics.map((t) => ({ id: t.id, label: t.name }))}
+                value={value.topicId}
+                onChange={(topicId) => set({ topicId })}
+                placeholder="Konu ara..."
+                ariaLabel="Konu seç"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {showResource && (
+        <div className="space-y-2">
+          <Label>{isBranchExam ? "Branş Denemesi Kaynakları" : "Kaynaklar (opsiyonel)"}</Label>
+          {value.resources.map((r, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="flex-1">
+                <ResourceCombobox
+                  resources={resources}
+                  resourceId={r.resourceId}
+                  resourceName={r.resourceName}
+                  addToLibrary={r.addToLibrary}
+                  onSelectExisting={(sel) => updateResourceRow(i, { ...r, resourceId: sel.id, resourceName: sel.name })}
+                  onTypeNew={(name) => updateResourceRow(i, { ...r, resourceId: "", resourceName: name })}
+                  onAddToLibraryChange={(v) => updateResourceRow(i, { ...r, addToLibrary: v })}
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeResourceRow(i)} aria-label="Kaynağı kaldır">
+                <X className="size-4" />
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={addResourceRow}>
+            <Plus className="size-3.5" />
+            Kaynak Ekle
+          </Button>
+        </div>
+      )}
+
+      {showCount && (
+        <div className="space-y-1.5">
+          <Label htmlFor="task-form-count" className="text-sm font-semibold">
+            {isBranchExam ? "Kaç Adet" : value.taskType === "topic_study" ? "Soru Sayısı (opsiyonel)" : "Soru Sayısı / Hedef"}
+          </Label>
+          <Input
+            id="task-form-count"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={value.totalCount}
+            onChange={(e) => set({ totalCount: e.target.value })}
+            placeholder="Örn: 40"
+          />
+        </div>
+      )}
+
+      {showDuration && (
+        <div className="space-y-1.5">
+          <Label htmlFor="task-form-duration" className="text-muted-foreground text-xs font-normal">
+            Hedef Süre (dk) — opsiyonel
+          </Label>
+          <Input
+            id="task-form-duration"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={value.durationMinutes}
+            onChange={(e) => set({ durationMinutes: e.target.value })}
+            className="max-w-[140px]"
+          />
+        </div>
+      )}
+
+      {showVideoLinks && (
+        <div className="space-y-2">
+          <Label>Video Linkleri (opsiyonel)</Label>
+          {value.videoLinks.map((link, i) => (
+            <VideoLinkRow key={i} link={link} onChange={(next) => updateVideoLink(i, next)} onRemove={() => removeVideoLink(i)} />
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={addVideoLink}>
+            <Plus className="size-3.5" />
+            Video Ekle
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}

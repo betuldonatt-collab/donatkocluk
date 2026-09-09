@@ -256,8 +256,12 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
+# Left false deliberately -- no SMS provider is configured (see
+# [auth.sms.twilio] below, still disabled), so a new account's phone is
+# marked confirmed manually via the admin-approval flow (auth.admin.createUser
+# with phone_confirm: true) instead of an OTP round trip.
 enable_confirmations = false
 # Template for sending OTP to users
 template = "Your code is {{ .Code }}"
@@ -286,12 +290,17 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+# GoTrue gates its entire phone-auth provider on SOME SMS provider being
+# enabled here, even for password-only sign-in that never actually sends
+# an OTP (accounts are created with phone_confirm: true, bypassing
+# verification entirely -- see approveSignupRequest, app/admin/actions.ts).
+# These are placeholder, never-used credentials for local dev only -- no
+# SMS is ever actually sent since nothing in this app triggers an OTP send.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
-auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+enabled = true
+account_sid = "ACunused0000000000000000000000000"
+message_service_sid = "MGunused00000000000000000000000000"
+auth_token = "unused_local_dev_placeholder"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]

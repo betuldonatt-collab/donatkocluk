@@ -1,14 +1,80 @@
-import { headers } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
+import { requireViewContext } from "@/lib/impersonation";
+import { fetchCoachAnnouncements } from "@/lib/announcements";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
+import { ImpersonationLockStyles } from "@/components/impersonation-lock-styles";
+import { fetchStopwatchCompetitionRoster, type StopwatchRosterRow } from "./actions";
+import { AnnouncementCenter } from "./_components/announcements/announcement-center";
+import { StopwatchSideWidget } from "./_components/stopwatch/stopwatch-side-widget";
+import { CoachSidebar } from "./_components/coach-sidebar";
 
-import { AdminViewSwitcher } from "@/components/admin-view-switcher";
+// Throttled to once per PRESENCE_THROTTLE_MS -- see the matching comment
+// in app/student/layout.tsx for why. coach_profiles has no row-creation
+// trigger (a coach's first navigation lazily creates it), so this can't
+// use a plain guarded UPDATE like the student side: it still needs
+// upsert's insert-or-update semantics, hence the SELECT to decide
+// whether the write is due at all. Still a net win -- a point SELECT by
+// primary key skips the row's BEFORE UPDATE trigger, the new row
+// version, and the WAL/dead-tuple cost entirely when the existing
+// timestamp is already fresh.
+const PRESENCE_THROTTLE_MS = 60_000;
+
+async function touchCoachPresence(supabase: Awaited<ReturnType<typeof createClient>>, coachId: string) {
+  const { data } = await supabase.from("coach_profiles").select("last_active_at").eq("coach_id", coachId).maybeSingle();
+  const isStale = !data?.last_active_at || Date.now() - new Date(data.last_active_at).getTime() > PRESENCE_THROTTLE_MS;
+  if (!isStale) return;
+  await supabase.from("coach_profiles").upsert({ coach_id: coachId, last_active_at: new Date().toISOString() }, { onConflict: "coach_id" });
+}
+
+async function fetchLayoutData(effectiveUserId: string, isImpersonating: boolean) {
+  const supabase = await createClient();
+
+  const [{ count }] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("coach_id", effectiveUserId)
+      .eq("status", "active"),
+    // Presence touch is a write -- never fires while impersonating,
+    // regardless of who the real caller is.
+    isImpersonating ? Promise.resolve(null) : touchCoachPresence(supabase, effectiveUserId),
+  ]);
+
+  return { unreadCount: count ?? 0 };
+}
 
 export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
-  const role = (await headers()).get("x-user-role");
+  const view = await requireViewContext("coach");
+  const { effectiveUserId, isImpersonating, targetName } = view;
+  const now = new Date();
+  const [{ unreadCount }, announcements, stopwatchRoster] = await Promise.all([
+    fetchLayoutData(effectiveUserId, isImpersonating),
+    fetchCoachAnnouncements(),
+    // Skipped while impersonating for the same reason announcements is --
+    // the whole panel renders inside a disabled <fieldset> then anyway,
+    // so there's nothing for this widget to usefully show.
+    isImpersonating
+      ? Promise.resolve([] as StopwatchRosterRow[])
+      : (async () => {
+          const supabase = await createClient();
+          return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+        })(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col">
-      {role === "admin" && <AdminViewSwitcher />}
-      <div className="flex flex-1">{children}</div>
+      {isImpersonating && (
+        <>
+          <ImpersonationBanner targetName={targetName ?? "kullanıcı"} />
+          <ImpersonationLockStyles />
+        </>
+      )}
+      <DashboardShell sidebar={<CoachSidebar unreadCount={unreadCount} />}>
+        {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
+      </DashboardShell>
+      <AnnouncementCenter announcements={announcements} />
+      <StopwatchSideWidget roster={stopwatchRoster} />
     </div>
   );
 }

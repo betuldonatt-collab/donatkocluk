@@ -1,0 +1,46 @@
+name: CI
+
+# Validation only -- this never touches a real Supabase project and needs
+# no secrets. It exists to catch two things before they reach main: a
+# regression in the app itself, and a migration that doesn't apply cleanly
+# (both currently only caught by a developer running these commands by
+# hand). Deploying migrations to production stays a deliberate, manual
+# step -- see the architectural note in the PR/commit that added this file.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec eslint .
+      - run: pnpm test
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # Spins up the same local Postgres+Auth stack `supabase start` uses
+      # in development, then applies every migration in supabase/migrations/
+      # plus supabase/seed.sql in order -- exactly `supabase db reset`'s
+      # normal local-dev behavior, just run in CI instead of by hand.
+      - name: Apply all migrations + seed to a fresh local database
+        run: |
+          supabase db start
+          supabase db reset

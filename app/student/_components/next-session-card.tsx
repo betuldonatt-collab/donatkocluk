@@ -4,17 +4,6 @@ import { useEffect, useState } from "react";
 import { Calendar, Video } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-// Join button lights up this many minutes before the session starts, and
-// stays lit afterward (no explicit session-duration field to expire it).
-const JOIN_LEAD_MINUTES = 15;
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "Şimdi";
@@ -28,6 +17,8 @@ function formatCountdown(ms: number) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+// Full-width banner at the top of Ana Sayfa — the join button stays
+// disabled until the exact scheduled_at instant, no early lead window.
 export function NextSessionCard({
   scheduledAt,
   meetingUrl,
@@ -44,19 +35,18 @@ export function NextSessionCard({
 
   if (!scheduledAt) {
     return (
-      <Card>
-        <CardHeader>
-          <Calendar className="text-muted-foreground size-6" />
-          <CardTitle className="text-base">Yaklaşan Koçluk Seansı</CardTitle>
-          <CardDescription>Şu an planlanmış bir koçluk seansın yok.</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="border-border bg-card flex items-center gap-3 rounded-xl border px-5 py-4">
+        <Calendar className="text-muted-foreground size-5 shrink-0" />
+        <p className="text-muted-foreground text-sm">
+          Şu an planlanmış bir koçluk seansın yok.
+        </p>
+      </div>
     );
   }
 
   const target = new Date(scheduledAt).getTime();
   const diff = target - now;
-  const canJoin = diff <= JOIN_LEAD_MINUTES * 60 * 1000 && !!meetingUrl;
+  const canJoin = diff <= 0 && !!meetingUrl;
 
   const formattedDate = new Date(scheduledAt).toLocaleString("tr-TR", {
     weekday: "long",
@@ -67,30 +57,37 @@ export function NextSessionCard({
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <Calendar className="text-primary size-6" />
-        <CardTitle className="text-base">Yaklaşan Koçluk Seansı</CardTitle>
-        <CardDescription>{formattedDate}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="text-foreground text-2xl font-semibold tabular-nums">
+    <div className="border-border from-primary/10 via-primary/5 flex flex-col gap-4 rounded-xl border bg-gradient-to-r to-transparent px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/15 flex size-11 shrink-0 items-center justify-center rounded-full">
+          <Calendar className="text-primary size-5" />
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Yaklaşan Koçluk Seansı
+          </p>
+          <p className="text-foreground text-sm font-medium">{formattedDate}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="text-foreground text-xl font-semibold tabular-nums sm:text-2xl">
           {formatCountdown(diff)}
         </div>
         {canJoin ? (
           <Button asChild>
             <a href={meetingUrl!} target="_blank" rel="noopener noreferrer">
               <Video className="size-4" />
-              Toplantıya Katıl
+              Görüşmeye Katıl
             </a>
           </Button>
         ) : (
           <Button disabled>
             <Video className="size-4" />
-            Toplantıya Katıl
+            Görüşmeye Katıl
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

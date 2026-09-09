@@ -1,14 +1,15 @@
-import { headers } from "next/headers";
-
-import { AdminViewSwitcher } from "@/components/admin-view-switcher";
+import { requireViewContext } from "@/lib/impersonation";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { AdminSidebar } from "./_components/admin-sidebar";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const role = (await headers()).get("x-user-role");
+  await requireViewContext("admin");
 
   return (
     <div className="flex flex-1 flex-col">
-      {role === "admin" && <AdminViewSwitcher />}
-      <div className="flex flex-1">{children}</div>
+      <DashboardShell sidebar={<AdminSidebar />}>
+        {children}
+      </DashboardShell>
     </div>
   );
 }

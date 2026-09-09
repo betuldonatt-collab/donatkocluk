@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { CourseTable, type ProgressMap, type Resource } from "./_components/course-table";
+import { BranchExamStockTable, type BranchExamResourceRef } from "./_components/branch-exam-stock-table";
+import { CourseTable, type CourseTopicStats, type ProgressMap, type Resource } from "./_components/course-table";
+import { TotalsSummary, type ResourceTotals } from "./_components/totals-summary";
 import {
   AYT_COURSES_BY_TRACK,
   TRACK_LABELS,
@@ -12,14 +15,29 @@ import {
   type Course,
   type Track,
 } from "@/lib/curriculum";
-import { addResource as addResourceAction, toggleResourceProgress } from "./actions";
+import {
+  addOwnBranchExamResource,
+  addResource as addResourceAction,
+  toggleResourceProgress,
+  updateOwnBranchExamStock,
+} from "./actions";
 
-export type CourseData = { resources: Resource[]; progress: ProgressMap };
+export type CourseData = {
+  resources: Resource[];
+  branchExamResources: BranchExamResourceRef[];
+  progress: ProgressMap;
+  topicStats: CourseTopicStats;
+};
+
+const EMPTY_TOPIC_STATS: CourseTopicStats = { byTopic: {}, karma: { total: 0, correct: 0, wrong: 0, empty: 0 } };
+const EMPTY_COURSE_DATA: CourseData = { resources: [], branchExamResources: [], progress: {}, topicStats: EMPTY_TOPIC_STATS };
 
 export function KaynakTakibiClient({
   initialCourseData,
+  totals,
 }: {
   initialCourseData: Record<string, CourseData>;
+  totals: ResourceTotals;
 }) {
   const [courseData, setCourseData] = useState<Record<string, CourseData>>(initialCourseData);
   const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
@@ -27,18 +45,24 @@ export function KaynakTakibiClient({
   const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
 
   function getData(courseId: string): CourseData {
-    return courseData[courseId] ?? { resources: [], progress: {} };
+    return courseData[courseId] ?? EMPTY_COURSE_DATA;
   }
 
   async function addResource(courseId: string, name: string) {
-    const resource = await addResourceAction(courseId, name);
-    setCourseData((prev) => {
-      const current = prev[courseId] ?? { resources: [], progress: {} };
-      return {
-        ...prev,
-        [courseId]: { ...current, resources: [...current.resources, resource] },
-      };
-    });
+    try {
+      const resource = await addResourceAction(courseId, name);
+      setCourseData((prev) => {
+        const current = prev[courseId] ?? EMPTY_COURSE_DATA;
+        return {
+          ...prev,
+          [courseId]: { ...current, resources: [...current.resources, resource] },
+        };
+      });
+      toast.success("Kaynak eklendi.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kaynak eklenemedi, tekrar dene.");
+      throw e;
+    }
   }
 
   function toggleProgress(
@@ -47,25 +71,78 @@ export function KaynakTakibiClient({
     resourceId: string,
     field: "solved" | "reviewed",
   ) {
-    const current = courseData[courseId] ?? { resources: [], progress: {} };
+    const current = courseData[courseId] ?? EMPTY_COURSE_DATA;
     const key = `${topicId}::${resourceId}`;
     const state = current.progress[key] ?? { solved: false, reviewed: false };
     const nextState = { ...state, [field]: !state[field] };
 
     setCourseData((prev) => {
-      const c = prev[courseId] ?? { resources: [], progress: {} };
+      const c = prev[courseId] ?? EMPTY_COURSE_DATA;
       return {
         ...prev,
         [courseId]: { ...c, progress: { ...c.progress, [key]: nextState } },
       };
     });
 
-    void toggleResourceProgress({
+    toggleResourceProgress({
       courseId,
       topicId,
       resourceId,
       solved: nextState.solved,
       reviewed: nextState.reviewed,
+    }).catch((e) => {
+      toast.error(e instanceof Error ? e.message : "Güncellenemedi, tekrar dene.");
+      // Roll back the optimistic flip so the UI matches what's actually saved.
+      setCourseData((prev) => {
+        const c = prev[courseId] ?? EMPTY_COURSE_DATA;
+        return { ...prev, [courseId]: { ...c, progress: { ...c.progress, [key]: state } } };
+      });
+    });
+  }
+
+  async function addBranchExamResource(courseId: string, name: string, totalStock: number, remainingStock: number) {
+    try {
+      const resource = await addOwnBranchExamResource(courseId, name, totalStock, remainingStock);
+      setCourseData((prev) => {
+        const current = prev[courseId] ?? EMPTY_COURSE_DATA;
+        return { ...prev, [courseId]: { ...current, branchExamResources: [...current.branchExamResources, resource] } };
+      });
+      toast.success("Branş denemesi eklendi.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Eklenemedi, tekrar dene.");
+      throw e;
+    }
+  }
+
+  function updateBranchExamStock(courseId: string, resourceId: string, totalStock: number, remainingStock: number) {
+    const previous = (courseData[courseId] ?? EMPTY_COURSE_DATA).branchExamResources.find((r) => r.id === resourceId);
+
+    setCourseData((prev) => {
+      const current = prev[courseId] ?? EMPTY_COURSE_DATA;
+      return {
+        ...prev,
+        [courseId]: {
+          ...current,
+          branchExamResources: current.branchExamResources.map((r) =>
+            r.id === resourceId ? { ...r, total_stock: totalStock, remaining_stock: remainingStock } : r,
+          ),
+        },
+      };
+    });
+
+    updateOwnBranchExamStock(resourceId, totalStock, remainingStock).catch((e) => {
+      toast.error(e instanceof Error ? e.message : "Stok güncellenemedi, tekrar dene.");
+      if (!previous) return;
+      setCourseData((prev) => {
+        const current = prev[courseId] ?? EMPTY_COURSE_DATA;
+        return {
+          ...prev,
+          [courseId]: {
+            ...current,
+            branchExamResources: current.branchExamResources.map((r) => (r.id === resourceId ? previous : r)),
+          },
+        };
+      });
     });
   }
 
@@ -86,6 +163,10 @@ export function KaynakTakibiClient({
         </p>
       </header>
 
+      <div className="mb-4">
+        <TotalsSummary totals={totals} />
+      </div>
+
       <Tabs defaultValue="tyt">
         <TabsList>
           <TabsTrigger value="tyt">TYT</TabsTrigger>
@@ -104,6 +185,8 @@ export function KaynakTakibiClient({
             getData={getData}
             addResource={addResource}
             toggleProgress={toggleProgress}
+            addBranchExamResource={addBranchExamResource}
+            updateBranchExamStock={updateBranchExamStock}
           />
         </TabsContent>
 
@@ -133,6 +216,8 @@ export function KaynakTakibiClient({
             getData={getData}
             addResource={addResource}
             toggleProgress={toggleProgress}
+            addBranchExamResource={addBranchExamResource}
+            updateBranchExamStock={updateBranchExamStock}
           />
         </TabsContent>
       </Tabs>
@@ -176,28 +261,40 @@ function ActiveCourseTable({
   getData,
   addResource,
   toggleProgress,
+  addBranchExamResource,
+  updateBranchExamStock,
 }: {
   courses: Course[];
   selectedId: string;
   getData: (courseId: string) => CourseData;
-  addResource: (courseId: string, name: string) => void;
+  addResource: (courseId: string, name: string) => Promise<void>;
   toggleProgress: (
     courseId: string,
     topic: string,
     resourceId: string,
     field: "solved" | "reviewed",
   ) => void;
+  addBranchExamResource: (courseId: string, name: string, totalStock: number, remainingStock: number) => Promise<void>;
+  updateBranchExamStock: (courseId: string, resourceId: string, totalStock: number, remainingStock: number) => void;
 }) {
   const course = courses.find((c) => c.id === selectedId) ?? courses[0];
   const data = getData(course.id);
 
   return (
-    <CourseTable
-      course={course}
-      resources={data.resources}
-      progress={data.progress}
-      onAddResource={(name) => addResource(course.id, name)}
-      onToggle={(topic, resourceId, field) => toggleProgress(course.id, topic, resourceId, field)}
-    />
+    <>
+      <CourseTable
+        course={course}
+        resources={data.resources}
+        progress={data.progress}
+        topicStats={data.topicStats}
+        onAddResource={(name) => addResource(course.id, name)}
+        onToggle={(topic, resourceId, field) => toggleProgress(course.id, topic, resourceId, field)}
+      />
+      <BranchExamStockTable
+        resources={data.branchExamResources}
+        onAdd={(name, totalStock, remainingStock) => addBranchExamResource(course.id, name, totalStock, remainingStock)}
+        onUpdateStock={(resourceId, totalStock, remainingStock) => updateBranchExamStock(course.id, resourceId, totalStock, remainingStock)}
+      />
+    </>
   );
 }

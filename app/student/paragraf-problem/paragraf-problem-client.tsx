@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 
@@ -22,9 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import { computeNet } from "@/lib/scoring";
-import { LineChart } from "./_components/line-chart";
-import { saveParagrafProblemEntry } from "./actions";
+import { ChartRangePicker } from "../_components/charts/chart-range-picker";
+import { DualMetricChart } from "../_components/charts/dual-metric-chart";
+import { getMoreParagrafEntries, getParagrafEntriesForDateRange, saveParagrafProblemEntry } from "./actions";
+import { PARAGRAF_ENTRIES_PAGE_SIZE } from "./constants";
 
 type SubjectForm = { dogru: string; yanlis: string; bos: string; sure: string };
 type SubjectEntry = { dogru: number; yanlis: number; bos: number; sure: number; net: number };
@@ -41,13 +44,71 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function ParagrafProblemClient({ initialHistory }: { initialHistory: HistoryEntry[] }) {
+export function ParagrafProblemClient({
+  initialHistory,
+  initialHasMore,
+}: {
+  initialHistory: HistoryEntry[];
+  initialHasMore: boolean;
+}) {
   const router = useRouter();
   const [date, setDate] = useState(todayISO());
   const [paragraf, setParagraf] = useState<SubjectForm>(EMPTY_SUBJECT);
   const [problem, setProblem] = useState<SubjectForm>(EMPTY_SUBJECT);
   const [saving, setSaving] = useState(false);
-  const history = initialHistory;
+  const [history, setHistory] = useState(initialHistory);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [syncedHistory, setSyncedHistory] = useState(initialHistory);
+
+  // Chart-only date range -- entirely separate from the "Geçmiş Veriler"
+  // table's own pagination below, which keeps using `history`/`hasMore`
+  // untouched. "Son 30 Gün" is answered from whatever's already loaded
+  // (the initial fetch already covers the most recent 30 rows); a custom
+  // calendar range may fall outside that window, so it's fetched on demand
+  // and cached by its "start_end" key to avoid refetching on toggle-back.
+  const [chartRange, setChartRange] = useState<ChartRange>(LAST_30_DAYS_RANGE);
+  const [rangeCache, setRangeCache] = useState<Record<string, HistoryEntry[]>>({});
+  const rangeCacheKey = chartRange.type === "custom" ? `${chartRange.startDate}_${chartRange.endDate}` : null;
+  // Derived, not its own state -- true exactly while a selected range's
+  // rows haven't landed in rangeCache yet, so it clears itself the instant
+  // the fetch below resolves without a second setState call.
+  const loadingChartRange = rangeCacheKey !== null && !rangeCache[rangeCacheKey];
+
+  useEffect(() => {
+    if (chartRange.type !== "custom" || rangeCacheKey === null || rangeCache[rangeCacheKey]) return;
+    let cancelled = false;
+    getParagrafEntriesForDateRange(chartRange.startDate, chartRange.endDate).then((rows) => {
+      if (cancelled) return;
+      setRangeCache((prev) => ({ ...prev, [rangeCacheKey]: rows }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chartRange, rangeCacheKey, rangeCache]);
+
+  // router.refresh() after a save re-runs the server fetch (page 1 only)
+  // and hands down a new initialHistory/initialHasMore -- resync local
+  // state to it rather than keep whatever "load more" had accumulated.
+  // Adjusted during render (not an effect) per React's "storing
+  // information from previous renders" pattern -- avoids an extra
+  // commit just to reset state that render can settle in one pass.
+  if (initialHistory !== syncedHistory) {
+    setSyncedHistory(initialHistory);
+    setHistory(initialHistory);
+    setHasMore(initialHasMore);
+  }
+
+  async function handleLoadMore() {
+    setLoadingMore(true);
+    try {
+      const more = await getMoreParagrafEntries(history.length);
+      setHistory((prev) => [...prev, ...more]);
+      setHasMore(more.length === PARAGRAF_ENTRIES_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const paragrafNet = computeNet(Number(paragraf.dogru) || 0, Number(paragraf.yanlis) || 0);
   const problemNet = computeNet(Number(problem.dogru) || 0, Number(problem.yanlis) || 0);
@@ -78,19 +139,20 @@ export function ParagrafProblemClient({ initialHistory }: { initialHistory: Hist
     }
   }
 
-  const sortedAsc = useMemo(
-    () => [...history].sort((a, b) => a.date.localeCompare(b.date)),
-    [history],
-  );
+  const chartSortedAsc = useMemo(() => {
+    const source =
+      chartRange.type === "last30"
+        ? history.filter((e) => isDateInChartRange(e.date, chartRange))
+        : (rangeCache[rangeCacheKey!] ?? []);
+    return [...source].sort((a, b) => a.date.localeCompare(b.date));
+  }, [chartRange, history, rangeCache, rangeCacheKey]);
   const sortedDesc = useMemo(
     () => [...history].sort((a, b) => b.date.localeCompare(a.date)),
     [history],
   );
 
-  const paragrafNetSeries = sortedAsc.map((e) => ({ date: e.date, value: e.paragraf.net }));
-  const paragrafSureSeries = sortedAsc.map((e) => ({ date: e.date, value: e.paragraf.sure }));
-  const problemNetSeries = sortedAsc.map((e) => ({ date: e.date, value: e.problem.net }));
-  const problemSureSeries = sortedAsc.map((e) => ({ date: e.date, value: e.problem.sure }));
+  const paragrafSeries = chartSortedAsc.map((e) => ({ date: e.date, a: e.paragraf.net, b: e.paragraf.sure }));
+  const problemSeries = chartSortedAsc.map((e) => ({ date: e.date, a: e.problem.net, b: e.problem.sure }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -103,11 +165,55 @@ export function ParagrafProblemClient({ initialHistory }: { initialHistory: Hist
         </p>
       </header>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-base">Yeni Veri Girişi</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <section aria-labelledby="section-charts">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="section-charts" className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+            Gelişim Grafikleri
+          </h2>
+          <ChartRangePicker value={chartRange} onChange={setChartRange} />
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Paragraf Gelişimi</CardTitle>
+              <CardDescription>Net ve süre değişimi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingChartRange ? (
+                <p className="text-muted-foreground flex h-[200px] items-center justify-center text-sm">
+                  Yükleniyor...
+                </p>
+              ) : (
+                <DualMetricChart data={paragrafSeries} labelA="Net" labelB="Süre" unitB=" dk" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Problem Gelişimi</CardTitle>
+              <CardDescription>Net ve süre değişimi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingChartRange ? (
+                <p className="text-muted-foreground flex h-[200px] items-center justify-center text-sm">
+                  Yükleniyor...
+                </p>
+              ) : (
+                <DualMetricChart data={problemSeries} labelA="Net" labelB="Süre" unitB=" dk" />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <hr className="border-border my-8" />
+
+      <section aria-labelledby="section-entry">
+        <h2 id="section-entry" className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+          Yeni Veri Girişi
+        </h2>
+        <div className="space-y-4">
           <div className="max-w-xs space-y-1.5">
             <Label htmlFor="entry-date">Tarih</Label>
             <Input
@@ -118,99 +224,114 @@ export function ParagrafProblemClient({ initialHistory }: { initialHistory: Hist
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <SubjectFields
-              title="Paragraf"
-              value={paragraf}
-              onChange={setParagraf}
-              net={paragrafNet}
-            />
-            <SubjectFields
-              title="Problem"
-              value={problem}
-              onChange={setProblem}
-              net={problemNet}
-            />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Paragraf Girişi</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SubjectFields title="Paragraf" value={paragraf} onChange={setParagraf} net={paragrafNet} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Problem Girişi</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SubjectFields title="Problem" value={problem} onChange={setProblem} net={problemNet} />
+              </CardContent>
+            </Card>
           </div>
 
           <Button type="button" onClick={handleSave} disabled={saving}>
             <Save className="size-4" />
             {saving ? "Kaydediliyor..." : "Kaydet"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Paragraf Gelişimi</CardTitle>
-            <CardDescription>Net ve süre değişimi</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium">Net</p>
-              <LineChart data={paragrafNetSeries} />
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium">Süre (dk)</p>
-              <LineChart data={paragrafSureSeries} unit=" dk" />
-            </div>
-          </CardContent>
-        </Card>
+      <hr className="border-border my-8" />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Problem Gelişimi</CardTitle>
-            <CardDescription>Net ve süre değişimi</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium">Net</p>
-              <LineChart data={problemNetSeries} />
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium">Süre (dk)</p>
-              <LineChart data={problemSureSeries} unit=" dk" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <section aria-labelledby="section-history">
+        <h2 id="section-history" className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+          Geçmiş Veriler
+        </h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Paragraf Geçmişi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {sortedDesc.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Net</TableHead>
+                      <TableHead>Süre</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedDesc.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{new Date(entry.date).toLocaleDateString("tr-TR")}</TableCell>
+                        <TableCell>{entry.paragraf.net}</TableCell>
+                        <TableCell>{entry.paragraf.sure} dk</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Geçmiş Veriler</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {sortedDesc.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tarih</TableHead>
-                  <TableHead>Paragraf Net</TableHead>
-                  <TableHead>Paragraf Süre</TableHead>
-                  <TableHead>Problem Net</TableHead>
-                  <TableHead>Problem Süre</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedDesc.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>
-                      {new Date(entry.date).toLocaleDateString("tr-TR")}
-                    </TableCell>
-                    <TableCell>{entry.paragraf.net}</TableCell>
-                    <TableCell>{entry.paragraf.sure} dk</TableCell>
-                    <TableCell>{entry.problem.net}</TableCell>
-                    <TableCell>{entry.problem.sure} dk</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Problem Geçmişi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {sortedDesc.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Net</TableHead>
+                      <TableHead>Süre</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedDesc.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{new Date(entry.date).toLocaleDateString("tr-TR")}</TableCell>
+                        <TableCell>{entry.problem.net}</TableCell>
+                        <TableCell>{entry.problem.sure} dk</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {hasMore && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 w-full"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Yükleniyor..." : "Daha Fazla Yükle"}
+          </Button>
+        )}
+      </section>
     </div>
   );
 }
@@ -232,8 +353,7 @@ function SubjectFields({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="flex items-center justify-end">
         <span className="text-muted-foreground text-xs">
           Net: <span className="text-foreground font-semibold">{net}</span>
         </span>

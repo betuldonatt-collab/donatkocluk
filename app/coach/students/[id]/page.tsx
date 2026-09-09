@@ -1,0 +1,497 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+
+import { createClient } from "@/lib/supabase/server";
+import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, KARMA_TOPIC_ID, TYT_COURSES, findCourseById } from "@/lib/curriculum";
+import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
+import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
+import { weekDates } from "@/lib/date";
+import { nextCycleRange } from "@/lib/karne";
+import { STUDENT_NOTES_PAGE_SIZE } from "./constants";
+import type { CoachReportCardRow } from "../../actions";
+import { DetailTabs } from "./_components/detail-tabs";
+import type { DayStat } from "./_components/daily-stats-summary";
+import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
+import { ProfileOverviewCard } from "./_components/profile-overview-card";
+import { StudentTimelineCard } from "./_components/student-timeline-card";
+import { TargetsCompletionCard } from "./_components/targets-completion-card";
+import type { TopicPerformanceRow } from "./_components/topic-performance-map";
+import type { WeakTopicRow } from "./weak-topic-map";
+import type {
+  CompletionStats,
+  DetailCoachNote,
+  DetailSession,
+  DetailTask,
+  ParagrafProblemEntry,
+  StudentProfile,
+  SubjectCompletion,
+} from "./types";
+
+const ALL_CURRICULUM_COURSE_IDS = [
+  ...TYT_COURSES.map((c) => c.id),
+  ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
+  ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
+  ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
+  ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
+];
+
+const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const MONTH_LABELS = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getWeekDays(referenceIso: string) {
+  return weekDates(referenceIso).map((date, i) => {
+    const d = new Date(`${date}T00:00:00Z`);
+    return { date, label: `${DAY_LABELS[i]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
+  });
+}
+
+function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
+  // Genel Deneme has no course_id -- its TYT/AYT track lives only in the
+  // title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."),
+  // per the coach's request to avoid a dedicated column for it.
+  if (task.task_type === "general_exam") return task.title.toUpperCase().startsWith("AYT") ? "ayt" : "tyt";
+  if (task.course_id?.startsWith("tyt-")) return "tyt";
+  if (task.course_id?.startsWith("ayt-")) return "ayt";
+  return "other";
+}
+
+function computeCompletionStats(tasks: DetailTask[]): CompletionStats {
+  const buckets = {
+    overall: { done: 0, total: 0 },
+    tyt: { done: 0, total: 0 },
+    ayt: { done: 0, total: 0 },
+  };
+  for (const t of tasks) {
+    buckets.overall.total += 1;
+    if (t.status === "done") buckets.overall.done += 1;
+    const track = classifyTrack(t);
+    if (track === "tyt" || track === "ayt") {
+      buckets[track].total += 1;
+      if (t.status === "done") buckets[track].done += 1;
+    }
+  }
+  const pct = (b: { done: number; total: number }) => (b.total > 0 ? Math.round((b.done / b.total) * 100) : null);
+  return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
+}
+
+// Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
+// (paragraf/problem) aren't real curriculum subjects, so they're excluded
+// here even though they're valid course_ids elsewhere in the app.
+function computeSubjectCompletion(tasks: DetailTask[]): SubjectCompletion[] {
+  const buckets = new Map<string, { done: number; total: number }>();
+  for (const t of tasks) {
+    if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
+    const bucket = buckets.get(t.course_id) ?? { done: 0, total: 0 };
+    bucket.total += 1;
+    if (t.status === "done") bucket.done += 1;
+    buckets.set(t.course_id, bucket);
+  }
+  return [...buckets.entries()]
+    .map(([courseId, b]) => {
+      const course = findCourseById(courseId);
+      const prefix = courseId.startsWith("tyt-") ? "TYT " : courseId.startsWith("ayt-") ? "AYT " : "";
+      return {
+        courseId,
+        courseName: `${prefix}${course?.name ?? courseId}`,
+        pct: Math.round((b.done / b.total) * 100),
+        done: b.done,
+        total: b.total,
+      };
+    })
+    .sort((a, b) => a.courseName.localeCompare(b.courseName, "tr"));
+}
+
+async function fetchStudentDetail(studentId: string) {
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", studentId).maybeSingle();
+  if (!profile) return null;
+
+  const today = todayISO();
+  const weekDays = getWeekDays(today);
+
+  const [
+    { data: allTasks },
+    { data: sessionRows },
+    { data: paragrafRows },
+    { data: weekTaskRows },
+    { data: resourceRows },
+    { data: progressRows },
+    { data: noteRows },
+    { data: taskResourceRows },
+    { data: dailyStatsRows },
+    { data: reportCardRows },
+  ] = await Promise.all([
+      supabase
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("task_date", { ascending: false }),
+      supabase
+        .from("coaching_sessions")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("scheduled_at", { ascending: false }),
+      supabase
+        .from("paragraf_problem_entries")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("entry_date", { ascending: true }),
+      supabase
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", studentId)
+        .gte("task_date", weekDays[0].date)
+        .lte("task_date", weekDays[6].date)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("student_resources")
+        .select("id, name, course_id, is_active, kind, total_stock, remaining_stock")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("student_resource_progress")
+        .select("course_id, topic_id, resource_id, solved, reviewed, total_questions, correct_answers, incorrect_answers")
+        .eq("student_id", studentId),
+      supabase
+        .from("coach_notes")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false })
+        .range(0, STUDENT_NOTES_PAGE_SIZE - 1),
+      supabase
+        .from("task_resources")
+        .select("task_id, resource_id, order_index, student_tasks!inner(student_id)")
+        .eq("student_tasks.student_id", studentId)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("student_daily_stats")
+        .select("entry_date, total_count, correct_count, wrong_count, empty_count")
+        .eq("student_id", studentId)
+        .gte("entry_date", weekDays[0].date)
+        .lte("entry_date", weekDays[6].date),
+      supabase
+        .from("student_report_cards")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("cycle_number", { ascending: false }),
+    ]);
+
+  // coaching_start_date is so often never set that generateCycleReportCard
+  // (app/coach/actions.ts) falls back to the coach_students roster-link's
+  // own created_at -- fetched here too, purely so the Karneler tab's date
+  // range picker can default to the same "next cycle" range the server
+  // would have auto-computed. RLS already scopes this to the caller's own
+  // link (or an admin's), no explicit coach_id filter needed, matching
+  // every other query above.
+  const { data: coachLink } = await supabase.from("coach_students").select("created_at").eq("student_id", studentId).maybeSingle();
+
+  const resourceIdsByTask = new Map<string, string[]>();
+  for (const row of taskResourceRows ?? []) {
+    const list = resourceIdsByTask.get(row.task_id) ?? [];
+    list.push(row.resource_id);
+    resourceIdsByTask.set(row.task_id, list);
+  }
+  const tasks = (allTasks ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[];
+  // Soft coach approval: a student's own pending self-created entry
+  // (is_coach_assigned: false, is_approved_by_coach: false) is excluded
+  // from the Kaynak Takibi and Gelişim Haritası aggregations below until
+  // approveStudentTask (app/coach/actions.ts) reviews it -- it still
+  // shows up in `tasks` itself (program completion, raw exam lists,
+  // etc.), only the analytics rollups read this narrower list.
+  const approvedTasks = tasks.filter((t) => t.is_coach_assigned || t.is_approved_by_coach);
+  const sessions = (sessionRows ?? []) as DetailSession[];
+  const paragrafEntries = (paragrafRows ?? []) as ParagrafProblemEntry[];
+  const notes = (noteRows ?? []) as DetailCoachNote[];
+
+  const EMPTY_TOPIC_STATS = { byTopic: {}, karma: { total: 0, correct: 0, wrong: 0, empty: 0 } };
+  const courseResourceData: CourseResourceData = {};
+  function courseEntry(courseId: string) {
+    return (courseResourceData[courseId] ??= {
+      resources: [],
+      branchExamResources: [],
+      progress: {},
+      topicStats: structuredClone(EMPTY_TOPIC_STATS),
+    });
+  }
+  for (const row of resourceRows ?? []) {
+    const entry = courseEntry(row.course_id);
+    // Branch-trial resources are inventory, not topic-checklist material
+    // -- they never show up in the solved/reviewed matrix, only in the
+    // separate stock table (branchExamResources).
+    if (row.kind === "branch_exam") {
+      entry.branchExamResources.push({
+        id: row.id,
+        name: row.name,
+        total_stock: row.total_stock ?? 0,
+        remaining_stock: row.remaining_stock ?? 0,
+        is_active: row.is_active,
+      });
+    } else {
+      entry.resources.push({ id: row.id, name: row.name, is_active: row.is_active });
+    }
+  }
+  for (const row of progressRows ?? []) {
+    const entry = courseEntry(row.course_id);
+    entry.progress[`${row.topic_id}::${row.resource_id}`] = { solved: row.solved, reviewed: row.reviewed };
+  }
+  // Every scored task's course_id/topic_id already sat in `tasks` (fetched
+  // above) -- no separate query needed. "karma" is a real, selectable
+  // topic (KARMA_TOPIC_ID, lib/curriculum) meaning "mixed topics" -- not
+  // the absence of one -- so both a null topic_id and an explicit "karma"
+  // pick are exactly what the Kaynak Takibi table's "Karma / Karışık
+  // Çözümler" row catches. Every other topic_id is a genuine syllabus
+  // topic and gets its own row.
+  for (const t of approvedTasks) {
+    if (t.course_id === null || t.total_count === null) continue;
+    const entry = courseEntry(t.course_id);
+    const hasRealTopic = t.topic_id && t.topic_id !== KARMA_TOPIC_ID;
+    const bucket = hasRealTopic ? (entry.topicStats.byTopic[t.topic_id!] ??= { total: 0, correct: 0, wrong: 0, empty: 0 }) : entry.topicStats.karma;
+    bucket.total += t.total_count ?? 0;
+    bucket.correct += t.correct_count ?? 0;
+    bucket.wrong += t.wrong_count ?? 0;
+    bucket.empty += t.empty_count ?? 0;
+  }
+
+  const weekStats: DayStat[] = (dailyStatsRows ?? []).map((r) => ({
+    date: r.entry_date,
+    total: r.total_count,
+    correct: r.correct_count,
+    wrong: r.wrong_count,
+    empty: r.empty_count,
+  }));
+
+  // Konu Performans Haritası must scan the student's ENTIRE exam history
+  // -- a recency window can silently drop an entire track (e.g. AYT
+  // branch exams pushed out by more frequent recent TYT ones).
+  const allExams = approvedTasks.filter((t) => t.task_type === "branch_exam" || t.task_type === "general_exam");
+  const allExamIds = allExams.map((e) => e.id);
+  const { data: mistakeRows } =
+    allExamIds.length > 0
+      ? await supabase.from("student_task_topic_mistakes").select("task_id, course_id, topic_id").in("task_id", allExamIds)
+      : { data: [] };
+
+  const examTitleById = new Map(allExams.map((e) => [e.id, e.title]));
+  const counts = new Map<string, { courseId: string; topicId: string; count: number; examTitles: string[] }>();
+  for (const m of mistakeRows ?? []) {
+    const key = `${m.course_id}::${m.topic_id}`;
+    const examTitle = examTitleById.get(m.task_id) ?? "";
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.examTitles.push(examTitle);
+    } else {
+      counts.set(key, { courseId: m.course_id, topicId: m.topic_id, count: 1, examTitles: [examTitle] });
+    }
+  }
+
+  // Each course's own exam count (not a single global sample size) is
+  // used as its topics' denominator, since a course tested in 2 exams
+  // shouldn't be judged against how many exams exist for every other
+  // course.
+  const courseExamCounts = new Map<string, number>();
+  for (const e of allExams) {
+    if (e.task_type === "branch_exam" && e.course_id) {
+      courseExamCounts.set(e.course_id, (courseExamCounts.get(e.course_id) ?? 0) + 1);
+    }
+    if (e.task_type === "general_exam") {
+      for (const group of TYT_SUBJECT_GROUPS) {
+        for (const cid of group.courseIds) {
+          courseExamCounts.set(cid, (courseExamCounts.get(cid) ?? 0) + 1);
+        }
+      }
+    }
+  }
+
+  // Windowed sibling of the all-time map below -- see lib/gelisim-haritasi.ts.
+  const gelisimHaritasi: GelisimHaritasiRow[] = computeGelisimHaritasi(ALL_CURRICULUM_COURSE_IDS, allExams, mistakeRows ?? []);
+
+  // Full-spectrum performance map: every topic in every curriculum course
+  // (not just ones the student has actually been examined on yet), so the
+  // coach can browse any course's chip and see a clean topic list -- a
+  // 0-mistake topic is real "good news" signal, not just an absence of
+  // data.
+  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = ALL_CURRICULUM_COURSE_IDS.flatMap((courseId) => {
+    const course = findCourseById(courseId);
+    if (!course) return [];
+    const sampleSize = courseExamCounts.get(courseId) ?? 0;
+    return course.units.flatMap((u) =>
+      u.topics.map((topic) => {
+        const key = `${courseId}::${topic.id}`;
+        const c = counts.get(key);
+        return {
+          courseId,
+          courseName: course.name,
+          topicId: topic.id,
+          topicName: topic.name,
+          count: c?.count ?? 0,
+          examTitles: c?.examTitles ?? [],
+          sampleSize,
+        };
+      }),
+    );
+  }).sort((a, b) => b.count - a.count);
+
+  // Topic-based question aggregation (distinct from the mistake-count
+  // tiers above): total/correct/incorrect QUESTIONS solved per topic,
+  // combining task-based practice (student_tasks) and book-based
+  // practice (student_resource_progress) -- "how well did the student
+  // grasp this topic", not "which book did it come from". A Karma task
+  // contributes via its own per-topic breakdown rows instead of its own
+  // (meaningless-per-topic) totals.
+  const topicQuestionTotals = new Map<string, { total: number; correct: number; incorrect: number }>();
+  function bumpQuestionTotals(courseId: string, topicId: string, total: number, correct: number, incorrect: number) {
+    const key = `${courseId}::${topicId}`;
+    const existing = topicQuestionTotals.get(key) ?? { total: 0, correct: 0, incorrect: 0 };
+    existing.total += total;
+    existing.correct += correct;
+    existing.incorrect += incorrect;
+    topicQuestionTotals.set(key, existing);
+  }
+
+  for (const t of approvedTasks) {
+    if (!t.course_id || !t.topic_id || t.topic_id === "karma") continue;
+    if (t.total_count === null && t.correct_count === null && t.wrong_count === null) continue;
+    bumpQuestionTotals(t.course_id, t.topic_id, t.total_count ?? 0, t.correct_count ?? 0, t.wrong_count ?? 0);
+  }
+
+  const karmaTaskIds = approvedTasks.filter((t) => t.topic_id === "karma").map((t) => t.id);
+  const { data: breakdownRows } =
+    karmaTaskIds.length > 0
+      ? await supabase
+          .from("student_task_topic_breakdown")
+          .select("course_id, topic_id, total_questions, correct_answers, incorrect_answers")
+          .in("task_id", karmaTaskIds)
+      : { data: [] };
+  for (const b of breakdownRows ?? []) {
+    bumpQuestionTotals(b.course_id, b.topic_id, b.total_questions, b.correct_answers, b.incorrect_answers);
+  }
+
+  for (const row of progressRows ?? []) {
+    if (row.total_questions === null || row.total_questions === undefined) continue;
+    bumpQuestionTotals(row.course_id, row.topic_id, row.total_questions, row.correct_answers ?? 0, row.incorrect_answers ?? 0);
+  }
+
+  const topicPerformanceWithQuestions: TopicPerformanceRow[] = topicPerformance.map((row) => {
+    const q = topicQuestionTotals.get(`${row.courseId}::${row.topicId}`);
+    return {
+      ...row,
+      questionTotal: q?.total ?? 0,
+      questionCorrect: q?.correct ?? 0,
+      questionIncorrect: q?.incorrect ?? 0,
+    };
+  });
+
+  return {
+    profile: profile as StudentProfile,
+    completion: computeCompletionStats(tasks),
+    subjectCompletion: computeSubjectCompletion(tasks),
+    topicPerformance: topicPerformanceWithQuestions,
+    gelisimHaritasi,
+    sessions,
+    notes,
+    notesHasMore: notes.length === STUDENT_NOTES_PAGE_SIZE,
+    paragrafEntries,
+    generalExams: tasks.filter((t) => t.task_type === "general_exam"),
+    branchExams: tasks.filter((t) => t.task_type === "branch_exam"),
+    examMistakes: mistakeRows ?? [],
+    weekDays,
+    weekTasks: (weekTaskRows ?? []) as DetailTask[],
+    courseResourceData,
+    today,
+    weekStats,
+    karneCycles: (reportCardRows ?? []) as CoachReportCardRow[],
+    // reportCardRows is ordered cycle_number descending, so [0] is the
+    // latest cycle -- same "chain off the last cycle" rule as
+    // generateCycleReportCard's own default, computed here only to seed
+    // the date range picker's initial value (the coach can freely change
+    // it from there). Null when there's nothing to chain off of yet
+    // (no coaching_start_date and no roster-link date either) -- the
+    // picker just starts empty in that rare case.
+    defaultKarneRange: (() => {
+      const coachingStart = profile.coaching_start_date ?? coachLink?.created_at?.slice(0, 10) ?? null;
+      if (!coachingStart) return null;
+      return nextCycleRange(coachingStart, reportCardRows?.[0]?.range_end ?? null);
+    })(),
+  };
+}
+
+const DETAIL_TABS = ["analiz", "gelisim-haritasi", "grafikler", "program", "kaynak-takibi", "karneler"] as const;
+
+export default async function CoachStudentDetailPage(props: PageProps<"/coach/students/[id]">) {
+  const { id } = await props.params;
+  const searchParams = await props.searchParams;
+  const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
+  const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
+  const detail = await fetchStudentDetail(id);
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <Link
+        href="/coach/students"
+        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
+      >
+        <ArrowLeft className="size-4" />
+        Öğrencilerim
+      </Link>
+
+      {!detail ? (
+        <p className="text-muted-foreground text-sm">Öğrenci bulunamadı veya bu öğrenci sana atanmamış.</p>
+      ) : (
+        <>
+          <header className="mb-6">
+            <h1 className="text-2xl font-semibold text-foreground">{detail.profile.full_name ?? "İsimsiz Öğrenci"}</h1>
+          </header>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <ProfileOverviewCard studentId={id} profile={detail.profile} />
+                <TargetsCompletionCard
+                  studentId={id}
+                  profile={detail.profile}
+                  completion={detail.completion}
+                  subjectCompletion={detail.subjectCompletion}
+                />
+              </div>
+
+              <DetailTabs
+                studentId={id}
+                topicPerformance={detail.topicPerformance}
+                gelisimHaritasi={detail.gelisimHaritasi}
+                paragrafEntries={detail.paragrafEntries}
+                generalExams={detail.generalExams}
+                branchExams={detail.branchExams}
+                initialWeekDays={detail.weekDays}
+                initialWeekTasks={detail.weekTasks}
+                courseResourceData={detail.courseResourceData}
+                today={detail.today}
+                initialWeekStats={detail.weekStats}
+                karneCycles={detail.karneCycles}
+                defaultKarneRange={detail.defaultKarneRange}
+                initialTab={initialTab}
+                examMistakes={detail.examMistakes}
+              />
+            </div>
+
+            <div className="lg:col-span-1">
+              <StudentTimelineCard
+                studentId={id}
+                notes={detail.notes}
+                sessions={detail.sessions}
+                initialHasMore={detail.notesHasMore}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

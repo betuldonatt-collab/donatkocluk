@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, Users, ClipboardList, ShieldCheck } from "lucide-react";
+import { GraduationCap, Users } from "lucide-react";
 
 import {
   Card,
@@ -9,6 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 
 const PANELS = [
   {
@@ -23,18 +24,6 @@ const PANELS = [
     description: "Çocuğunun ilerlemesini izle.",
     icon: Users,
   },
-  {
-    href: "/login?role=coach",
-    label: "Koç Girişi",
-    description: "Öğrencilerini yönet ve koçluk yap.",
-    icon: ClipboardList,
-  },
-  {
-    href: "/login?role=admin",
-    label: "Admin Girişi",
-    description: "Platformu yönet.",
-    icon: ShieldCheck,
-  },
 ];
 
 export default function Home() {
@@ -42,9 +31,12 @@ export default function Home() {
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-2xl space-y-8">
         <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Koçluk Platformu
-          </h1>
+          <div className="flex items-center justify-center gap-3">
+            <Logo className="size-14" />
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Donat Koçluk
+            </h1>
+          </div>
           <p className="text-muted-foreground">
             Devam etmek için panelini seç.
           </p>
@@ -66,6 +58,12 @@ export default function Home() {
             </Card>
           ))}
         </div>
+
+        <p className="text-center text-sm">
+          <Link href="/team" className="text-muted-foreground hover:underline">
+            Ekip üyesi misin? Buradan giriş yap →
+          </Link>
+        </p>
       </div>
     </div>
   );

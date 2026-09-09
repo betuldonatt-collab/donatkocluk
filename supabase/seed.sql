@@ -4,6 +4,7 @@
 --
 -- Admin: admin@local.dev / LocalAdmin123!
 -- Coach: coach@local.dev / LocalCoach123!
+-- Parent: parent@local.dev / ParentTest2026!
 create or replace function pg_temp.create_local_test_user(
   p_email text, p_password text, p_role text, p_full_name text
 ) returns uuid
@@ -16,6 +17,10 @@ begin
     return (select id from auth.users where email = p_email);
   end if;
 
+  -- role lives in raw_app_meta_data, not raw_user_meta_data -- handle_new_user()
+  -- (0062) only trusts the former (the public signUp() client can never set
+  -- it, only the service-role Admin API), so a locally-seeded test account
+  -- needs it there too or it silently ends up 'student' regardless of p_role.
   insert into auth.users (
     instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
@@ -29,8 +34,8 @@ begin
     p_email,
     crypt(p_password, gen_salt('bf')),
     now(),
-    '{"provider":"email","providers":["email"]}',
-    jsonb_build_object('role', p_role, 'full_name', p_full_name),
+    jsonb_build_object('provider', 'email', 'providers', array['email'], 'role', p_role),
+    jsonb_build_object('full_name', p_full_name),
     now(), now(),
     '', '', '', ''
   );
@@ -55,3 +60,4 @@ $$;
 
 select pg_temp.create_local_test_user('admin@local.dev', 'LocalAdmin123!', 'admin', 'Local Test Admin');
 select pg_temp.create_local_test_user('coach@local.dev', 'LocalCoach123!', 'coach', 'Local Test Coach');
+select pg_temp.create_local_test_user('parent@local.dev', 'ParentTest2026!', 'parent', 'Local Test Parent');

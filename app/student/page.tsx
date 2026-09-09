@@ -1,53 +1,111 @@
-import Link from "next/link";
-import { ClipboardList } from "lucide-react";
-
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { getViewContext } from "@/lib/impersonation";
+import { mondayOf, weekDates } from "@/lib/date";
 import { NextSessionCard } from "./_components/next-session-card";
-import { CoachNotesPreview } from "./_components/coach-notes-preview";
+import { SessionRatingBanner } from "./_components/session-rating-banner";
+import { TaskBoard } from "./_components/daily-tasks/task-board";
+import type { StudentTask } from "./_components/daily-tasks/types";
+import type { SessionNeedingRating } from "./_components/types";
+
+const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const MONTH_LABELS = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Monday-through-Sunday week containing `todayISO`, computed in UTC to
+// match todayISO()'s own UTC-based "today" (see fetchHomeData).
+function getWeekDays(todayIso: string) {
+  // weekDates returns Monday..Sunday in order, so the array index doubles
+  // as the DAY_LABELS index directly.
+  return weekDates(todayIso).map((date, i) => {
+    const d = new Date(`${date}T00:00:00Z`);
+    return { date, label: `${DAY_LABELS[i]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
+  });
+}
 
 async function fetchHomeData(userId: string) {
   const supabase = await createClient();
+  const today = todayISO();
+  const weekDays = getWeekDays(today);
+  const weekStart = weekDays[0].date;
+  const weekEnd = weekDays[6].date;
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-  const [{ data: sessionRows }, { data: noteRows }] = await Promise.all([
-    supabase
-      .from("coaching_sessions")
-      .select("scheduled_at, meeting_url")
-      .eq("student_id", userId)
-      .gte("scheduled_at", graceCutoff)
-      .order("scheduled_at", { ascending: true })
-      .limit(1),
-    supabase
-      .from("coach_notes")
-      .select("id, content, created_at")
-      .eq("student_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(5),
-  ]);
+  const [{ data: sessionRows }, { data: weekTaskRows }, { data: pendingTaskRows }, { data: ratingSessionRows }, { data: lockRows }] =
+    await Promise.all([
+      supabase
+        .from("coaching_sessions")
+        .select("scheduled_at, meeting_url")
+        .eq("student_id", userId)
+        .gte("scheduled_at", graceCutoff)
+        .order("scheduled_at", { ascending: true })
+        .limit(1),
+      supabase
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", userId)
+        .gte("task_date", weekStart)
+        .lte("task_date", weekEnd)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", userId)
+        .eq("analysis_pending", true)
+        .lt("task_date", weekStart)
+        .order("task_date", { ascending: false }),
+      supabase
+        .from("coaching_sessions")
+        .select("id, scheduled_at")
+        .eq("student_id", userId)
+        .eq("outcome", "completed")
+        .is("student_rating", null)
+        .order("scheduled_at", { ascending: false })
+        .limit(1),
+      // Every locked week for this student, not just the current one --
+      // an older pending-analysis task (pendingTaskRows, above) can belong
+      // to a week the coach has since locked.
+      supabase.from("week_locks").select("week_start_date").eq("student_id", userId),
+    ]);
+
+  const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
+
+  // Pending-analysis tasks from earlier weeks aren't in the week fetch,
+  // so merge them in (dedup not needed — the date ranges don't overlap).
+  const tasks = [...(weekTaskRows ?? []), ...(pendingTaskRows ?? [])].map((t) => ({
+    ...t,
+    week_locked: lockedWeeks.has(mondayOf(t.task_date)),
+  })) as StudentTask[];
+
   return {
+    today,
+    weekDays,
     nextSession: sessionRows?.[0] ?? null,
-    notes: noteRows ?? [],
+    tasks,
+    sessionNeedingRating: (ratingSessionRows?.[0] ?? null) as SessionNeedingRating | null,
+    todayLocked: lockedWeeks.has(mondayOf(today)),
   };
 }
 
 export default async function StudentHomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const view = await getViewContext("student");
 
-  const { nextSession, notes } = user
-    ? await fetchHomeData(user.id)
-    : { nextSession: null, notes: [] };
+  const { today, weekDays, nextSession, tasks, sessionNeedingRating, todayLocked } = view
+    ? await fetchHomeData(view.effectiveUserId)
+    : {
+        today: todayISO(),
+        weekDays: getWeekDays(todayISO()),
+        nextSession: null,
+        tasks: [] as StudentTask[],
+        sessionNeedingRating: null as SessionNeedingRating | null,
+        todayLocked: false,
+      };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -56,31 +114,20 @@ export default async function StudentHomePage() {
         <p className="text-muted-foreground text-sm">Tekrar hoş geldin!</p>
       </header>
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mb-6">
         <NextSessionCard
           scheduledAt={nextSession?.scheduled_at ?? null}
           meetingUrl={nextSession?.meeting_url ?? null}
         />
-        <CoachNotesPreview
-          notes={notes.map((n) => ({ id: n.id, body: n.content, createdAt: n.created_at }))}
-        />
       </div>
 
-      <Card className="max-w-md">
-        <CardHeader>
-          <ClipboardList className="text-primary size-6" />
-          <CardTitle className="text-base">Bugünün ödevleri seni bekliyor</CardTitle>
-          <CardDescription>
-            Günlük ve haftalık görevlerini görmek, işaretlemek ve kronometre
-            fotoğrafını yüklemek için Ödevler sayfasına geç.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/student/odevler">Ödevlere Git</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      {sessionNeedingRating && (
+        <div className="mb-6">
+          <SessionRatingBanner session={sessionNeedingRating} />
+        </div>
+      )}
+
+      <TaskBoard today={today} weekDays={weekDays} initialTasks={tasks} todayLocked={todayLocked} />
     </div>
   );
 }
