@@ -45,10 +45,15 @@ export async function updateSession(request: NextRequest) {
 
   if (routeRole) {
     if (!user) {
+      // TEMPORARY diagnostic (remove once the /admin redirect issue is
+      // confirmed fixed) -- distinguishes "middleware never saw a session
+      // at all" from the profile-role branch below, which looks identical
+      // to the end user (both land on "/").
+      console.error("[proxy] no user in middleware", { path, routeRole });
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
@@ -63,6 +68,14 @@ export async function updateSession(request: NextRequest) {
     // it just lets the request through to the layout, which does.
     const isAdminCoachPreview = routeRole === "coach" && profile?.role === "admin";
     if (profile?.role !== routeRole && !isAdminCoachPreview) {
+      // TEMPORARY diagnostic, same reason as above.
+      console.error("[proxy] role mismatch or missing profile in middleware", {
+        path,
+        routeRole,
+        userId: user.id,
+        profileRole: profile?.role ?? null,
+        profileError: profileError?.message ?? null,
+      });
       const home = profile?.role ? ROLE_HOME[profile.role] : "/";
       return NextResponse.redirect(new URL(home, request.url));
     }

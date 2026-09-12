@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -25,10 +26,6 @@ const ROLE_HOME: Record<string, string> = {
   admin: "/admin",
 };
 
-// Roles a stranger is allowed to REQUEST an account for. 'admin' is
-// deliberately absent -- there is no code path, anywhere, where public
-// input can result in an admin account. Admins are created only by an
-// existing admin, through a separate, explicit action.
 const REQUESTABLE_ROLES = new Set(["student", "parent", "coach"]);
 
 export type AuthFormState = {
@@ -42,7 +39,7 @@ export async function signIn(
 ): Promise<AuthFormState> {
   const phoneRaw = String(formData.get("phone") ?? "");
   const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "student");
+  const formRole = String(formData.get("role") ?? "").trim();
 
   const phone = normalizeTurkishPhone(phoneRaw);
   if (!phone) {
@@ -52,9 +49,6 @@ export async function signIn(
   const adminClient = createAdminClient();
   const ip = await getClientIp();
 
-  // IP throttle first -- an attacker hammering a single already-locked
-  // phone, or spraying guesses across many phones, still counts against
-  // their IP's budget even before the per-phone check runs.
   if (await checkIpThrottle(adminClient, ip)) {
     return { error: IP_THROTTLE_MESSAGE };
   }
@@ -68,38 +62,41 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword({ phone, password });
 
   if (error) {
+    console.error("[signIn] signInWithPassword failed:", { message: error.message, status: error.status, code: error.code });
+    Sentry.captureException(error);
     await recordFailedIp(adminClient, ip);
     const justLocked = await recordFailedAttempt(adminClient, phone);
     return { error: justLocked ? LOCKOUT_MESSAGE : "Telefon numarası veya şifre hatalı." };
   }
 
-  // Checked here too (not just requireViewContext) so a deactivated user
-  // gets an immediate, clear rejection instead of a successful-looking
-  // login that then bounces them straight back out.
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", user!.id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", user!.id).maybeSingle();
+  
   if (profile?.is_active === false) {
     await supabase.auth.signOut();
     return { error: "Bu hesap pasif durumda. Yönetici ile iletişime geç." };
   }
 
-  // A real successful login (right phone AND right password) is the one
-  // signal that resets the counter -- a locked account still can't get
-  // here at all (rejected above before signInWithPassword ever runs).
-  await clearFailedAttempts(adminClient, phone);
+  const actualRole = profile?.role;
+  if (!actualRole || !(actualRole in ROLE_HOME)) {
+    await supabase.auth.signOut();
+    console.error("[signIn] authenticated user has no valid profile role", { userId: user!.id, role: actualRole ?? null });
+    Sentry.captureMessage("signIn: authenticated user has no valid profile role", { extra: { userId: user!.id, role: actualRole ?? null } });
+    return { error: "Hesap profili bulunamadı. Yönetici ile iletişime geç." };
+  }
 
-  redirect(ROLE_HOME[role] ?? "/");
+  // Strict Door Check: If the form specifies a role, it must match the database role exactly.
+  if (formRole && formRole !== actualRole) {
+    await supabase.auth.signOut();
+    return { error: "Bu giriş kapısından bu hesap türüyle giriş yapamazsınız. Lütfen doğru giriş sayfasını kullanın." };
+  }
+
+  await clearFailedAttempts(adminClient, phone);
+  redirect(ROLE_HOME[actualRole]);
 }
 
-// Replaces the old direct signUp() call. This is the fix for the
-// front-door admin vulnerability: public submission never touches
-// auth.users/profiles at all -- it only inserts a row into
-// signup_requests (role constrained to student/parent/coach at the
-// column-type level, see 0030). No account exists, and none can be
-// escalated, until an admin explicitly approves it
-// (approveSignupRequest, app/admin/actions.ts).
 export async function submitSignupRequest(
   _prevState: AuthFormState,
   formData: FormData,
@@ -141,12 +138,6 @@ export async function submitSignupRequest(
   };
 }
 
-// No email exists to send a reset link to (phone-only accounts, see
-// approveSignupRequest) -- this just queues the phone number for an
-// admin to see and manually reset via "Şifreyi Sıfırla" on that user's
-// detail page. Anonymous by design (the caller is, by definition, locked
-// out and unauthenticated); RLS (password_reset_requests_anon_insert,
-// 0035/0036) is the only thing gating this, same pattern as signup_requests.
 export async function submitPasswordResetRequest(
   _prevState: AuthFormState,
   formData: FormData,
