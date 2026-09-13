@@ -26,8 +26,12 @@ import {
   type Course,
   type Track,
 } from "@/lib/curriculum";
-import { addResource, addResources } from "./actions";
+import { addResource } from "./actions";
 import type { LibraryResource } from "./page";
+
+type BulkAddResponse =
+  | { ok: true; data: { id: string; name: string; course_id: string }[] }
+  | { ok: false; error: string };
 
 export function KaynakKutuphanesiClient({
   initialResources,
@@ -163,12 +167,14 @@ function CourseLibraryPanel({
     if (!name) return;
     setSaving(true);
     try {
-      const row = await addResource(course.id, name);
-      onAdded([{ id: row.id, name: row.name, courseId: row.course_id }]);
+      const result = await addResource(course.id, name);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onAdded([{ id: result.data.id, name: result.data.name, courseId: result.data.course_id }]);
       setSingleName("");
       setSingleOpen(false);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaynak eklenemedi.");
     } finally {
       setSaving(false);
     }
@@ -178,12 +184,30 @@ function CourseLibraryPanel({
     const lines = bulkText.split("\n");
     setSaving(true);
     try {
-      const rows = await addResources(course.id, lines);
-      onAdded(rows.map((r) => ({ id: r.id, name: r.name, courseId: r.course_id })));
+      const res = await fetch("/api/kaynak-kutuphanesi/bulk-add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: course.id, names: lines }),
+      });
+
+      let result: BulkAddResponse;
+      try {
+        result = await res.json();
+      } catch {
+        // The response wasn't JSON at all -- e.g. a platform-level error
+        // page instead of this route's own handler running. res.status is
+        // still the one piece of real information available here.
+        toast.error(`Sunucu beklenmeyen bir yanıt döndürdü (HTTP ${res.status}).`);
+        return;
+      }
+
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      onAdded(result.data.map((r) => ({ id: r.id, name: r.name, courseId: r.course_id })));
       setBulkText("");
       setBulkOpen(false);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaynaklar eklenemedi.");
     } finally {
       setSaving(false);
     }
