@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Library, Plus, Rows3 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -166,6 +167,8 @@ function CourseLibraryPanel({
       onAdded([{ id: row.id, name: row.name, courseId: row.course_id }]);
       setSingleName("");
       setSingleOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kaynak eklenemedi.");
     } finally {
       setSaving(false);
     }
@@ -179,6 +182,8 @@ function CourseLibraryPanel({
       onAdded(rows.map((r) => ({ id: r.id, name: r.name, courseId: r.course_id })));
       setBulkText("");
       setBulkOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kaynaklar eklenemedi.");
     } finally {
       setSaving(false);
     }
