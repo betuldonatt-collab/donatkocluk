@@ -1514,19 +1514,27 @@ export async function deleteAssignedTask(studentId: string, taskId: string) {
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com"]);
 
-function decodeHtmlEntities(s: string) {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
-}
-
-// Fetches the <title> of a pasted YouTube URL so the coach doesn't have
-// to type it -- restricted to known YouTube hosts to avoid the server
-// fetching arbitrary/internal URLs on the coach's behalf.
+// Fetches the official title of a pasted YouTube URL so the coach doesn't
+// have to type it -- via YouTube's own oEmbed endpoint (the standard,
+// purpose-built way to do this: www.youtube.com/oembed?url=...), not by
+// scraping the watch page's HTML. The watch page is a heavily JS-rendered
+// SPA -- a plain server-side fetch of it (no JS execution) often doesn't
+// contain the real title in a <title> tag at all, or gets served a
+// consent/interstitial page instead, which is exactly why titles were
+// silently coming back empty and every video link fell back to the
+// generic "Video" label. oEmbed always returns clean, already-decoded
+// JSON regardless of any of that -- no HTML parsing needed at all.
+//
+// The host check runs before the call purely to reject obviously
+// non-YouTube input early (and skip a wasted round-trip); it's not load-
+// bearing for safety the way it would be for a raw fetch of an arbitrary
+// URL, since the actual outbound request always goes to the fixed
+// www.youtube.com host either way -- the pasted URL is just a query
+// parameter YouTube's own service resolves, not a host our server fetches.
+//
+// Never throws -- every failure mode (bad URL, network error, malformed
+// response, video without a title) resolves to null, matching the
+// caller's "leave the title blank if we can't get one" expectation.
 export async function fetchYoutubeTitle(url: string): Promise<string | null> {
   let parsed: URL;
   try {
@@ -1536,15 +1544,19 @@ export async function fetchYoutubeTitle(url: string): Promise<string | null> {
   }
   if (!YOUTUBE_HOSTS.has(parsed.hostname)) return null;
 
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!res.ok) return null;
-  const html = await res.text();
-  const match = html.match(/<title>([^<]*)<\/title>/i);
-  if (!match) return null;
-  const title = decodeHtmlEntities(match[1])
-    .replace(/\s*-\s*YouTube\s*$/, "")
-    .trim();
-  return title || null;
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const res = await fetch(oembedUrl);
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (typeof data !== "object" || data === null || !("title" in data) || typeof (data as { title: unknown }).title !== "string") {
+      return null;
+    }
+    const title = (data as { title: string }).title.trim();
+    return title || null;
+  } catch {
+    return null;
+  }
 }
 
 // --- Student detail: Kaynak Takibi (coach write access) ------------------
