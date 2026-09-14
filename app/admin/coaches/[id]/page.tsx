@@ -25,9 +25,21 @@ function ReadOnlyBadge() {
 const OFFLINE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 const CHECK_IN_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 const CHECKLIST_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+// Rolling window for the "how much of what this coach assigned actually
+// got done" completion rate -- was an unbounded all-time scan across the
+// coach's entire roster's task history, which only gets more expensive
+// every year. 12 months keeps the number meaningful (a recent-performance
+// signal, not diluted by years-old tasks) while keeping the query bounded.
+const TASK_COMPLETION_WINDOW_MONTHS = 12;
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isoDateMonthsAgo(months: number) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.toISOString().slice(0, 10);
 }
 
 function formatDateTime(iso: string) {
@@ -102,11 +114,17 @@ async function fetchCoachDetail(coachId: string) {
 
   const rosterIds = (roster ?? []).map((r) => r.student_id);
 
-  // All-time completion rate across the current roster's coach-assigned
-  // tasks -- "how much of what this coach assigned actually got done".
+  // Completion rate across the current roster's coach-assigned tasks from
+  // the last 12 months -- "how much of what this coach assigned actually
+  // got done", bounded so it doesn't scan a growing all-time task history.
   const { data: rosterTasks } =
     rosterIds.length > 0
-      ? await supabase.from("student_tasks").select("status").in("student_id", rosterIds).eq("is_coach_assigned", true)
+      ? await supabase
+          .from("student_tasks")
+          .select("status")
+          .in("student_id", rosterIds)
+          .eq("is_coach_assigned", true)
+          .gte("task_date", isoDateMonthsAgo(TASK_COMPLETION_WINDOW_MONTHS))
       : { data: [] };
   const taskCompletionTotal = rosterTasks?.length ?? 0;
   const taskCompletionDone = (rosterTasks ?? []).filter((t) => t.status === "done").length;

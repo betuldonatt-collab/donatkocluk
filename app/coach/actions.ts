@@ -865,19 +865,32 @@ export async function deleteStudentEvent(studentId: string, eventId: string) {
 }
 
 // Past-weeks archive ("Geçmiş Programlar") -- distinct Monday-start weeks
-// that actually have assigned tasks, most recent first, so the coach can
-// jump straight to a week that has something in it instead of paging
-// prev/next one at a time. Grouped in JS rather than a SQL GROUP BY --
-// supabase-js has no clean way to express date_trunc('week', ...) via
-// the query builder, and per-student task volume is small enough that
-// fetching every task_date and grouping here is simpler than an RPC.
+// (within the last 12 months) that actually have assigned tasks, most
+// recent first, so the coach can jump straight to a week that has
+// something in it instead of paging prev/next one at a time. Grouped in
+// JS rather than a SQL GROUP BY -- supabase-js has no clean way to
+// express date_trunc('week', ...) via the query builder, and per-student
+// task volume within this window is small enough that fetching every
+// task_date and grouping here is simpler than an RPC. The 12-month bound
+// keeps that true as students accrue years of history -- older weeks
+// still exist in the DB, they just drop out of this dropdown.
+function isoDateMonthsAgo(months: number) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function getPastWeeksForStudent(studentId: string): Promise<{ weekStart: string; taskCount: number }[]> {
   const studentIdV = parseInput(uuidSchema, studentId);
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const { data, error } = await supabase.from("student_tasks").select("task_date").eq("student_id", studentIdV);
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .select("task_date")
+    .eq("student_id", studentIdV)
+    .gte("task_date", isoDateMonthsAgo(12));
   if (error) throw dbError(error);
 
   const counts = new Map<string, number>();

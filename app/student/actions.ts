@@ -443,14 +443,27 @@ export async function submitAnnouncementRsvp(
   return data;
 }
 
-// Powers the "Geçmiş Programlar" dropdown -- every past week that has at
-// least one task, newest first. Mirrors the coach's own
-// getPastWeeksForStudent (app/coach/actions.ts) exactly.
+// Powers the "Geçmiş Programlar" dropdown -- every past week (within the
+// last 12 months) that has at least one task, newest first. Mirrors the
+// coach's own getPastWeeksForStudent (app/coach/actions.ts) exactly,
+// including this same rolling window -- older weeks still exist in the
+// DB, they just drop out of this specific dropdown, so this table never
+// grows into an all-time scan as task history accumulates over years.
+function isoDateMonthsAgo(months: number) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function getPastWeeksForStudent(): Promise<{ weekStart: string; taskCount: number }[]> {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const { data, error } = await supabase.from("student_tasks").select("task_date").eq("student_id", user.id);
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .select("task_date")
+    .eq("student_id", user.id)
+    .gte("task_date", isoDateMonthsAgo(12));
   if (error) throw dbError(error);
 
   const counts = new Map<string, number>();
