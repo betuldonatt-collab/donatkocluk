@@ -222,22 +222,30 @@ export function TaskDrawer({
   // so the task can link to a real row. Declining just drops that row
   // rather than inventing a resource that doesn't exist. Order is
   // preserved -- it becomes each row's task_resources.order_index.
+  //
+  // Fires every new-resource creation concurrently rather than one at a
+  // time: addStudentResource does its own auth round-trip (getUser() +
+  // a coach_students check) on every call by design, so N new resources
+  // used to mean N sequential network round-trips before the task save
+  // even started -- a real, noticeable delay on "assign a task with
+  // several brand-new resources." Promise.all keeps every one of those
+  // per-call security checks intact, it just runs them at once instead
+  // of back to back; array order (which becomes task_resources.order_index)
+  // is preserved by .map() regardless of which call actually finishes first.
   async function resolveResourceIds(): Promise<string[]> {
     if (value.taskType !== "question_bank" && value.taskType !== "branch_exam" && value.taskType !== "topic_study") return [];
     const kind = value.taskType === "branch_exam" ? "branch_exam" : "study";
-    const ids: string[] = [];
-    for (const r of value.resources) {
-      if (r.resourceId) {
-        ids.push(r.resourceId);
-        continue;
-      }
-      const name = r.resourceName.trim();
-      if (!name || !r.addToLibrary) continue;
-      const created = await addStudentResource(studentId, value.courseId, name, kind);
-      onResourceCreated(value.courseId, kind, created);
-      ids.push(created.id);
-    }
-    return ids;
+    const resolved = await Promise.all(
+      value.resources.map(async (r): Promise<string | null> => {
+        if (r.resourceId) return r.resourceId;
+        const name = r.resourceName.trim();
+        if (!name || !r.addToLibrary) return null;
+        const created = await addStudentResource(studentId, value.courseId, name, kind);
+        onResourceCreated(value.courseId, kind, created);
+        return created.id;
+      }),
+    );
+    return resolved.filter((id): id is string => id !== null);
   }
 
   async function handleSave() {
