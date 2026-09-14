@@ -23,6 +23,33 @@ type StudentRow = Person & {
 };
 type StatusState = { isActive: boolean; exitCategory: ExitCategory | ""; exitNote: string };
 
+function defaultStatus(s: StudentRow): StatusState {
+  return { isActive: s.is_active, exitCategory: s.exit_category ?? "", exitNote: s.exit_note ?? "" };
+}
+
+// Both statuses/quotas are seeded once from `students` via useState's lazy
+// initializer, which only runs on first mount -- this component stays
+// mounted across a revalidatePath() that adds a new student (e.g. a
+// signup request just got approved), so a freshly-approved student's id
+// is missing from both maps until they're actually edited. Every read
+// site resolves through these instead of indexing the map directly, so
+// there's no render (or interaction, immediately after) where a missing
+// entry can crash instead of just showing/acting on the real current
+// value from the students prop.
+function resolveStatus(studentId: string, statuses: Record<string, StatusState>, students: StudentRow[]): StatusState {
+  const existing = statuses[studentId];
+  if (existing) return existing;
+  const student = students.find((s) => s.id === studentId);
+  return student ? defaultStatus(student) : { isActive: true, exitCategory: "", exitNote: "" };
+}
+
+function resolveQuota(studentId: string, quotas: Record<string, string>, students: StudentRow[]): string {
+  const existing = quotas[studentId];
+  if (existing !== undefined) return existing;
+  const student = students.find((s) => s.id === studentId);
+  return String(student?.total_session_quota ?? 0);
+}
+
 export function CoachAssignmentTable({
   students,
   coaches,
@@ -40,12 +67,7 @@ export function CoachAssignmentTable({
   const [assignments, setAssignments] = useState(assignedCoachByStudent);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, StatusState>>(() =>
-    Object.fromEntries(
-      students.map((s) => [
-        s.id,
-        { isActive: s.is_active, exitCategory: s.exit_category ?? "", exitNote: s.exit_note ?? "" },
-      ]),
-    ),
+    Object.fromEntries(students.map((s) => [s.id, defaultStatus(s)])),
   );
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
   const [quotas, setQuotas] = useState<Record<string, string>>(() =>
@@ -54,7 +76,7 @@ export function CoachAssignmentTable({
   const [quotaSavingId, setQuotaSavingId] = useState<string | null>(null);
 
   async function handleQuotaBlur(studentId: string) {
-    const value = Math.max(0, Number(quotas[studentId]) || 0);
+    const value = Math.max(0, Number(resolveQuota(studentId, quotas, students)) || 0);
     setQuotas((prev) => ({ ...prev, [studentId]: String(value) }));
     setQuotaSavingId(studentId);
     try {
@@ -81,11 +103,11 @@ export function CoachAssignmentTable({
   }
 
   function updateStatusField(studentId: string, patch: Partial<StatusState>) {
-    setStatuses((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }));
+    setStatuses((prev) => ({ ...prev, [studentId]: { ...resolveStatus(studentId, prev, students), ...patch } }));
   }
 
   async function saveStatus(studentId: string) {
-    const s = statuses[studentId];
+    const s = resolveStatus(studentId, statuses, students);
     setStatusSavingId(studentId);
     try {
       await setStudentStatus(studentId, s.isActive, s.isActive ? null : s.exitCategory || null, s.isActive ? null : s.exitNote.trim() || null);
@@ -99,7 +121,7 @@ export function CoachAssignmentTable({
     updateStatusField(studentId, { isActive });
     setStatusSavingId(studentId);
     try {
-      const s = statuses[studentId];
+      const s = resolveStatus(studentId, statuses, students);
       await setStudentStatus(studentId, isActive, isActive ? null : s.exitCategory || null, isActive ? null : s.exitNote.trim() || null);
     } finally {
       setStatusSavingId(null);
@@ -127,7 +149,12 @@ export function CoachAssignmentTable({
         </TableHeader>
         <TableBody>
           {students.map((student) => {
-            const status = statuses[student.id];
+            // See resolveStatus/resolveQuota's own comment -- falls back to
+            // a freshly-derived default instead of crashing when this
+            // student's id isn't in local state yet (e.g. right after
+            // approving their signup request, before they've been edited).
+            const status = resolveStatus(student.id, statuses, students);
+            const quota = resolveQuota(student.id, quotas, students);
             return (
               <TableRow key={student.id}>
                 <TableCell className="font-medium">{student.full_name ?? "(İsimsiz)"}</TableCell>
@@ -161,7 +188,7 @@ export function CoachAssignmentTable({
                   <div className="flex items-center gap-1.5">
                     <span
                       className={
-                        (completedCountByStudent[student.id] ?? 0) >= Number(quotas[student.id])
+                        (completedCountByStudent[student.id] ?? 0) >= Number(quota)
                           ? "text-rose-600 text-sm font-semibold tabular-nums"
                           : "text-muted-foreground text-sm tabular-nums"
                       }
@@ -172,7 +199,7 @@ export function CoachAssignmentTable({
                     <input
                       type="number"
                       min={0}
-                      value={quotas[student.id]}
+                      value={quota}
                       onChange={(e) => setQuotas((prev) => ({ ...prev, [student.id]: e.target.value }))}
                       onBlur={() => handleQuotaBlur(student.id)}
                       disabled={quotaSavingId === student.id}
