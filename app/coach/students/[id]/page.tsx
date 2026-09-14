@@ -128,6 +128,7 @@ async function fetchStudentDetail(studentId: string) {
     { data: taskResourceRows },
     { data: dailyStatsRows },
     { data: reportCardRows },
+    { data: topicStatsRows },
   ] = await Promise.all([
       supabase
         .from("student_tasks")
@@ -182,6 +183,15 @@ async function fetchStudentDetail(studentId: string) {
         .select("*")
         .eq("student_id", studentId)
         .order("cycle_number", { ascending: false }),
+      // Phase 2 rollup (migration 0072): a fixed-size cache of lifetime
+      // per-(course, topic) totals, maintained incrementally by every
+      // student_tasks write site rather than recomputed here from
+      // approvedTasks -- bounded by distinct topics ever touched, not by
+      // how many years of task history exist.
+      supabase
+        .from("student_topic_stats")
+        .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count")
+        .eq("student_id", studentId),
     ]);
 
   // coaching_start_date is so often never set that generateCycleReportCard
@@ -255,22 +265,31 @@ async function fetchStudentDetail(studentId: string) {
     const entry = courseEntry(row.course_id);
     entry.progress[`${row.topic_id}::${row.resource_id}`] = { solved: row.solved, reviewed: row.reviewed };
   }
-  // Every scored task's course_id/topic_id already sat in `tasks` (fetched
-  // above) -- no separate query needed. "karma" is a real, selectable
-  // topic (KARMA_TOPIC_ID, lib/curriculum) meaning "mixed topics" -- not
-  // the absence of one -- so both a null topic_id and an explicit "karma"
-  // pick are exactly what the Kaynak Takibi table's "Karma / Karışık
-  // Çözümler" row catches. Every other topic_id is a genuine syllabus
-  // topic and gets its own row.
-  for (const t of approvedTasks) {
-    if (t.course_id === null || t.total_count === null || !isCompletedTask(t)) continue;
-    const entry = courseEntry(t.course_id);
-    const hasRealTopic = t.topic_id && t.topic_id !== KARMA_TOPIC_ID;
-    const bucket = hasRealTopic ? (entry.topicStats.byTopic[t.topic_id!] ??= { total: 0, correct: 0, wrong: 0, empty: 0 }) : entry.topicStats.karma;
-    bucket.total += t.total_count ?? 0;
-    bucket.correct += t.correct_count ?? 0;
-    bucket.wrong += t.wrong_count ?? 0;
-    bucket.empty += t.empty_count ?? 0;
+  // Sourced from student_topic_stats (migration 0072) instead of
+  // iterating approvedTasks -- that rollup already applies the exact same
+  // counting rule (isCompletedTask + coach-provenanced + course_id/
+  // total_count present) at write time, so this is just shaping its rows
+  // into the same { byTopic, karma } structure the Kaynak Takibi tab
+  // already expects. "karma" is a real, selectable topic (KARMA_TOPIC_ID,
+  // lib/curriculum) meaning "mixed topics", not the absence of one -- the
+  // rollup already folds a null raw topic_id into it, so topic_id here is
+  // always a real value, never null.
+  //
+  // A zero-total row is skipped for byTopic specifically (never created
+  // in the old JS-aggregation version unless a task genuinely existed) --
+  // it can linger in the rollup table after e.g. the one task that ever
+  // populated a topic gets deleted, and the RPC zeroes rather than
+  // deletes that bucket row. karma itself has no such skip: it's always
+  // rendered (zero or not), matching its pre-existing "always present"
+  // shape from EMPTY_TOPIC_STATS above.
+  for (const row of topicStatsRows ?? []) {
+    const entry = courseEntry(row.course_id);
+    const stat = { total: row.total_count, correct: row.correct_count, wrong: row.wrong_count, empty: row.empty_count };
+    if (row.topic_id === KARMA_TOPIC_ID) {
+      entry.topicStats.karma = stat;
+    } else if (row.total_count > 0) {
+      entry.topicStats.byTopic[row.topic_id] = stat;
+    }
   }
 
   const weekStats: DayStat[] = (dailyStatsRows ?? []).map((r) => ({

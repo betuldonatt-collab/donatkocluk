@@ -40,6 +40,21 @@ export type TaskProgressPatch = Partial<{
 
 const SCORE_FIELDS = ["total_count", "correct_count", "wrong_count", "empty_count"] as const;
 
+// Recomputes one (student, course, topic) bucket in student_topic_stats
+// (migration 0072) from scratch -- called after any write that could
+// change a task's contribution to it. Mirrors recomputeDailyStats' own
+// call-site-driven, self-healing idiom, one level up. A null courseId
+// (e.g. a task with no curriculum course attached) has no bucket to
+// recompute -- every call site below checks for that before calling this.
+async function recomputeTopicStats(supabase: SupabaseClient, studentId: string, courseId: string, topicId: string | null) {
+  const { error } = await supabase.rpc("recompute_student_topic_stats", {
+    p_student_id: studentId,
+    p_course_id: courseId,
+    p_topic_id: topicId ?? "karma",
+  });
+  if (error) throw dbError(error);
+}
+
 const countField = z.number().int().min(0).max(10000).nullable().optional();
 const subjectScoreSchema = z.object({
   correct: z.number().int().min(0).max(10000).nullable(),
@@ -111,6 +126,13 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   if (SCORE_FIELDS.some((f) => f in patchV)) {
     await recomputeDailyStats(supabase, data.student_id, data.task_date);
   }
+  // Counts AND status both affect this task's contribution to its topic
+  // bucket (student_topic_stats, migration 0072) -- a status flip alone
+  // (e.g. done -> not_done, with the same old counts still on the row)
+  // must resync it just as much as a count edit does.
+  if (data.course_id && (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV)) {
+    await recomputeTopicStats(supabase, data.student_id, data.course_id, data.topic_id);
+  }
 
   revalidatePath("/student");
   return data;
@@ -157,7 +179,7 @@ export async function deleteCustomTask(taskId: string) {
   // rejecting explicitly here means "not yours" instead of a silent no-op.
   const { data: existing } = await supabase
     .from("student_tasks")
-    .select("student_id, task_date, total_count")
+    .select("student_id, task_date, total_count, course_id, topic_id")
     .eq("id", taskIdV)
     .maybeSingle();
   if (!existing || existing.student_id !== user.id) {
@@ -169,6 +191,9 @@ export async function deleteCustomTask(taskId: string) {
 
   if (existing.total_count !== null) {
     await recomputeDailyStats(supabase, existing.student_id, existing.task_date);
+  }
+  if (existing.course_id) {
+    await recomputeTopicStats(supabase, existing.student_id, existing.course_id, existing.topic_id);
   }
 
   revalidatePath("/student");

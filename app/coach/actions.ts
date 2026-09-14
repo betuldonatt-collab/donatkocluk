@@ -997,6 +997,24 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
   return rows;
 }
 
+// Recomputes one (student, course, topic) bucket in student_topic_stats
+// (migration 0072) from scratch -- called after any write that could
+// change a task's contribution to it: a status change, a count edit, a
+// course/topic reassignment, or a coach approval. Mirrors
+// recomputeDailyStats' call-site-driven, self-healing idiom
+// (app/student/actions.ts), one level up. A null courseId (e.g. a
+// calendar-only "Diğer" block, or a Genel Deneme, which has no course_id)
+// has no bucket to recompute -- every call site below checks for that
+// before calling this.
+async function recomputeTopicStats(supabase: SupabaseClient, studentId: string, courseId: string, topicId: string | null) {
+  const { error } = await supabase.rpc("recompute_student_topic_stats", {
+    p_student_id: studentId,
+    p_course_id: courseId,
+    p_topic_id: topicId ?? "karma",
+  });
+  if (error) throw dbError(error);
+}
+
 // Links the same ordered resource list to every given task id (one
 // created task per date/video-link pair shares the coach's one resource
 // pick). No-ops when there's nothing to link.
@@ -1108,6 +1126,12 @@ export async function updateAssignedTask(
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
+  // Read before the update -- if this edit reassigns course/topic, the
+  // OLD bucket (course_id/topic_id as they stood before this write) would
+  // otherwise keep a stale count forever, since nothing else would ever
+  // re-touch it once the row moves to a different bucket.
+  const { data: taskBefore } = await supabase.from("student_tasks").select("course_id, topic_id").eq("id", taskIdV).maybeSingle();
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input_.taskType !== undefined) patch.task_type = input_.taskType;
   if (input_.courseId !== undefined) patch.course_id = input_.courseId || null;
@@ -1128,6 +1152,9 @@ export async function updateAssignedTask(
 
   const { data, error } = await supabase.from("student_tasks").update(patch).eq("id", taskIdV).select("*").single();
   if (error) throw dbError(error);
+
+  if (taskBefore?.course_id) await recomputeTopicStats(supabase, studentIdV, taskBefore.course_id, taskBefore.topic_id);
+  if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
 
   let resourceIds = input_.resourceIds;
   if (resourceIds !== undefined) {
@@ -1318,6 +1345,12 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
   if (error) throw dbError(error);
   if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
 
+  // Approval is exactly what flips this row from "not yet counted" to
+  // "counted" (see the counting rule comment on isCompletedTask in
+  // app/coach/students/[id]/page.tsx) -- the bucket it belongs to must be
+  // resynced now, not just on the next unrelated write to that topic.
+  if (data[0].course_id) await recomputeTopicStats(supabase, existing.student_id, data[0].course_id, data[0].topic_id);
+
   await resolvePendingApprovalNotification(supabase, user.id, taskIdV);
 
   revalidatePath(`/coach/students/${existing.student_id}`);
@@ -1493,6 +1526,7 @@ export async function updateAssignedTaskStatus(studentId: string, taskId: string
     .select("*")
     .single();
   if (error) throw dbError(error);
+  if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
   revalidatePath(`/coach/students/${studentIdV}`);
   return data;
 }
@@ -1519,8 +1553,16 @@ export async function deleteAssignedTask(studentId: string, taskId: string) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
+
+  // Read before the delete -- need course_id/topic_id to resync that
+  // bucket afterward, and the row won't exist to read anymore once gone.
+  const { data: existing } = await supabase.from("student_tasks").select("course_id, topic_id").eq("id", taskIdV).maybeSingle();
+
   const { error } = await supabase.from("student_tasks").delete().eq("id", taskIdV);
   if (error) throw dbError(error);
+
+  if (existing?.course_id) await recomputeTopicStats(supabase, studentIdV, existing.course_id, existing.topic_id);
+
   revalidatePath(`/coach/students/${studentIdV}`);
 }
 
@@ -2007,6 +2049,12 @@ export async function saveCoachTrialResults(
     .select("*")
     .single();
   if (error) throw dbError(error);
+
+  // Sets status: "done" directly above, which is exactly a countedness-
+  // flipping write -- course_id is null for a Genel Deneme (no dedicated
+  // column, see classifyTrack's own comment), so only Branş sonuçları
+  // ever actually have a bucket to resync here.
+  if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
 
   const { error: deleteError } = await supabase.from("student_task_topic_mistakes").delete().eq("task_id", taskIdV);
   if (deleteError) throw dbError(deleteError);
