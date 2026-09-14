@@ -12,6 +12,14 @@ import { signIn, submitPasswordResetRequest, submitSignupRequest, type AuthFormS
 
 const initialState: AuthFormState = {};
 
+// Requestable via the public signup form -- 'admin' is deliberately absent
+// (see REQUESTABLE_ROLES in ./actions.ts; this list must stay in sync).
+const SIGNUP_ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "student", label: "Öğrenci" },
+  { value: "parent", label: "Veli" },
+  { value: "coach", label: "Koç" },
+];
+
 export function LoginForm({
   role,
   roleLabel,
@@ -36,6 +44,19 @@ export function LoginForm({
   // third Tabs entry, since it's a fallback off the login form itself
   // rather than a parallel top-level destination like signup.
   const [showForgot, setShowForgot] = useState(false);
+
+  // The signup form's role used to rely silently on which page/URL the
+  // visitor landed on (?role=parent vs ?role=student), with nothing in
+  // the form itself confirming that -- a parent who ended up on the
+  // student page's "Kayıt İsteği Gönder" tab (the landing page shows
+  // "Öğrenci Girişi" first, "Veli Girişi" is one click further) would
+  // silently submit a student request with no indication anything was
+  // wrong. Defaulting to the current page's role but making it an
+  // explicit, visible field here means a mismatch is something the user
+  // can actually see and correct before submitting.
+  const [signupRole, setSignupRole] = useState(
+    SIGNUP_ROLE_OPTIONS.some((o) => o.value === role) ? role : "student",
+  );
 
   // Admin accounts are never self-service -- no request tab is offered
   // for this role, full stop.
@@ -105,7 +126,22 @@ export function LoginForm({
       {canRequestAccount && (
         <TabsContent value="signup">
           <form action={requestAction} className="space-y-4">
-            <input type="hidden" name="role" value={role} />
+            <div className="space-y-2">
+              <Label htmlFor="request-role">Hesap Türü</Label>
+              <select
+                id="request-role"
+                name="role"
+                value={signupRole}
+                onChange={(e) => setSignupRole(e.target.value)}
+                className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+              >
+                {SIGNUP_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="request-name">Ad Soyad</Label>
               <Input id="request-name" name="fullName" required />
