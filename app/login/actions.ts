@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { clearImpersonationCookie } from "@/lib/impersonation";
 import { dbError } from "@/lib/errors";
 import { normalizeTurkishPhone } from "@/lib/phone";
 import { nonEmptyText, parseInput } from "@/lib/validation";
@@ -50,17 +51,25 @@ export async function signIn(
   const adminClient = createAdminClient();
   const ip = await getClientIp();
 
-  if (await checkIpThrottle(adminClient, ip)) {
+  // Neither check depends on the other's result, only their booleans --
+  // running them concurrently instead of two sequential round trips halves
+  // this part of the login's latency on the common (not-throttled,
+  // not-locked-out) path. Priority order is preserved exactly: a throttled
+  // IP still short-circuits before the lockout branch even looks at its
+  // own result, matching the original sequential behavior.
+  const [isThrottled, isLockedOut] = await Promise.all([checkIpThrottle(adminClient, ip), checkLockout(adminClient, phone)]);
+
+  if (isThrottled) {
     return { error: IP_THROTTLE_MESSAGE };
   }
 
-  if (await checkLockout(adminClient, phone)) {
+  if (isLockedOut) {
     await recordFailedIp(adminClient, ip);
     return { error: LOCKOUT_MESSAGE };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ phone, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ phone, password });
 
   if (error) {
     console.error("[signIn] signInWithPassword failed:", { message: error.message, status: error.status, code: error.code });
@@ -70,9 +79,26 @@ export async function signIn(
     return { error: justLocked ? LOCKOUT_MESSAGE : "Telefon numarası veya şifre hatalı." };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // A stale impersonation cookie from an earlier admin "view as coach"
+  // session (set by setImpersonationCookie, app/admin/actions.ts) that
+  // was never cleared -- e.g. the admin navigated away instead of
+  // clicking "Görünümden Çık" -- would otherwise silently survive into
+  // WHOEVER logs into this browser next, for up to its 4-hour maxAge.
+  // getViewContext only ever honors that cookie for an actual admin
+  // session, but assertNotImpersonating (called at the top of most write
+  // actions) only checks whether the cookie is present at all, with no
+  // regard for who's making the request -- so a real coach signing in
+  // fresh on that same browser would pass getViewContext's check but
+  // still get every write rejected by the leftover cookie. Clearing it
+  // on every successful sign-in, before anything else, means a new
+  // session never inherits state from whatever came before it on this
+  // browser. Pure cookie op, no network round trip.
+  await clearImpersonationCookie();
+
+  // signInWithPassword's own response already carries the authenticated
+  // user -- a separate supabase.auth.getUser() call right after it would
+  // just re-fetch the exact same thing over another network round trip.
+  const user = signInData.user;
   const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", user!.id).maybeSingle();
   
   if (profile?.is_active === false) {

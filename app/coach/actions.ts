@@ -2470,12 +2470,26 @@ export async function getCoachLiveFocusStatuses(): Promise<LiveFocusStatus[]> {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const { data: rosterLinks } = await supabase.from("coach_students").select("student_id").eq("coach_id", user.id);
-  const studentIds = (rosterLinks ?? []).map((l) => l.student_id);
-  if (studentIds.length === 0) return [];
+  // Single embedded query instead of roster-then-profiles as two separate
+  // round trips -- coach_students has FKs to profiles on both coach_id and
+  // student_id, so the relationship is ambiguous without the !student_id
+  // hint (PostgREST error PGRST201 without it, verified directly).
+  const { data, error } = await supabase
+    .from("coach_students")
+    .select("student_id, profiles!student_id(active_focus_heartbeat_at)")
+    .eq("coach_id", user.id);
+  if (error) throw dbError(error);
 
-  const { data: profiles } = await supabase.from("profiles").select("id, active_focus_heartbeat_at").in("id", studentIds);
-  return (profiles ?? []).map((p) => ({ studentId: p.id, activeFocusHeartbeatAt: p.active_focus_heartbeat_at }));
+  // student_id is unique on coach_students, so this embed is genuinely
+  // one-to-one -- verified directly against the real schema, a single
+  // object per row, not an array. The untyped client still infers the
+  // generic to-many array shape here since it has no generated types to
+  // know that, hence the cast.
+  const rows = (data ?? []) as unknown as { student_id: string; profiles: { active_focus_heartbeat_at: string | null } | null }[];
+  return rows.map((row) => ({
+    studentId: row.student_id,
+    activeFocusHeartbeatAt: row.profiles?.active_focus_heartbeat_at ?? null,
+  }));
 }
 
 // --- Kronometre Yarışması: coach-private groups + active/passive status ---
