@@ -207,6 +207,19 @@ async function fetchStudentDetail(studentId: string) {
   // shows up in `tasks` itself (program completion, raw exam lists,
   // etc.), only the analytics rollups read this narrower list.
   const approvedTasks = tasks.filter((t) => t.is_coach_assigned || t.is_approved_by_coach);
+  // A coach assigning a task can set total_count as the PLAN (e.g. "solve
+  // 20 questions") before the student has touched it -- status stays
+  // 'pending' until they actually do. Question-distribution/topic-
+  // performance aggregations must only ever reflect real, self-reported
+  // work: 'done' (fully completed, whatever counts the student entered
+  // are the real result) or 'half_done' (partial, but still genuine --
+  // whatever was actually attempted). 'pending' (untouched plan) and
+  // 'not_done' (explicitly skipped) both get excluded -- any total_count
+  // still sitting on either of those is the coach's original plan, not a
+  // result. Applies uniformly to every task type, including "Ekstra
+  // Çalışma" -- there's nothing task-type-specific here, only completion
+  // state.
+  const isCompletedTask = (t: DetailTask) => t.status === "done" || t.status === "half_done";
   const sessions = (sessionRows ?? []) as DetailSession[];
   const paragrafEntries = (paragrafRows ?? []) as ParagrafProblemEntry[];
   const notes = (noteRows ?? []) as DetailCoachNote[];
@@ -250,7 +263,7 @@ async function fetchStudentDetail(studentId: string) {
   // Çözümler" row catches. Every other topic_id is a genuine syllabus
   // topic and gets its own row.
   for (const t of approvedTasks) {
-    if (t.course_id === null || t.total_count === null) continue;
+    if (t.course_id === null || t.total_count === null || !isCompletedTask(t)) continue;
     const entry = courseEntry(t.course_id);
     const hasRealTopic = t.topic_id && t.topic_id !== KARMA_TOPIC_ID;
     const bucket = hasRealTopic ? (entry.topicStats.byTopic[t.topic_id!] ??= { total: 0, correct: 0, wrong: 0, empty: 0 }) : entry.topicStats.karma;
@@ -359,10 +372,15 @@ async function fetchStudentDetail(studentId: string) {
   for (const t of approvedTasks) {
     if (!t.course_id || !t.topic_id || t.topic_id === "karma") continue;
     if (t.total_count === null && t.correct_count === null && t.wrong_count === null) continue;
+    if (!isCompletedTask(t)) continue;
     bumpQuestionTotals(t.course_id, t.topic_id, t.total_count ?? 0, t.correct_count ?? 0, t.wrong_count ?? 0);
   }
 
-  const karmaTaskIds = approvedTasks.filter((t) => t.topic_id === "karma").map((t) => t.id);
+  // Karma tasks contribute their per-topic breakdown rows (below) instead
+  // of a single total -- same completion requirement as the loop above,
+  // so a still-pending karma task's breakdown (if any were ever entered
+  // ahead of completion) doesn't leak into the aggregation either.
+  const karmaTaskIds = approvedTasks.filter((t) => t.topic_id === "karma" && isCompletedTask(t)).map((t) => t.id);
   const { data: breakdownRows } =
     karmaTaskIds.length > 0
       ? await supabase
