@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { dbError } from "@/lib/errors";
 import { normalizeTurkishPhone } from "@/lib/phone";
 import { nonEmptyText, parseInput } from "@/lib/validation";
 import {
@@ -129,7 +130,12 @@ export async function submitSignupRequest(
     .insert({ full_name: fullName, phone, requested_role: role });
 
   if (error) {
-    console.error("[submitSignupRequest]", error);
+    // dbError logs the full raw Postgres error (message/code/details/hint)
+    // AND reports it to Sentry -- same sanitize-and-log convention every
+    // other DB-touching action uses. This is a public, unauthenticated
+    // form (anon role, no login required), so the raw error never reaches
+    // the client either way; check Sentry/Vercel logs for the real cause.
+    dbError(error);
     return { error: "Kayıt isteği gönderilemedi. Lütfen tekrar dene." };
   }
 
@@ -155,7 +161,7 @@ export async function submitPasswordResetRequest(
   const supabase = await createClient();
   const { error } = await supabase.from("password_reset_requests").insert({ phone });
   if (error) {
-    console.error("[submitPasswordResetRequest]", error);
+    dbError(error);
     return { error: "İstek gönderilemedi. Lütfen tekrar dene." };
   }
 
