@@ -33,13 +33,22 @@ export default async function KaynakTakibiPage() {
       // (approveStudentTask, app/coach/actions.ts) -- coach-assigned
       // tasks are always pre-approved. Pending entries still show up
       // fine in the student's own daily task board, just not here.
+      //
+      // status in (done, half_done): total_count can be set by the coach
+      // as the PLAN at assignment time (e.g. "solve 20 questions"), before
+      // the student has touched it -- status stays 'pending' until they
+      // actually do. Without this filter that planned count was being
+      // counted as if already solved. 'half_done' is still genuine,
+      // self-reported work (just not the full plan), so it's included;
+      // 'pending' (untouched) and 'not_done' (explicitly skipped) are not.
       supabase
         .from("student_tasks")
         .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count")
         .eq("student_id", view.effectiveUserId)
         .not("total_count", "is", null)
         .not("course_id", "is", null)
-        .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true"),
+        .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true")
+        .in("status", ["done", "half_done"]),
     ]);
 
     function courseEntry(courseId: string): CourseData {

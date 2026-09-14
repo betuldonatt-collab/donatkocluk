@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
@@ -1547,14 +1548,29 @@ export async function fetchYoutubeTitle(url: string): Promise<string | null> {
   try {
     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
     const res = await fetch(oembedUrl);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // TEMPORARY diagnostic (remove once title-fetching is confirmed
+      // working in production) -- the request succeeding from a local
+      // machine doesn't prove it succeeds from Vercel's own outbound IPs;
+      // some public APIs rate-limit or block known datacenter ranges
+      // differently than residential ones. This is the one piece of
+      // evidence that distinguishes that from every other failure mode.
+      const bodySnippet = await res.text().catch(() => "(could not read body)");
+      console.error("[fetchYoutubeTitle] oEmbed request failed:", { url, status: res.status, statusText: res.statusText, bodySnippet: bodySnippet.slice(0, 500) });
+      Sentry.captureMessage("fetchYoutubeTitle: oEmbed request failed", { extra: { url, status: res.status, statusText: res.statusText, bodySnippet: bodySnippet.slice(0, 500) } });
+      return null;
+    }
     const data: unknown = await res.json();
     if (typeof data !== "object" || data === null || !("title" in data) || typeof (data as { title: unknown }).title !== "string") {
+      console.error("[fetchYoutubeTitle] oEmbed response had no usable title field:", { url, data });
+      Sentry.captureMessage("fetchYoutubeTitle: oEmbed response missing title", { extra: { url, data } });
       return null;
     }
     const title = (data as { title: string }).title.trim();
     return title || null;
-  } catch {
+  } catch (e) {
+    console.error("[fetchYoutubeTitle] unexpected error:", { url, error: e });
+    Sentry.captureException(e, { extra: { url } });
     return null;
   }
 }
