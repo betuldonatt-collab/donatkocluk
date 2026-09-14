@@ -1021,6 +1021,7 @@ export async function assignTaskToStudent(input: AssignTaskInput & { studentId: 
   await linkTaskResources(supabase, data.map((t) => t.id), inputV.resourceIds);
 
   revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
   return data.map((t) => ({ ...t, resource_ids: inputV.resourceIds ?? [] }));
 }
 
@@ -1046,6 +1047,7 @@ export async function assignRoutineToWeek(input: AssignTaskInput & { studentId: 
   await linkTaskResources(supabase, data.map((t) => t.id), inputV.resourceIds);
 
   revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
   return data.map((t) => ({ ...t, resource_ids: inputV.resourceIds ?? [] }));
 }
 
