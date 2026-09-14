@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { AlertTriangle, RotateCw } from "lucide-react";
+import * as Sentry from "@sentry/nextjs";
 
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,11 @@ import { Button } from "@/components/ui/button";
 export function DashboardError({ error, reset, homeHref }: { error: Error & { digest?: string }; reset: () => void; homeHref: string }) {
   useEffect(() => {
     console.error(error);
+    // error.digest correlates this client-visible crash with the full,
+    // untruncated server-side error Next.js already logged for the same
+    // request (production strips the real message/stack from what
+    // reaches the client, leaving only this digest as the shared key).
+    Sentry.captureException(error, { extra: { digest: error.digest ?? null } });
   }, [error]);
 
   return (
