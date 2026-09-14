@@ -477,7 +477,7 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
   // field the public, anon-key auth.signUp() endpoint can never set itself
   // (only the service-role Admin API used right here can). full_name has
   // no privilege implications, so it stays in user_metadata as before.
-  const { error: createError } = await adminClient.auth.admin.createUser({
+  const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
     phone: request.phone,
     password: tempPassword,
     phone_confirm: true,
@@ -485,6 +485,21 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
     user_metadata: { full_name: request.full_name },
   });
   if (createError) throw dbError(createError);
+
+  // Belt-and-suspenders, confirmed necessary in production: handle_new_user()
+  // reads app_metadata.role at INSERT time, but that's occasionally observed
+  // to still be empty at the exact moment its AFTER INSERT trigger fires,
+  // silently falling back to its own 'student' default even though
+  // app_metadata itself is correctly set on the finished auth.users row.
+  // Rather than depend on that trigger's timing at all, explicitly (re)set
+  // the role here as a guaranteed final step. Requires migration 0071
+  // (prevent_self_role_change now exempts service-role connections,
+  // matching what that trigger's own comment always claimed it did).
+  const { error: roleFixError } = await adminClient
+    .from("profiles")
+    .update({ role: request.requested_role })
+    .eq("id", createData.user.id);
+  if (roleFixError) throw dbError(roleFixError);
 
   const { error: updateError } = await supabase
     .from("signup_requests")
