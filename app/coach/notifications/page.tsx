@@ -58,28 +58,21 @@ async function syncThresholdNotifications(
   if (roster.length === 0) return;
   const studentIds = roster.map((s) => s.id);
   const today = todayISO();
-
-  const { data: recentRows } = await supabase
-    .from("notifications")
-    .select("student_id, type, status, done_at")
-    .eq("coach_id", coachId)
-    .in("type", ["inactive_student", "critical_completion_drop", "success_completion"])
-    .gte("created_at", isoTimestampDaysAgo(2));
-
-  function hasRecent(studentId: string, type: NotificationType) {
-    return (recentRows ?? []).some(
-      (r) =>
-        r.student_id === studentId &&
-        r.type === type &&
-        (r.status === "active" || (r.status === "done" && r.done_at?.slice(0, 10) === today)),
-    );
-  }
-
   const todayWeek = weekDates(today);
   const prevWeekMonday = addDaysISO(todayWeek[0], -7);
   const prevWeekSunday = addDaysISO(todayWeek[0], -1);
 
-  const [{ data: activityRows }, { data: prevWeekRows }, { data: currentWeekRows }] = await Promise.all([
+  // All four reads are independent of each other -- recentRows only feeds
+  // hasRecent() below, none of the student_tasks queries depend on it or
+  // on one another. One Promise.all instead of recentRows running alone
+  // as its own round trip before the other three.
+  const [{ data: recentRows }, { data: activityRows }, { data: prevWeekRows }, { data: currentWeekRows }] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("student_id, type, status, done_at")
+      .eq("coach_id", coachId)
+      .in("type", ["inactive_student", "critical_completion_drop", "success_completion"])
+      .gte("created_at", isoTimestampDaysAgo(2)),
     supabase
       .from("student_tasks")
       .select("student_id, updated_at, created_at")
@@ -98,6 +91,15 @@ async function syncThresholdNotifications(
       .gte("task_date", todayWeek[0])
       .lte("task_date", todayWeek[6]),
   ]);
+
+  function hasRecent(studentId: string, type: NotificationType) {
+    return (recentRows ?? []).some(
+      (r) =>
+        r.student_id === studentId &&
+        r.type === type &&
+        (r.status === "active" || (r.status === "done" && r.done_at?.slice(0, 10) === today)),
+    );
+  }
 
   const activeIds = new Set(
     (activityRows ?? [])
@@ -180,8 +182,12 @@ export default async function CoachNotificationsPage() {
   const supabase = await createClient();
   const coachId = view.effectiveUserId;
 
+  // Roster names embedded directly on the coach_students query (same
+  // profiles!student_id hint as getCoachLiveFocusStatuses -- required
+  // since coach_students has FKs to profiles on both coach_id and
+  // student_id) instead of a separate profiles round trip after this one.
   const [{ data: rosterLinks }, { data: settingsRow }] = await Promise.all([
-    supabase.from("coach_students").select("student_id").eq("coach_id", coachId),
+    supabase.from("coach_students").select("student_id, profiles!student_id(id, full_name)").eq("coach_id", coachId),
     supabase
       .from("coach_settings")
       .select("inactivity_threshold_days, critical_completion_threshold_pct, success_alert_enabled")
@@ -189,10 +195,8 @@ export default async function CoachNotificationsPage() {
       .maybeSingle(),
   ]);
 
-  const studentIds = (rosterLinks ?? []).map((l) => l.student_id);
-  const { data: profiles } =
-    studentIds.length > 0 ? await supabase.from("profiles").select("id, full_name").in("id", studentIds) : { data: [] };
-  const roster = (profiles ?? []) as RosterStudent[];
+  const rosterRows = (rosterLinks ?? []) as unknown as { student_id: string; profiles: RosterStudent | null }[];
+  const roster = rosterRows.map((r) => r.profiles).filter((p): p is RosterStudent => p !== null);
   const settings = settingsRow ?? DEFAULT_SETTINGS;
 
   // Generating notifications is a write -- never runs while impersonating,

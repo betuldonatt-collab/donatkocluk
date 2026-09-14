@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -90,7 +91,16 @@ export type ViewContext = {
 // auth.uid()) kept the actual DATA empty; the page itself never refused
 // to render. Returning null here on a mismatch is what lets every
 // layout's requireViewContext() (below) turn that into a real redirect.
-export async function getViewContext(routeRole: AppRole): Promise<ViewContext | null> {
+// Wrapped in React's cache() -- every dashboard layout calls
+// requireViewContext (which calls this) once to guard the whole route,
+// and the individual page.tsx under it independently calls this again
+// for its own effectiveUserId/isImpersonating -- same routeRole argument,
+// same request. Without caching that was 2 full sequential round trips
+// (auth.getUser() + the profiles lookup) paid TWICE on every single
+// dashboard page load. cache() scopes the dedup to one request/render
+// pass only -- it can never leak a result across separate requests, so
+// this is purely a latency fix, not a staleness or security change.
+export const getViewContext = cache(async (routeRole: AppRole): Promise<ViewContext | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -117,7 +127,7 @@ export async function getViewContext(routeRole: AppRole): Promise<ViewContext | 
   if (actualRole !== routeRole) return null;
 
   return { effectiveUserId: user.id, isImpersonating: false, targetName: null };
-}
+});
 
 // The layout-level guard -- every one of the 4 dashboard layouts
 // (admin/coach/parent/student) calls this before rendering anything.
