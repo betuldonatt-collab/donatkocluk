@@ -10,6 +10,14 @@ export type TaskStatus = "pending" | "done" | "half_done" | "not_done";
 
 export type SubjectScore = { correct: number | null; wrong: number | null; empty: number | null };
 
+// Mirrors the coach panel's VideoLink (app/coach/students/[id]/types.ts),
+// plus `watched` -- an addition scoped to the student side only, since
+// that's the side that actually watches the video. Stored inline in each
+// video_links array entry rather than a separate table: no per-link id
+// exists to key a separate row on, and the array itself is already the
+// natural unit a task's video links come and go as.
+export type VideoLink = { url: string; title: string | null; watched: boolean };
+
 export type StudentTask = {
   id: string;
   task_date: string;
@@ -30,6 +38,7 @@ export type StudentTask = {
   empty_count: number | null;
   duration_minutes: number | null;
   subject_scores: Record<string, SubjectScore> | null;
+  video_links: VideoLink[];
   completed: boolean;
   analysis_pending: boolean;
   status: TaskStatus;

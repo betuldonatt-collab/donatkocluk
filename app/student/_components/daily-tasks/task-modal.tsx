@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Lock } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Lock, PlayCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import {
   getTaskTopicMistakes,
   saveTaskAnalysis,
+  setVideoLinkWatched,
   updateTaskProgress,
   type TaskProgressPatch,
 } from "../../actions";
@@ -172,6 +173,26 @@ function TaskModalBody({
   const [emptyCount, setEmptyCount] = useState(task.empty_count?.toString() ?? "");
   const [durationMinutes, setDurationMinutes] = useState(task.duration_minutes?.toString() ?? "");
   const [completed, setCompleted] = useState(task.completed);
+  // A video link created before this feature shipped has no `watched` key
+  // at all in its stored jsonb -- normalized to false here so Checkbox
+  // below always gets a real boolean, never undefined.
+  const [videoLinks, setVideoLinks] = useState(() => task.video_links.map((l) => ({ ...l, watched: l.watched ?? false })));
+
+  // Optimistic toggle, reverted on failure -- doesn't go through the
+  // form's own saving/handleSaveSimple flow since it's an independent,
+  // immediate write (setVideoLinkWatched), not part of this task's
+  // counts/status being saved.
+  async function handleToggleWatched(url: string, watched: boolean) {
+    const previous = videoLinks;
+    setVideoLinks((prev) => prev.map((l) => (l.url === url ? { ...l, watched } : l)));
+    try {
+      const updated = await setVideoLinkWatched(task.id, url, watched);
+      onSaved(updated as StudentTask);
+    } catch (e) {
+      setVideoLinks(previous);
+      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+    }
+  }
 
   const showSubjectScores = task.task_type === "general_exam";
   const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
@@ -455,6 +476,28 @@ function TaskModalBody({
             Bu haftanın görevleri koçun tarafından kilitlendi. Sadece görüntüleyebilirsin.
           </div>
 
+          {task.video_links.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-foreground text-sm font-medium">Video Linkleri</p>
+              {task.video_links.map((link, i) => (
+                <div key={link.url + i} className="border-border flex items-center gap-2 rounded-md border px-2.5 py-2">
+                  <span
+                    className={cn("size-2 shrink-0 rounded-full", link.watched ? "bg-emerald-500" : "bg-muted-foreground/30")}
+                    aria-label={link.watched ? "İzlendi" : "İzlenmedi"}
+                  />
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary min-w-0 flex-1 truncate text-sm underline-offset-2 hover:underline"
+                  >
+                    {link.title || "Video"}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+
           {showCounts && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <ReadOnlyField label="Toplam" value={task.total_count} />
@@ -563,6 +606,30 @@ function TaskModalBody({
       </DialogHeader>
 
       <div className="space-y-4">
+        {videoLinks.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-foreground text-sm font-medium">Video Linkleri</p>
+            {videoLinks.map((link, i) => (
+              <div key={link.url + i} className="border-border flex items-center gap-2 rounded-md border px-2.5 py-2">
+                <Checkbox
+                  id={`video-watched-${i}`}
+                  checked={link.watched}
+                  onCheckedChange={(v) => handleToggleWatched(link.url, v === true)}
+                />
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary flex min-w-0 flex-1 items-center gap-1 truncate text-sm underline-offset-2 hover:underline"
+                >
+                  <PlayCircle className="size-3.5 shrink-0" />
+                  <span className="truncate">{link.title || "Video"}</span>
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+
         {showCounts && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />

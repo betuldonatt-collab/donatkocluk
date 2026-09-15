@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Lock,
   MinusCircle,
+  PlayCircle,
   Sparkles,
   Video,
 } from "lucide-react";
@@ -137,6 +138,16 @@ export function WeekTaskCell({ task, onClick }: { task: StudentTask; onClick: ()
           <p className="text-muted-foreground text-[10px] leading-snug break-words">
             {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
           </p>
+
+          {/* Count + watched-progress only, not full titles/links -- this
+              cell is too tight for that (see TaskCard/TaskModal for the
+              actual clickable list); opening the cell reaches those. */}
+          {task.video_links.length > 0 && (
+            <span className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] text-rose-600">
+              <PlayCircle className="size-2.5 shrink-0" />
+              {task.video_links.filter((l) => l.watched).length}/{task.video_links.length} video
+            </span>
+          )}
 
           {task.analysis_pending && (
             <span className="mt-0.5 inline-block rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">

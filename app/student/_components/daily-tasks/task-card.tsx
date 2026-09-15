@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Lock,
   MinusCircle,
+  PlayCircle,
   Sparkles,
   Video,
   XCircle,
@@ -137,6 +138,25 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
         <p className="text-muted-foreground truncate text-xs">
           {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : taskSubtitle(task)}
         </p>
+        {task.video_links.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {task.video_links.map((link, i) => (
+              <a
+                key={link.url + i}
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  "inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug",
+                  link.watched ? "bg-emerald-500/10 text-emerald-700" : "bg-rose-500/10 text-rose-600",
+                )}
+              >
+                <PlayCircle className="size-3 shrink-0" />
+                <span className="truncate">{link.title || "Video"}</span>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       <FocusTimerTrigger task={task} className="hidden shrink-0 sm:flex" />

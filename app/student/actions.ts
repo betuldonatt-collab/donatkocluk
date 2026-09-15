@@ -138,6 +138,60 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   return data;
 }
 
+const setVideoLinkWatchedSchema = z.object({
+  taskId: uuidSchema,
+  url: z.string().trim().min(1).max(2000),
+  watched: z.boolean(),
+});
+
+// Toggles ONE entry inside a task's video_links jsonb array by url (its
+// natural key -- links don't carry a separate id) rather than by array
+// index, since an index can silently point at the wrong entry if the
+// array was ever reordered between page load and this click. Same
+// double-layer ownership check as updateTaskProgress above. Doesn't touch
+// total_count/status/course_id/topic_id, so unlike updateTaskProgress
+// this never needs a student_daily_stats or student_topic_stats
+// recompute -- watched is purely descriptive metadata on the link itself.
+//
+// Known limitation, not addressed here: a coach re-saving this task's
+// video links via updateAssignedTask (app/coach/actions.ts) replaces the
+// whole video_links array from their own form, which doesn't carry a
+// watched flag -- any watched state a student had already set would be
+// lost if a coach edits the same task's links afterward.
+export async function setVideoLinkWatched(taskId: string, url: string, watched: boolean) {
+  await assertNotImpersonating();
+  const v = parseInput(setVideoLinkWatchedSchema, { taskId, url, watched });
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("student_tasks")
+    .select("student_id, video_links")
+    .eq("id", v.taskId)
+    .maybeSingle();
+  if (fetchError) throw dbError(fetchError);
+  if (!existing || existing.student_id !== user.id) {
+    throw new Error("Bu görev sana ait değil.");
+  }
+
+  const links = (existing.video_links ?? []) as { url: string; title: string | null; watched?: boolean }[];
+  if (!links.some((link) => link.url === v.url)) {
+    throw new Error("Video linki bulunamadı.");
+  }
+  const updatedLinks = links.map((link) => (link.url === v.url ? { ...link, watched: v.watched } : link));
+
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .update({ video_links: updatedLinks, updated_at: new Date().toISOString() })
+    .eq("id", v.taskId)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath("/student");
+  return data;
+}
+
 const orderListSchema = z.array(z.object({ id: uuidSchema, order_index: z.number().int().min(0) }));
 
 // Persists a drag-and-drop reorder within one day's task list. Runs as
