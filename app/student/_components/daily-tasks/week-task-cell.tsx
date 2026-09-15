@@ -139,14 +139,29 @@ export function WeekTaskCell({ task, onClick }: { task: StudentTask; onClick: ()
             {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
           </p>
 
-          {/* Count + watched-progress only, not full titles/links -- this
-              cell is too tight for that (see TaskCard/TaskModal for the
-              actual clickable list); opening the cell reaches those. */}
+          {/* Each link's own title, clamped to 2 lines rather than a bare
+              count -- readable at a glance without needing to open the
+              cell first. Toggling watched itself still only happens in
+              TaskModal; this is read+navigate only, same division as
+              TaskCard's own video badges. */}
           {task.video_links.length > 0 && (
-            <span className="mt-0.5 inline-flex items-center gap-0.5 text-[9px] text-rose-600">
-              <PlayCircle className="size-2.5 shrink-0" />
-              {task.video_links.filter((l) => l.watched).length}/{task.video_links.length} video
-            </span>
+            <div className="mt-0.5 flex flex-col gap-0.5">
+              {task.video_links.map((link, i) => (
+                <a
+                  key={link.url + i}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    "flex items-start gap-0.5 rounded px-1 py-0.5 text-[9px] leading-snug",
+                    link.watched ? "bg-emerald-500/10 text-emerald-700" : "bg-rose-500/10 text-rose-600",
+                  )}
+                >
+                  <PlayCircle className="mt-0.5 size-2.5 shrink-0" />
+                  <span className="line-clamp-2 break-words">{link.title || "Video"}</span>
+                </a>
+              ))}
+            </div>
           )}
 
           {task.analysis_pending && (
