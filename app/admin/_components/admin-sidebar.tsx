@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { href: "/admin/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ fullName = null }: { fullName?: string | null }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
@@ -65,6 +65,9 @@ export function AdminSidebar() {
       </nav>
 
       <div className="mt-auto px-3 pb-3">
+        {!effectiveCollapsed && fullName && (
+          <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
+        )}
         <TourTrigger role="admin" welcome={ADMIN_WELCOME_STEP} items={ADMIN_NAV_ITEMS} landingPath={ADMIN_LANDING_PATH} collapsed={effectiveCollapsed} />
       </div>
 

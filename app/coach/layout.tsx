@@ -27,29 +27,33 @@ async function touchCoachPresence(supabase: Awaited<ReturnType<typeof createClie
   await supabase.from("coach_profiles").upsert({ coach_id: coachId, last_active_at: new Date().toISOString() }, { onConflict: "coach_id" });
 }
 
-async function fetchLayoutData(effectiveUserId: string, isImpersonating: boolean) {
+async function fetchLayoutData(effectiveUserId: string, realUserId: string, isImpersonating: boolean) {
   const supabase = await createClient();
 
-  const [{ count }] = await Promise.all([
+  const [{ count }, { data: profile }] = await Promise.all([
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("coach_id", effectiveUserId)
       .eq("status", "active"),
+    // realUserId, not effectiveUserId -- the sidebar greeting is always
+    // the actual logged-in person, not whichever coach an admin might
+    // currently be viewing as.
+    supabase.from("profiles").select("full_name").eq("id", realUserId).maybeSingle(),
     // Presence touch is a write -- never fires while impersonating,
     // regardless of who the real caller is.
     isImpersonating ? Promise.resolve(null) : touchCoachPresence(supabase, effectiveUserId),
   ]);
 
-  return { unreadCount: count ?? 0 };
+  return { unreadCount: count ?? 0, fullName: profile?.full_name ?? null };
 }
 
 export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
   const view = await requireViewContext("coach");
-  const { effectiveUserId, isImpersonating, targetName } = view;
+  const { effectiveUserId, realUserId, isImpersonating, targetName } = view;
   const now = new Date();
-  const [{ unreadCount }, announcements, stopwatchRoster] = await Promise.all([
-    fetchLayoutData(effectiveUserId, isImpersonating),
+  const [{ unreadCount, fullName }, announcements, stopwatchRoster] = await Promise.all([
+    fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
     fetchCoachAnnouncements(),
     // Skipped while impersonating for the same reason announcements is --
     // the whole panel renders inside a disabled <fieldset> then anyway,
@@ -70,7 +74,7 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<CoachSidebar unreadCount={unreadCount} />}>
+      <DashboardShell sidebar={<CoachSidebar unreadCount={unreadCount} fullName={fullName} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />

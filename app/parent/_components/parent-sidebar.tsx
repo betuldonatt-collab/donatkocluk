@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { href: "/parent/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function ParentSidebar() {
+export function ParentSidebar({ fullName = null }: { fullName?: string | null }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
@@ -64,6 +64,9 @@ export function ParentSidebar() {
       </nav>
 
       <div className="mt-auto px-3 pb-3">
+        {!effectiveCollapsed && fullName && (
+          <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
+        )}
         <TourTrigger role="parent" welcome={PARENT_WELCOME_STEP} items={PARENT_NAV_ITEMS} landingPath={PARENT_LANDING_PATH} collapsed={effectiveCollapsed} />
       </div>
 

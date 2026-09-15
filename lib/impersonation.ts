@@ -72,6 +72,12 @@ export type ViewContext = {
   effectiveUserId: string;
   isImpersonating: boolean;
   targetName: string | null;
+  // The actual authenticated caller's own id, regardless of impersonation
+  // -- identical to effectiveUserId for every routeRole except an admin
+  // impersonating a coach, where effectiveUserId switches to the target.
+  // For "who is using the app right now" purposes (e.g. a sidebar
+  // greeting), this is the id that should always be used.
+  realUserId: string;
 };
 
 // The cookie's content is NEVER trusted on its own -- the real logged-in
@@ -120,13 +126,13 @@ export const getViewContext = cache(async (routeRole: AppRole): Promise<ViewCont
   if (routeRole === "coach" && actualRole === "admin") {
     const state = await readImpersonationCookie();
     if (state) {
-      return { effectiveUserId: state.targetId, isImpersonating: true, targetName: state.targetName };
+      return { effectiveUserId: state.targetId, isImpersonating: true, targetName: state.targetName, realUserId: user.id };
     }
   }
 
   if (actualRole !== routeRole) return null;
 
-  return { effectiveUserId: user.id, isImpersonating: false, targetName: null };
+  return { effectiveUserId: user.id, isImpersonating: false, targetName: null, realUserId: user.id };
 });
 
 // The layout-level guard -- every one of the 4 dashboard layouts

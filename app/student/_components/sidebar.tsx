@@ -34,7 +34,7 @@ const NAV_ITEMS = [
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function StudentSidebar() {
+export function StudentSidebar({ fullName = null }: { fullName?: string | null }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
@@ -79,6 +79,9 @@ export function StudentSidebar() {
       </nav>
 
       <div className="mt-auto px-3 pb-3">
+        {!effectiveCollapsed && fullName && (
+          <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
+        )}
         <TourTrigger role="student" welcome={STUDENT_WELCOME_STEP} items={STUDENT_NAV_ITEMS} landingPath={STUDENT_LANDING_PATH} collapsed={effectiveCollapsed} />
       </div>
 
