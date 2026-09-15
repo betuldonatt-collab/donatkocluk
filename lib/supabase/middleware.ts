@@ -10,6 +10,13 @@ const ROLE_HOME: Record<string, string> = {
 
 const PROTECTED_ROLES = Object.keys(ROLE_HOME);
 
+// @supabase/ssr's default cookie name is `sb-<project-ref>-auth-token`,
+// chunked into `.0`/`.1`/... for a large JWT. This does NOT match the
+// transient `-code-verifier` cookie used mid-OAuth -- that's a different
+// signal (an in-progress login, not an existing session) and shouldn't
+// count as "had a session".
+const AUTH_COOKIE_PATTERN = /^sb-.*-auth-token(\.\d+)?$/;
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -34,6 +41,13 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
+  // Snapshot BEFORE calling getUser() -- a successful refresh inside that
+  // call rewrites request.cookies via setAll above, so checking cookies
+  // afterward would no longer reflect what the browser actually sent in.
+  const hadAuthCookie = request.cookies
+    .getAll()
+    .some((cookie) => AUTH_COOKIE_PATTERN.test(cookie.name));
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -45,10 +59,24 @@ export async function updateSession(request: NextRequest) {
 
   if (routeRole) {
     if (!user) {
-      // TEMPORARY diagnostic (remove once the /admin redirect issue is
-      // confirmed fixed) -- distinguishes "middleware never saw a session
-      // at all" from the profile-role branch below, which looks identical
-      // to the end user (both land on "/").
+      if (hadAuthCookie) {
+        // A session cookie WAS sent, but getUser() still failed -- almost
+        // certainly a refresh-token rotation race: a sibling request from
+        // the same drag/save burst already rotated the token, so this
+        // request's refresh attempt is using an already-invalidated one.
+        // This is NOT "logged out" -- redirecting here is exactly what
+        // produced the sudden-logout bug during concurrent schedule saves.
+        // Let this request through once; the browser's Supabase client
+        // will pick up a valid session on its next call, and the very
+        // next middleware pass will see a good user again.
+        console.error(
+          "[proxy] getUser failed but auth cookie present -- likely refresh race, allowing through",
+          { path, routeRole },
+        );
+        return supabaseResponse;
+      }
+
+      // No auth cookie at all -- genuinely unauthenticated.
       console.error("[proxy] no user in middleware", { path, routeRole });
       return NextResponse.redirect(new URL("/", request.url));
     }
@@ -68,7 +96,6 @@ export async function updateSession(request: NextRequest) {
     // it just lets the request through to the layout, which does.
     const isAdminCoachPreview = routeRole === "coach" && profile?.role === "admin";
     if (profile?.role !== routeRole && !isAdminCoachPreview) {
-      // TEMPORARY diagnostic, same reason as above.
       console.error("[proxy] role mismatch or missing profile in middleware", {
         path,
         routeRole,
