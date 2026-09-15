@@ -722,6 +722,7 @@ export type StudentEvent = {
   start_time: string;
   end_time: string;
   order_index: number;
+  is_locked: boolean;
 };
 
 const studentEventTypeSchema = z.enum(["meeting", "school", "sports", "personal", "other"]);
@@ -776,6 +777,17 @@ export async function createStudentEvent(
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
+  // Same append-to-bottom fix as buildTaskRows for tasks -- a plain "+"
+  // new time block used to always default to order_index 0 (the column
+  // default) just like a new task did. orderIndex stays an explicit
+  // override for callers that already know the right spot (duplicate,
+  // drag-driven creation), computed here only when they didn't pass one.
+  let orderIndex = inputV.orderIndex;
+  if (orderIndex === undefined) {
+    const startOrderByDate = await nextOrderIndexByDate(supabase, studentIdV, [inputV.eventDate]);
+    orderIndex = startOrderByDate.get(inputV.eventDate)!;
+  }
+
   const { data, error } = await supabase
     .from("student_events")
     .insert({
@@ -787,7 +799,7 @@ export async function createStudentEvent(
       event_date: inputV.eventDate,
       start_time: inputV.startTime,
       end_time: inputV.endTime,
-      order_index: inputV.orderIndex ?? 0,
+      order_index: orderIndex,
     })
     .select("*")
     .single();
@@ -848,6 +860,28 @@ export async function updateStudentEventOrder(studentId: string, orders: { id: s
   const failed = results.find((r) => r.error);
   if (failed?.error) throw dbError(failed.error);
   revalidatePath(`/coach/students/${studentIdV}/schedule`);
+}
+
+// Prevents this one time block from being dragged -- enforced client-side
+// via useSortable({ disabled: event.is_locked }) in EventCard; everything
+// else in the day's combined sequence still drags freely around it.
+export async function setEventLocked(studentId: string, eventId: string, locked: boolean) {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const eventIdV = parseInput(uuidSchema, eventId);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+  const { data, error } = await supabase
+    .from("student_events")
+    .update({ is_locked: locked, updated_at: new Date().toISOString() })
+    .eq("id", eventIdV)
+    .eq("student_id", studentIdV)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
+  return data as StudentEvent;
 }
 
 export async function deleteStudentEvent(studentId: string, eventId: string) {
@@ -938,13 +972,41 @@ const assignTaskInputSchema = z.object({
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
 });
 
+// A day's Görevler section is one combined [task|event] order_index
+// sequence rendered/dragged across two tables (see combinedItemIdsForDay,
+// schedule-board.tsx) -- Rutinler tasks share the same student_tasks.
+// order_index column but are never compared against Görevler items in
+// either section's own render (each filters to its own subset before
+// sorting), so a single "max across everything for this date, +1" is
+// always >= the correct value for WHICHEVER section a new row belongs to,
+// never a collision. Shared by every task/event creation path below so
+// "new item lands at the bottom" is one correct implementation, not
+// reimplemented (or missed) per call site.
+async function nextOrderIndexByDate(supabase: SupabaseClient, studentId: string, dates: string[]): Promise<Map<string, number>> {
+  const uniqueDates = [...new Set(dates)];
+  const [{ data: taskRows }, { data: eventRows }] = await Promise.all([
+    supabase.from("student_tasks").select("task_date, order_index").eq("student_id", studentId).in("task_date", uniqueDates),
+    supabase.from("student_events").select("event_date, order_index").eq("student_id", studentId).in("event_date", uniqueDates),
+  ]);
+  const maxByDate = new Map<string, number>();
+  for (const r of taskRows ?? []) maxByDate.set(r.task_date, Math.max(maxByDate.get(r.task_date) ?? -1, r.order_index));
+  for (const r of eventRows ?? []) maxByDate.set(r.event_date, Math.max(maxByDate.get(r.event_date) ?? -1, r.order_index));
+
+  const startByDate = new Map<string, number>();
+  for (const d of uniqueDates) startByDate.set(d, (maxByDate.get(d) ?? -1) + 1);
+  return startByDate;
+}
+
 // Builds one insertable row per (date x video-link) pair. For every
 // task type except "video" this is just one row per date, video_links
 // carried as-is (unchanged from before). For "video" with N links, each
 // date gets N separate rows -- one link each, in the order the coach
 // added them -- so the student gets N independently checkable cards
-// instead of one card bundling every video.
-function buildTaskRows(studentId: string, coachId: string, taskDates: string[], input: AssignTaskInput) {
+// instead of one card bundling every video. startOrderByDate seeds each
+// date's first new row at the current append position (nextOrderIndexByDate
+// above); multiple rows sharing a date (the multi-video-link case) get
+// consecutive indexes after that, incremented locally as they're built.
+function buildTaskRows(studentId: string, coachId: string, taskDates: string[], input: AssignTaskInput, startOrderByDate: Map<string, number>) {
   const title =
     input.taskType === "general_exam"
       ? buildGeneralExamTitle(input.generalExamTrack, input.generalExamPublisher)
@@ -968,11 +1030,13 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
     total_count: number | null;
     duration_minutes: number | null;
     video_links: VideoLink[];
+    order_index: number;
     is_coach_assigned: true;
     is_approved_by_coach: true;
   }[] = [];
 
   for (const taskDate of taskDates) {
+    let nextOrder = startOrderByDate.get(taskDate) ?? 0;
     for (const videoLinks of videoLinkGroups) {
       rows.push({
         student_id: studentId,
@@ -985,6 +1049,7 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
         total_count: input.totalCount ?? null,
         duration_minutes: input.durationMinutes ?? null,
         video_links: videoLinks,
+        order_index: nextOrder++,
         is_coach_assigned: true,
         // A coach-originated task needs no separate review -- see
         // "Soft Coach Approval" in app/student/actions.ts's
@@ -1046,7 +1111,8 @@ export async function assignTaskToStudent(input: AssignTaskInput & { studentId: 
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const rows = buildTaskRows(studentIdV, user.id, [taskDateV], inputV);
+  const startOrderByDate = await nextOrderIndexByDate(supabase, studentIdV, [taskDateV]);
+  const rows = buildTaskRows(studentIdV, user.id, [taskDateV], inputV, startOrderByDate);
   const { data, error } = await supabase.from("student_tasks").insert(rows).select("*");
   if (error) throw dbError(error);
 
@@ -1072,7 +1138,8 @@ export async function assignRoutineToWeek(input: AssignTaskInput & { studentId: 
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const rows = buildTaskRows(studentIdV, user.id, taskDatesV, inputV);
+  const startOrderByDate = await nextOrderIndexByDate(supabase, studentIdV, taskDatesV);
+  const rows = buildTaskRows(studentIdV, user.id, taskDatesV, inputV, startOrderByDate);
   const { data, error } = await supabase.from("student_tasks").insert(rows).select("*");
   if (error) throw dbError(error);
 
@@ -1193,12 +1260,15 @@ export async function duplicateAssignedTask(studentId: string, taskId: string, t
     .eq("task_id", taskIdV)
     .order("order_index", { ascending: true });
 
+  const targetDateForOrder = targetDateV ?? original.task_date;
+  const startOrderByDate = await nextOrderIndexByDate(supabase, studentIdV, [targetDateForOrder]);
+
   const { data, error } = await supabase
     .from("student_tasks")
     .insert({
       student_id: original.student_id,
       coach_id: user.id,
-      task_date: targetDateV ?? original.task_date,
+      task_date: targetDateForOrder,
       task_type: original.task_type,
       title: original.title,
       course_id: original.course_id,
@@ -1206,6 +1276,7 @@ export async function duplicateAssignedTask(studentId: string, taskId: string, t
       total_count: original.total_count,
       duration_minutes: original.duration_minutes,
       video_links: original.video_links,
+      order_index: startOrderByDate.get(targetDateForOrder)!,
       is_coach_assigned: true,
       is_approved_by_coach: true,
     })
@@ -1528,6 +1599,27 @@ export async function updateAssignedTaskStatus(studentId: string, taskId: string
   if (error) throw dbError(error);
   if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
   revalidatePath(`/coach/students/${studentIdV}`);
+  return data;
+}
+
+// Prevents this one task from being dragged -- enforced client-side via
+// useSortable({ disabled: task.is_locked }) in KanbanTaskCard; everything
+// else in the day's combined sequence still drags freely around it.
+export async function setTaskLocked(studentId: string, taskId: string, locked: boolean) {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const taskIdV = parseInput(uuidSchema, taskId);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .update({ is_locked: locked, updated_at: new Date().toISOString() })
+    .eq("id", taskIdV)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
   return data;
 }
 

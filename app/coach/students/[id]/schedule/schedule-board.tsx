@@ -32,6 +32,8 @@ import {
   isWeekLocked,
   lockWeek,
   moveAssignedTask,
+  setEventLocked,
+  setTaskLocked,
   unlockWeek,
   updateAssignedTaskOrder,
   updateAssignedTaskStatus,
@@ -248,6 +250,17 @@ export function ScheduleBoard({
     setEvents((prev) => [...prev, created]);
   }
 
+  // Optimistic, reverted on failure -- same shape as every other quick
+  // toggle in this file (handleStatusChange below).
+  function handleToggleEventLock(event: StudentEvent) {
+    const next = !event.is_locked;
+    setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, is_locked: next } : e)));
+    setEventLocked(studentId, event.id, next).catch((e) => {
+      setEvents((prev) => prev.map((ev) => (ev.id === event.id ? { ...ev, is_locked: event.is_locked } : ev)));
+      toast.error(e instanceof Error ? e.message : "Kilit durumu değiştirilemedi.");
+    });
+  }
+
   function handleDeleteEvent(event: StudentEvent) {
     const previousEvents = events;
     setEvents((prev) => prev.filter((e) => e.id !== event.id));
@@ -428,6 +441,16 @@ export function ScheduleBoard({
     setTasks((prev) => [...prev, created as DetailTask]);
   }
 
+  // Optimistic, reverted on failure -- same shape as handleToggleEventLock.
+  function handleToggleTaskLock(task: DetailTask) {
+    const next = !task.is_locked;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_locked: next } : t)));
+    setTaskLocked(studentId, task.id, next).catch((e) => {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_locked: task.is_locked } : t)));
+      toast.error(e instanceof Error ? e.message : "Kilit durumu değiştirilemedi.");
+    });
+  }
+
   function handleDelete(task: DetailTask) {
     const previousTasks = tasks;
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
@@ -556,10 +579,12 @@ export function ScheduleBoard({
                   onDuplicate={handleDuplicate}
                   onDelete={handleDelete}
                   onStatusChange={handleStatusChange}
+                  onToggleLock={handleToggleTaskLock}
                   onAddEvent={() => setEventDialogState({ mode: "create", date: day.date })}
                   onEditEvent={(event) => setEventDialogState({ mode: "edit", event })}
                   onDuplicateEvent={handleDuplicateEvent}
                   onDeleteEvent={handleDeleteEvent}
+                  onToggleEventLock={handleToggleEventLock}
                 />
               );
             })}
@@ -628,10 +653,12 @@ function DayColumn({
   onDuplicate,
   onDelete,
   onStatusChange,
+  onToggleLock,
   onAddEvent,
   onEditEvent,
   onDuplicateEvent,
   onDeleteEvent,
+  onToggleEventLock,
 }: {
   day: { date: string; label: string };
   isToday: boolean;
@@ -645,10 +672,12 @@ function DayColumn({
   onDuplicate: (task: DetailTask) => void;
   onDelete: (task: DetailTask) => void;
   onStatusChange: (task: DetailTask, status: AssignedTaskStatus) => void;
+  onToggleLock: (task: DetailTask) => void;
   onAddEvent: () => void;
   onEditEvent: (event: StudentEvent) => void;
   onDuplicateEvent: (event: StudentEvent) => void;
   onDeleteEvent: (event: StudentEvent) => void;
+  onToggleEventLock: (event: StudentEvent) => void;
 }) {
   // Droppable now covers the WHOLE column (events + rutinler + görevler),
   // not just the görevler list -- a time block can be dropped anywhere in
@@ -758,9 +787,17 @@ function DayColumn({
                     onDuplicate={onDuplicate}
                     onDelete={onDelete}
                     onStatusChange={onStatusChange}
+                    onToggleLock={onToggleLock}
                   />
                 ) : (
-                  <EventCard key={item.data.id} event={item.data} onEdit={onEditEvent} onDuplicate={onDuplicateEvent} onDelete={onDeleteEvent} />
+                  <EventCard
+                    key={item.data.id}
+                    event={item.data}
+                    onEdit={onEditEvent}
+                    onDuplicate={onDuplicateEvent}
+                    onDelete={onDeleteEvent}
+                    onToggleLock={onToggleEventLock}
+                  />
                 ),
               )
             )}

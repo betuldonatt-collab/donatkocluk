@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock, Copy, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { Clock, Copy, GripVertical, Lock, LockOpen, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -73,13 +73,20 @@ export function EventCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onToggleLock,
 }: {
   event: StudentEvent;
   onEdit: (event: StudentEvent) => void;
   onDuplicate: (event: StudentEvent) => void;
   onDelete: (event: StudentEvent) => void;
+  onToggleLock: (event: StudentEvent) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: eventDragId(event.id) });
+  // Same disabled-via-lock treatment as KanbanTaskCard -- see its own
+  // comment for why this is enough on its own, no reorder-math changes.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: eventDragId(event.id),
+    disabled: event.is_locked,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
@@ -87,17 +94,31 @@ export function EventCard({
       <div className="flex items-start gap-1">
         <button
           type="button"
-          className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-0.5 opacity-70 active:cursor-grabbing"
-          aria-label="Sürükleyerek taşı"
+          className={cn(
+            "mt-0.5 shrink-0 touch-none rounded p-0.5 opacity-70",
+            event.is_locked ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing",
+          )}
+          aria-label={event.is_locked ? "Kilitli -- taşınamaz" : "Sürükleyerek taşı"}
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="size-3.5" />
+          {event.is_locked ? <Lock className="size-3.5" /> : <GripVertical className="size-3.5" />}
         </button>
         <EventCardBody event={event} />
       </div>
 
       <div className="flex justify-end gap-0.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-5 opacity-70 hover:opacity-100"
+          onClick={() => onToggleLock(event)}
+          aria-label={event.is_locked ? "Kilidi Aç" : "Kilitle"}
+          title={event.is_locked ? "Kilidi Aç" : "Kilitle"}
+        >
+          {event.is_locked ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
+        </Button>
         <Button
           type="button"
           variant="ghost"

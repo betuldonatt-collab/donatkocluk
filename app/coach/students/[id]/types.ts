@@ -47,6 +47,7 @@ export type DetailTask = {
   duration_minutes: number | null;
   video_links: VideoLink[];
   order_index: number;
+  is_locked: boolean;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   analysis_pending: boolean;
 };
