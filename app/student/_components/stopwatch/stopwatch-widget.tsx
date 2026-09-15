@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ChevronRight, Timer, Trophy } from "lucide-react";
+import { ChevronRight, Crown, Timer, Trophy } from "lucide-react";
 
 import { useStopwatchWidgetCollapsed } from "@/lib/use-stopwatch-widget-collapsed";
 import type { DailyStopwatchRanking } from "../../actions";
@@ -70,6 +70,30 @@ export function StopwatchWidget({ ranking }: { ranking: DailyStopwatchRanking })
       </div>
 
       <div className="space-y-2 px-4 pb-4">
+        {/* Dünün Şampiyonu -- only the previous logical day's (02:00
+            Turkey time boundary, migration 0079) top scorer, so a student
+            who fell asleep before the reset still gets to see who won
+            instead of that standing just vanishing. Absent (not a 0-
+            minute placeholder) whenever nobody tracked anything that day. */}
+        {ranking.yesterdayWinnerName && (
+          <div className="relative overflow-hidden rounded-md border border-amber-300 bg-gradient-to-br from-amber-50 to-amber-100 p-3 dark:border-amber-700/50 dark:from-amber-950/40 dark:to-amber-900/30">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-400/30">
+                <Crown className="size-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-400">
+                  Dünün Şampiyonu
+                </p>
+                <p className="text-foreground truncate text-sm font-semibold">{ranking.yesterdayWinnerName}</p>
+              </div>
+              <p className="shrink-0 text-sm font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                {formatMinutesLabel(ranking.yesterdayWinnerTotalMinutes ?? 0)}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="border-border flex items-center gap-2 rounded-md border p-3">
           <Trophy className="size-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">

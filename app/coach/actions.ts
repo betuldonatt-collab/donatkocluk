@@ -18,7 +18,7 @@ import {
 } from "@/lib/curriculum";
 import { dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
-import { mondayOf } from "@/lib/date";
+import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
   computeAylikKarne,
@@ -2483,11 +2483,25 @@ export async function fetchStopwatchCompetitionRoster(
   if (studentIds.length === 0) return [];
 
   const today = new Date().toISOString().slice(0, 10);
+  // Kronometre Yarışması's "daily" bucket runs on its own shifted logical
+  // day (02:00 Turkey time, see stopwatchLogicalDateIso) -- kept separate
+  // from `today`/weekStart/monthStart below, which stay on plain calendar
+  // days since this shift is scoped to the daily reset only, not the
+  // weekly/monthly totals in this same roster.
+  const logicalToday = stopwatchLogicalDateIso();
   const weekStart = mondayOf(today);
   const monthStart = `${yearV}-${String(monthV).padStart(2, "0")}-01`;
   const nextMonth = monthV === 12 ? { y: yearV + 1, m: 1 } : { y: yearV, m: monthV + 1 };
   const monthEndExclusive = `${nextMonth.y}-${String(nextMonth.m).padStart(2, "0")}-01`;
   const rangeStart = monthStart < weekStart ? monthStart : weekStart;
+  // logicalToday can briefly run ONE calendar day ahead of `today` (during
+  // the UTC 23:00-23:59 hour, i.e. 02:00-02:59 Turkey time, right after
+  // the shifted boundary but before literal UTC midnight) -- a task
+  // already assigned for that "tomorrow" date is a real row a coach could
+  // otherwise have, so the fetch range's upper bound has to reach
+  // whichever of the two is later or that row silently never gets fetched
+  // at all, making the daily total wrongly show 0 for that whole hour.
+  const rangeEnd = logicalToday > today ? logicalToday : today;
 
   // profiles has TWO relationships to student_groups -- student_groups.
   // coach_id (a coach's own groups) and profiles.competition_group_id
@@ -2511,7 +2525,7 @@ export async function fetchStopwatchCompetitionRoster(
       .select("student_id, task_date, tracked_duration_minutes")
       .in("student_id", studentIds)
       .gte("task_date", rangeStart)
-      .lte("task_date", today),
+      .lte("task_date", rangeEnd),
   ]);
   if (profilesError) throw dbError(profilesError);
 
@@ -2522,7 +2536,7 @@ export async function fetchStopwatchCompetitionRoster(
     const totals = totalsByStudent.get(row.student_id);
     if (!totals) continue;
     const minutes = row.tracked_duration_minutes ?? 0;
-    if (row.task_date === today) totals.daily += minutes;
+    if (row.task_date === logicalToday) totals.daily += minutes;
     if (row.task_date >= weekStart) totals.weekly += minutes;
     if (row.task_date >= monthStart && row.task_date < monthEndExclusive) totals.monthly += minutes;
   }

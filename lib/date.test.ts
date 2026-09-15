@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mondayOf, weekDates } from "./date";
+import { mondayOf, stopwatchLogicalDateIso, weekDates } from "./date";
 
 // 2024-01-01 is a known Monday; 2025-01-01 is a known Wednesday (2024 is a
 // leap year, 366 % 7 === 2) -- used throughout as fixed reference points
@@ -23,6 +23,32 @@ describe("mondayOf", () => {
 
   it("rolls over a year boundary correctly", () => {
     expect(mondayOf("2025-01-01")).toBe("2024-12-30"); // Wednesday -> the Monday in the prior year
+  });
+});
+
+// The boundary is UTC 23:00 (= 02:00 Turkey time) -- these use explicit
+// UTC instants rather than the local Date() constructor so the test
+// itself doesn't depend on the machine running it being in any
+// particular timezone.
+describe("stopwatchLogicalDateIso", () => {
+  it("is unchanged just before the boundary", () => {
+    expect(stopwatchLogicalDateIso(new Date("2024-01-04T22:59:00Z"))).toBe("2024-01-04");
+  });
+
+  it("advances to the next day right at the boundary", () => {
+    expect(stopwatchLogicalDateIso(new Date("2024-01-04T23:00:00Z"))).toBe("2024-01-05");
+  });
+
+  it("stays on the next day just after the boundary", () => {
+    expect(stopwatchLogicalDateIso(new Date("2024-01-04T23:01:00Z"))).toBe("2024-01-05");
+  });
+
+  it("is unchanged during the middle of the day", () => {
+    expect(stopwatchLogicalDateIso(new Date("2024-01-04T12:00:00Z"))).toBe("2024-01-04");
+  });
+
+  it("rolls over a year boundary correctly", () => {
+    expect(stopwatchLogicalDateIso(new Date("2024-12-31T23:30:00Z"))).toBe("2025-01-01");
   });
 });
 

@@ -606,15 +606,21 @@ export type DailyStopwatchRanking = {
   topStudentName: string | null;
   topStudentTotalMinutes: number | null;
   participantCount: number;
+  // The single highest scorer on the previous logical day (02:00 Turkey
+  // time to 01:59:59 the next day, migration 0079) -- null when nobody in
+  // the roster tracked any time that day, not just when there's no coach.
+  yesterdayWinnerName: string | null;
+  yesterdayWinnerTotalMinutes: number | null;
 };
 
 // Kronometre Yarışması widget -- calls the get_daily_stopwatch_ranking()
-// security-definer function (migration 0054) rather than querying
-// student_tasks/profiles directly, since RLS has no student-to-student
-// read policy at all. The function itself resolves the caller's own
-// coach and returns only these five scalars (never a per-student list),
-// so there's nothing further to restrict here -- a student with no coach
-// gets participantCount: 0 and every other field null, not an error.
+// security-definer function (migration 0054, extended in 0079 for the
+// yesterday_winner_* columns) rather than querying student_tasks/profiles
+// directly, since RLS has no student-to-student read policy at all. The
+// function itself resolves the caller's own coach and returns only these
+// scalars (never a per-student list), so there's nothing further to
+// restrict here -- a student with no coach gets participantCount: 0 and
+// every other field null, not an error.
 export async function getDailyStopwatchRanking(): Promise<DailyStopwatchRanking> {
   const supabase = await createClient();
   await requireUser(supabase);
@@ -628,6 +634,8 @@ export async function getDailyStopwatchRanking(): Promise<DailyStopwatchRanking>
     top_student_name: string | null;
     top_student_total_minutes: number | null;
     participant_count: number;
+    yesterday_winner_name: string | null;
+    yesterday_winner_total_minutes: number | null;
   };
 
   return {
@@ -636,6 +644,8 @@ export async function getDailyStopwatchRanking(): Promise<DailyStopwatchRanking>
     topStudentName: row.top_student_name,
     topStudentTotalMinutes: row.top_student_total_minutes,
     participantCount: row.participant_count,
+    yesterdayWinnerName: row.yesterday_winner_name,
+    yesterdayWinnerTotalMinutes: row.yesterday_winner_total_minutes,
   };
 }
 

@@ -15,6 +15,8 @@ const EMPTY_RANKING: DailyStopwatchRanking = {
   topStudentName: null,
   topStudentTotalMinutes: null,
   participantCount: 0,
+  yesterdayWinnerName: null,
+  yesterdayWinnerTotalMinutes: null,
 };
 
 // Presence heartbeat for the admin directory's online indicator -- never

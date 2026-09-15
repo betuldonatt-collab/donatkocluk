@@ -29,3 +29,22 @@ export function weekDates(referenceIso: string): string[] {
     return d.toISOString().slice(0, 10);
   });
 }
+
+// Kronometre Yarışması's "logical day" (migration 0079,
+// get_daily_stopwatch_ranking) runs from 02:00 Turkey time (UTC+3, no
+// DST) to 01:59:59 the next day, not literal UTC midnight like every
+// other date in this app -- so a student still studying past midnight
+// keeps contributing to what the leaderboard still treats as "today".
+// 02:00 Turkey time is UTC 23:00 (of the preceding UTC calendar day), so
+// shifting the clock forward 1 hour before taking the UTC date lands the
+// rollover exactly there: at UTC 22:59 that's 23:59 the same UTC day
+// (date unchanged, boundary not yet crossed); at UTC 23:01 that's 00:01
+// the NEXT UTC day (date advances). This must stay byte-for-byte the
+// same math as the SQL function's `(now() at time zone 'utc' + interval
+// '1 hour')::date` -- used by fetchStopwatchCompetitionRoster
+// (app/coach/actions.ts) so the coach's own roster totals never disagree
+// with the student's own widget about what "today" means.
+export function stopwatchLogicalDateIso(reference: Date = new Date()): string {
+  const shifted = new Date(reference.getTime() + 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
