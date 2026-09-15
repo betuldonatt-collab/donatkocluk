@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Lock, PlayCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Lock, PlayCircle, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -625,6 +625,19 @@ function TaskModalBody({
                   <PlayCircle className="size-3.5 shrink-0" />
                   <span className="truncate">{link.title || "Video"}</span>
                 </a>
+                {link.watched && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-foreground size-7 shrink-0"
+                    aria-label="İzlemedim olarak işaretle"
+                    title="İzlemedim"
+                    onClick={() => handleToggleWatched(link.url, false)}
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
