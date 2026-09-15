@@ -30,7 +30,6 @@ export type TaskProgressPatch = Partial<{
   wrong_count: number | null;
   empty_count: number | null;
   duration_minutes: number | null;
-  tracked_duration_minutes: number;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   completed: boolean;
   analysis_pending: boolean;
@@ -74,7 +73,6 @@ const taskProgressPatchSchema = z.object({
   wrong_count: countField,
   empty_count: countField,
   duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
-  tracked_duration_minutes: z.number().int().min(0).max(1440).optional(),
   subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
   completed: z.boolean().optional(),
   analysis_pending: z.boolean().optional(),
@@ -827,4 +825,259 @@ export async function getMyResourcesForCourse(courseId: string, kind: "study" | 
     .order("created_at", { ascending: true });
   if (error) throw dbError(error);
   return data as { id: string; name: string }[];
+}
+
+// --- Focus Timer sessions (resumable, cross-device) -----------------------
+//
+// A focus_sessions row (migration 0078) is the live/paused state of an
+// in-progress session for one (student, task) pair -- created on Başlat,
+// updated on every pause/resume/heartbeat, and always resolved (banked into
+// tracked_duration_seconds, then deleted) before this function set is done
+// with it: on Bitir/Vazgeç (endFocusSession), or transparently by
+// startFocusSession/getActiveFocusSession finding a leftover one first.
+//
+// run_started_at is a timestamp, not a counter -- elapsed is always
+// accumulated_seconds + (now - run_started_at) while running, computed
+// fresh by whichever device asks, so no polling is required for a second
+// device to see accurate progress. Reconciling a dangling "running" row
+// (this device crashed, or a different device is asking) always banks
+// through last_heartbeat_at, never "now" -- see liveElapsedSeconds/
+// resumeFocusSession below, and end_focus_session in the migration.
+
+const FOCUS_SESSION_STALE_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+type FocusSessionRow = {
+  id: string;
+  mode: "stopwatch" | "countdown";
+  countdown_target_seconds: number | null;
+  status: "running" | "paused";
+  run_started_at: string | null;
+  accumulated_seconds: number;
+  last_heartbeat_at: string;
+};
+
+const focusModeSchema = z.enum(["stopwatch", "countdown"]);
+// 1..180 minutes, matching the countdown picker's own custom-input cap
+// (focus-timer-modal.tsx) -- null only ever pairs with "stopwatch".
+const countdownTargetSchema = z.number().int().min(60).max(10_800).nullable();
+
+async function getOwnFocusSession(
+  supabase: SupabaseClient,
+  userId: string,
+  taskId: string,
+): Promise<FocusSessionRow | null> {
+  const { data, error } = await supabase
+    .from("focus_sessions")
+    .select("id, mode, countdown_target_seconds, status, run_started_at, accumulated_seconds, last_heartbeat_at")
+    .eq("student_id", userId)
+    .eq("task_id", taskId)
+    .maybeSingle();
+  if (error) throw dbError(error);
+  return data as FocusSessionRow | null;
+}
+
+// Seconds elapsed in this session as of right now -- the wall-clock
+// reconstruction described above.
+function liveElapsedSeconds(session: FocusSessionRow): number {
+  if (session.status !== "running" || !session.run_started_at) return session.accumulated_seconds;
+  const ranMs = Date.now() - new Date(session.run_started_at).getTime();
+  return session.accumulated_seconds + Math.max(0, Math.round(ranMs / 1000));
+}
+
+function isStaleSession(session: FocusSessionRow): boolean {
+  return Date.now() - new Date(session.last_heartbeat_at).getTime() > FOCUS_SESSION_STALE_MS;
+}
+
+// Called right when the Focus Timer opens for a task -- returns the
+// resumable state for the "Devam eden bir seansın var..." prompt, or null
+// when there's genuinely nothing to resume. A row past the 3-hour
+// staleness cutoff is auto-banked and cleared right here instead of ever
+// being offered: a session abandoned that long ago isn't something to
+// prompt "continue?" on, it's just focus time to credit quietly and move
+// on from.
+export async function getActiveFocusSession(taskId: string): Promise<{
+  mode: "stopwatch" | "countdown";
+  countdownTargetSeconds: number | null;
+  status: "running" | "paused";
+  elapsedSeconds: number;
+} | null> {
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+
+  const session = await getOwnFocusSession(supabase, user.id, taskIdV);
+  if (!session) return null;
+
+  if (isStaleSession(session)) {
+    const { error } = await supabase.rpc("end_focus_session", {
+      p_task_id: taskIdV,
+      p_bank_through: session.last_heartbeat_at,
+    });
+    if (error) throw dbError(error);
+    revalidatePath("/student");
+    return null;
+  }
+
+  return {
+    mode: session.mode,
+    countdownTargetSeconds: session.countdown_target_seconds,
+    status: session.status,
+    elapsedSeconds: liveElapsedSeconds(session),
+  };
+}
+
+// Starts a fresh session -- if one already existed for this task (whether
+// still-live or stale), it's banked and cleared first, exactly like
+// getActiveFocusSession's own staleness path, so choosing "Yeni Başlat"
+// off the resume prompt never silently discards the old time, it just
+// closes that session out before opening a new one.
+export async function startFocusSession(
+  taskId: string,
+  mode: "stopwatch" | "countdown",
+  countdownTargetSeconds: number | null,
+): Promise<void> {
+  await assertNotImpersonating();
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+  const modeV = parseInput(focusModeSchema, mode);
+  const countdownV = parseInput(countdownTargetSchema, countdownTargetSeconds);
+  if (modeV === "countdown" && countdownV === null) {
+    throw new Error("Geri sayım süresi seçilmedi.");
+  }
+
+  const { data: task, error: taskError } = await supabase
+    .from("student_tasks")
+    .select("student_id")
+    .eq("id", taskIdV)
+    .maybeSingle();
+  if (taskError) throw dbError(taskError);
+  if (!task || task.student_id !== user.id) throw new Error("Bu görev sana ait değil.");
+
+  const existing = await getOwnFocusSession(supabase, user.id, taskIdV);
+  if (existing) {
+    const { error } = await supabase.rpc("end_focus_session", {
+      p_task_id: taskIdV,
+      p_bank_through: isStaleSession(existing) ? existing.last_heartbeat_at : new Date().toISOString(),
+    });
+    if (error) throw dbError(error);
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("focus_sessions").upsert(
+    {
+      student_id: user.id,
+      task_id: taskIdV,
+      mode: modeV,
+      countdown_target_seconds: modeV === "countdown" ? countdownV : null,
+      status: "running",
+      run_started_at: now,
+      accumulated_seconds: 0,
+      last_heartbeat_at: now,
+    },
+    { onConflict: "student_id,task_id" },
+  );
+  if (error) throw dbError(error);
+}
+
+// Resumes a session -- shared by the cross-device/crash resume prompt AND
+// Mola Ver's own "Devam Et" (the same reconciliation is correct either way:
+// when nothing went wrong, last_heartbeat_at is fresh enough that banking
+// through it vs. through "now" makes no practical difference).
+export async function resumeFocusSession(taskId: string): Promise<{ elapsedSeconds: number } | null> {
+  await assertNotImpersonating();
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+
+  const existing = await getOwnFocusSession(supabase, user.id, taskIdV);
+  if (!existing) return null;
+
+  const banked =
+    existing.status === "running" && existing.run_started_at
+      ? existing.accumulated_seconds +
+        Math.max(
+          0,
+          Math.round(
+            (new Date(existing.last_heartbeat_at).getTime() - new Date(existing.run_started_at).getTime()) / 1000,
+          ),
+        )
+      : existing.accumulated_seconds;
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("focus_sessions")
+    .update({ status: "running", run_started_at: now, accumulated_seconds: banked, last_heartbeat_at: now })
+    .eq("id", existing.id);
+  if (error) throw dbError(error);
+
+  return { elapsedSeconds: banked };
+}
+
+// Mola Ver -- banks the just-finished run segment (through "now", this is a
+// live in-the-moment action) and flips to paused. A no-op if there's
+// nothing running -- defensive: the beforeunload route handler
+// (app/api/focus-checkpoint/route.ts) reuses this for a real tab close,
+// which can race with a session that already ended some other way.
+export async function pauseFocusSession(taskId: string): Promise<void> {
+  await assertNotImpersonating();
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+
+  const existing = await getOwnFocusSession(supabase, user.id, taskIdV);
+  if (!existing || existing.status !== "running" || !existing.run_started_at) return;
+
+  const ranSeconds = Math.max(0, Math.round((Date.now() - new Date(existing.run_started_at).getTime()) / 1000));
+  const { error } = await supabase
+    .from("focus_sessions")
+    .update({
+      status: "paused",
+      run_started_at: null,
+      accumulated_seconds: existing.accumulated_seconds + ranSeconds,
+      last_heartbeat_at: new Date().toISOString(),
+    })
+    .eq("id", existing.id);
+  if (error) throw dbError(error);
+}
+
+// Fired every ~20s while running (FocusTimerModal), alongside the unrelated
+// coach-live-status heartbeat (sendFocusHeartbeat above) -- purely refreshes
+// the staleness/trust boundary described at the top of this section. A
+// missed beat only widens the dead-air window a later reconciliation has to
+// assume didn't happen, never a lost task update, so this deliberately
+// doesn't throw on a missing/already-ended row.
+export async function heartbeatFocusSession(taskId: string): Promise<void> {
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+
+  await supabase
+    .from("focus_sessions")
+    .update({ last_heartbeat_at: new Date().toISOString() })
+    .eq("student_id", user.id)
+    .eq("task_id", taskIdV)
+    .eq("status", "running");
+}
+
+// Bitir and Vazgeç both end here -- the only difference between them is
+// client-side UX (a celebration screen vs. not), not what gets persisted.
+// Banks through "now" (a live, in-the-moment end) and deletes the session
+// row via end_focus_session (migration 0078). Returns the task's new
+// cumulative tracked_duration_seconds total (null if there was no session
+// to end), so the caller can show it without waiting on revalidation.
+export async function endFocusSession(taskId: string): Promise<number | null> {
+  await assertNotImpersonating();
+  const supabase = await createClient();
+  await requireUser(supabase);
+  const taskIdV = parseInput(uuidSchema, taskId);
+
+  const { data, error } = await supabase.rpc("end_focus_session", {
+    p_task_id: taskIdV,
+    p_bank_through: new Date().toISOString(),
+  });
+  if (error) throw dbError(error);
+
+  if (data !== null) revalidatePath("/student");
+  return data as number | null;
 }

@@ -6,9 +6,17 @@ import { Timer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { sendFocusHeartbeat, updateTaskProgress } from "../../actions";
+import {
+  endFocusSession,
+  getActiveFocusSession,
+  heartbeatFocusSession,
+  pauseFocusSession,
+  resumeFocusSession,
+  sendFocusHeartbeat,
+  startFocusSession,
+} from "../../actions";
 import type { StudentTask } from "../daily-tasks/types";
-import { FocusTimerModal, type FocusTimerMode } from "./focus-timer-modal";
+import { FocusTimerModal, type ActiveFocusSession, type FocusTimerMode } from "./focus-timer-modal";
 
 function formatDuration(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -24,53 +32,79 @@ function formatMinutesLabel(totalMinutes: number): string {
 }
 
 // Per-task Focus Mode entry point -- opens the same fullscreen timer for
-// whichever task this button is rendered next to. Every way a session can
-// end -- Bitir, Vazgeç, or the modal unmounting mid-session -- logs its
-// seconds onto THIS task's own tracked_duration_minutes (accumulated, since
-// a student may run several sessions on the same task across visits),
-// reusing the existing updateTaskProgress action. Deliberately a SEPARATE
-// column from duration_minutes (a coach's target/estimated duration, or a
-// student's manually-typed exam time) -- the Kronometre Yarışması
-// leaderboard sums only tracked_duration_minutes, so a task merely being
-// assigned a target duration must never inflate it; only genuine stopwatch
-// time recorded here does (see migration 0074_stopwatch_tracked_duration).
+// whichever task this button is rendered next to. Persistence is entirely
+// server-authoritative now (migration 0078, app/student/actions.ts): a
+// focus_sessions row tracks the live/paused state of a session by task id,
+// resumable from any device, and reconciled via wall-clock math against a
+// last_heartbeat_at trust boundary rather than anything this component
+// computes itself. This component's job is just wiring the modal's UI
+// events to the right server action and keeping the "Süre Tut" button's own
+// cumulative badge (task.tracked_duration_minutes) in view.
 export function FocusTimerTrigger({ task, className }: { task: StudentTask; className?: string }) {
   const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [initialSession, setInitialSession] = useState<ActiveFocusSession | null>(null);
 
-  // Shared by every exit path (Bitir, Vazgeç, unmount) so all three save
-  // identically -- a session with 0 seconds (e.g. Vazgeç before starting)
-  // is silently skipped rather than writing a no-op update.
-  async function persistSession(seconds: number) {
-    if (seconds <= 0) return;
-    const sessionMinutes = Math.max(1, Math.round(seconds / 60));
-    const nextTotal = Math.min(1440, task.tracked_duration_minutes + sessionMinutes);
-    setSaving(true);
+  // Resolves whether there's a resumable session BEFORE the modal ever
+  // mounts, so it can go straight to the "Devam eden bir seansın var..."
+  // prompt instead of flashing the normal picker first. A failure here
+  // just falls back to the normal picker (harmless -- if a resumable
+  // session genuinely exists, it's still sitting on the server and will be
+  // banked, not lost, whenever it's next reconciled).
+  async function handleOpen() {
+    setChecking(true);
     try {
-      await updateTaskProgress(task.id, { tracked_duration_minutes: nextTotal });
-      toast.success(`${formatDuration(seconds)} odaklandın, göreve kaydedildi.`);
+      const session = await getActiveFocusSession(task.id);
+      setInitialSession(session);
     } catch {
-      toast.error("Odak süresi kaydedilemedi, tekrar dene.");
+      setInitialSession(null);
     } finally {
-      setSaving(false);
+      setChecking(false);
+      setOpen(true);
     }
   }
 
   async function handleFinish(result: { mode: FocusTimerMode; seconds: number }) {
     setOpen(false);
-    await persistSession(result.seconds);
+    try {
+      await endFocusSession(task.id);
+      if (result.seconds > 0) toast.success(`${formatDuration(result.seconds)} odaklandın, göreve kaydedildi.`);
+    } catch {
+      toast.error("Odak süresi kaydedilemedi, tekrar dene.");
+    }
   }
 
   async function handleCancel(seconds: number) {
     setOpen(false);
-    await persistSession(seconds);
+    try {
+      await endFocusSession(task.id);
+      if (seconds > 0) toast.success(`${formatDuration(seconds)} odaklandın, göreve kaydedildi.`);
+    } catch {
+      toast.error("Odak süresi kaydedilemedi, tekrar dene.");
+    }
+  }
+
+  function handleStart(mode: FocusTimerMode, countdownTargetSeconds: number | null) {
+    startFocusSession(task.id, mode, countdownTargetSeconds).catch(() => {
+      toast.error("Süre senkronize edilemedi ama sayaç çalışmaya devam ediyor.");
+    });
+  }
+
+  function handlePause() {
+    pauseFocusSession(task.id).catch(() => {});
+  }
+
+  function handleResumeSession() {
+    return resumeFocusSession(task.id);
   }
 
   // Fire-and-forget: a missed beat only leaves a coach seeing a stale
-  // "Boşta" a little longer (see lib/focus-live-status.ts), never a
-  // lost task update, so this deliberately doesn't toast or retry.
+  // "Boşta" a little longer, or widens the dead-air window a later
+  // reconciliation has to assume didn't happen -- never a lost task
+  // update, so this deliberately doesn't toast or retry.
   function handleHeartbeat() {
     sendFocusHeartbeat().catch(() => {});
+    heartbeatFocusSession(task.id).catch(() => {});
   }
 
   if (task.week_locked) return null;
@@ -95,9 +129,9 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            setOpen(true);
+            handleOpen();
           }}
-          disabled={saving}
+          disabled={checking}
           aria-label="Odak modunu başlat"
         >
           <Timer className="size-3.5" />
@@ -106,7 +140,17 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
       </div>
 
       {open && (
-        <FocusTimerModal taskTitle={task.title} onCancel={handleCancel} onFinish={handleFinish} onHeartbeat={handleHeartbeat} />
+        <FocusTimerModal
+          taskId={task.id}
+          taskTitle={task.title}
+          initialSession={initialSession}
+          onStart={handleStart}
+          onPause={handlePause}
+          onResumeSession={handleResumeSession}
+          onCancel={handleCancel}
+          onFinish={handleFinish}
+          onHeartbeat={handleHeartbeat}
+        />
       )}
     </>
   );

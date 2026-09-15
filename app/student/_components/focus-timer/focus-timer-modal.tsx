@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Coffee, PartyPopper, Pause, Play } from "lucide-react";
+import { Coffee, History, PartyPopper, Pause, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,17 +55,50 @@ function resolvePraiseMessage(finishing: { seconds: number; goalHit: boolean }):
 // prevent the student from wandering off without at least pausing or
 // finishing. "Vazgeç" is the one explicit escape hatch, kept small and
 // separate from Mola Ver / Bitir so it's never an accidental click.
+export type ActiveFocusSession = {
+  mode: FocusTimerMode;
+  countdownTargetSeconds: number | null;
+  status: "running" | "paused";
+  elapsedSeconds: number;
+};
+
 export function FocusTimerModal({
+  taskId,
   taskTitle,
+  initialSession,
+  onStart,
+  onPause,
+  onResumeSession,
   onCancel,
   onFinish,
   onHeartbeat,
 }: {
+  taskId: string;
   taskTitle: string;
+  // Resolved by the trigger (getActiveFocusSession) BEFORE this modal ever
+  // mounts -- a resumable session (this device, a crashed tab, or a
+  // different device entirely) shows the "Devam eden bir seansın var..."
+  // prompt first instead of the normal mode picker. null means there's
+  // genuinely nothing to resume (including a stale one already
+  // auto-flushed server-side).
+  initialSession: ActiveFocusSession | null;
+  // Fired once, right when Başlat is clicked (fire-and-forget from this
+  // modal's perspective -- the visual timer never waits on it, matching
+  // every other persistence call here).
+  onStart: (mode: FocusTimerMode, countdownTargetSeconds: number | null) => void;
+  // Mola Ver -- banks the live segment server-side and flips to paused.
+  onPause: () => void;
+  // Shared by the resume prompt's "Süre tutmaya devam et" AND Mola Ver's
+  // own "Devam Et" -- returns the server's reconciled elapsed seconds
+  // (null if there was nothing to resume), which the resume prompt needs
+  // to seed its local display from (this modal has no memory of a session
+  // it didn't start itself).
+  onResumeSession: () => Promise<{ elapsedSeconds: number } | null>;
   // Called on "Vazgeç" or an unexpected unmount -- with however many
   // seconds had accumulated at that point (0 if the session never
-  // started), so the trigger can persist a session even when it wasn't
-  // finished through the normal Bitir flow.
+  // started). Persistence itself is server-authoritative now (endFocusSession
+  // re-derives the true elapsed from the session row), so `seconds` here is
+  // only ever used for this modal's own display text.
   onCancel: (seconds: number) => void;
   onFinish: (result: { mode: FocusTimerMode; seconds: number }) => void;
   // Fired immediately whenever the timer starts/resumes, then every
@@ -82,6 +115,12 @@ export function FocusTimerModal({
   const [onBreak, setOnBreak] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [finishing, setFinishing] = useState<{ mode: FocusTimerMode; seconds: number; goalHit: boolean } | null>(null);
+  // Shown instead of the mode picker while there's a resumable session to
+  // decide on -- cleared either by "Süre tutmaya devam et" (jumps straight
+  // to the running screen) or "Yeni Başlat" (falls through to the picker;
+  // the old session isn't lost, startFocusSession banks it transparently).
+  const [resumePromptPending, setResumePromptPending] = useState(initialSession !== null);
+  const [resumeActionPending, setResumeActionPending] = useState(false);
   const startedAtRef = useRef<number | null>(null);
 
   // Picked once per mount -- since the parent only mounts this modal while
@@ -112,12 +151,13 @@ export function FocusTimerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  // Mirrors the latest started/elapsed/finishing state after every render
-  // so the unmount cleanup below (a closure fixed at effect-setup time)
-  // can still read live values instead of the ones from its first render.
-  const liveRef = useRef({ started, elapsedMs, finishing });
+  // Mirrors the latest started/elapsed/finishing/running state after every
+  // render so the unmount cleanup below (a closure fixed at effect-setup
+  // time) and the beforeunload handler further down can still read live
+  // values instead of the ones from their first render.
+  const liveRef = useRef({ started, elapsedMs, finishing, running });
   useEffect(() => {
-    liveRef.current = { started, elapsedMs, finishing };
+    liveRef.current = { started, elapsedMs, finishing, running };
   });
 
   // Guards against reporting a session's elapsed time more than once --
@@ -176,6 +216,24 @@ export function FocusTimerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A real tab close/refresh/crash never runs the React cleanup above --
+  // the JS runtime is torn down immediately, before any of it can fire.
+  // `beforeunload` is the one moment a request kicked off during unload is
+  // reliably delivered, and only via sendBeacon (a plain fetch would be
+  // cancelled mid-flight). The route handler behind it just pauses the
+  // session server-side (banks the live segment, keeps it resumable) --
+  // this is best-effort on top of the 20s heartbeat's own trust boundary,
+  // not the only thing standing between a crash and lost time.
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (!liveRef.current.running) return;
+      const blob = new Blob([JSON.stringify({ taskId })], { type: "application/json" });
+      navigator.sendBeacon("/api/focus-checkpoint", blob);
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [taskId]);
+
   // Picked once when the session actually finishes, not re-rolled while
   // the success screen is showing.
   const praiseMessage = useMemo(() => (finishing ? resolvePraiseMessage(finishing) : ""), [finishing]);
@@ -190,18 +248,56 @@ export function FocusTimerModal({
     setElapsedMs(0);
     setStarted(true);
     setRunning(true);
+    onStart(mode, mode === "countdown" ? countdownMinutes * 60 : null);
   }
 
   function handleTakeBreak() {
     setRunning(false);
     setOnBreak(true);
     startedAtRef.current = null;
+    onPause();
   }
 
   function handleResume() {
     setOnBreak(false);
     startedAtRef.current = Date.now() - elapsedMs;
     setRunning(true);
+    onResumeSession().catch(() => {});
+  }
+
+  // The resume prompt's "Süre tutmaya devam et" -- unlike handleResume
+  // above, this modal has no local memory of a session it didn't start
+  // itself, so it seeds elapsedMs from the server's reconciled value
+  // (falling back to the prompt's own already-displayed estimate if the
+  // network call itself fails, rather than stranding the student on the
+  // prompt screen).
+  async function handleResumeFromPrompt() {
+    if (!initialSession) return;
+    setResumeActionPending(true);
+    let seconds = initialSession.elapsedSeconds;
+    try {
+      const result = await onResumeSession();
+      if (result) seconds = result.elapsedSeconds;
+    } catch {
+      // Fall through with the prompt's own last-known elapsed.
+    }
+    setMode(initialSession.mode);
+    if (initialSession.mode === "countdown" && initialSession.countdownTargetSeconds) {
+      setCountdownMinutes(Math.round(initialSession.countdownTargetSeconds / 60));
+    }
+    startedAtRef.current = Date.now() - seconds * 1000;
+    setElapsedMs(seconds * 1000);
+    setStarted(true);
+    setRunning(true);
+    setResumeActionPending(false);
+    setResumePromptPending(false);
+  }
+
+  // "Yeni Başlat" -- falls through to the normal mode picker. The old
+  // session isn't discarded: startFocusSession (fired from the next
+  // handleStart, via onStart) transparently banks it first.
+  function handleDiscardResume() {
+    setResumePromptPending(false);
   }
 
   function handleFinish() {
@@ -212,11 +308,20 @@ export function FocusTimerModal({
   }
 
   // The explicit "Vazgeç" click -- reports whatever's accumulated so far
-  // (0 if the session never started) before closing, then lets the
-  // reportedRef guard above no-op the unmount cleanup that follows it.
+  // before closing, then lets the reportedRef guard above no-op the
+  // unmount cleanup that follows it. Bailing straight from the resume
+  // prompt (never actually pressing Devam Et or Yeni Başlat) still banks
+  // that pre-existing session's real elapsed -- same "close and bank
+  // whatever's active" meaning Vazgeç already has everywhere else, it just
+  // happens to apply to a session this modal instance didn't start itself.
   function handleCancelClick() {
     reportedRef.current = true;
-    onCancel(started ? Math.round(elapsedMs / 1000) : 0);
+    const seconds = started
+      ? Math.round(elapsedMs / 1000)
+      : resumePromptPending && initialSession
+        ? Math.round(initialSession.elapsedSeconds)
+        : 0;
+    onCancel(seconds);
   }
 
   function handleCustomMinutesChange(value: string) {
@@ -279,6 +384,33 @@ export function FocusTimerModal({
               <p className="text-muted-foreground text-sm">
                 {formatSeconds(finishing.seconds)} boyunca odaklandın. Bu süre göreve kaydedildi.
               </p>
+            </div>
+          </>
+        ) : resumePromptPending && initialSession ? (
+          <>
+            <div className="bg-primary/10 flex size-16 items-center justify-center rounded-full">
+              <History className="text-primary size-8" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-foreground text-lg font-semibold">Devam eden bir seansın var</h2>
+              <p className="text-muted-foreground max-w-[260px] truncate text-sm" title={taskTitle}>
+                {taskTitle}
+              </p>
+            </div>
+            <p className="text-foreground text-5xl font-bold tabular-nums">
+              {formatSeconds(initialSession.elapsedSeconds)}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              {initialSession.status === "running" ? "Başka bir cihazda çalışıyor olabilir" : "Duraklatılmış"}
+            </p>
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="outline" size="lg" onClick={handleDiscardResume} disabled={resumeActionPending}>
+                Yeni Başlat
+              </Button>
+              <Button type="button" size="lg" onClick={handleResumeFromPrompt} disabled={resumeActionPending}>
+                <Play className="size-4" />
+                Süre tutmaya devam et
+              </Button>
             </div>
           </>
         ) : !started ? (
