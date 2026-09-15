@@ -2489,10 +2489,22 @@ export async function fetchStopwatchCompetitionRoster(
   const monthEndExclusive = `${nextMonth.y}-${String(nextMonth.m).padStart(2, "0")}-01`;
   const rangeStart = monthStart < weekStart ? monthStart : weekStart;
 
-  const [{ data: profiles }, { data: taskRows }] = await Promise.all([
+  // profiles has TWO relationships to student_groups -- student_groups.
+  // coach_id (a coach's own groups) and profiles.competition_group_id
+  // (which group THIS profile belongs to) -- so the embed needs the
+  // !profiles_competition_group_id_fkey hint or PostgREST rejects it as
+  // ambiguous (error PGRST201, verified directly against production).
+  // That error was never being checked below, so the whole query silently
+  // came back as `profiles: null` and every row's fullName fell back to
+  // null -- the actual cause of every name in the Kronometre Yarışması
+  // widget rendering as "—". Also added the missing error check itself,
+  // so a future regression here fails loudly instead of silently again.
+  const [{ data: profiles, error: profilesError }, { data: taskRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, sinif_sube, active_focus_heartbeat_at, competition_group_id, competition_status, student_groups(name)")
+      .select(
+        "id, full_name, sinif_sube, active_focus_heartbeat_at, competition_group_id, competition_status, student_groups!profiles_competition_group_id_fkey(name)",
+      )
       .in("id", studentIds),
     supabase
       .from("student_tasks")
@@ -2501,6 +2513,7 @@ export async function fetchStopwatchCompetitionRoster(
       .gte("task_date", rangeStart)
       .lte("task_date", today),
   ]);
+  if (profilesError) throw dbError(profilesError);
 
   const totalsByStudent = new Map<string, { daily: number; weekly: number; monthly: number }>();
   for (const id of studentIds) totalsByStudent.set(id, { daily: 0, weekly: 0, monthly: 0 });
