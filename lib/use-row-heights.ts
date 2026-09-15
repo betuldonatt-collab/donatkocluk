@@ -59,7 +59,16 @@ export function useRowHeights(
   }
 
   function onResize(rowIndex: number, deltaY: number) {
-    setHeights((prev) => ({ ...prev, [rowIndex]: Math.max(minHeight, (prev[rowIndex] ?? defaultHeight) + deltaY) }));
+    // Rounded right here, the single place `heights` ever gets written --
+    // a real PointerEvent's clientY can be fractional (subpixel mouse
+    // position, devicePixelRatio scaling), so an unrounded deltaY drifts
+    // the accumulated height off-integer immediately. Rounding once per
+    // accumulation (not per pixel of on-screen movement) avoids compounding
+    // error from many small fractional deltas, and keeps every downstream
+    // consumer -- the CSS px style, and rowHeightsSchema's z.number().int()
+    // in lib/schedule-row-heights.ts -- looking at a real integer the
+    // whole time, not just at the moment it's persisted.
+    setHeights((prev) => ({ ...prev, [rowIndex]: Math.max(minHeight, Math.round((prev[rowIndex] ?? defaultHeight) + deltaY)) }));
   }
 
   function onResizeEnd(rowIndex: number, rowCount: number) {
