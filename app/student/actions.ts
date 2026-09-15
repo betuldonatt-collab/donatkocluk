@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
-import { countsAreConsistent } from "@/lib/count-fields";
+import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
@@ -62,31 +62,26 @@ const subjectScoreSchema = z.object({
   wrong: z.number().int().min(0).max(10000).nullable(),
   empty: z.number().int().min(0).max(10000).nullable(),
 });
-const taskProgressPatchSchema = z
-  .object({
-    total_count: countField,
-    correct_count: countField,
-    wrong_count: countField,
-    empty_count: countField,
-    duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
-    tracked_duration_minutes: z.number().int().min(0).max(1440).optional(),
-    subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
-    completed: z.boolean().optional(),
-    analysis_pending: z.boolean().optional(),
-    status: z.enum(["pending", "done", "half_done", "not_done"]).optional(),
-    reason: z.string().trim().max(1000).nullable().optional(),
-    note: z.string().trim().max(2000).nullable().optional(),
-  })
-  .refine(
-    (v) =>
-      countsAreConsistent({
-        total: v.total_count ?? null,
-        correct: v.correct_count ?? null,
-        wrong: v.wrong_count ?? null,
-        empty: v.empty_count ?? null,
-      }),
-    { message: "Toplam, Doğru + Yanlış + Boş toplamına eşit olmalıdır.", path: ["total_count"] },
-  );
+// No countsAreConsistent refine here (unlike createRichCustomTaskSchema
+// below, a one-shot "declare a finished result" flow where exact
+// consistency still makes sense) -- this is the ongoing-progress path,
+// where Doğru+Yanlış+Boş falling short of Toplam is now a legitimate,
+// expected state ("Yarım Yapıldı"), not a data-entry error to reject. See
+// computeAutoTaskStatus below.
+const taskProgressPatchSchema = z.object({
+  total_count: countField,
+  correct_count: countField,
+  wrong_count: countField,
+  empty_count: countField,
+  duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
+  tracked_duration_minutes: z.number().int().min(0).max(1440).optional(),
+  subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
+  completed: z.boolean().optional(),
+  analysis_pending: z.boolean().optional(),
+  status: z.enum(["pending", "done", "half_done", "not_done"]).optional(),
+  reason: z.string().trim().max(1000).nullable().optional(),
+  note: z.string().trim().max(2000).nullable().optional(),
+});
 
 // Security Hardening Group 4 (double-layer authorization): student_tasks
 // RLS (student_tasks_student_update) already restricts this update to
@@ -105,12 +100,61 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
 
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
-    .select("student_id")
+    .select("student_id, is_coach_assigned, task_type, total_count, correct_count, wrong_count, empty_count")
     .eq("id", taskIdV)
     .maybeSingle();
   if (fetchError) throw dbError(fetchError);
   if (!existing || existing.student_id !== user.id) {
     throw new Error("Bu görev sana ait değil.");
+  }
+
+  // Coach-assigned Toplam is the coach's own call -- the student only
+  // ever changes how many they actually solved (Doğru/Yanlış/Boş). The UI
+  // never renders an editable field for this case, but this is the
+  // authoritative check (mirrored at the DB level by
+  // prevent_student_task_core_tampering, migration 0077) -- a direct or
+  // forged call gets the same clear rejection.
+  if (existing.is_coach_assigned && "total_count" in patchV && patchV.total_count !== existing.total_count) {
+    throw new Error("Koç tarafından atanan toplam soru sayısı değiştirilemez.");
+  }
+
+  // A "dual" task (task-modal.tsx) is a video/topic-study task that also
+  // carries a real question-count target -- the student logs BOTH a
+  // manual status for the video/topic-study half AND question counts for
+  // the other half, and the two get merged (mergeDualTaskStatus) into one
+  // overall status. The manual half is required -- the UI already blocks
+  // Kaydet without it, but this is the authoritative gate.
+  const dualTarget = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
+  const isDual = (existing.task_type === "video" || existing.task_type === "topic_study") && dualTarget !== null;
+  let dualManualStatus: DualPartStatus | null = null;
+  if (isDual) {
+    if (patchV.status === undefined || patchV.status === "pending") {
+      throw new Error("Video/konu çalışması durumu seçilmeden kaydedilemez.");
+    }
+    dualManualStatus = patchV.status;
+  }
+
+  // Auto status: whenever this update touches how many were actually
+  // solved, and the task has a known Toplam (coach- or self-assigned) to
+  // compare against, the resulting status is computed here -- never
+  // trusted from the client -- rather than the caller having to get this
+  // right itself. Mirrors the live hint shown in task-modal.tsx exactly
+  // (computeAutoTaskStatus, lib/count-fields.ts), so what the student sees
+  // before saving always matches what's actually persisted. A dual task
+  // merges this count-based result with the manual half above instead of
+  // being overwritten by it outright. An explicit status the caller passed
+  // with no counts touched (a single-part task's status button, or a dual
+  // task's manual pick with the counts left untouched this save) is left
+  // as-is either way.
+  const touchesCounts = "correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV;
+  if (touchesCounts) {
+    const correct = ("correct_count" in patchV ? patchV.correct_count : existing.correct_count) ?? 0;
+    const wrong = ("wrong_count" in patchV ? patchV.wrong_count : existing.wrong_count) ?? 0;
+    const empty = ("empty_count" in patchV ? patchV.empty_count : existing.empty_count) ?? 0;
+    const countStatus = computeAutoTaskStatus(dualTarget, correct, wrong, empty);
+    if (countStatus) {
+      patchV.status = dualManualStatus ? mergeDualTaskStatus(dualManualStatus, countStatus) : countStatus;
+    }
   }
 
   const { data, error } = await supabase

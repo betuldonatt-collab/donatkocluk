@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Lock, PlayCircle, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
+import { autoCalcMissingField, computeAutoTaskStatus, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
@@ -59,8 +59,14 @@ export function TaskModal({
   // count grids needs the wider container -- narrowing this to just
   // branch/general exam left question_bank's identical 4-column grid
   // squeezed into the default max-w-sm dialog, overflowing to the right.
+  // A "dual" video/topic-study task (one that also carries a question-
+  // count target, see isDual in TaskModalBody) renders that same grid
+  // too, stacked below its manual status selector.
   const needsWideModal =
-    task?.task_type === "branch_exam" || task?.task_type === "general_exam" || task?.task_type === "question_bank";
+    task?.task_type === "branch_exam" ||
+    task?.task_type === "general_exam" ||
+    task?.task_type === "question_bank" ||
+    ((task?.task_type === "video" || task?.task_type === "topic_study") && task?.total_count !== null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,6 +130,68 @@ function ReadOnlyField({ label, value }: { label: string; value: number | null }
   );
 }
 
+const STATUS_BUTTON_META: Record<
+  DualPartStatus,
+  { label: string; Icon: typeof CheckCircle2; selectedClass: string; idleClass: string }
+> = {
+  done: {
+    label: "Yapıldı",
+    Icon: CheckCircle2,
+    selectedClass: "border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700",
+    idleClass: "border-emerald-300 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700",
+  },
+  half_done: {
+    label: "Yarım Yapıldı",
+    Icon: MinusCircle,
+    selectedClass: "border-amber-500 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 hover:text-amber-700",
+    idleClass: "border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700",
+  },
+  not_done: {
+    label: "Yapılmadı",
+    Icon: XCircle,
+    selectedClass: "border-rose-500 bg-rose-500/10 text-rose-700 hover:bg-rose-500/10 hover:text-rose-700",
+    idleClass: "border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700",
+  },
+};
+
+const STATUS_BANNER_CLASS: Record<DualPartStatus, string> = {
+  done: "bg-emerald-500/10 text-emerald-700",
+  half_done: "bg-amber-500/10 text-amber-700",
+  not_done: "bg-rose-500/10 text-rose-700",
+};
+
+// Used two ways: as an immediate one-click save action (single-part tasks
+// -- video/topic-study with no question-count target, or a free-form
+// extra task -- see handleMarkStatus, `selected` omitted so it never
+// shows a persistent highlight) and as a persistent selector (a dual
+// task's top section, `selected` reflects manualStatus) where clicking
+// only stages the pick for the shared Kaydet button below.
+function ManualStatusButton({
+  status,
+  selected,
+  onClick,
+  disabled,
+}: {
+  status: DualPartStatus;
+  selected?: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  const { label, Icon, selectedClass, idleClass } = STATUS_BUTTON_META[status];
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn("gap-1.5", selected ? selectedClass : idleClass)}
+    >
+      <Icon className="size-4" />
+      {label}
+    </Button>
+  );
+}
+
 const EMPTY_SUBJECT_SCORE: SubjectScore = { correct: null, wrong: null, empty: null };
 
 function toNumberOrNull(v: string) {
@@ -172,7 +240,6 @@ function TaskModalBody({
   const [wrongCount, setWrongCount] = useState(task.wrong_count?.toString() ?? "");
   const [emptyCount, setEmptyCount] = useState(task.empty_count?.toString() ?? "");
   const [durationMinutes, setDurationMinutes] = useState(task.duration_minutes?.toString() ?? "");
-  const [completed, setCompleted] = useState(task.completed);
   // A video link created before this feature shipped has no `watched` key
   // at all in its stored jsonb -- normalized to false here so Checkbox
   // below always gets a real boolean, never undefined.
@@ -230,10 +297,29 @@ function TaskModalBody({
   const [mistakesLoaded, setMistakesLoaded] = useState(false);
 
   const isTytBranchExam = task.task_type === "branch_exam" && task.course_id?.startsWith("tyt-");
-  const showCounts = task.task_type === "question_bank" || task.task_type === "branch_exam";
-  const showCompletedToggle =
-    task.task_type === "video" || task.task_type === "topic_study" || task.task_type === "extra_custom";
   const showAnalysisFlow = task.task_type === "branch_exam" || task.task_type === "general_exam";
+
+  // Whether this video/topic-study task also carries a real question-count
+  // target (set by the coach or the student at creation time -- see
+  // task-form-fields.tsx / add-custom-task-dialog.tsx). If so, it's a
+  // "dual" task: the student logs BOTH a manual video/topic-study status
+  // AND question counts in this same modal, merged into one overall
+  // status (mergeDualTaskStatus, lib/count-fields.ts).
+  const isDual = (task.task_type === "video" || task.task_type === "topic_study") && task.total_count !== null;
+
+  // Pure question-count tasks (question_bank, branch_exam, general_exam)
+  // are entirely score-driven -- their status is always computed from the
+  // entered counts, so they never show the manual status buttons.
+  const isPureCountType =
+    task.task_type === "question_bank" || task.task_type === "branch_exam" || task.task_type === "general_exam";
+  const showManualButtons = !isPureCountType;
+  const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
+
+  const [manualStatus, setManualStatus] = useState<DualPartStatus | null>(() =>
+    isDual && (task.status === "done" || task.status === "half_done" || task.status === "not_done")
+      ? task.status
+      : null,
+  );
 
   const branchCourse = task.task_type === "branch_exam" ? findCourseById(task.course_id) : null;
 
@@ -256,18 +342,28 @@ function TaskModalBody({
 
   const trackNotChosen = showSubjectScores && examTrack === "ayt" && !aytTrack;
 
-  // True only once all 4 fields are filled and manually overridden to not
-  // add up -- auto-calc below already keeps the exactly-3-filled case
-  // consistent by construction, so this only ever catches a genuine,
-  // fully-entered mismatch that needs to block saving.
-  const totalMismatch =
-    showCounts &&
-    !countsAreConsistent({
-      total: toNumberOrNull(totalCount),
-      correct: toNumberOrNull(correctCount),
-      wrong: toNumberOrNull(wrongCount),
-      empty: toNumberOrNull(emptyCount),
-    });
+  // Doğru+Yanlış+Boş no longer has to add up to Toplam -- that's exactly
+  // what "partially completed" means now (see computeAutoTaskStatus,
+  // lib/count-fields.ts), so unlike before, a student who's short of the
+  // assigned total is never blocked from saving. Only shown once they've
+  // actually entered something (not on a freshly-opened, untouched form),
+  // and null whenever there's no known Toplam to compare against at all.
+  const hasEnteredCounts = correctCount.trim() !== "" || wrongCount.trim() !== "" || emptyCount.trim() !== "";
+  const countStatus =
+    showFlatCounts && hasEnteredCounts
+      ? computeAutoTaskStatus(toNumberOrNull(totalCount), Number(correctCount) || 0, Number(wrongCount) || 0, Number(emptyCount) || 0)
+      : null;
+
+  // What Kaydet will actually persist: for a dual task, the merge of the
+  // manual (video/topic-study) pick above and the question-count result
+  // (mergeDualTaskStatus) -- falls back to whichever half is known when
+  // only one has been touched so far. For every other type this is just
+  // the plain count-based preview, unchanged from before.
+  const overallStatusPreview: DualPartStatus | null = isDual
+    ? manualStatus && countStatus
+      ? mergeDualTaskStatus(manualStatus, countStatus)
+      : (manualStatus ?? countStatus)
+    : countStatus;
 
   // If exactly 3 of Toplam/Doğru/Yanlış/Boş are filled, auto-fills the 4th
   // (lib/count-fields.ts) so the student doesn't have to do the arithmetic.
@@ -304,13 +400,17 @@ function TaskModalBody({
 
   function buildCountsPatch(): TaskProgressPatch {
     const patch: TaskProgressPatch = {};
-    if (showCounts) {
+    if (showFlatCounts) {
       patch.total_count = toNumberOrNull(totalCount);
       patch.correct_count = toNumberOrNull(correctCount);
       patch.wrong_count = toNumberOrNull(wrongCount);
       patch.empty_count = toNumberOrNull(emptyCount);
       if (isTytBranchExam) patch.duration_minutes = toNumberOrNull(durationMinutes);
-      patch.status = "done";
+      // No explicit status here for a pure count type -- updateTaskProgress
+      // computes it itself from these same counts (computeAutoTaskStatus),
+      // the same rule the live hint below previews. A dual task DOES set
+      // patch.status below (the manual half); the server merges it with
+      // these same counts (mergeDualTaskStatus) instead of overwriting it.
     }
     if (showSubjectScores) {
       const perSubject = activeGroups.map((g) => ({
@@ -334,14 +434,19 @@ function TaskModalBody({
       patch.empty_count = perSubject.reduce((sum, s) => sum + (s.empty ?? 0), 0);
       patch.status = "done";
     }
-    if (showCompletedToggle) {
-      patch.completed = completed;
-      patch.status = completed ? "done" : "pending";
+    if (isDual) {
+      // Guaranteed non-null here -- handleSaveSimple refuses to call this
+      // at all while manualStatus is still unset (see its own guard).
+      patch.status = manualStatus!;
     }
     return patch;
   }
 
   async function handleSaveSimple() {
+    if (isDual && manualStatus === null) {
+      setError("Kaydetmeden önce yukarıdan video/konu çalışması durumunu seç.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -357,14 +462,19 @@ function TaskModalBody({
     }
   }
 
-  // Explicit "I didn't do this" -- distinct from just leaving a task
-  // untouched (still "pending"), so the coach can tell "forgotten" from
-  // "consciously skipped" instead of both looking identical.
-  async function handleMarkNotDone() {
+  // Single-part tasks (video/topic-study with no question-count target, or
+  // a free-form extra task) have no counts to derive a status from -- these
+  // three buttons are the student's only, direct way to set one. Each is
+  // an immediate save (unlike a dual task's top selector, which only
+  // stages a pick for the shared Kaydet button), matching the one-click
+  // "I didn't do this" action this replaces -- distinct from just leaving
+  // a task untouched (still "pending"), so the coach can tell "forgotten"
+  // from "consciously reported" instead of both looking identical.
+  async function handleMarkStatus(status: DualPartStatus) {
     setSaving(true);
     setError(null);
     try {
-      const updated = await updateTaskProgress(task.id, { status: "not_done", completed: false });
+      const updated = await updateTaskProgress(task.id, { status, completed: status === "done" });
       onSaved(updated as StudentTask);
       onOpenChange(false);
     } catch (e) {
@@ -374,24 +484,6 @@ function TaskModalBody({
     }
   }
 
-  // "I did some of it" -- reuses whatever counts/subject-scores/completed
-  // state is already filled in the form (same as a full save), just
-  // marked half_done instead of done, so partial numbers aren't lost.
-  async function handleMarkHalfDone() {
-    setSaving(true);
-    setError(null);
-    try {
-      const patch = buildCountsPatch();
-      patch.status = "half_done";
-      const updated = await updateTaskProgress(task.id, patch);
-      onSaved(updated as StudentTask);
-      onOpenChange(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleGoToAnalysis() {
     setSaving(true);
@@ -498,7 +590,7 @@ function TaskModalBody({
             </div>
           )}
 
-          {showCounts && (
+          {showFlatCounts && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <ReadOnlyField label="Toplam" value={task.total_count} />
               <ReadOnlyField label="Doğru" value={task.correct_count} />
@@ -520,12 +612,6 @@ function TaskModalBody({
                 </div>
               ))}
             </div>
-          )}
-
-          {showCompletedToggle && (
-            <p className="text-foreground text-sm">
-              Durum: <span className="font-medium">{task.completed ? "Tamamlandı" : "Tamamlanmadı"}</span>
-            </p>
           )}
 
           <p className="text-foreground text-sm">
@@ -643,9 +729,43 @@ function TaskModalBody({
           </div>
         )}
 
-        {showCounts && (
+        {/* Dual task's top section: a persistent selector (not an
+            immediate save -- Kaydet below saves this together with the
+            counts) for the video/topic-study half. */}
+        {isDual && (
+          <div className="space-y-1.5">
+            <Label>{task.task_type === "video" ? "Video Durumu" : "Konu Çalışması Durumu"}</Label>
+            <div className="flex flex-wrap gap-2">
+              <ManualStatusButton
+                status="not_done"
+                selected={manualStatus === "not_done"}
+                onClick={() => setManualStatus("not_done")}
+              />
+              <ManualStatusButton
+                status="half_done"
+                selected={manualStatus === "half_done"}
+                onClick={() => setManualStatus("half_done")}
+              />
+              <ManualStatusButton
+                status="done"
+                selected={manualStatus === "done"}
+                onClick={() => setManualStatus("done")}
+              />
+            </div>
+          </div>
+        )}
+
+        {showFlatCounts && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
+            {/* Coach-assigned Toplam is the coach's own call -- not
+                editable here (mirrored server-side in updateTaskProgress
+                and at the DB level, migration 0077). A self-created
+                task's own Toplam stays editable, same as before. */}
+            {task.is_coach_assigned ? (
+              <ReadOnlyField label="Toplam" value={task.total_count} />
+            ) : (
+              <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
+            )}
             <Field label="Doğru" value={correctCount} onChange={(v) => handleCountFieldChange("correct", v)} />
             <Field label="Yanlış" value={wrongCount} onChange={(v) => handleCountFieldChange("wrong", v)} />
             <Field label="Boş" value={emptyCount} onChange={(v) => handleCountFieldChange("empty", v)} />
@@ -660,10 +780,17 @@ function TaskModalBody({
           </div>
         )}
 
-        {totalMismatch && (
-          <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <AlertTriangle className="size-3.5 shrink-0" />
-            Toplam, Doğru + Yanlış + Boş toplamına eşit değil.
+        {/* Live preview of the status Kaydet will actually persist -- for
+            a dual task this is the MERGE of the top selection and the
+            counts above (mergeDualTaskStatus), not just the counts in
+            isolation, so the hint never disagrees with what gets saved. */}
+        {overallStatusPreview && (
+          <div className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-xs", STATUS_BANNER_CLASS[overallStatusPreview])}>
+            {(() => {
+              const Icon = STATUS_BUTTON_META[overallStatusPreview].Icon;
+              return <Icon className="size-3.5 shrink-0" />;
+            })()}
+            Bu haliyle görev <strong>{STATUS_BUTTON_META[overallStatusPreview].label}</strong> olarak işaretlenecek.
           </div>
         )}
 
@@ -729,23 +856,6 @@ function TaskModalBody({
           </div>
         )}
 
-        {showCompletedToggle && (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="task-completed"
-              checked={completed}
-              onCheckedChange={(v) => setCompleted(v === true)}
-            />
-            <Label htmlFor="task-completed">
-              {task.task_type === "video"
-                ? "İzledim"
-                : task.task_type === "topic_study"
-                  ? "Tamamladım"
-                  : "Tamamlandı"}
-            </Label>
-          </div>
-        )}
-
         {showAnalysisFlow && task.analysis_pending && (
           <div className="flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-600">
             <AlertTriangle className="size-3.5 shrink-0" />
@@ -769,53 +879,51 @@ function TaskModalBody({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
             İptal
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleMarkNotDone}
-            disabled={saving}
-            className="border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-          >
-            Yapılmadı
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleMarkHalfDone}
-            disabled={saving || totalMismatch}
-            className="border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-          >
-            Yarım Yapıldı
-          </Button>
+          {/* Single-part tasks (not dual, not pure question-count) have no
+              Kaydet row at all below -- these three ARE the save action,
+              each an immediate mark-and-close (handleMarkStatus). */}
+          {showManualButtons && !isDual && (
+            <>
+              <ManualStatusButton status="not_done" onClick={() => handleMarkStatus("not_done")} disabled={saving} />
+              <ManualStatusButton status="half_done" onClick={() => handleMarkStatus("half_done")} disabled={saving} />
+              <ManualStatusButton status="done" onClick={() => handleMarkStatus("done")} disabled={saving} />
+            </>
+          )}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2">
-          {/* "Analizi Sonra Yap" stays mounted at all times for
-              analysis-flow tasks -- only its visibility toggles with
-              missedCount, so this row's button count (and therefore its
-              height) never changes while the student is mid-keystroke in
-              the Yanlış/Boş fields above. Removing/adding the button here
-              would resize the footer and re-center the whole dialog under
-              the focused input. */}
-          {showAnalysisFlow && (
+        {/* Pure question-count tasks and dual tasks both save via Kaydet
+            (dual's manual half was already picked above, in the body --
+            see handleSaveSimple's guard) -- single-part tasks have nothing
+            left to Kaydet once the three buttons above cover the save. */}
+        {!(showManualButtons && !isDual) && (
+          <div className="flex flex-wrap justify-end gap-2">
+            {/* "Analizi Sonra Yap" stays mounted at all times for
+                analysis-flow tasks -- only its visibility toggles with
+                missedCount, so this row's button count (and therefore its
+                height) never changes while the student is mid-keystroke in
+                the Yanlış/Boş fields above. Removing/adding the button here
+                would resize the footer and re-center the whole dialog under
+                the focused input. */}
+            {showAnalysisFlow && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDeferAnalysis}
+                disabled={saving || trackNotChosen}
+                className={cn(missedCount === 0 && "invisible")}
+              >
+                Analizi Sonra Yap
+              </Button>
+            )}
             <Button
               type="button"
-              variant="outline"
-              onClick={handleDeferAnalysis}
-              disabled={saving || trackNotChosen || totalMismatch}
-              className={cn(missedCount === 0 && "invisible")}
+              onClick={showAnalysisFlow && missedCount > 0 ? handleGoToAnalysis : handleSaveSimple}
+              disabled={saving || trackNotChosen}
             >
-              Analizi Sonra Yap
+              {saving ? "Kaydediliyor..." : showAnalysisFlow && missedCount > 0 ? "Devam Et: Konu Analizi" : "Kaydet"}
             </Button>
-          )}
-          <Button
-            type="button"
-            onClick={showAnalysisFlow && missedCount > 0 ? handleGoToAnalysis : handleSaveSimple}
-            disabled={saving || trackNotChosen || totalMismatch}
-          >
-            {saving ? "Kaydediliyor..." : showAnalysisFlow && missedCount > 0 ? "Devam Et: Konu Analizi" : "Kaydet"}
-          </Button>
-        </div>
+          </div>
+        )}
       </DialogFooter>
     </>
   );
