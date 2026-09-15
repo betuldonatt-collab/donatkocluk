@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isRoutineCourseId } from "@/lib/curriculum";
 import { sumTaskCounts } from "@/lib/scoring";
+import { updateScheduleDensity, type ScheduleDensity } from "@/lib/schedule-density";
 import {
   createStudentEvent,
   deleteAssignedTask,
@@ -48,7 +49,7 @@ import { EventCard, EventCardBody, EVENT_TYPE_CLASSES, eventDragId, isEventDragI
 import { EventDialog, type EventDialogState } from "../_components/kanban/event-dialog";
 import { KanbanTaskCard } from "../_components/kanban/kanban-task-card";
 import { RoutineTaskCard } from "../_components/kanban/routine-task-card";
-import { cardBackgroundClass, statusClasses, TaskCardBody } from "../_components/kanban/task-card-body";
+import { CARD_DENSITY_CONFIG, cardBackgroundClass, statusClasses, TaskCardBody, type CardDensity } from "../_components/kanban/task-card-body";
 import { TaskDrawer, type TaskDrawerState } from "../_components/kanban/task-drawer";
 
 const DAY_PREFIX = "day:";
@@ -86,6 +87,22 @@ function getWeekDays(referenceIso: string) {
   });
 }
 
+// "Hızlı İşaretleme" (Paintbrush) toolbar options -- see the paintMode
+// state and its toggle buttons in ScheduleBoard.
+const PAINT_MODES: { value: AssignedTaskStatus; label: string; emoji: string; activeClass: string }[] = [
+  { value: "done", label: "Yapıldı Olarak İşaretle", emoji: "✅", activeClass: "bg-emerald-500 text-white border-emerald-500" },
+  { value: "half_done", label: "Yarım Olarak İşaretle", emoji: "⏳", activeClass: "bg-amber-500 text-white border-amber-500" },
+  { value: "not_done", label: "Yapılmadı Olarak İşaretle", emoji: "❌", activeClass: "bg-rose-500 text-white border-rose-500" },
+];
+
+// "Görünüm" (card density) toggle options -- see the density state and
+// CARD_DENSITY_CONFIG (task-card-body.tsx).
+const DENSITY_OPTIONS: { value: ScheduleDensity; label: string }[] = [
+  { value: "compact", label: "Kompakt" },
+  { value: "medium", label: "Orta" },
+  { value: "comfortable", label: "Rahat" },
+];
+
 function drawerKey(state: TaskDrawerState | null): string {
   if (!state) return "closed";
   if (state.mode === "create") return `create:${state.date}`;
@@ -112,6 +129,7 @@ export function ScheduleBoard({
   initialEvents,
   courseResourceData: initialCourseResourceData,
   highlightTaskId,
+  initialDensity,
 }: {
   studentId: string;
   initialWeekDays: { date: string; label: string }[];
@@ -123,6 +141,10 @@ export function ScheduleBoard({
   // straight on the specific exam that's missing a result instead of the
   // student's general profile.
   highlightTaskId?: string | null;
+  // The coach's own schedule_density (profiles), fetched server-side by
+  // schedule/page.tsx so the very first render already matches their last
+  // choice -- no flash of the wrong density while a client fetch resolves.
+  initialDensity: ScheduleDensity;
 }) {
   const today = todayISO();
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -144,6 +166,36 @@ export function ScheduleBoard({
   const activeEvent = activeId && isEventDragId(activeId) ? (events.find((e) => e.id === eventIdFromDragId(activeId)) ?? null) : null;
   const [weekLocked, setWeekLocked] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  // Card density ("Görünüm": Kompakt/Orta/Rahat) -- persisted to
+  // profiles.schedule_density (see lib/schedule-density.ts) so it follows
+  // the coach across devices, not just this browser. Optimistic like every
+  // other quick toggle in this file, reverted on failure.
+  const [density, setDensity] = useState<ScheduleDensity>(initialDensity);
+
+  function handleDensityChange(next: ScheduleDensity) {
+    const previous = density;
+    setDensity(next);
+    updateScheduleDensity(next).catch((e) => {
+      setDensity(previous);
+      toast.error(e instanceof Error ? e.message : "Görünüm tercihi kaydedilemedi.");
+    });
+  }
+
+  // "Hızlı İşaretleme" (Paintbrush) mode -- while set, clicking any task
+  // card on the board marks it with this status instead of opening the
+  // edit drawer (see handleStatusChange below and the card components'
+  // own paintMode prop). Coach-only by design: the student board has no
+  // equivalent, since there's nothing bulky to replace there.
+  const [paintMode, setPaintMode] = useState<AssignedTaskStatus | null>(null);
+
+  useEffect(() => {
+    if (!paintMode) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setPaintMode(null);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [paintMode]);
 
   // Flattened once per courseResourceData change -- a task's resource_ids
   // don't carry their own course_id, and a resource could in principle be
@@ -518,6 +570,14 @@ export function ScheduleBoard({
     });
   }
 
+  // The widest Rutinler lane across the current 7-day window -- every
+  // DayColumn pads its own lane out to this many slots (real cards, then
+  // empty fixed-height placeholders) so the Görevler section starts at the
+  // exact same Y in every column, Monday through Sunday. With every card
+  // already a fixed height (TASK_CARD_HEIGHT_CLASS), this single number is
+  // all strict alignment needs -- no per-row measuring.
+  const maxRoutineSlots = Math.max(0, ...weekDays.map((day) => tasksByDay(day.date).filter((t) => isRoutineCourseId(t.course_id)).length));
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -595,6 +655,48 @@ export function ScheduleBoard({
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-xs font-medium">Görünüm:</span>
+        <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
+          {DENSITY_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleDensityChange(value)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                density === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-border/70 bg-muted/20 flex flex-wrap items-center gap-2 rounded-lg border border-dashed px-3 py-2">
+        <span className="text-muted-foreground text-xs font-medium">Hızlı İşaretleme:</span>
+        {PAINT_MODES.map(({ value, label, emoji, activeClass }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setPaintMode((prev) => (prev === value ? null : value))}
+            className={cn(
+              "border-border inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+              paintMode === value ? activeClass : "bg-background text-foreground hover:bg-accent",
+            )}
+          >
+            <span aria-hidden>{emoji}</span>
+            {label}
+          </button>
+        ))}
+        {paintMode && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setPaintMode(null)}>
+            Modu Kapat (Esc)
+          </Button>
+        )}
+      </div>
+
       {weekLocked && (
         <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
           <Lock className="size-4 shrink-0" />
@@ -621,6 +723,8 @@ export function ScheduleBoard({
                   events={eventsByDay(day.date)}
                   routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
                   regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
+                  maxRoutineSlots={maxRoutineSlots}
+                  density={density}
                   resourceNameById={resourceNameById}
                   onAddRoutine={() => setDrawerState({ mode: "create-multi", initialTab: "routine", initialDate: day.date })}
                   onAddTask={() => setDrawerState({ mode: "create", date: day.date })}
@@ -629,6 +733,7 @@ export function ScheduleBoard({
                   onDelete={handleDelete}
                   onStatusChange={handleStatusChange}
                   onToggleLock={handleToggleTaskLock}
+                  paintMode={paintMode}
                   onAddEvent={() => setEventDialogState({ mode: "create", date: day.date })}
                   onEditEvent={(event) => setEventDialogState({ mode: "edit", event })}
                   onDuplicateEvent={handleDuplicateEvent}
@@ -648,8 +753,15 @@ export function ScheduleBoard({
             old behavior where the list itself reflowed under the cursor. */}
         <DragOverlay>
           {activeTask && (
-            <div className={cn("border-border w-[220px] rounded-md border p-2.5 shadow-lg", cardBackgroundClass(activeTask), statusClasses(activeTask))}>
-              <TaskCardBody task={activeTask} resourceNameById={resourceNameById} />
+            <div
+              className={cn(
+                "border-border flex w-[220px] flex-col rounded-md border p-2.5 shadow-lg",
+                CARD_DENSITY_CONFIG[density].heightClass,
+                cardBackgroundClass(activeTask),
+                statusClasses(activeTask),
+              )}
+            >
+              <TaskCardBody task={activeTask} resourceNameById={resourceNameById} density={density} />
             </div>
           )}
           {activeEvent && (
@@ -695,6 +807,8 @@ function DayColumn({
   events,
   routineTasks,
   regularTasks,
+  maxRoutineSlots,
+  density,
   resourceNameById,
   onAddRoutine,
   onAddTask,
@@ -703,6 +817,7 @@ function DayColumn({
   onDelete,
   onStatusChange,
   onToggleLock,
+  paintMode,
   onAddEvent,
   onEditEvent,
   onDuplicateEvent,
@@ -714,6 +829,8 @@ function DayColumn({
   events: StudentEvent[];
   routineTasks: DetailTask[];
   regularTasks: DetailTask[];
+  maxRoutineSlots: number;
+  density: CardDensity;
   resourceNameById: Map<string, string>;
   onAddRoutine: () => void;
   onAddTask: () => void;
@@ -722,6 +839,7 @@ function DayColumn({
   onDelete: (task: DetailTask) => void;
   onStatusChange: (task: DetailTask, status: AssignedTaskStatus) => void;
   onToggleLock: (task: DetailTask) => void;
+  paintMode: AssignedTaskStatus | null;
   onAddEvent: () => void;
   onEditEvent: (event: StudentEvent) => void;
   onDuplicateEvent: (event: StudentEvent) => void;
@@ -776,7 +894,7 @@ function DayColumn({
             <Plus className="size-3.5" />
           </Button>
         </div>
-        {routineTasks.length === 0 ? (
+        {maxRoutineSlots === 0 ? (
           <p className="text-muted-foreground py-1.5 text-center text-[10px]">—</p>
         ) : (
           <div className="space-y-1.5">
@@ -789,6 +907,22 @@ function DayColumn({
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onStatusChange={onStatusChange}
+                paintMode={paintMode}
+                density={density}
+              />
+            ))}
+            {/* Pads this day's Rutinler lane out to the week's widest one
+                (maxRoutineSlots, computed in ScheduleBoard) so the Görevler
+                section below starts at the same Y in every column, even on
+                a day with fewer routines than its busiest neighbor. Height
+                follows the current density, same as a real card, so a
+                tighter density also shrinks how much empty space this
+                leaves on a light day. */}
+            {Array.from({ length: maxRoutineSlots - routineTasks.length }).map((_, i) => (
+              <div
+                key={`routine-placeholder-${i}`}
+                aria-hidden
+                className={cn(CARD_DENSITY_CONFIG[density].heightClass, "border-border/40 rounded-md border border-dashed")}
               />
             ))}
           </div>
@@ -837,6 +971,8 @@ function DayColumn({
                     onDelete={onDelete}
                     onStatusChange={onStatusChange}
                     onToggleLock={onToggleLock}
+                    paintMode={paintMode}
+                    density={density}
                   />
                 ) : (
                   <EventCard

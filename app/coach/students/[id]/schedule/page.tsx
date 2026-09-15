@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { getViewContext } from "@/lib/impersonation";
+import type { ScheduleDensity } from "@/lib/schedule-density";
 import type { StudentEvent } from "../../../actions";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
 import type { DetailTask } from "../types";
@@ -129,7 +131,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
   }
 
   const weekDays = getWeekDays(referenceDate);
-  const data = await fetchScheduleData(id, weekDays);
+  const [data, initialDensity] = await Promise.all([fetchScheduleData(id, weekDays), fetchCoachScheduleDensity()]);
   const studentName = data.profile?.full_name ?? "Öğrenci";
 
   return (
@@ -156,7 +158,20 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
         initialEvents={data.weekEvents}
         courseResourceData={data.courseResourceData}
         highlightTaskId={highlightTaskId}
+        initialDensity={initialDensity}
       />
     </div>
   );
+}
+
+// The COACH's own card-density preference -- effectiveUserId, not the `id`
+// route param (that's the student being viewed). Falls back to "medium"
+// (the same default profiles.schedule_density itself has) if the view
+// context can't be resolved for any reason, rather than failing the page.
+async function fetchCoachScheduleDensity(): Promise<ScheduleDensity> {
+  const view = await getViewContext("coach");
+  if (!view) return "medium";
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("schedule_density").eq("id", view.effectiveUserId).maybeSingle();
+  return (data?.schedule_density as ScheduleDensity | undefined) ?? "medium";
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { mondayOf, weekDates } from "@/lib/date";
+import type { ScheduleDensity } from "@/lib/schedule-density";
 import { NextSessionCard } from "./_components/next-session-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
@@ -37,7 +38,7 @@ async function fetchHomeData(userId: string) {
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-  const [{ data: sessionRows }, { data: weekTaskRows }, { data: pendingTaskRows }, { data: ratingSessionRows }, { data: lockRows }] =
+  const [{ data: sessionRows }, { data: weekTaskRows }, { data: pendingTaskRows }, { data: ratingSessionRows }, { data: lockRows }, { data: profileRow }] =
     await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -72,6 +73,7 @@ async function fetchHomeData(userId: string) {
       // an older pending-analysis task (pendingTaskRows, above) can belong
       // to a week the coach has since locked.
       supabase.from("week_locks").select("week_start_date").eq("student_id", userId),
+      supabase.from("profiles").select("schedule_density").eq("id", userId).maybeSingle(),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
@@ -90,13 +92,14 @@ async function fetchHomeData(userId: string) {
     tasks,
     sessionNeedingRating: (ratingSessionRows?.[0] ?? null) as SessionNeedingRating | null,
     todayLocked: lockedWeeks.has(mondayOf(today)),
+    density: (profileRow?.schedule_density as ScheduleDensity | undefined) ?? "medium",
   };
 }
 
 export default async function StudentHomePage() {
   const view = await getViewContext("student");
 
-  const { today, weekDays, nextSession, tasks, sessionNeedingRating, todayLocked } = view
+  const { today, weekDays, nextSession, tasks, sessionNeedingRating, todayLocked, density } = view
     ? await fetchHomeData(view.effectiveUserId)
     : {
         today: todayISO(),
@@ -105,6 +108,7 @@ export default async function StudentHomePage() {
         tasks: [] as StudentTask[],
         sessionNeedingRating: null as SessionNeedingRating | null,
         todayLocked: false,
+        density: "medium" as ScheduleDensity,
       };
 
   return (
@@ -127,7 +131,7 @@ export default async function StudentHomePage() {
         </div>
       )}
 
-      <TaskBoard today={today} weekDays={weekDays} initialTasks={tasks} todayLocked={todayLocked} />
+      <TaskBoard today={today} weekDays={weekDays} initialTasks={tasks} todayLocked={todayLocked} initialDensity={density} />
     </div>
   );
 }

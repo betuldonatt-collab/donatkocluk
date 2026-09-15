@@ -18,19 +18,22 @@ import {
 } from "@dnd-kit/sortable";
 import { CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Lock, Trash2 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { isRoutineCourseId } from "@/lib/curriculum";
 import { weekDates } from "@/lib/date";
 import { sumTaskCounts, sumTaskDuration } from "@/lib/scoring";
+import { updateScheduleDensity, type ScheduleDensity } from "@/lib/schedule-density";
 import { deleteCustomTask, getPastWeeksForStudent, getTasksForWeek, updateTaskOrder } from "../../actions";
 import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
 import type { StudentTask } from "./types";
-import { WeekTaskCell } from "./week-task-cell";
+import { WEEK_CELL_DENSITY_CONFIG, WeekTaskCell } from "./week-task-cell";
 
 type ViewMode = "today" | "week";
 type ModalStep = "form" | "analysis";
@@ -73,16 +76,34 @@ function formatMinutesLabel(totalMinutes: number): string {
   return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
+// "Görünüm" (card density) toggle options -- see the density state and
+// WEEK_CELL_DENSITY_CONFIG (week-task-cell.tsx). Mirrors the coach panel's
+// own DENSITY_OPTIONS (schedule-board.tsx) exactly; ported rather than
+// shared, per this app's per-panel duplication convention.
+const DENSITY_OPTIONS: { value: ScheduleDensity; label: string }[] = [
+  { value: "compact", label: "Kompakt" },
+  { value: "medium", label: "Orta" },
+  { value: "comfortable", label: "Rahat" },
+];
+
 export function TaskBoard({
   today,
   weekDays: initialWeekDays,
   initialTasks,
   todayLocked,
+  initialDensity,
 }: {
   today: string;
   weekDays: { date: string; label: string }[];
   initialTasks: StudentTask[];
   todayLocked: boolean;
+  // The student's own schedule_density (profiles), fetched server-side by
+  // app/student/page.tsx so the very first render already matches their
+  // last choice -- no flash of the wrong density while a client fetch
+  // resolves. Only ever affects the "Bu Hafta" grid -- the "Bugün" list
+  // (SortableTaskCard) isn't a grid, so there's no alignment concern to
+  // adjust for there.
+  initialDensity: ScheduleDensity;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -96,6 +117,19 @@ export function TaskBoard({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState<ModalStep>("form");
   const [modalOpenKey, setModalOpenKey] = useState(0);
+  // Persisted to profiles.schedule_density (see lib/schedule-density.ts)
+  // so it follows the student across devices. Optimistic, reverted on
+  // failure -- same shape as every other quick toggle in this app.
+  const [density, setDensity] = useState<ScheduleDensity>(initialDensity);
+
+  function handleDensityChange(next: ScheduleDensity) {
+    const previous = density;
+    setDensity(next);
+    updateScheduleDensity(next).catch((e) => {
+      setDensity(previous);
+      toast.error(e instanceof Error ? e.message : "Görünüm tercihi kaydedilemedi.");
+    });
+  }
 
   const isCurrentWeek = weekDays.some((d) => d.date === today);
 
@@ -240,6 +274,27 @@ export function TaskBoard({
         )}
       </div>
 
+      {view === "week" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs font-medium">Görünüm:</span>
+          <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
+            {DENSITY_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handleDensityChange(value)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  density === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {view === "week" && weekLocked && (
         <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
           <Lock className="size-4 shrink-0" />
@@ -353,7 +408,19 @@ export function TaskBoard({
               Sizing matches the coach's schedule board (schedule-board.tsx)
               for visual parity between panels. */}
           <div className="grid min-w-[1260px] grid-cols-7 items-start gap-3">
-            {weekDays.map((day) => {
+            {(() => {
+              // The widest Rutinler lane across the currently-loaded 7-day
+              // window -- every day pads its own lane out to this many
+              // slots (real cells, then empty fixed-height placeholders) so
+              // the Görevler section starts at the same Y in every column.
+              // Mirrors the coach's own schedule-board.tsx (maxRoutineSlots)
+              // exactly; ported rather than shared, per this app's
+              // per-panel duplication convention.
+              const maxRoutineSlots = Math.max(
+                0,
+                ...weekDays.map((day) => tasks.filter((t) => t.task_date === day.date && isRoutineCourseId(t.course_id)).length),
+              );
+              return weekDays.map((day) => {
               const dayTasks = tasks.filter((t) => t.task_date === day.date).sort(byOrder);
               // Same Rutinler/Görevler split as the "Bugün" view and the
               // coach's own schedule board (isRoutineCourseId), applied
@@ -377,15 +444,25 @@ export function TaskBoard({
                   </div>
 
                   {/* Section 1: Rutinler -- persistent chrome even when
-                      empty, matching the coach's schedule board. */}
+                      empty, matching the coach's schedule board. Padded out
+                      to maxRoutineSlots (real cells, then empty fixed-height
+                      placeholders) so Section 2 starts at the same Y in
+                      every column. */}
                   <div className="border-border/60 mx-2 mt-2 space-y-1.5 border-b pb-2">
                     <span className="text-primary text-[10px] font-semibold tracking-wide uppercase">Rutinler</span>
-                    {dayRoutineTasks.length === 0 ? (
+                    {maxRoutineSlots === 0 ? (
                       <p className="text-muted-foreground py-1.5 text-center text-[10px]">—</p>
                     ) : (
                       <div className="space-y-1.5">
                         {dayRoutineTasks.map((task) => (
-                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} />
+                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} density={density} />
+                        ))}
+                        {Array.from({ length: maxRoutineSlots - dayRoutineTasks.length }).map((_, i) => (
+                          <div
+                            key={`routine-placeholder-${i}`}
+                            aria-hidden
+                            className={cn(WEEK_CELL_DENSITY_CONFIG[density].heightClass, "border-border/40 rounded-md border border-dashed")}
+                          />
                         ))}
                       </div>
                     )}
@@ -401,7 +478,7 @@ export function TaskBoard({
                     ) : (
                       <div className="flex flex-col gap-1.5">
                         {dayRegularTasks.map((task) => (
-                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} />
+                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} density={density} />
                         ))}
                       </div>
                     )}
@@ -410,7 +487,8 @@ export function TaskBoard({
                   <DybFooter tasks={dayTasks} />
                 </div>
               );
-            })}
+              });
+            })()}
           </div>
         </div>
 
