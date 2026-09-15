@@ -26,14 +26,15 @@ import { cn } from "@/lib/utils";
 import { isRoutineCourseId } from "@/lib/curriculum";
 import { weekDates } from "@/lib/date";
 import { sumTaskCounts, sumTaskDuration } from "@/lib/scoring";
-import { updateScheduleDensity, type ScheduleDensity } from "@/lib/schedule-density";
+import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
+import { useRowHeights } from "@/lib/use-row-heights";
 import { deleteCustomTask, getPastWeeksForStudent, getTasksForWeek, updateTaskOrder } from "../../actions";
 import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
 import type { StudentTask } from "./types";
-import { WEEK_CELL_DENSITY_CONFIG, WeekTaskCell } from "./week-task-cell";
+import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
 
 type ViewMode = "today" | "week";
 type ModalStep = "form" | "analysis";
@@ -76,34 +77,27 @@ function formatMinutesLabel(totalMinutes: number): string {
   return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
-// "Görünüm" (card density) toggle options -- see the density state and
-// WEEK_CELL_DENSITY_CONFIG (week-task-cell.tsx). Mirrors the coach panel's
-// own DENSITY_OPTIONS (schedule-board.tsx) exactly; ported rather than
-// shared, per this app's per-panel duplication convention.
-const DENSITY_OPTIONS: { value: ScheduleDensity; label: string }[] = [
-  { value: "compact", label: "Kompakt" },
-  { value: "medium", label: "Orta" },
-  { value: "comfortable", label: "Rahat" },
-];
-
 export function TaskBoard({
   today,
   weekDays: initialWeekDays,
   initialTasks,
   todayLocked,
-  initialDensity,
+  initialRoutineRowHeights,
+  initialTaskRowHeights,
 }: {
   today: string;
   weekDays: { date: string; label: string }[];
   initialTasks: StudentTask[];
   todayLocked: boolean;
-  // The student's own schedule_density (profiles), fetched server-side by
+  // The student's own profiles.schedule_routine_row_heights_px /
+  // schedule_task_row_heights_px, fetched server-side by
   // app/student/page.tsx so the very first render already matches their
-  // last choice -- no flash of the wrong density while a client fetch
+  // last drag, with no flash of the wrong heights while a client fetch
   // resolves. Only ever affects the "Bu Hafta" grid -- the "Bugün" list
   // (SortableTaskCard) isn't a grid, so there's no alignment concern to
   // adjust for there.
-  initialDensity: ScheduleDensity;
+  initialRoutineRowHeights: number[];
+  initialTaskRowHeights: number[];
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -117,19 +111,25 @@ export function TaskBoard({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState<ModalStep>("form");
   const [modalOpenKey, setModalOpenKey] = useState(0);
-  // Persisted to profiles.schedule_density (see lib/schedule-density.ts)
-  // so it follows the student across devices. Optimistic, reverted on
-  // failure -- same shape as every other quick toggle in this app.
-  const [density, setDensity] = useState<ScheduleDensity>(initialDensity);
-
-  function handleDensityChange(next: ScheduleDensity) {
-    const previous = density;
-    setDensity(next);
-    updateScheduleDensity(next).catch((e) => {
-      setDensity(previous);
-      toast.error(e instanceof Error ? e.message : "Görünüm tercihi kaydedilemedi.");
-    });
-  }
+  // Independent per-row height for each lane -- a strict, Excel-like grid
+  // across the whole "Bu Hafta" board, mirroring the coach's own
+  // schedule-board.tsx exactly (see useRowHeights for the shared drag/
+  // persist mechanics). The two lanes are entirely independent row-index
+  // spaces from each other.
+  const routineRows = useRowHeights(
+    initialRoutineRowHeights,
+    MIN_CELL_HEIGHT_PX,
+    DEFAULT_CELL_HEIGHT_PX,
+    updateScheduleRoutineRowHeights,
+    (message) => toast.error(message),
+  );
+  const taskRows = useRowHeights(
+    initialTaskRowHeights,
+    MIN_CELL_HEIGHT_PX,
+    DEFAULT_CELL_HEIGHT_PX,
+    updateScheduleTaskRowHeights,
+    (message) => toast.error(message),
+  );
 
   const isCurrentWeek = weekDays.some((d) => d.date === today);
 
@@ -274,26 +274,6 @@ export function TaskBoard({
         )}
       </div>
 
-      {view === "week" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs font-medium">Görünüm:</span>
-          <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
-            {DENSITY_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => handleDensityChange(value)}
-                className={cn(
-                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                  density === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {view === "week" && weekLocked && (
         <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
@@ -409,16 +389,22 @@ export function TaskBoard({
               for visual parity between panels. */}
           <div className="grid min-w-[1260px] grid-cols-7 items-start gap-3">
             {(() => {
-              // The widest Rutinler lane across the currently-loaded 7-day
-              // window -- every day pads its own lane out to this many
-              // slots (real cells, then empty fixed-height placeholders) so
-              // the Görevler section starts at the same Y in every column.
-              // Mirrors the coach's own schedule-board.tsx (maxRoutineSlots)
-              // exactly; ported rather than shared, per this app's
-              // per-panel duplication convention.
+              // The widest lane across the currently-loaded 7-day window,
+              // one for each of the two independent row-index spaces (see
+              // routineRows/taskRows) -- every day pads its own lane out to
+              // this many slots (real cells, then empty per-row-height
+              // placeholders) so every row -- Rutinler AND Görevler alike
+              // -- lines up at the same Y in every column. Mirrors the
+              // coach's own schedule-board.tsx (maxRoutineSlots/
+              // maxGorevSlots) exactly; ported rather than shared, per this
+              // app's per-panel duplication convention.
               const maxRoutineSlots = Math.max(
                 0,
                 ...weekDays.map((day) => tasks.filter((t) => t.task_date === day.date && isRoutineCourseId(t.course_id)).length),
+              );
+              const maxGorevSlots = Math.max(
+                0,
+                ...weekDays.map((day) => tasks.filter((t) => t.task_date === day.date && !isRoutineCourseId(t.course_id)).length),
               );
               return weekDays.map((day) => {
               const dayTasks = tasks.filter((t) => t.task_date === day.date).sort(byOrder);
@@ -454,32 +440,64 @@ export function TaskBoard({
                       <p className="text-muted-foreground py-1.5 text-center text-[10px]">—</p>
                     ) : (
                       <div className="space-y-1.5">
-                        {dayRoutineTasks.map((task) => (
-                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} density={density} />
-                        ))}
-                        {Array.from({ length: maxRoutineSlots - dayRoutineTasks.length }).map((_, i) => (
-                          <div
-                            key={`routine-placeholder-${i}`}
-                            aria-hidden
-                            className={cn(WEEK_CELL_DENSITY_CONFIG[density].heightClass, "border-border/40 rounded-md border border-dashed")}
+                        {dayRoutineTasks.map((task, i) => (
+                          <WeekTaskCell
+                            key={task.id}
+                            task={task}
+                            onClick={() => openTask(task)}
+                            height={routineRows.heightOf(i)}
+                            onResize={(deltaY) => routineRows.onResize(i, deltaY)}
+                            onResizeEnd={() => routineRows.onResizeEnd(i, maxRoutineSlots)}
                           />
                         ))}
+                        {Array.from({ length: maxRoutineSlots - dayRoutineTasks.length }).map((_, j) => {
+                          const rowIndex = dayRoutineTasks.length + j;
+                          return (
+                            <div
+                              key={`routine-placeholder-${rowIndex}`}
+                              aria-hidden
+                              style={{ height: routineRows.heightOf(rowIndex) }}
+                              className="border-border/40 rounded-md border border-dashed"
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>
 
-                  {/* Section 2: Görevler -- everything else. */}
+                  {/* Section 2: Görevler -- everything else. Padded out to
+                      maxGorevSlots exactly like the Rutinler lane above --
+                      a strict grid across the whole board, not just the
+                      routine lane. */}
                   <div className="flex flex-col gap-1.5 p-2">
                     <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Görevler</span>
-                    {dayRegularTasks.length === 0 ? (
+                    {maxGorevSlots === 0 ? (
                       <p className="text-muted-foreground flex min-h-[80px] items-center justify-center rounded-md border border-dashed py-6 text-center text-xs">
                         —
                       </p>
                     ) : (
                       <div className="flex flex-col gap-1.5">
-                        {dayRegularTasks.map((task) => (
-                          <WeekTaskCell key={task.id} task={task} onClick={() => openTask(task)} density={density} />
+                        {dayRegularTasks.map((task, i) => (
+                          <WeekTaskCell
+                            key={task.id}
+                            task={task}
+                            onClick={() => openTask(task)}
+                            height={taskRows.heightOf(i)}
+                            onResize={(deltaY) => taskRows.onResize(i, deltaY)}
+                            onResizeEnd={() => taskRows.onResizeEnd(i, maxGorevSlots)}
+                          />
                         ))}
+                        {Array.from({ length: maxGorevSlots - dayRegularTasks.length }).map((_, j) => {
+                          const rowIndex = dayRegularTasks.length + j;
+                          return (
+                            <div
+                              key={`gorev-placeholder-${rowIndex}`}
+                              aria-hidden
+                              style={{ height: taskRows.heightOf(rowIndex) }}
+                              className="border-border/40 rounded-md border border-dashed"
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </div>

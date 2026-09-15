@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import type { ScheduleDensity } from "@/lib/schedule-density";
 import type { StudentEvent } from "../../../actions";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
 import type { DetailTask } from "../types";
@@ -131,7 +130,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
   }
 
   const weekDays = getWeekDays(referenceDate);
-  const [data, initialDensity] = await Promise.all([fetchScheduleData(id, weekDays), fetchCoachScheduleDensity()]);
+  const [data, rowHeights] = await Promise.all([fetchScheduleData(id, weekDays), fetchCoachRowHeights()]);
   const studentName = data.profile?.full_name ?? "Öğrenci";
 
   return (
@@ -158,20 +157,30 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
         initialEvents={data.weekEvents}
         courseResourceData={data.courseResourceData}
         highlightTaskId={highlightTaskId}
-        initialDensity={initialDensity}
+        initialRoutineRowHeights={rowHeights.routine}
+        initialTaskRowHeights={rowHeights.task}
       />
     </div>
   );
 }
 
-// The COACH's own card-density preference -- effectiveUserId, not the `id`
-// route param (that's the student being viewed). Falls back to "medium"
-// (the same default profiles.schedule_density itself has) if the view
-// context can't be resolved for any reason, rather than failing the page.
-async function fetchCoachScheduleDensity(): Promise<ScheduleDensity> {
+// The COACH's own per-row height preferences -- effectiveUserId, not the
+// `id` route param (that's the student being viewed). Falls back to an
+// empty array (every row then uses DEFAULT_CARD_HEIGHT_PX -- see
+// ScheduleBoard/useRowHeights) when the coach has never dragged a row yet,
+// or if the view context can't be resolved for any reason, rather than
+// failing the page.
+async function fetchCoachRowHeights(): Promise<{ routine: number[]; task: number[] }> {
   const view = await getViewContext("coach");
-  if (!view) return "medium";
+  if (!view) return { routine: [], task: [] };
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("schedule_density").eq("id", view.effectiveUserId).maybeSingle();
-  return (data?.schedule_density as ScheduleDensity | undefined) ?? "medium";
+  const { data } = await supabase
+    .from("profiles")
+    .select("schedule_routine_row_heights_px, schedule_task_row_heights_px")
+    .eq("id", view.effectiveUserId)
+    .maybeSingle();
+  return {
+    routine: data?.schedule_routine_row_heights_px ?? [],
+    task: data?.schedule_task_row_heights_px ?? [],
+  };
 }

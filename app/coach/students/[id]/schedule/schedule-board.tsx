@@ -21,7 +21,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isRoutineCourseId } from "@/lib/curriculum";
 import { sumTaskCounts } from "@/lib/scoring";
-import { updateScheduleDensity, type ScheduleDensity } from "@/lib/schedule-density";
+import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
+import { useRowHeights, type RowHeights } from "@/lib/use-row-heights";
 import {
   createStudentEvent,
   deleteAssignedTask,
@@ -49,7 +50,13 @@ import { EventCard, EventCardBody, EVENT_TYPE_CLASSES, eventDragId, isEventDragI
 import { EventDialog, type EventDialogState } from "../_components/kanban/event-dialog";
 import { KanbanTaskCard } from "../_components/kanban/kanban-task-card";
 import { RoutineTaskCard } from "../_components/kanban/routine-task-card";
-import { CARD_DENSITY_CONFIG, cardBackgroundClass, statusClasses, TaskCardBody, type CardDensity } from "../_components/kanban/task-card-body";
+import {
+  cardBackgroundClass,
+  DEFAULT_CARD_HEIGHT_PX,
+  MIN_CARD_HEIGHT_PX,
+  statusClasses,
+  TaskCardBody,
+} from "../_components/kanban/task-card-body";
 import { TaskDrawer, type TaskDrawerState } from "../_components/kanban/task-drawer";
 
 const DAY_PREFIX = "day:";
@@ -95,14 +102,6 @@ const PAINT_MODES: { value: AssignedTaskStatus; label: string; emoji: string; ac
   { value: "not_done", label: "Yapılmadı Olarak İşaretle", emoji: "❌", activeClass: "bg-rose-500 text-white border-rose-500" },
 ];
 
-// "Görünüm" (card density) toggle options -- see the density state and
-// CARD_DENSITY_CONFIG (task-card-body.tsx).
-const DENSITY_OPTIONS: { value: ScheduleDensity; label: string }[] = [
-  { value: "compact", label: "Kompakt" },
-  { value: "medium", label: "Orta" },
-  { value: "comfortable", label: "Rahat" },
-];
-
 function drawerKey(state: TaskDrawerState | null): string {
   if (!state) return "closed";
   if (state.mode === "create") return `create:${state.date}`;
@@ -129,7 +128,8 @@ export function ScheduleBoard({
   initialEvents,
   courseResourceData: initialCourseResourceData,
   highlightTaskId,
-  initialDensity,
+  initialRoutineRowHeights,
+  initialTaskRowHeights,
 }: {
   studentId: string;
   initialWeekDays: { date: string; label: string }[];
@@ -141,10 +141,12 @@ export function ScheduleBoard({
   // straight on the specific exam that's missing a result instead of the
   // student's general profile.
   highlightTaskId?: string | null;
-  // The coach's own schedule_density (profiles), fetched server-side by
-  // schedule/page.tsx so the very first render already matches their last
-  // choice -- no flash of the wrong density while a client fetch resolves.
-  initialDensity: ScheduleDensity;
+  // The coach's own profiles.schedule_routine_row_heights_px /
+  // schedule_task_row_heights_px, fetched server-side by schedule/page.tsx
+  // so the very first render already matches their last drag, with no
+  // flash of the wrong heights while a client fetch resolves.
+  initialRoutineRowHeights: number[];
+  initialTaskRowHeights: number[];
 }) {
   const today = todayISO();
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -166,20 +168,27 @@ export function ScheduleBoard({
   const activeEvent = activeId && isEventDragId(activeId) ? (events.find((e) => e.id === eventIdFromDragId(activeId)) ?? null) : null;
   const [weekLocked, setWeekLocked] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
-  // Card density ("Görünüm": Kompakt/Orta/Rahat) -- persisted to
-  // profiles.schedule_density (see lib/schedule-density.ts) so it follows
-  // the coach across devices, not just this browser. Optimistic like every
-  // other quick toggle in this file, reverted on failure.
-  const [density, setDensity] = useState<ScheduleDensity>(initialDensity);
-
-  function handleDensityChange(next: ScheduleDensity) {
-    const previous = density;
-    setDensity(next);
-    updateScheduleDensity(next).catch((e) => {
-      setDensity(previous);
-      toast.error(e instanceof Error ? e.message : "Görünüm tercihi kaydedilemedi.");
-    });
-  }
+  // Independent per-row height for each lane -- a strict, Excel-like grid
+  // across the WHOLE board: dragging any card's or event's resize handle
+  // only ever adjusts the row it's actually in (shared across all 7 days
+  // at that index), leaving every other row untouched, in both the
+  // Rutinler lane and the Görevler lane. The two lanes are entirely
+  // independent row-index spaces from each other. See useRowHeights for
+  // the shared drag/persist mechanics.
+  const routineRows = useRowHeights(
+    initialRoutineRowHeights,
+    MIN_CARD_HEIGHT_PX,
+    DEFAULT_CARD_HEIGHT_PX,
+    updateScheduleRoutineRowHeights,
+    (message) => toast.error(message),
+  );
+  const taskRows = useRowHeights(
+    initialTaskRowHeights,
+    MIN_CARD_HEIGHT_PX,
+    DEFAULT_CARD_HEIGHT_PX,
+    updateScheduleTaskRowHeights,
+    (message) => toast.error(message),
+  );
 
   // "Hızlı İşaretleme" (Paintbrush) mode -- while set, clicking any task
   // card on the board marks it with this status instead of opening the
@@ -570,13 +579,20 @@ export function ScheduleBoard({
     });
   }
 
-  // The widest Rutinler lane across the current 7-day window -- every
+  // The widest lane across the current 7-day window, one for each of the
+  // two independent row-index spaces (see routineRows/taskRows) -- every
   // DayColumn pads its own lane out to this many slots (real cards, then
-  // empty fixed-height placeholders) so the Görevler section starts at the
-  // exact same Y in every column, Monday through Sunday. With every card
-  // already a fixed height (TASK_CARD_HEIGHT_CLASS), this single number is
-  // all strict alignment needs -- no per-row measuring.
+  // empty per-row-height placeholders) so every row -- Rutinler AND
+  // Görevler alike -- lines up at the exact same Y in every column,
+  // Monday through Sunday, and so a day with fewer items than its busiest
+  // neighbor still has a same-height placeholder sitting at each row it's
+  // missing (needed for taskRows.heightOf(i) to mean the same row for
+  // every day, not just "however many items I happen to have").
   const maxRoutineSlots = Math.max(0, ...weekDays.map((day) => tasksByDay(day.date).filter((t) => isRoutineCourseId(t.course_id)).length));
+  const maxGorevSlots = Math.max(
+    0,
+    ...weekDays.map((day) => tasksByDay(day.date).filter((t) => !isRoutineCourseId(t.course_id)).length + eventsByDay(day.date).length),
+  );
 
   return (
     <div className="space-y-4">
@@ -655,25 +671,6 @@ export function ScheduleBoard({
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground text-xs font-medium">Görünüm:</span>
-        <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
-          {DENSITY_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => handleDensityChange(value)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                density === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="border-border/70 bg-muted/20 flex flex-wrap items-center gap-2 rounded-lg border border-dashed px-3 py-2">
         <span className="text-muted-foreground text-xs font-medium">Hızlı İşaretleme:</span>
         {PAINT_MODES.map(({ value, label, emoji, activeClass }) => (
@@ -724,7 +721,9 @@ export function ScheduleBoard({
                   routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
                   regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
                   maxRoutineSlots={maxRoutineSlots}
-                  density={density}
+                  maxGorevSlots={maxGorevSlots}
+                  routineRows={routineRows}
+                  taskRows={taskRows}
                   resourceNameById={resourceNameById}
                   onAddRoutine={() => setDrawerState({ mode: "create-multi", initialTab: "routine", initialDate: day.date })}
                   onAddTask={() => setDrawerState({ mode: "create", date: day.date })}
@@ -752,16 +751,21 @@ export function ScheduleBoard({
             while this floating clone follows the pointer, instead of the
             old behavior where the list itself reflowed under the cursor. */}
         <DragOverlay>
+          {/* Row height is a property of the SLOT the card is dragged
+              through, not the card itself (see routineRows/taskRows) --
+              the floating ghost isn't sitting in any slot, so it just uses
+              a sensible fixed preview size rather than trying to track
+              whichever row it's currently hovering. */}
           {activeTask && (
             <div
+              style={{ height: DEFAULT_CARD_HEIGHT_PX }}
               className={cn(
-                "border-border flex w-[220px] flex-col rounded-md border p-2.5 shadow-lg",
-                CARD_DENSITY_CONFIG[density].heightClass,
+                "border-border flex w-[220px] flex-col overflow-hidden rounded-md border p-2.5 shadow-lg",
                 cardBackgroundClass(activeTask),
                 statusClasses(activeTask),
               )}
             >
-              <TaskCardBody task={activeTask} resourceNameById={resourceNameById} density={density} />
+              <TaskCardBody task={activeTask} resourceNameById={resourceNameById} />
             </div>
           )}
           {activeEvent && (
@@ -808,7 +812,9 @@ function DayColumn({
   routineTasks,
   regularTasks,
   maxRoutineSlots,
-  density,
+  maxGorevSlots,
+  routineRows,
+  taskRows,
   resourceNameById,
   onAddRoutine,
   onAddTask,
@@ -830,7 +836,9 @@ function DayColumn({
   routineTasks: DetailTask[];
   regularTasks: DetailTask[];
   maxRoutineSlots: number;
-  density: CardDensity;
+  maxGorevSlots: number;
+  routineRows: RowHeights;
+  taskRows: RowHeights;
   resourceNameById: Map<string, string>;
   onAddRoutine: () => void;
   onAddTask: () => void;
@@ -898,7 +906,7 @@ function DayColumn({
           <p className="text-muted-foreground py-1.5 text-center text-[10px]">—</p>
         ) : (
           <div className="space-y-1.5">
-            {routineTasks.map((task) => (
+            {routineTasks.map((task, i) => (
               <RoutineTaskCard
                 key={task.id}
                 task={task}
@@ -908,23 +916,28 @@ function DayColumn({
                 onDelete={onDelete}
                 onStatusChange={onStatusChange}
                 paintMode={paintMode}
-                density={density}
+                cardHeight={routineRows.heightOf(i)}
+                onResize={(deltaY) => routineRows.onResize(i, deltaY)}
+                onResizeEnd={() => routineRows.onResizeEnd(i, maxRoutineSlots)}
               />
             ))}
             {/* Pads this day's Rutinler lane out to the week's widest one
-                (maxRoutineSlots, computed in ScheduleBoard) so the Görevler
-                section below starts at the same Y in every column, even on
-                a day with fewer routines than its busiest neighbor. Height
-                follows the current density, same as a real card, so a
-                tighter density also shrinks how much empty space this
-                leaves on a light day. */}
-            {Array.from({ length: maxRoutineSlots - routineTasks.length }).map((_, i) => (
-              <div
-                key={`routine-placeholder-${i}`}
-                aria-hidden
-                className={cn(CARD_DENSITY_CONFIG[density].heightClass, "border-border/40 rounded-md border border-dashed")}
-              />
-            ))}
+                (maxRoutineSlots, computed in ScheduleBoard) so every row --
+                not just where the lane happens to end -- lines up at the
+                same Y in every column. Each placeholder shares its row's
+                own independent height (routineRows.heightOf), same as a
+                real card at that index would. */}
+            {Array.from({ length: maxRoutineSlots - routineTasks.length }).map((_, j) => {
+              const rowIndex = routineTasks.length + j;
+              return (
+                <div
+                  key={`routine-placeholder-${rowIndex}`}
+                  aria-hidden
+                  style={{ height: routineRows.heightOf(rowIndex) }}
+                  className="border-border/40 rounded-md border border-dashed"
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -951,7 +964,7 @@ function DayColumn({
 
         <SortableContext items={scheduleItemIds} strategy={verticalListSortingStrategy}>
           <div className="flex min-h-[80px] flex-col gap-1.5">
-            {scheduleItems.length === 0 ? (
+            {maxGorevSlots === 0 ? (
               <button
                 type="button"
                 onClick={onAddTask}
@@ -960,31 +973,54 @@ function DayColumn({
                 Görev ekle
               </button>
             ) : (
-              scheduleItems.map((item) =>
-                item.kind === "task" ? (
-                  <KanbanTaskCard
-                    key={item.data.id}
-                    task={item.data}
-                    resourceNameById={resourceNameById}
-                    onEdit={onEdit}
-                    onDuplicate={onDuplicate}
-                    onDelete={onDelete}
-                    onStatusChange={onStatusChange}
-                    onToggleLock={onToggleLock}
-                    paintMode={paintMode}
-                    density={density}
-                  />
-                ) : (
-                  <EventCard
-                    key={item.data.id}
-                    event={item.data}
-                    onEdit={onEditEvent}
-                    onDuplicate={onDuplicateEvent}
-                    onDelete={onDeleteEvent}
-                    onToggleLock={onToggleEventLock}
-                  />
-                ),
-              )
+              <>
+                {scheduleItems.map((item, i) =>
+                  item.kind === "task" ? (
+                    <KanbanTaskCard
+                      key={item.data.id}
+                      task={item.data}
+                      resourceNameById={resourceNameById}
+                      onEdit={onEdit}
+                      onDuplicate={onDuplicate}
+                      onDelete={onDelete}
+                      onStatusChange={onStatusChange}
+                      onToggleLock={onToggleLock}
+                      paintMode={paintMode}
+                      cardHeight={taskRows.heightOf(i)}
+                      onResize={(deltaY) => taskRows.onResize(i, deltaY)}
+                      onResizeEnd={() => taskRows.onResizeEnd(i, maxGorevSlots)}
+                    />
+                  ) : (
+                    <EventCard
+                      key={item.data.id}
+                      event={item.data}
+                      onEdit={onEditEvent}
+                      onDuplicate={onDuplicateEvent}
+                      onDelete={onDeleteEvent}
+                      onToggleLock={onToggleEventLock}
+                      height={taskRows.heightOf(i)}
+                      onResize={(deltaY) => taskRows.onResize(i, deltaY)}
+                      onResizeEnd={() => taskRows.onResizeEnd(i, maxGorevSlots)}
+                    />
+                  ),
+                )}
+                {/* Pads this day's Görevler lane out to the week's widest
+                    one (maxGorevSlots, computed in ScheduleBoard) so every
+                    row lines up at the same Y in every column, exactly
+                    like the Rutinler placeholders above -- a strict grid
+                    across the whole board, not just the routine lane. */}
+                {Array.from({ length: maxGorevSlots - scheduleItems.length }).map((_, j) => {
+                  const rowIndex = scheduleItems.length + j;
+                  return (
+                    <div
+                      key={`gorev-placeholder-${rowIndex}`}
+                      aria-hidden
+                      style={{ height: taskRows.heightOf(rowIndex) }}
+                      className="border-border/40 rounded-md border border-dashed"
+                    />
+                  );
+                })}
+              </>
             )}
           </div>
         </SortableContext>

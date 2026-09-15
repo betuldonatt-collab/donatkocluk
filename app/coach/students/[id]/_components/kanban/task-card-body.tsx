@@ -2,7 +2,6 @@ import { PlayCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
-import type { ScheduleDensity } from "@/lib/schedule-density";
 import type { DetailTask } from "../../types";
 
 export const TASK_TYPE_LABELS: Record<string, string> = {
@@ -40,32 +39,17 @@ export function cardBackgroundClass(task: DetailTask) {
   return "bg-card";
 }
 
-// Three content profiles a coach can pick (see the "Görünüm" toggle in
-// schedule-board.tsx, persisted to profiles.schedule_density) -- each is a
-// full height+clamp combination, not just a CSS height number, since a
-// shorter card genuinely has to show LESS (fewer title lines, no topic,
-// fewer video rows) to guarantee it never overflows. Every card sharing
-// one tier (KanbanTaskCard, RoutineTaskCard, and the routine-slot
-// placeholders in schedule-board.tsx) is always exactly this tall, so the
-// weekly grid's strict alignment holds at any density.
-export type CardDensity = ScheduleDensity;
-
-type DensityConfig = {
-  heightClass: string;
-  titleClamp: "line-clamp-1" | "line-clamp-2";
-  showTopic: boolean;
-  // How many rows CardVideoLinks may use, and whether it's allowed to show
-  // an actual video TITLE (vs. only ever a bare "N video" count) -- see
-  // CardVideoLinks below.
-  videoRows: 0 | 1 | 2;
-  videoShowTitles: boolean;
-};
-
-export const CARD_DENSITY_CONFIG: Record<CardDensity, DensityConfig> = {
-  compact: { heightClass: "h-[112px]", titleClamp: "line-clamp-1", showTopic: false, videoRows: 1, videoShowTitles: false },
-  medium: { heightClass: "h-[144px]", titleClamp: "line-clamp-1", showTopic: true, videoRows: 1, videoShowTitles: true },
-  comfortable: { heightClass: "h-[180px]", titleClamp: "line-clamp-2", showTopic: true, videoRows: 2, videoShowTitles: true },
-};
+// The floor a coach can drag a card down to (see ResizeHandle in
+// kanban-task-card.tsx/routine-task-card.tsx) -- just tall enough to
+// always fit the icon + one truncated title line + the action-icon row,
+// which never clip (see TaskCardBody below). Mirrors the DB check
+// constraint (schedule_card_height_px_floor, migration 0076) with extra
+// headroom for this panel's own, slightly larger card chrome.
+export const MIN_CARD_HEIGHT_PX = 84;
+// This panel's own starting height when a coach has never dragged a
+// card yet (profiles.schedule_card_height_px is null) -- see
+// schedule/page.tsx.
+export const DEFAULT_CARD_HEIGHT_PX = 144;
 
 function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>): string {
   // The generic type label ("Soru Çözümü") is a placeholder for what's
@@ -82,124 +66,73 @@ function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>):
   return `${base}${count}${duration}`;
 }
 
-function videoRow(link: DetailTask["video_links"][number], clamp: "line-clamp-1" | "line-clamp-2") {
+// A single colorful pill -- shared by an individual video's title AND the
+// "N video" summary badge, so every video-related indicator on a card
+// (whichever one applies) reads as the same visual language as the full
+// list shown in TaskCardHoverDetail on hover.
+function VideoPill({ children }: { children: React.ReactNode }) {
   return (
-    <a
-      href={link.url}
-      target="_blank"
-      rel="noreferrer"
-      className="bg-rose-500/10 text-rose-600 inline-flex max-w-full items-start gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug"
-    >
-      <PlayCircle className="mt-0.5 size-3 shrink-0" />
-      <span className={cn(clamp, "break-words")}>{link.title || "Video"}</span>
-    </a>
+    <span className="bg-rose-500/10 text-rose-600 inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
+      <PlayCircle className="size-3 shrink-0" />
+      <span className="truncate">{children}</span>
+    </span>
   );
 }
 
-// Default-state video block, shaped by the density tier's videoRows/
-// videoShowTitles -- guaranteed to fit its row budget regardless of how
-// many links are attached:
-//   - videoShowTitles=false (compact): always a single "N video" count,
-//     never a title, so a long title can never sneak in a compact card.
-//   - videoRows=1 (medium): 1 video -> its title, clamped to 1 line;
-//     2+ -> a single "N video eklendi" summary (no individual title, since
-//     only one row is available and title+count together wouldn't fit).
-//   - videoRows=2 (comfortable): today's behavior -- 1 video gets up to 2
-//     lines; 2+ each get 1 line, capped to the first 2 with a "+N daha"
-//     row past that.
-// The full, untruncated list is always one hover away (TaskCardHoverDetail).
-function CardVideoLinks({ videoLinks, density }: { videoLinks: DetailTask["video_links"]; density: CardDensity }) {
+// Default-state video indicator: 1 video shows its own title (as a real
+// link); 2+ collapse into a single "N video" summary pill instead of
+// stacking individual titles -- since the card's height is now a free
+// drag rather than a fixed tier, there's no fixed row budget to cap
+// against, just no appetite for an unbounded stack of video rows. Always
+// exactly one line, truncated by VideoPill/the card's own overflow-hidden
+// if it doesn't fit. Full untruncated list is always one hover away
+// (TaskCardHoverDetail).
+function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] }) {
   if (videoLinks.length === 0) return null;
-  const config = CARD_DENSITY_CONFIG[density];
-  if (config.videoRows === 0) return null;
-
-  if (!config.videoShowTitles) {
-    return (
-      <span className="text-muted-foreground inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
-        <PlayCircle className="size-3 shrink-0" />
-        {videoLinks.length} video
-      </span>
-    );
-  }
-
-  if (config.videoRows === 1) {
-    return (
-      <div className="flex flex-col items-start gap-1">
-        {videoLinks.length === 1 ? (
-          videoRow(videoLinks[0], "line-clamp-1")
-        ) : (
-          <span className="text-muted-foreground inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
-            <PlayCircle className="size-3 shrink-0" />
-            {videoLinks.length} video eklendi
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  // videoRows === 2 (comfortable).
   if (videoLinks.length === 1) {
-    return <div className="flex flex-col items-start gap-1">{videoRow(videoLinks[0], "line-clamp-2")}</div>;
+    return (
+      <a href={videoLinks[0].url} target="_blank" rel="noreferrer" className="block max-w-full">
+        <VideoPill>{videoLinks[0].title || "Video"}</VideoPill>
+      </a>
+    );
   }
-  return (
-    <div className="flex flex-col items-start gap-1">
-      {videoRow(videoLinks[0], "line-clamp-1")}
-      {videoLinks.length === 2 ? (
-        videoRow(videoLinks[1], "line-clamp-1")
-      ) : (
-        <span className="text-muted-foreground inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
-          +{videoLinks.length - 1} video daha
-        </span>
-      )}
-    </div>
-  );
+  return <VideoPill>{videoLinks.length} video</VideoPill>;
 }
 
-// Default card content, shaped entirely by `density` (see
-// CARD_DENSITY_CONFIG) -- guaranteed to fit inside that tier's
-// heightClass regardless of content. Shared by KanbanTaskCard (draggable,
-// in a day column) and RoutineTaskCard (static, in the Rutinler lane) so
-// the two stay visually identical. Full, untruncated detail lives in
-// TaskCardHoverDetail below, shown in a HoverCard by the card components
-// themselves -- topic is always visible there even when this tier hides it.
-export function TaskCardBody({
-  task,
-  resourceNameById,
-  density,
-}: {
-  task: DetailTask;
-  resourceNameById?: Map<string, string>;
-  density: CardDensity;
-}) {
+// Default card content -- course name, topic, subtitle, and a video
+// indicator, each always rendered as a single truncated (ellipsis) line
+// rather than hidden or multi-line clamped. The card's own fixed-but-
+// draggable height + overflow-hidden (see kanban-task-card.tsx/
+// routine-task-card.tsx) clips whichever rows don't fit when dragged
+// short -- deliberately simple, no per-height content profile. Shared by
+// KanbanTaskCard (draggable, in a day column) and RoutineTaskCard
+// (static, in the Rutinler lane) so the two stay visually identical. Full,
+// untruncated detail lives in TaskCardHoverDetail below, shown in a
+// HoverCard by the card components themselves.
+export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
-  const config = CARD_DENSITY_CONFIG[density];
 
   return (
-    <div className="min-w-0 flex-1 space-y-1">
-      <p className={cn("text-foreground text-sm leading-snug font-semibold break-words", config.titleClamp)}>{cLabel ?? task.title}</p>
+    <div className="min-w-0 flex-1 space-y-1 overflow-hidden">
+      <p className="text-foreground truncate text-sm leading-snug font-semibold">{cLabel ?? task.title}</p>
 
-      {config.showTopic && topic && (
-        <p
-          className={cn(
-            "line-clamp-1 text-xs leading-snug break-words",
-            topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
-          )}
-        >
+      {topic && (
+        <p className={cn("truncate text-xs leading-snug", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>
           {topic.name}
         </p>
       )}
 
-      <p className="text-muted-foreground line-clamp-1 text-[11px] leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
+      <p className="text-muted-foreground truncate text-[11px] leading-snug">{subtitleText(task, resourceNameById)}</p>
 
-      <CardVideoLinks videoLinks={task.video_links} density={density} />
+      <CardVideoLinks videoLinks={task.video_links} />
     </div>
   );
 }
 
-// Full, untruncated version of TaskCardBody -- no clamping, no density,
-// topic always shown, every video link with its complete title. Rendered
-// inside a HoverCard's content on hover, never inline in the grid itself.
+// Full, untruncated version of TaskCardBody -- no truncation, topic
+// always shown, every video link with its complete title. Rendered inside
+// a HoverCard's content on hover, never inline in the grid itself.
 export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);

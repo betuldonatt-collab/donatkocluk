@@ -7,17 +7,11 @@ import { Copy, GripVertical, Lock, LockOpen, Pencil, Trash2 } from "lucide-react
 
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ResizeHandle } from "@/components/ui/resize-handle";
 import { cn } from "@/lib/utils";
 import type { AssignedTaskStatus } from "../../../../actions";
 import type { DetailTask } from "../../types";
-import {
-  CARD_DENSITY_CONFIG,
-  cardBackgroundClass,
-  statusClasses,
-  TaskCardBody,
-  TaskCardHoverDetail,
-  type CardDensity,
-} from "./task-card-body";
+import { cardBackgroundClass, statusClasses, TaskCardBody, TaskCardHoverDetail } from "./task-card-body";
 
 const PAINT_FLASH_CLASS: Partial<Record<AssignedTaskStatus, string>> = {
   done: "bg-emerald-500/25",
@@ -34,7 +28,9 @@ export function KanbanTaskCard({
   onStatusChange,
   onToggleLock,
   paintMode,
-  density,
+  cardHeight,
+  onResize,
+  onResizeEnd,
 }: {
   task: DetailTask;
   resourceNameById?: Map<string, string>;
@@ -49,7 +45,15 @@ export function KanbanTaskCard({
   // mutes the grip handle + action-icon row so there's only one click
   // target on the card while it's active.
   paintMode: AssignedTaskStatus | null;
-  density: CardDensity;
+  // Current height in px for the ROW this card is in (its position in the
+  // day's Görevler list -- see taskRows in schedule-board.tsx), and the
+  // drag callbacks (see ResizeHandle). Every card and placeholder at that
+  // same row index, across all 7 days, shares this value -- dragging this
+  // card's handle only ever resizes its own row, leaving every other row
+  // untouched, like dragging one row boundary in a spreadsheet.
+  cardHeight: number;
+  onResize: (deltaY: number) => void;
+  onResizeEnd: () => void;
 }) {
   const [flash, setFlash] = useState<AssignedTaskStatus | null>(null);
 
@@ -62,7 +66,7 @@ export function KanbanTaskCard({
     id: task.id,
     disabled: task.is_locked || !!paintMode,
   });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height: cardHeight };
 
   function handlePaintClick() {
     if (!paintMode) return;
@@ -79,15 +83,14 @@ export function KanbanTaskCard({
           style={style}
           onClick={paintMode ? handlePaintClick : undefined}
           className={cn(
-            "border-border flex flex-col rounded-md border p-2.5 transition-colors",
-            CARD_DENSITY_CONFIG[density].heightClass,
+            "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",
             flash && PAINT_FLASH_CLASS[flash],
           )}
         >
-          <div className="flex items-start gap-1.5">
+          <div className="flex min-h-0 flex-1 items-start gap-1.5 overflow-hidden">
             <button
               type="button"
               className={cn(
@@ -103,10 +106,10 @@ export function KanbanTaskCard({
             >
               {task.is_locked ? <Lock className="size-3.5" /> : <GripVertical className="size-3.5" />}
             </button>
-            <TaskCardBody task={task} resourceNameById={resourceNameById} density={density} />
+            <TaskCardBody task={task} resourceNameById={resourceNameById} />
           </div>
 
-          <div className={cn("mt-auto flex justify-end gap-0.5 pt-1.5", paintMode && "pointer-events-none opacity-30")}>
+          <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", paintMode && "pointer-events-none opacity-30")}>
             <Button
               type="button"
               variant="ghost"
@@ -135,6 +138,8 @@ export function KanbanTaskCard({
               <Trash2 className="size-3" />
             </Button>
           </div>
+
+          <ResizeHandle onResize={onResize} onResizeEnd={onResizeEnd} label="Bu satırın yüksekliğini ayarla" />
         </div>
       </HoverCardTrigger>
       <HoverCardContent>
