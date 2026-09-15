@@ -418,32 +418,43 @@ export function ScheduleBoard({
       }),
     );
 
-    const calls: Promise<unknown>[] = [];
-    if (moved?.kind === "task") {
-      calls.push(moveAssignedTask(studentId, moved.task.id, moved.targetDay, taskOrderById.get(moved.task.id)!));
-      const rest = taskUpdates.filter((u) => u.id !== moved.task.id);
-      if (rest.length > 0) calls.push(updateAssignedTaskOrder(studentId, rest));
-      if (eventUpdates.length > 0) calls.push(updateStudentEventOrder(studentId, eventUpdates));
-    } else if (moved?.kind === "event") {
-      calls.push(
-        updateStudentEvent(studentId, moved.event.id, {
+    // Sequential, not Promise.all -- each of these is its own independent
+    // Server Action request, and firing 2-3 of them at once from a single
+    // drag was a real contributor to the session-refresh race investigated
+    // above: Supabase rotates the refresh token on use, so if this burst
+    // happens to land right as the access token needs refreshing, whichever
+    // concurrent request loses the rotation gets treated by proxy.ts as
+    // "no user" and hard-redirects the coach out entirely. One request at a
+    // time can still theoretically lose a race against some OTHER
+    // concurrent activity, but it removes this specific self-inflicted
+    // burst as a cause. Slightly slower per drag (a few hundred ms at
+    // most, still fire-and-forget from the caller's perspective below);
+    // rollback-on-any-failure behavior is unchanged.
+    async function runCalls() {
+      if (moved?.kind === "task") {
+        await moveAssignedTask(studentId, moved.task.id, moved.targetDay, taskOrderById.get(moved.task.id)!);
+        const rest = taskUpdates.filter((u) => u.id !== moved.task.id);
+        if (rest.length > 0) await updateAssignedTaskOrder(studentId, rest);
+        if (eventUpdates.length > 0) await updateStudentEventOrder(studentId, eventUpdates);
+      } else if (moved?.kind === "event") {
+        await updateStudentEvent(studentId, moved.event.id, {
           description: moved.event.description,
           eventType: moved.event.event_type,
           eventDate: moved.targetDay,
           startTime: moved.event.start_time.slice(0, 5),
           endTime: moved.event.end_time.slice(0, 5),
           orderIndex: eventOrderById.get(moved.event.id)!,
-        }),
-      );
-      const rest = eventUpdates.filter((u) => u.id !== moved.event.id);
-      if (rest.length > 0) calls.push(updateStudentEventOrder(studentId, rest));
-      if (taskUpdates.length > 0) calls.push(updateAssignedTaskOrder(studentId, taskUpdates));
-    } else {
-      if (taskUpdates.length > 0) calls.push(updateAssignedTaskOrder(studentId, taskUpdates));
-      if (eventUpdates.length > 0) calls.push(updateStudentEventOrder(studentId, eventUpdates));
+        });
+        const rest = eventUpdates.filter((u) => u.id !== moved.event.id);
+        if (rest.length > 0) await updateStudentEventOrder(studentId, rest);
+        if (taskUpdates.length > 0) await updateAssignedTaskOrder(studentId, taskUpdates);
+      } else {
+        if (taskUpdates.length > 0) await updateAssignedTaskOrder(studentId, taskUpdates);
+        if (eventUpdates.length > 0) await updateStudentEventOrder(studentId, eventUpdates);
+      }
     }
 
-    Promise.all(calls).catch((e) => {
+    runCalls().catch((e) => {
       setTasks(previousTasks);
       setEvents(previousEvents);
       toast.error(e instanceof Error ? e.message : "Sıralama kaydedilemedi, geri alındı.");
