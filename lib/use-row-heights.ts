@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type RowHeights = {
   heightOf: (rowIndex: number) => number;
@@ -40,6 +40,19 @@ export function useRowHeights(
     return record;
   });
   const savedRef = useRef(heights);
+  // Mirrors `heights` on every render so onResizeEnd can read the latest
+  // value synchronously without going through a setState updater --
+  // calling persist() (a Server Action, which touches router state
+  // internally) from inside a setState updater is what caused "Cannot
+  // update a component (Router) while rendering ScheduleBoard": React may
+  // invoke an updater function during render/reconciliation, and a
+  // Server Action call has no business running in that context. Updaters
+  // must stay pure; persist() now only ever runs from onResizeEnd's own
+  // body, a plain event-handler call, never from inside setHeights itself.
+  const heightsRef = useRef(heights);
+  useEffect(() => {
+    heightsRef.current = heights;
+  }, [heights]);
 
   function heightOf(rowIndex: number): number {
     return heights[rowIndex] ?? defaultHeight;
@@ -50,19 +63,20 @@ export function useRowHeights(
   }
 
   function onResizeEnd(rowIndex: number, rowCount: number) {
-    setHeights((prev) => {
-      const next = { ...prev, [rowIndex]: Math.max(minHeight, prev[rowIndex] ?? defaultHeight) };
-      const array = Array.from({ length: rowCount }, (_, i) => next[i] ?? defaultHeight);
-      persist(array)
-        .then(() => {
-          savedRef.current = next;
-        })
-        .catch((e) => {
-          setHeights(savedRef.current);
-          onError(e instanceof Error ? e.message : "Satır yüksekliği kaydedilemedi.");
-        });
-      return next;
-    });
+    const current = heightsRef.current;
+    const clamped = Math.max(minHeight, current[rowIndex] ?? defaultHeight);
+    const next = { ...current, [rowIndex]: clamped };
+    if (clamped !== current[rowIndex]) setHeights(next);
+
+    const array = Array.from({ length: rowCount }, (_, i) => next[i] ?? defaultHeight);
+    persist(array)
+      .then(() => {
+        savedRef.current = next;
+      })
+      .catch((e) => {
+        setHeights(savedRef.current);
+        onError(e instanceof Error ? e.message : "Satır yüksekliği kaydedilemedi.");
+      });
   }
 
   return { heightOf, onResize, onResizeEnd };
