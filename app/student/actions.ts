@@ -30,6 +30,7 @@ export type TaskProgressPatch = Partial<{
   wrong_count: number | null;
   empty_count: number | null;
   duration_minutes: number | null;
+  tracked_duration_minutes: number;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   completed: boolean;
   analysis_pending: boolean;
@@ -68,6 +69,7 @@ const taskProgressPatchSchema = z
     wrong_count: countField,
     empty_count: countField,
     duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
+    tracked_duration_minutes: z.number().int().min(0).max(1440).optional(),
     subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
     completed: z.boolean().optional(),
     analysis_pending: z.boolean().optional(),

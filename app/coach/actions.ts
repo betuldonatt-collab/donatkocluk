@@ -2508,7 +2508,7 @@ export async function fetchStopwatchCompetitionRoster(
       .in("id", studentIds),
     supabase
       .from("student_tasks")
-      .select("student_id, task_date, duration_minutes")
+      .select("student_id, task_date, tracked_duration_minutes")
       .in("student_id", studentIds)
       .gte("task_date", rangeStart)
       .lte("task_date", today),
@@ -2521,7 +2521,7 @@ export async function fetchStopwatchCompetitionRoster(
   for (const row of taskRows ?? []) {
     const totals = totalsByStudent.get(row.student_id);
     if (!totals) continue;
-    const minutes = row.duration_minutes ?? 0;
+    const minutes = row.tracked_duration_minutes ?? 0;
     if (row.task_date === today) totals.daily += minutes;
     if (row.task_date >= weekStart) totals.weekly += minutes;
     if (row.task_date >= monthStart && row.task_date < monthEndExclusive) totals.monthly += minutes;

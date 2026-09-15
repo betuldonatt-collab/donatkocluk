@@ -26,10 +26,14 @@ function formatMinutesLabel(totalMinutes: number): string {
 // Per-task Focus Mode entry point -- opens the same fullscreen timer for
 // whichever task this button is rendered next to. Every way a session can
 // end -- Bitir, Vazgeç, or the modal unmounting mid-session -- logs its
-// seconds onto THIS task's own duration_minutes (accumulated, since a
-// student may run several sessions on the same task across visits),
-// reusing the existing updateTaskProgress action -- no new column or
-// table, matching student_tasks' current schema exactly.
+// seconds onto THIS task's own tracked_duration_minutes (accumulated, since
+// a student may run several sessions on the same task across visits),
+// reusing the existing updateTaskProgress action. Deliberately a SEPARATE
+// column from duration_minutes (a coach's target/estimated duration, or a
+// student's manually-typed exam time) -- the Kronometre Yarışması
+// leaderboard sums only tracked_duration_minutes, so a task merely being
+// assigned a target duration must never inflate it; only genuine stopwatch
+// time recorded here does (see migration 0074_stopwatch_tracked_duration).
 export function FocusTimerTrigger({ task, className }: { task: StudentTask; className?: string }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,10 +44,10 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   async function persistSession(seconds: number) {
     if (seconds <= 0) return;
     const sessionMinutes = Math.max(1, Math.round(seconds / 60));
-    const nextTotal = Math.min(1440, (task.duration_minutes ?? 0) + sessionMinutes);
+    const nextTotal = Math.min(1440, task.tracked_duration_minutes + sessionMinutes);
     setSaving(true);
     try {
-      await updateTaskProgress(task.id, { duration_minutes: nextTotal });
+      await updateTaskProgress(task.id, { tracked_duration_minutes: nextTotal });
       toast.success(`${formatDuration(seconds)} odaklandın, göreve kaydedildi.`);
     } catch {
       toast.error("Odak süresi kaydedilemedi, tekrar dene.");
@@ -78,9 +82,9 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           hide/show together as one unit -- the caller in task-card.tsx
           doesn't need to change at all. */}
       <div className={cn("items-center gap-1.5", className)}>
-        {!!task.duration_minutes && (
+        {!!task.tracked_duration_minutes && (
           <span className="text-muted-foreground shrink-0 text-xs font-medium tabular-nums">
-            {formatMinutesLabel(task.duration_minutes)}
+            {formatMinutesLabel(task.tracked_duration_minutes)}
           </span>
         )}
         <Button

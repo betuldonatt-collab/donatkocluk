@@ -37,6 +37,7 @@ export type StudentTask = {
   wrong_count: number | null;
   empty_count: number | null;
   duration_minutes: number | null;
+  tracked_duration_minutes: number;
   subject_scores: Record<string, SubjectScore> | null;
   video_links: VideoLink[];
   completed: boolean;
