@@ -294,6 +294,42 @@ export function ScheduleBoard({
       .map((it) => it.id);
   }
 
+  function isLockedId(id: string): boolean {
+    if (isEventDragId(id)) return events.find((e) => e.id === eventIdFromDragId(id))?.is_locked ?? false;
+    return tasks.find((t) => t.id === id)?.is_locked ?? false;
+  }
+
+  // useSortable({ disabled }) only stops a locked card from being picked
+  // up -- it does nothing to stop arrayMove/splice from repositioning it
+  // when OTHER items get dragged past it, since dnd-kit treats every id in
+  // the array uniformly once a drag is in progress elsewhere. This corrects
+  // that after the fact: every locked id gets pinned back to the exact
+  // absolute index it held in `originalOrder` (the day's sequence right
+  // before this specific drag), and only unlocked ids flow into whatever
+  // slots are left, in the relative order `naiveOrder` (a plain arrayMove
+  // or splice result) already put them in. Applies equally to same-day
+  // reorders and cross-day inserts below -- both produce a "naive new
+  // order" that needs the same correction.
+  function enforceLockedPositions(naiveOrder: string[], originalOrder: string[]): string[] {
+    const lockedIndexById = new Map<string, number>();
+    originalOrder.forEach((id, i) => {
+      if (isLockedId(id)) lockedIndexById.set(id, i);
+    });
+    if (lockedIndexById.size === 0) return naiveOrder;
+
+    const indexToLockedId = new Map<number, string>();
+    lockedIndexById.forEach((idx, id) => indexToLockedId.set(idx, id));
+
+    const unlockedInNaiveOrder = naiveOrder.filter((id) => !lockedIndexById.has(id));
+    const result: string[] = [];
+    let ui = 0;
+    for (let i = 0; i < naiveOrder.length; i++) {
+      const lockedId = indexToLockedId.get(i);
+      result.push(lockedId ?? unlockedInNaiveOrder[ui++]);
+    }
+    return result;
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
   }
@@ -314,7 +350,8 @@ export function ScheduleBoard({
       const oldIndex = dayItemIds.indexOf(activeId);
       const newIndex = dayItemIds.indexOf(overId);
       if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-      applyCombinedOrder(arrayMove(dayItemIds, oldIndex, newIndex));
+      const naiveOrder = arrayMove(dayItemIds, oldIndex, newIndex);
+      applyCombinedOrder(enforceLockedPositions(naiveOrder, dayItemIds));
       return;
     }
 
@@ -331,8 +368,9 @@ export function ScheduleBoard({
       const idx = targetItemIds.indexOf(overId);
       if (idx !== -1) insertIndex = idx;
     }
-    const newTargetIds = [...targetItemIds];
-    newTargetIds.splice(insertIndex, 0, activeId);
+    const naiveTargetIds = [...targetItemIds];
+    naiveTargetIds.splice(insertIndex, 0, activeId);
+    const newTargetIds = enforceLockedPositions(naiveTargetIds, targetItemIds);
 
     if (isEventDragId(activeId)) {
       const movedEvent = events.find((e) => e.id === eventIdFromDragId(activeId));
