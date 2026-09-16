@@ -37,8 +37,15 @@ async function fetchHomeData(userId: string) {
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-  const [{ data: sessionRows }, { data: weekTaskRows }, { data: pendingTaskRows }, { data: ratingSessionRows }, { data: lockRows }, { data: profileRow }] =
-    await Promise.all([
+  const [
+    { data: sessionRows },
+    { data: weekTaskRows },
+    { data: pendingTaskRows },
+    { data: ratingSessionRows },
+    { data: lockRows },
+    { data: profileRow },
+    { data: taskResourceRows },
+  ] = await Promise.all([
       supabase
         .from("coaching_sessions")
         .select("scheduled_at, meeting_url")
@@ -73,15 +80,37 @@ async function fetchHomeData(userId: string) {
       // to a week the coach has since locked.
       supabase.from("week_locks").select("week_start_date").eq("student_id", userId),
       supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px").eq("id", userId).maybeSingle(),
+      // Which book/kaynak (if any) a coach linked to each task -- mirrors
+      // the coach panel's own task_resources join (schedule/page.tsx)
+      // exactly, just scoped by student_tasks.student_id instead of by
+      // coach roster. Not filtered on lock/date range: a resource name is
+      // cheap, harmless to fetch for a pending-analysis task from an
+      // older week too, and doing so here avoids a second query shaped
+      // just for that handful of rows.
+      supabase
+        .from("task_resources")
+        .select("task_id, order_index, student_tasks!inner(student_id), student_resources(name)")
+        .eq("student_tasks.student_id", userId)
+        .order("order_index", { ascending: true }),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
+
+  const resourceNamesByTask = new Map<string, string[]>();
+  for (const row of taskResourceRows ?? []) {
+    const name = (row as unknown as { student_resources: { name: string } | null }).student_resources?.name;
+    if (!name) continue;
+    const list = resourceNamesByTask.get(row.task_id) ?? [];
+    list.push(name);
+    resourceNamesByTask.set(row.task_id, list);
+  }
 
   // Pending-analysis tasks from earlier weeks aren't in the week fetch,
   // so merge them in (dedup not needed — the date ranges don't overlap).
   const tasks = [...(weekTaskRows ?? []), ...(pendingTaskRows ?? [])].map((t) => ({
     ...t,
     week_locked: lockedWeeks.has(mondayOf(t.task_date)),
+    resource_names: resourceNamesByTask.get(t.id) ?? [],
   })) as StudentTask[];
 
   return {

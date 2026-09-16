@@ -39,15 +39,27 @@ const TASK_TYPE_ICONS = {
 };
 
 // The floor a student can drag a cell down to (see ResizeHandle in
-// task-board.tsx) -- just tall enough to always fit the icon + one
-// truncated title line, which never clips (see WeekTaskCell below).
-// Mirrors the DB check constraint (schedule_card_height_px_floor,
-// migration 0076) with this panel's own, already-tighter cell chrome.
-export const MIN_CELL_HEIGHT_PX = 64;
+// task-board.tsx) -- tall enough to always fit the icon + title + topic +
+// status subtitle (the fields a student needs at a glance to know WHAT a
+// task is and where they stand on it) without clipping; only the kaynak
+// line and video pills are still first to give way below this. Raised
+// from the original 64px, which only guaranteed the icon + one title
+// line -- everything else silently clipped at that floor, which is
+// exactly the "hidden unless you hover" complaint this pass fixes. Still
+// well above the DB check constraint's own 56px minimum (migration 0076).
+export const MIN_CELL_HEIGHT_PX = 84;
 // This panel's own starting height when a student has never dragged a
 // cell yet (profiles.schedule_card_height_px is null) -- see
-// app/student/page.tsx.
-export const DEFAULT_CELL_HEIGHT_PX = 108;
+// app/student/page.tsx. Raised alongside the floor above, for the same
+// reason: room for the new kaynak line and a video pill by default too.
+export const DEFAULT_CELL_HEIGHT_PX = 132;
+
+// Same duration convention as TaskCard's own durationSuffix (task-card.tsx)
+// -- coach-set target, or (once recorded via task-modal.tsx's Süre field
+// on a TYT branch exam) the actual time taken.
+function durationSuffix(task: StudentTask): string {
+  return task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
+}
 
 // Same subtitle rules as TaskCard's taskSubtitle, kept in sync deliberately
 // rather than shared -- the grid cell is a distinct, much tighter layout
@@ -55,11 +67,19 @@ export const DEFAULT_CELL_HEIGHT_PX = 108;
 function cellSubtitle(task: StudentTask): string {
   switch (task.task_type) {
     case "question_bank":
-    case "branch_exam":
+    case "branch_exam": {
+      // See taskSubtitle's matching comment in task-card.tsx -- the
+      // assigned target must stay visible once progress starts, not get
+      // replaced by it, and a duration-only target needs to surface even
+      // with no count target at all.
+      const countUnit = task.task_type === "branch_exam" ? "adet" : "soru";
+      const target = task.total_count !== null ? `${task.total_count} ${countUnit}` : "";
       if (task.correct_count !== null || task.total_count !== null) {
-        return `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
+        const progress = `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
+        return `${target ? `${target} · ` : ""}${progress}${durationSuffix(task)}`;
       }
-      return TASK_TYPE_LABELS[task.task_type];
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+    }
     case "general_exam": {
       if (!task.subject_scores) return TASK_TYPE_LABELS[task.task_type];
       const totals = Object.values(task.subject_scores).reduce<{
@@ -74,16 +94,35 @@ function cellSubtitle(task: StudentTask): string {
         }),
         { correct: 0, wrong: 0, empty: 0 },
       );
-      return `D:${totals.correct} Y:${totals.wrong} B:${totals.empty}`;
+      return `D:${totals.correct} Y:${totals.wrong} B:${totals.empty}${durationSuffix(task)}`;
     }
     case "video":
-      if (task.status === "half_done") return "Yarım İzlendi";
-      return task.completed ? "İzlendi" : "İzlenmedi";
-    case "topic_study":
-      if (task.status === "half_done") return "Yarım Tamamlandı";
-      return task.completed ? "Tamamlandı" : "Tamamlanmadı";
+    case "topic_study": {
+      const isVideo = task.task_type === "video";
+      // Derived from task.status, not task.completed -- see taskSubtitle's
+      // matching comment in task-card.tsx for why.
+      const manual =
+        task.status === "done"
+          ? isVideo
+            ? "İzlendi"
+            : "Tamamlandı"
+          : task.status === "half_done"
+            ? isVideo
+              ? "Yarım İzlendi"
+              : "Yarım Tamamlandı"
+            : task.status === "not_done"
+              ? "Yapılmadı"
+              : isVideo
+                ? "İzlenmedi"
+                : "Tamamlanmadı";
+      // Dual task (see taskSubtitle's matching comment in task-card.tsx).
+      if (task.total_count !== null) {
+        return `${manual} · D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}${durationSuffix(task)}`;
+      }
+      return `${manual}${durationSuffix(task)}`;
+    }
     default:
-      return task.description ?? TASK_TYPE_LABELS[task.task_type];
+      return `${task.description ?? TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
   }
 }
 
@@ -136,6 +175,9 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
         <p className={cn("text-xs leading-snug break-words", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>
           {topic.name}
         </p>
+      )}
+      {task.resource_names.length > 0 && (
+        <p className="text-muted-foreground text-xs leading-snug break-words">{task.resource_names.join(" + ")}</p>
       )}
       <p className="text-muted-foreground text-xs leading-snug break-words">
         {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
@@ -264,9 +306,23 @@ export function WeekTaskCell({
               </div>
 
               {topic && (
-                <p className={cn("truncate text-[11px] leading-snug", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+                <p
+                  className={cn(
+                    "line-clamp-2 text-[11px] leading-snug break-words",
+                    topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
+                  )}
+                >
                   {topic.name}
                 </p>
+              )}
+
+              {/* Which book/kaynak the coach linked, if any -- see the
+                  matching comment on StudentTask.resource_names. Kept
+                  single-line (unlike the title/topic above) -- this grid
+                  cell is tight enough that every extra wrapped line adds
+                  real height pressure across all 7 day columns at once. */}
+              {task.resource_names.length > 0 && (
+                <p className="text-muted-foreground truncate text-[10px] leading-snug">{task.resource_names.join(" + ")}</p>
               )}
 
               <p className="text-muted-foreground truncate text-[10px] leading-snug">

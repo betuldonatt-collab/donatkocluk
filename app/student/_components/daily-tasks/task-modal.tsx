@@ -568,6 +568,23 @@ function TaskModalBody({
             Bu haftanın görevleri koçun tarafından kilitlendi. Sadece görüntüleyebilirsin.
           </div>
 
+          {(task.resource_names.length > 0 || task.duration_minutes !== null) && (
+            <div className="space-y-1 text-sm">
+              {task.resource_names.length > 0 && (
+                <p className="text-foreground">
+                  <span className="text-muted-foreground">Kaynak: </span>
+                  {task.resource_names.join(" + ")}
+                </p>
+              )}
+              {task.duration_minutes !== null && (
+                <p className="text-foreground">
+                  <span className="text-muted-foreground">Süre: </span>
+                  {task.duration_minutes} dk
+                </p>
+              )}
+            </div>
+          )}
+
           {task.video_links.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-foreground text-sm font-medium">Video Linkleri</p>
@@ -692,6 +709,30 @@ function TaskModalBody({
       </DialogHeader>
 
       <div className="space-y-4">
+        {/* Kaynak (which book/resource the coach linked, if any) and the
+            target/recorded süre -- previously invisible everywhere in the
+            student panel, not just the compact card, not even here in the
+            full detail view. isTytBranchExam is excluded: for that type
+            duration_minutes is the student's OWN editable field further
+            down (recording actual time taken), not a read-only coach
+            target, so showing it twice here would be redundant/confusing. */}
+        {(task.resource_names.length > 0 || (task.duration_minutes !== null && !isTytBranchExam)) && (
+          <div className="space-y-1 text-sm">
+            {task.resource_names.length > 0 && (
+              <p className="text-foreground">
+                <span className="text-muted-foreground">Kaynak: </span>
+                {task.resource_names.join(" + ")}
+              </p>
+            )}
+            {task.duration_minutes !== null && !isTytBranchExam && (
+              <p className="text-foreground">
+                <span className="text-muted-foreground">Süre: </span>
+                {task.duration_minutes} dk
+              </p>
+            )}
+          </div>
+        )}
+
         {videoLinks.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-foreground text-sm font-medium">Video Linkleri</p>

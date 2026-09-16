@@ -40,16 +40,19 @@ export function cardBackgroundClass(task: DetailTask) {
 }
 
 // The floor a coach can drag a card down to (see ResizeHandle in
-// kanban-task-card.tsx/routine-task-card.tsx) -- just tall enough to
-// always fit the icon + one truncated title line + the action-icon row,
-// which never clip (see TaskCardBody below). Mirrors the DB check
-// constraint (schedule_card_height_px_floor, migration 0076) with extra
-// headroom for this panel's own, slightly larger card chrome.
-export const MIN_CARD_HEIGHT_PX = 84;
+// kanban-task-card.tsx/routine-task-card.tsx) -- tall enough to always
+// fit the icon + course/title + topic + subtitle (kaynak or count/
+// duration) + the action-icon row, without clipping. Raised from the
+// original 84px, which only guaranteed the title line + action row --
+// topic/subtitle silently clipped below that, the exact "hidden unless
+// you hover" complaint this pass fixes. Still comfortably above the DB
+// check constraint's own 56px minimum (migration 0076).
+export const MIN_CARD_HEIGHT_PX = 104;
 // This panel's own starting height when a coach has never dragged a
 // card yet (profiles.schedule_card_height_px is null) -- see
-// schedule/page.tsx.
-export const DEFAULT_CARD_HEIGHT_PX = 144;
+// schedule/page.tsx. Raised alongside the floor above, for room for a
+// video pill by default too.
+export const DEFAULT_CARD_HEIGHT_PX = 160;
 
 function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>): string {
   // The generic type label ("Soru Çözümü") is a placeholder for what's
@@ -117,8 +120,16 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
     <div className="min-w-0 flex-1 space-y-1 overflow-hidden">
       <p className="text-foreground truncate text-sm leading-snug font-semibold">{cLabel ?? task.title}</p>
 
+      {/* line-clamp-2, not a hard truncate -- was cutting long topic
+          names off with "…" at a glance, forcing a hover just to read
+          the thing the course line already promised was coming. */}
       {topic && (
-        <p className={cn("truncate text-xs leading-snug", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "line-clamp-2 text-xs leading-snug break-words",
+            topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
+          )}
+        >
           {topic.name}
         </p>
       )}

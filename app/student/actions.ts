@@ -502,7 +502,7 @@ export async function getTasksForWeek(weekStart: string, weekEnd: string) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const [{ data: taskRows, error }, { data: lockRow }] = await Promise.all([
+  const [{ data: taskRows, error }, { data: lockRow }, { data: taskResourceRows }] = await Promise.all([
     supabase
       .from("student_tasks")
       .select("*")
@@ -511,12 +511,37 @@ export async function getTasksForWeek(weekStart: string, weekEnd: string) {
       .lte("task_date", weekEndV)
       .order("created_at", { ascending: true }),
     supabase.from("week_locks").select("id").eq("student_id", user.id).eq("week_start_date", weekStartV).maybeSingle(),
+    // Mirrors fetchHomeData's own task_resources join (app/student/page.tsx)
+    // exactly -- this is the OTHER path a task can reach the client
+    // through (navigating "Bu Hafta" to a different week), so it needs
+    // the same resource_names or a student would see kaynak names vanish
+    // the moment they page away from the week they logged in on.
+    supabase
+      .from("task_resources")
+      .select("task_id, order_index, student_tasks!inner(student_id), student_resources(name)")
+      .eq("student_tasks.student_id", user.id)
+      .gte("student_tasks.task_date", weekStartV)
+      .lte("student_tasks.task_date", weekEndV)
+      .order("order_index", { ascending: true }),
   ]);
   if (error) throw dbError(error);
 
+  const resourceNamesByTask = new Map<string, string[]>();
+  for (const row of taskResourceRows ?? []) {
+    const name = (row as unknown as { student_resources: { name: string } | null }).student_resources?.name;
+    if (!name) continue;
+    const list = resourceNamesByTask.get(row.task_id) ?? [];
+    list.push(name);
+    resourceNamesByTask.set(row.task_id, list);
+  }
+
   const weekLocked = lockRow !== null;
   return {
-    tasks: (taskRows ?? []).map((t) => ({ ...t, week_locked: weekLocked })),
+    tasks: (taskRows ?? []).map((t) => ({
+      ...t,
+      week_locked: weekLocked,
+      resource_names: resourceNamesByTask.get(t.id) ?? [],
+    })),
     weekLocked,
   };
 }

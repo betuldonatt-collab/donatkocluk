@@ -146,7 +146,13 @@ export function TaskBoard({
   }
 
   function handleSaved(updated: StudentTask) {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    // Merged onto the existing row, not a wholesale replacement: `updated`
+    // comes straight back from a plain `select("*")` in actions.ts, which
+    // (like week_locked already did) doesn't include resource_names --
+    // that's joined once, up front, in fetchHomeData (page.tsx) and never
+    // changes via any of these save paths, so keeping whatever the task
+    // already had is exactly correct, not stale.
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
   function handleCreated(task: StudentTask) {

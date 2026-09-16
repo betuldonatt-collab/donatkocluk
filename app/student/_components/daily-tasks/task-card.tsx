@@ -25,14 +25,36 @@ const TASK_TYPE_ICONS = {
   extra_custom: ClipboardList,
 };
 
+// Coach-set target (or, once the student records it via task-modal.tsx's
+// own Süre field on a TYT branch exam, the actual time taken) -- shown
+// wherever it's set, appended the same way the coach's own card does
+// (task-card-body.tsx's subtitleText). Previously never surfaced anywhere
+// on the student side at all.
+function durationSuffix(task: StudentTask): string {
+  return task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
+}
+
 function taskSubtitle(task: StudentTask): string {
   switch (task.task_type) {
     case "question_bank":
-    case "branch_exam":
+    case "branch_exam": {
+      // The assigned target (e.g. "40 soru") -- unlike general_exam below,
+      // this IS a real pre-assigned goal here, not a computed result, so
+      // it has to stay visible once progress starts, not get replaced by
+      // it. Previously this branch swapped straight to the D/Y/B readout
+      // the moment any count existed, silently dropping the number a
+      // student was actually responsible for.
+      const countUnit = task.task_type === "branch_exam" ? "adet" : "soru";
+      const target = task.total_count !== null ? `${task.total_count} ${countUnit}` : "";
       if (task.correct_count !== null || task.total_count !== null) {
-        return `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
+        const progress = `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
+        return `${target ? `${target} · ` : ""}${progress}${durationSuffix(task)}`;
       }
-      return TASK_TYPE_LABELS[task.task_type];
+      // No count target at all -- still show a duration-only target
+      // (e.g. "solve for 45 minutes", no fixed question count) instead of
+      // a bare type label with no goal in sight.
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+    }
     case "general_exam": {
       if (task.subject_scores) {
         const totals = Object.values(task.subject_scores).reduce<{
@@ -47,7 +69,7 @@ function taskSubtitle(task: StudentTask): string {
           }),
           { correct: 0, wrong: 0, empty: 0 },
         );
-        return `D:${totals.correct} Y:${totals.wrong} B:${totals.empty}`;
+        return `D:${totals.correct} Y:${totals.wrong} B:${totals.empty}${durationSuffix(task)}`;
       }
       // Falls back to the flat columns when a coach entered this exam's
       // result via the kanban's own trial-results-section.tsx, which
@@ -55,18 +77,45 @@ function taskSubtitle(task: StudentTask): string {
       // subject_scores -- without this, a coach-recorded general exam
       // would show no D/Y/B at all on the student's own dashboard card.
       if (task.correct_count !== null || task.total_count !== null) {
-        return `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
+        return `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}${durationSuffix(task)}`;
       }
       return TASK_TYPE_LABELS[task.task_type];
     }
     case "video":
-      if (task.status === "half_done") return "Yarım İzlendi";
-      return task.completed ? "İzlendi" : "İzlenmedi";
-    case "topic_study":
-      if (task.status === "half_done") return "Yarım Tamamlandı";
-      return task.completed ? "Tamamlandı" : "Tamamlanmadı";
+    case "topic_study": {
+      const isVideo = task.task_type === "video";
+      // Derived from task.status, not task.completed -- a dual task's
+      // merged outcome (mergeDualTaskStatus, updateTaskProgress) only
+      // ever gets written to status, never to completed, so checking
+      // completed here silently showed "Tamamlanmadı"/"İzlenmedi" for a
+      // dual task even once it was genuinely done. This also recovers
+      // the "Yapılmadı" case, previously indistinguishable from a task
+      // nobody had touched yet.
+      const manual =
+        task.status === "done"
+          ? isVideo
+            ? "İzlendi"
+            : "Tamamlandı"
+          : task.status === "half_done"
+            ? isVideo
+              ? "Yarım İzlendi"
+              : "Yarım Tamamlandı"
+            : task.status === "not_done"
+              ? "Yapılmadı"
+              : isVideo
+                ? "İzlenmedi"
+                : "Tamamlanmadı";
+      // A "dual" task (Focus Timer plan: a video/topic-study task that
+      // also carries a question-count target) -- the manual watched/
+      // completed status alone used to be the ONLY thing shown here, with
+      // no sign at all of the question-count half's own progress.
+      if (task.total_count !== null) {
+        return `${manual} · D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}${durationSuffix(task)}`;
+      }
+      return `${manual}${durationSuffix(task)}`;
+    }
     default:
-      return task.description ?? TASK_TYPE_LABELS[task.task_type];
+      return `${task.description ?? TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
   }
 }
 
@@ -108,8 +157,13 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="text-foreground truncate text-sm font-medium">{task.title}</p>
+        {/* items-start (not -center): the title can now wrap to 2 lines
+            (line-clamp-2, was a hard single-line truncate) so long
+            course+topic combinations stop losing their second half to
+            "…" -- centering these badges against a now-possibly-taller
+            title would float them awkwardly mid-block. */}
+        <div className="flex items-start gap-1.5">
+          <p className="text-foreground line-clamp-2 min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
           {task.week_locked ? (
             <span
               className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
@@ -135,6 +189,13 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
             </span>
           )}
         </div>
+        {/* Which book/kaynak the coach linked, if any -- previously
+            invisible anywhere in the student panel, including the full
+            task modal (traced to the fetch itself never joining
+            task_resources; see resource_names on StudentTask). */}
+        {task.resource_names.length > 0 && (
+          <p className="text-muted-foreground line-clamp-1 text-xs break-words">{task.resource_names.join(" + ")}</p>
+        )}
         <p className="text-muted-foreground truncate text-xs">
           {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : taskSubtitle(task)}
         </p>

@@ -255,7 +255,15 @@ export function AddCustomTaskDialog({
         freeTitle: isFree ? value.freeTitle : null,
         freeDescription: isFree ? value.freeDescription : null,
       });
-      onCreated(task as StudentTask);
+      // createRichCustomTask's own return only carries resource_ids (see
+      // its own comment) -- filled in client-side here from what this
+      // dialog already knows, rather than a second round trip just to
+      // read back the name it was just given. Branch exams excluded: for
+      // that type this same field is the exam's PUBLISHER, already
+      // embedded in the task's title (branchExamPublisher above) --
+      // repeating it as a "Kaynak: X" line would just be a duplicate.
+      const resourceName = !isBranchExam && resourceId ? value.resource.resourceName.trim() : "";
+      onCreated({ ...task, resource_names: resourceName ? [resourceName] : [] } as StudentTask);
       setValue(initialFormState());
       setOpen(false);
     } catch (e) {

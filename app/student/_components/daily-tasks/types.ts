@@ -26,12 +26,17 @@ export type StudentTask = {
   description: string | null;
   course_id: string | null;
   // Already returned by every select("*") this type wraps -- just wasn't
-  // declared here before. resource_id (singular) is the other stale/
-  // incomplete field on this type (student_tasks moved to a task_resources
-  // junction table in migration 0032; the coach panel picked that up,
-  // this type didn't) -- out of scope for this pass, left as-is.
+  // declared here before. resource_id (singular) is stale/unused (student_
+  // tasks moved to a task_resources junction table in migration 0032; the
+  // coach panel picked that up, this column never did) -- left as-is, not
+  // read anywhere. resource_names below is the real, current answer: the
+  // linked resources' names, in order, fetched via that same junction
+  // table (app/student/page.tsx's fetchHomeData) -- a student previously
+  // had no way to see which book/kaynak a coach assigned a task from,
+  // anywhere in the panel, not even in the full task modal.
   topic_id: string | null;
   resource_id: string | null;
+  resource_names: string[];
   total_count: number | null;
   correct_count: number | null;
   wrong_count: number | null;
