@@ -1,11 +1,13 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { clearImpersonationCookie } from "@/lib/impersonation";
+import { REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
 import { dbError } from "@/lib/errors";
 import { normalizeTurkishPhone } from "@/lib/phone";
 import { nonEmptyText, parseInput } from "@/lib/validation";
@@ -66,6 +68,19 @@ export async function signIn(
   if (isLockedOut) {
     await recordFailedIp(adminClient, ip);
     return { error: LOCKOUT_MESSAGE };
+  }
+
+  // "Beni Hatırla" -- set (or clear, if this login on this browser is now
+  // unchecked after a previous one had it checked) BEFORE createClient()
+  // below so its own setAll (lib/supabase/server.ts) sees the marker
+  // already in this same request's cookie store the moment
+  // signInWithPassword triggers it to write the session cookies.
+  const rememberMe = formData.get("rememberMe") === "on";
+  const cookieStore = await cookies();
+  if (rememberMe) {
+    cookieStore.set(REMEMBER_ME_COOKIE_NAME, "1", rememberMeCookieOptions());
+  } else {
+    cookieStore.delete(REMEMBER_ME_COOKIE_NAME);
   }
 
   const supabase = await createClient();

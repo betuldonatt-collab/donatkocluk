@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { applyRememberMeCookieOptions, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
 
 const ROLE_HOME: Record<string, string> = {
   student: "/student",
@@ -20,6 +21,10 @@ const AUTH_COOKIE_PATTERN = /^sb-.*-auth-token(\.\d+)?$/;
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Snapshot before any refresh below can touch request.cookies -- same
+  // reasoning as hadAuthCookie further down.
+  const rememberMe = request.cookies.get(REMEMBER_ME_COOKIE_NAME)?.value === "1";
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -34,8 +39,15 @@ export async function updateSession(request: NextRequest) {
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
+            supabaseResponse.cookies.set(name, value, applyRememberMeCookieOptions(name, options, rememberMe)),
           );
+          // Sliding window -- see the matching comment in
+          // lib/supabase/server.ts's own setAll. This is the path that
+          // matters most for "stay logged in as long as they keep using
+          // it": every authenticated page load runs through here.
+          if (rememberMe) {
+            supabaseResponse.cookies.set(REMEMBER_ME_COOKIE_NAME, "1", rememberMeCookieOptions());
+          }
         },
       },
     },

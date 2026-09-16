@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useActionState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -109,6 +110,16 @@ export function LoginForm({
             {signInState.error && (
               <p className="text-destructive text-sm">{signInState.error}</p>
             )}
+            {/* Unchecked by default -- a shared/public computer shouldn't
+                stay signed in for 30 days just because someone logged in
+                on it once. See lib/remember-me.ts for what checking this
+                actually does (a sliding 30-day session, not a fixed one). */}
+            <div className="flex items-center gap-2">
+              <Checkbox id="signin-remember-me" name="rememberMe" />
+              <Label htmlFor="signin-remember-me" className="text-muted-foreground text-sm font-normal">
+                Beni Hatırla
+              </Label>
+            </div>
             <Button type="submit" className="w-full" disabled={signInPending}>
               {signInPending ? "Giriş yapılıyor..." : `${roleLabel} olarak giriş yap`}
             </Button>
