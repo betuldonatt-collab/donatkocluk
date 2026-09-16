@@ -220,7 +220,12 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
         )}
       </div>
 
-      <FocusTimerTrigger task={task} className="hidden shrink-0 sm:flex" />
+      {/* Always visible -- was `hidden sm:flex`, which hid it on mobile
+          portrait (most phones sit below the 640px sm breakpoint in
+          portrait but cross it in landscape), making the button appear
+          to only work in landscape. The row already copes with the
+          narrower space via the title's own line-clamp-2/truncate. */}
+      <FocusTimerTrigger task={task} className="flex shrink-0" />
     </div>
   );
 }
