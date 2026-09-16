@@ -120,14 +120,23 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   // carries a real question-count target -- the student logs BOTH a
   // manual status for the video/topic-study half AND question counts for
   // the other half, and the two get merged (mergeDualTaskStatus) into one
-  // overall status. The manual half is required -- the UI already blocks
-  // Kaydet without it, but this is the authoritative gate.
+  // overall status. A question_bank/branch_exam task with NO count target
+  // at all (a duration-only target, e.g. "Soru Çözümü · 60 dk") needs the
+  // same explicit declaration for the opposite reason: computeAutoTaskStatus
+  // below can never derive a status from counts without a numeric target to
+  // compare against, and per product decision such a task must never
+  // auto-complete -- the student declares its status themselves instead.
+  // Either way the manual pick is required -- the UI already blocks Kaydet
+  // without it, but this is the authoritative gate.
   const dualTarget = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
   const isDual = (existing.task_type === "video" || existing.task_type === "topic_study") && dualTarget !== null;
+  const isDurationOnlyTarget =
+    (existing.task_type === "question_bank" || existing.task_type === "branch_exam") && dualTarget === null;
+  const needsManualStatus = isDual || isDurationOnlyTarget;
   let dualManualStatus: DualPartStatus | null = null;
-  if (isDual) {
+  if (needsManualStatus) {
     if (patchV.status === undefined || patchV.status === "pending") {
-      throw new Error("Video/konu çalışması durumu seçilmeden kaydedilemez.");
+      throw new Error("Görev durumu seçilmeden kaydedilemez.");
     }
     dualManualStatus = patchV.status;
   }

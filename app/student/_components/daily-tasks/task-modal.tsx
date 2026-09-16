@@ -307,16 +307,36 @@ function TaskModalBody({
   // status (mergeDualTaskStatus, lib/count-fields.ts).
   const isDual = (task.task_type === "video" || task.task_type === "topic_study") && task.total_count !== null;
 
+  // A coach-assigned question_bank/branch_exam task with NO question-count
+  // target at all -- a duration-only target, e.g. "Soru Çözümü · 60 dk".
+  // computeAutoTaskStatus can never derive a status here (there's no
+  // numeric target to compare counts against, and never will be -- Toplam
+  // stays permanently null/coach-controlled), so per product decision this
+  // must never auto-complete from counts: the student logs Doğru/Yanlış/
+  // Boş freely, same as any question-count task, but declares the status
+  // itself explicitly, same selector a dual task's manual half uses.
+  const isDurationOnlyTarget =
+    (task.task_type === "question_bank" || task.task_type === "branch_exam") &&
+    task.is_coach_assigned &&
+    task.total_count === null;
+
   // Pure question-count tasks (question_bank, branch_exam, general_exam)
   // are entirely score-driven -- their status is always computed from the
-  // entered counts, so they never show the manual status buttons.
+  // entered counts, so they never show the manual status buttons. A
+  // duration-only target is the one exception (see above).
   const isPureCountType =
-    task.task_type === "question_bank" || task.task_type === "branch_exam" || task.task_type === "general_exam";
+    (task.task_type === "question_bank" || task.task_type === "branch_exam" || task.task_type === "general_exam") &&
+    !isDurationOnlyTarget;
   const showManualButtons = !isPureCountType;
   const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
 
+  // Needs the persistent top selector + shared Kaydet flow (merged status,
+  // required before saving) rather than the plain auto-status path or the
+  // three single-part tasks' immediate-save buttons.
+  const needsManualStatusSelector = isDual || isDurationOnlyTarget;
+
   const [manualStatus, setManualStatus] = useState<DualPartStatus | null>(() =>
-    isDual && (task.status === "done" || task.status === "half_done" || task.status === "not_done")
+    needsManualStatusSelector && (task.status === "done" || task.status === "half_done" || task.status === "not_done")
       ? task.status
       : null,
   );
@@ -357,9 +377,12 @@ function TaskModalBody({
   // What Kaydet will actually persist: for a dual task, the merge of the
   // manual (video/topic-study) pick above and the question-count result
   // (mergeDualTaskStatus) -- falls back to whichever half is known when
-  // only one has been touched so far. For every other type this is just
-  // the plain count-based preview, unchanged from before.
-  const overallStatusPreview: DualPartStatus | null = isDual
+  // only one has been touched so far. A duration-only target task also
+  // goes through this branch, but its countStatus is always null (no
+  // numeric target to derive one from), so it simplifies to exactly
+  // manualStatus -- never auto-completed from counts alone. Every other
+  // type is just the plain count-based preview, unchanged from before.
+  const overallStatusPreview: DualPartStatus | null = needsManualStatusSelector
     ? manualStatus && countStatus
       ? mergeDualTaskStatus(manualStatus, countStatus)
       : (manualStatus ?? countStatus)
@@ -384,7 +407,19 @@ function TaskModalBody({
       wrong: toNumberOrNull(next.wrong),
       empty: toNumberOrNull(next.empty),
     });
-    if (derived.total !== undefined) setTotalCount(String(derived.total));
+    // Coach-assigned Toplam is never student-editable (it renders as
+    // ReadOnlyField below, not Field) and must never silently change --
+    // for a coach-assigned task with NO count target at all (a duration-
+    // only target, e.g. "Soru Çözümü · 60 dk"), Toplam stays permanently
+    // null/unfilled, so entering Doğru+Yanlış+Boş makes exactly 3 of 4
+    // fields "filled" and this auto-calc used to derive and silently set
+    // a Toplam here anyway -- invisible in the UI (it still shows the
+    // real, unchanged "—" from task.total_count), but included in the
+    // save payload, where the server correctly rejects it as an attempt
+    // to change a coach-assigned total. That rejection is what surfaced
+    // to the student as a hard crash (React error #441) instead of just
+    // saving. See app/student/actions.ts's updateTaskProgress guard.
+    if (!task.is_coach_assigned && derived.total !== undefined) setTotalCount(String(derived.total));
     if (derived.correct !== undefined) setCorrectCount(String(derived.correct));
     if (derived.wrong !== undefined) setWrongCount(String(derived.wrong));
     if (derived.empty !== undefined) setEmptyCount(String(derived.empty));
@@ -408,9 +443,10 @@ function TaskModalBody({
       if (isTytBranchExam) patch.duration_minutes = toNumberOrNull(durationMinutes);
       // No explicit status here for a pure count type -- updateTaskProgress
       // computes it itself from these same counts (computeAutoTaskStatus),
-      // the same rule the live hint below previews. A dual task DOES set
-      // patch.status below (the manual half); the server merges it with
-      // these same counts (mergeDualTaskStatus) instead of overwriting it.
+      // the same rule the live hint below previews. A task that needs the
+      // manual selector (dual, or a duration-only target) DOES set
+      // patch.status below; the server merges/respects it instead of
+      // overwriting it with an auto-computed one.
     }
     if (showSubjectScores) {
       const perSubject = activeGroups.map((g) => ({
@@ -434,19 +470,30 @@ function TaskModalBody({
       patch.empty_count = perSubject.reduce((sum, s) => sum + (s.empty ?? 0), 0);
       patch.status = "done";
     }
-    if (isDual) {
-      // Guaranteed non-null here -- handleSaveSimple refuses to call this
-      // at all while manualStatus is still unset (see its own guard).
+    if (needsManualStatusSelector) {
+      // Guaranteed non-null here -- every save path first calls
+      // blockedWithoutManualStatus(), which refuses to proceed at all
+      // while manualStatus is still unset.
       patch.status = manualStatus!;
     }
     return patch;
   }
 
-  async function handleSaveSimple() {
-    if (isDual && manualStatus === null) {
-      setError("Kaydetmeden önce yukarıdan video/konu çalışması durumunu seç.");
-      return;
+  // Shared guard for every save path that ends up calling
+  // buildCountsPatch() (Kaydet, "Devam Et: Konu Analizi", "Analizi Sonra
+  // Yap") -- a dual task or a duration-only target task both require an
+  // explicit manual status pick before any of them can proceed, not just
+  // the plain Kaydet button.
+  function blockedWithoutManualStatus(): boolean {
+    if (needsManualStatusSelector && manualStatus === null) {
+      setError("Kaydetmeden önce yukarıdan görev durumunu seç.");
+      return true;
     }
+    return false;
+  }
+
+  async function handleSaveSimple() {
+    if (blockedWithoutManualStatus()) return;
     setSaving(true);
     setError(null);
     try {
@@ -486,6 +533,7 @@ function TaskModalBody({
 
 
   async function handleGoToAnalysis() {
+    if (blockedWithoutManualStatus()) return;
     setSaving(true);
     setError(null);
     try {
@@ -502,6 +550,7 @@ function TaskModalBody({
   }
 
   async function handleDeferAnalysis() {
+    if (blockedWithoutManualStatus()) return;
     setSaving(true);
     setError(null);
     try {
@@ -770,12 +819,20 @@ function TaskModalBody({
           </div>
         )}
 
-        {/* Dual task's top section: a persistent selector (not an
-            immediate save -- Kaydet below saves this together with the
-            counts) for the video/topic-study half. */}
-        {isDual && (
+        {/* Persistent selector (not an immediate save -- Kaydet below
+            saves this together with the counts): a dual task's video/
+            topic-study half, or a duration-only target's own status,
+            declared explicitly since there's no count target to ever
+            auto-derive one from. */}
+        {needsManualStatusSelector && (
           <div className="space-y-1.5">
-            <Label>{task.task_type === "video" ? "Video Durumu" : "Konu Çalışması Durumu"}</Label>
+            <Label>
+              {task.task_type === "video"
+                ? "Video Durumu"
+                : task.task_type === "topic_study"
+                  ? "Konu Çalışması Durumu"
+                  : "Görev Durumu"}
+            </Label>
             <div className="flex flex-wrap gap-2">
               <ManualStatusButton
                 status="not_done"
@@ -920,10 +977,11 @@ function TaskModalBody({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
             İptal
           </Button>
-          {/* Single-part tasks (not dual, not pure question-count) have no
-              Kaydet row at all below -- these three ARE the save action,
-              each an immediate mark-and-close (handleMarkStatus). */}
-          {showManualButtons && !isDual && (
+          {/* Single-part tasks (not dual, not a duration-only target, not
+              pure question-count) have no Kaydet row at all below -- these
+              three ARE the save action, each an immediate mark-and-close
+              (handleMarkStatus). */}
+          {showManualButtons && !needsManualStatusSelector && (
             <>
               <ManualStatusButton status="not_done" onClick={() => handleMarkStatus("not_done")} disabled={saving} />
               <ManualStatusButton status="half_done" onClick={() => handleMarkStatus("half_done")} disabled={saving} />
@@ -932,11 +990,12 @@ function TaskModalBody({
           )}
         </div>
 
-        {/* Pure question-count tasks and dual tasks both save via Kaydet
-            (dual's manual half was already picked above, in the body --
-            see handleSaveSimple's guard) -- single-part tasks have nothing
+        {/* Pure question-count tasks and tasks needing the manual selector
+            (dual, or a duration-only target) both save via Kaydet (the
+            manual half/status was already picked above, in the body -- see
+            blockedWithoutManualStatus) -- single-part tasks have nothing
             left to Kaydet once the three buttons above cover the save. */}
-        {!(showManualButtons && !isDual) && (
+        {!(showManualButtons && !needsManualStatusSelector) && (
           <div className="flex flex-wrap justify-end gap-2">
             {/* "Analizi Sonra Yap" stays mounted at all times for
                 analysis-flow tasks -- only its visibility toggles with
