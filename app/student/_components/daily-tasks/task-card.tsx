@@ -14,7 +14,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { FocusTimerTrigger } from "../focus-timer/focus-timer-trigger";
-import { examTintClass, statusBorderClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
+import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
 
 const TASK_TYPE_ICONS = {
   question_bank: BookOpenCheck,
@@ -137,8 +137,8 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
       }}
       className={cn(
         "border-border hover:bg-accent/40 flex w-full cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
-        task.rejected_at ? "bg-rose-500/5" : examTintClass(task),
-        statusBorderClass(task) && cn("border-l-4", statusBorderClass(task)),
+        task.rejected_at ? "bg-rose-500/5" : subjectTintClass(task),
+        statusBorderClass(task),
         task.rejected_at && "border-l-4 border-l-rose-400",
         (task.week_locked || task.rejected_at) && "opacity-70",
       )}

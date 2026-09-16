@@ -2,6 +2,7 @@ import { PlayCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import type { DetailTask } from "../../types";
 
 export const TASK_TYPE_LABELS: Record<string, string> = {
@@ -20,23 +21,22 @@ export function courseLabel(courseId: string | null) {
   return `${prefix}${course.name}`;
 }
 
+// Thick, full-saturation border for task-completion status -- previously
+// a thin left-only accent. See lib/subject-colors.ts for why the border
+// deliberately owns emerald/amber/rose exclusively (never used in a
+// subject's background tint below).
 export function statusClasses(task: DetailTask) {
-  const isDone = task.status === "done" || task.completed;
-  if (isDone) return "border-l-2 border-l-emerald-500";
-  if (task.status === "half_done") return "border-l-2 border-l-amber-500";
-  if (task.status === "not_done") return "border-l-2 border-l-rose-500";
-  return "";
+  return taskStatusBorderClass(task.status, task.completed);
 }
 
-// Deneme cards get a distinct pastel navy tint so they stand out from
-// regular task cards at a glance; opacity-based (not a flat bg-blue-50)
-// so it stays theme-safe in dark mode like the rest of the app's tinting.
-// Indigo (not slate) is the hue -- slate reads as plain gray, indigo
-// reads as navy blue even at low opacity.
+// Subject-hierarchical pastel background: each course family gets its own
+// hue, progressing lightest (TYT) -> medium (AYT) -> deepest (Branş
+// Denemesi) via opacity, same theme-safe bg-{hue}-500/N convention as the
+// rest of this app's tinting. General exams keep their original flat
+// indigo tint (see lib/subject-colors.ts), since they aren't tied to one
+// subject family.
 export function cardBackgroundClass(task: DetailTask) {
-  if (task.task_type === "general_exam") return "bg-indigo-500/20";
-  if (task.task_type === "branch_exam") return "bg-indigo-500/10";
-  return "bg-card";
+  return subjectBackgroundClass(task.course_id, task.task_type);
 }
 
 // The floor a coach can drag a card down to (see ResizeHandle in

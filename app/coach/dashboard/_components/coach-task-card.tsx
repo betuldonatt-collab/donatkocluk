@@ -34,11 +34,10 @@ export function CoachTaskCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-md border p-1.5 text-xs",
-        task.status === "done" && "border-emerald-500/40 bg-emerald-500/10",
-        task.status === "not_done" && "border-rose-500/40 bg-rose-500/10",
-        task.status === "message_sent" && "border-amber-500/40 bg-amber-500/10",
-        task.status === "pending" && "border-border bg-card",
+        "bg-card border-border rounded-md border p-1.5 text-xs",
+        task.status === "done" && "border-[3px] border-emerald-500",
+        task.status === "not_done" && "border-[3px] border-rose-500",
+        task.status === "message_sent" && "border-[3px] border-amber-500",
       )}
     >
       <div className="flex items-start gap-1">

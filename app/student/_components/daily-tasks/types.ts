@@ -1,3 +1,5 @@
+import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
+
 export type TaskType =
   | "question_bank"
   | "video"
@@ -79,20 +81,19 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   extra_custom: "Ekstra Çalışma",
 };
 
-// Mirrors the coach panel's kanban coloring (task-card-body.tsx) so a
-// task looks the same regardless of which side is viewing it -- ported
-// rather than shared/imported, per this repo's convention of duplicating
-// UI across panels instead of cross-importing.
+// Thick, full-saturation status border -- mirrors the coach panel's own
+// statusClasses (task-card-body.tsx), both backed by the same shared
+// color data in lib/subject-colors.ts (pure lookup, no UI framework
+// dependency, so sharing it doesn't break this repo's per-panel
+// UI-duplication convention -- each panel keeps its own function name and
+// call sites).
 export function statusBorderClass(task: Pick<StudentTask, "status" | "completed">) {
-  const isDone = task.status === "done" || task.completed;
-  if (isDone) return "border-l-emerald-500";
-  if (task.status === "half_done") return "border-l-amber-500";
-  if (task.status === "not_done") return "border-l-rose-500";
-  return "";
+  return taskStatusBorderClass(task.status, task.completed);
 }
 
-export function examTintClass(task: Pick<StudentTask, "task_type">) {
-  if (task.task_type === "general_exam") return "bg-indigo-500/20";
-  if (task.task_type === "branch_exam") return "bg-indigo-500/10";
-  return "bg-card";
+// Subject-hierarchical pastel background -- mirrors the coach panel's own
+// cardBackgroundClass. Renamed from examTintClass: it now colors every
+// task by subject family, not just exams.
+export function subjectTintClass(task: Pick<StudentTask, "task_type" | "course_id">) {
+  return subjectBackgroundClass(task.course_id, task.task_type);
 }

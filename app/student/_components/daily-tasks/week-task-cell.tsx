@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ResizeHandle } from "@/components/ui/resize-handle";
-import { examTintClass, statusBorderClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
+import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
 
 // Same courseLabel convention as the coach's TaskCardBody
 // (app/coach/students/[id]/_components/kanban/task-card-body.tsx) --
@@ -267,8 +267,8 @@ export function WeekTaskCell({
           style={{ height }}
           className={cn(
             "border-border hover:bg-accent/40 relative flex w-full cursor-pointer flex-col overflow-hidden rounded-md border p-2 text-left transition-colors",
-            task.rejected_at ? "bg-rose-500/5" : examTintClass(task),
-            statusBorderClass(task) && cn("border-l-2", statusBorderClass(task)),
+            task.rejected_at ? "bg-rose-500/5" : subjectTintClass(task),
+            statusBorderClass(task),
             task.rejected_at && "border-l-2 border-l-rose-400",
             (task.week_locked || task.rejected_at) && "opacity-70",
           )}

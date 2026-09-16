@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Lock, SquareArrowOutUpRight } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { weekDates } from "@/lib/date";
 import { getStudentTasksForWeek } from "../../../actions";
 import type { DetailTask } from "../types";
@@ -41,13 +42,6 @@ function addDaysISO(dateStr: string, days: number) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-function statusClasses(task: DetailTask) {
-  const isDone = task.status === "done" || task.completed;
-  if (isDone) return "border-l-2 border-l-emerald-500";
-  if (task.status === "not_done") return "border-l-2 border-l-rose-500";
-  return "";
 }
 
 function statusLabel(task: DetailTask) {
@@ -167,7 +161,11 @@ export function ProgramTab({
                     dayTasks.map((task) => (
                       <div
                         key={task.id}
-                        className={cn("border-border bg-card rounded-md border p-1.5 text-[11px]", statusClasses(task))}
+                        className={cn(
+                          "border-border rounded-md border p-1.5 text-[11px]",
+                          subjectBackgroundClass(task.course_id, task.task_type),
+                          taskStatusBorderClass(task.status, task.completed),
+                        )}
                       >
                         <div className="flex items-center gap-1">
                           <p className="text-foreground min-w-0 flex-1 truncate font-medium">{taskLabel(task)}</p>
