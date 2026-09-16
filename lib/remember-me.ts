@@ -14,10 +14,30 @@ import type { CookieOptions } from "@supabase/ssr";
 export const REMEMBER_ME_COOKIE_NAME = "remember_me";
 export const REMEMBER_ME_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
+// Computed fresh on every call, not a fixed constant -- always means "30
+// days from right now," paired alongside maxAge below as a defense-in-depth
+// hedge for iOS/Safari (WebKit) cookie-persistence quirks. Max-Age is fully
+// supported by modern Safari, but Expires is the older, more universally
+// respected attribute; setting both costs nothing and only helps if a given
+// browser/webview ever mishandles one of the two.
+function rememberMeExpiresAt(): Date {
+  return new Date(Date.now() + REMEMBER_ME_MAX_AGE_SECONDS * 1000);
+}
+
 // Same httpOnly/sameSite shape as the existing impersonation cookie
 // (lib/impersonation.ts) -- server-only, never read from client JS.
+// `secure` is gated on NODE_ENV (not just always-on) so it still works over
+// plain http in local dev -- a Secure cookie is silently dropped by every
+// browser on a non-HTTPS origin.
 export function rememberMeCookieOptions(): CookieOptions {
-  return { httpOnly: true, sameSite: "lax", path: "/", maxAge: REMEMBER_ME_MAX_AGE_SECONDS };
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
+    expires: rememberMeExpiresAt(),
+  };
 }
 
 // @supabase/ssr's default cookie name is `sb-<project-ref>-auth-token`,
@@ -41,5 +61,5 @@ export function applyRememberMeCookieOptions(
   const rest = { ...options };
   delete rest.maxAge;
   delete rest.expires;
-  return rememberMe ? { ...rest, maxAge: REMEMBER_ME_MAX_AGE_SECONDS } : rest;
+  return rememberMe ? { ...rest, maxAge: REMEMBER_ME_MAX_AGE_SECONDS, expires: rememberMeExpiresAt() } : rest;
 }
