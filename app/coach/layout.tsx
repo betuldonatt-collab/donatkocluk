@@ -4,7 +4,7 @@ import { fetchCoachAnnouncements } from "@/lib/announcements";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { ImpersonationLockStyles } from "@/components/impersonation-lock-styles";
-import { fetchStopwatchCompetitionRoster, type StopwatchRosterRow } from "./actions";
+import { fetchStopwatchCompetitionRoster, fetchYesterdaysStopwatchWinner, type StopwatchRosterRow, type YesterdaysStopwatchWinner } from "./actions";
 import { AnnouncementCenter } from "./_components/announcements/announcement-center";
 import { StopwatchSideWidget } from "./_components/stopwatch/stopwatch-side-widget";
 import { CoachSidebar } from "./_components/coach-sidebar";
@@ -52,7 +52,7 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
   const view = await requireViewContext("coach");
   const { effectiveUserId, realUserId, isImpersonating, targetName } = view;
   const now = new Date();
-  const [{ unreadCount, fullName }, announcements, stopwatchRoster] = await Promise.all([
+  const [{ unreadCount, fullName }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
     fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
     fetchCoachAnnouncements(),
     // Skipped while impersonating for the same reason announcements is --
@@ -63,6 +63,12 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
       : (async () => {
           const supabase = await createClient();
           return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+        })(),
+    isImpersonating
+      ? Promise.resolve(null as YesterdaysStopwatchWinner)
+      : (async () => {
+          const supabase = await createClient();
+          return fetchYesterdaysStopwatchWinner(supabase, effectiveUserId);
         })(),
   ]);
 
@@ -78,7 +84,7 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />
-      <StopwatchSideWidget roster={stopwatchRoster} />
+      <StopwatchSideWidget roster={stopwatchRoster} yesterdaysWinner={yesterdaysWinner} />
     </div>
   );
 }

@@ -2640,6 +2640,56 @@ export async function getStopwatchCompetitionData(year: number, month: number): 
   return fetchStopwatchCompetitionRoster(supabase, user.id, year, month);
 }
 
+// "Dünün Birincisi" -- the coach's own roster member with the highest
+// tracked_duration_minutes (real Süre Tut time, never a target) on
+// yesterday's Kronometre Yarışması logical day (02:00 Turkey time, see
+// stopwatchLogicalDateIso). Excludes competition_status = 'passive' --
+// same rule get_daily_stopwatch_ranking's own student-facing ranking
+// already applies, a student who opted out of the competition shouldn't
+// be crowned its winner. null when nobody on the roster tracked any time
+// at all yesterday, not a 0-minute "winner". Coach-roster-wide, not
+// grouped by competition_group_id -- matches fetchStopwatchCompetitionRoster's
+// own stance (the coach sees everyone; group-scoping is a student-side
+// concept for who THEY compete against).
+export type YesterdaysStopwatchWinner = { studentId: string; fullName: string | null; minutes: number } | null;
+
+export async function fetchYesterdaysStopwatchWinner(
+  supabase: SupabaseClient,
+  coachId: string,
+): Promise<YesterdaysStopwatchWinner> {
+  const { data: rosterLinks } = await supabase.from("coach_students").select("student_id").eq("coach_id", coachId);
+  const studentIds = (rosterLinks ?? []).map((l) => l.student_id);
+  if (studentIds.length === 0) return null;
+
+  const logicalYesterday = addDaysISO(stopwatchLogicalDateIso(), -1);
+
+  const [{ data: profiles }, { data: taskRows }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, competition_status").in("id", studentIds),
+    supabase
+      .from("student_tasks")
+      .select("student_id, tracked_duration_minutes")
+      .in("student_id", studentIds)
+      .eq("task_date", logicalYesterday),
+  ]);
+
+  const activeIds = new Set((profiles ?? []).filter((p) => (p.competition_status ?? "active") === "active").map((p) => p.id));
+  const fullNameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+
+  const minutesByStudent = new Map<string, number>();
+  for (const row of taskRows ?? []) {
+    if (!activeIds.has(row.student_id)) continue;
+    minutesByStudent.set(row.student_id, (minutesByStudent.get(row.student_id) ?? 0) + row.tracked_duration_minutes);
+  }
+
+  let winner: { studentId: string; minutes: number } | null = null;
+  for (const [studentId, minutes] of minutesByStudent) {
+    if (minutes > 0 && (!winner || minutes > winner.minutes)) winner = { studentId, minutes };
+  }
+  if (!winner) return null;
+
+  return { studentId: winner.studentId, fullName: fullNameById.get(winner.studentId) ?? null, minutes: winner.minutes };
+}
+
 export type LiveFocusStatus = { studentId: string; activeFocusHeartbeatAt: string | null };
 
 // Polled every ~20s by both the dashboard's stopwatch widget and the

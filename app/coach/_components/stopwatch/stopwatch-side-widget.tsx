@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Timer } from "lucide-react";
+import { ChevronRight, Crown, Timer } from "lucide-react";
 
 import { useCoachStopwatchWidgetCollapsed } from "@/lib/use-coach-stopwatch-widget-collapsed";
 import { isLiveNow } from "@/lib/focus-live-status";
 import { cn } from "@/lib/utils";
-import { getCoachLiveFocusStatuses, type StopwatchRosterRow } from "../../actions";
+import { getCoachLiveFocusStatuses, type StopwatchRosterRow, type YesterdaysStopwatchWinner } from "../../actions";
 
 const LIVE_POLL_INTERVAL_MS = 20_000;
 const CLOCK_TICK_MS = 5_000;
@@ -36,7 +36,16 @@ function formatMinutesLabel(totalMinutes: number): string {
 // totals); getCoachLiveFocusStatuses is polled separately and more
 // often so the live dot stays current without re-running that heavier
 // aggregation every 20s.
-export function StopwatchSideWidget({ roster }: { roster: StopwatchRosterRow[] }) {
+export function StopwatchSideWidget({
+  roster,
+  yesterdaysWinner,
+}: {
+  roster: StopwatchRosterRow[];
+  // "Dünün Birincisi" -- see fetchYesterdaysStopwatchWinner's own comment
+  // (app/coach/actions.ts). Same amber/Crown treatment as the student
+  // widget's own "Dünün Şampiyonu" block, one row above the roster list.
+  yesterdaysWinner: YesterdaysStopwatchWinner;
+}) {
   const pathname = usePathname();
   const { collapsed, toggle } = useCoachStopwatchWidgetCollapsed();
   const [now, setNow] = useState(() => Date.now());
@@ -96,6 +105,31 @@ export function StopwatchSideWidget({ roster }: { roster: StopwatchRosterRow[] }
           <ChevronRight className="size-4" />
         </button>
       </div>
+
+      {/* Pinned above the scrollable roster below (not inside it) so it
+          stays visible regardless of how far the coach scrolls -- unlike
+          the student widget's own "Dünün Şampiyonu", which sits inside a
+          short, non-scrolling list of just 2-3 rows. */}
+      {yesterdaysWinner && (
+        <div className="shrink-0 px-4 pb-3">
+          <div className="relative overflow-hidden rounded-md border border-amber-300 bg-gradient-to-br from-amber-50 to-amber-100 p-3 dark:border-amber-700/50 dark:from-amber-950/40 dark:to-amber-900/30">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-400/30">
+                <Crown className="size-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold tracking-wide text-amber-700 uppercase dark:text-amber-400">
+                  Dünün Birincisi
+                </p>
+                <p className="text-foreground truncate text-sm font-semibold">{yesterdaysWinner.fullName ?? "—"}</p>
+              </div>
+              <p className="shrink-0 text-sm font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                {formatMinutesLabel(yesterdaysWinner.minutes)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="min-h-0 space-y-1.5 overflow-y-auto px-4 pb-4">
         {rows.map((row) => {
