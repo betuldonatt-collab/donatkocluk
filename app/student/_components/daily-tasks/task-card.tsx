@@ -235,12 +235,13 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
         )}
       </div>
 
-      {/* Always visible -- was `hidden sm:flex`, which hid it on mobile
+      {/* Hidden once the task is done -- nothing left to time. Otherwise
+          always visible -- was `hidden sm:flex`, which hid it on mobile
           portrait (most phones sit below the 640px sm breakpoint in
           portrait but cross it in landscape), making the button appear
           to only work in landscape. The row copes with the narrower
           space via the title's own free wrapping. */}
-      <FocusTimerTrigger task={task} className="flex shrink-0" />
+      {!isDone && <FocusTimerTrigger task={task} className="flex shrink-0" />}
     </div>
   );
 }

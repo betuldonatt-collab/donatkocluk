@@ -715,19 +715,26 @@ export async function sendFocusHeartbeat(): Promise<void> {
 //
 // Deliberately scoped narrower than the coach's own "Yeni Görev Ekle"
 // form in two ways:
-// - Course pickers only ever offer atomic TYT/AYT courses (never the
-//   branch-exam macro groupings or Paragraf/Problem's routine pseudo-
-//   courses) -- Kaynak Takibi's own tabs are atomic-only, so a task filed
-//   under a macro course would silently be invisible there, and
-//   Paragraf/Problem already has its own dedicated logging page.
-// - Only "Soru Çözümü" gets full one-step result entry (Toplam/Doğru/
-//   Yanlış/Boş) here, since that's the actual "I just did this, here's
-//   what happened" case this feature is for. "Branş Denemesi"/"Genel
-//   Deneme" are created pending, same as a coach assignment, and
-//   completed afterward through the existing TaskModal (which already
-//   has the full trial-results/subject-scores flow for those two types)
-//   -- avoids re-building that considerably more complex UI a second
-//   time here.
+// - Course pickers only ever offer atomic TYT/AYT courses, EXCEPT for
+//   Branş Denemesi -- Kaynak Takibi's own tabs are atomic-only, so a
+//   Soru Çözümü/Konu Çalışması task filed under a macro course would
+//   silently be invisible there, and Paragraf/Problem's routine
+//   pseudo-courses already have their own dedicated logging page. A
+//   branch exam's Ders picker offers the macro groupings too (same as
+//   the coach's own form) -- these feed the exam/trial analysis features
+//   as their own saved data points, so this exception is intentional,
+//   not an oversight.
+// - "Soru Çözümü" and "Branş Denemesi" are the only two types that get
+//   full one-step result entry (Toplam/Doğru/Yanlış/Boş) here, gated by
+//   the explicit isCompleted toggle ("Bu çalışmayı tamamladın mı?")
+//   rather than inferred from whether Toplam happened to be filled in --
+//   the student states up front whether this is a future goal or
+//   something already done (e.g. at school), and the form/status/
+//   stopwatch all follow that one answer. "Genel Deneme" is always
+//   created pending, same as a coach assignment, and completed
+//   afterward through the existing TaskModal (which already has the
+//   full subject-scores flow for that type) -- avoids re-building that
+//   considerably more complex UI a second time here.
 export type RichTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom" | "reading";
 
 const richTaskCountField = z.number().int().min(0).max(10000).nullable().optional();
@@ -744,6 +751,10 @@ const createRichCustomTaskSchema = z
     wrongCount: richTaskCountField,
     emptyCount: richTaskCountField,
     durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
+    // "Soru Çözümü"/"Branş Denemesi" only -- "Bu çalışmayı tamamladın
+    // mı?". Ignored for every other task type (each already has its own
+    // always-pending or always-full-results shape).
+    isCompleted: z.boolean().nullable().optional(),
     generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
     generalExamPublisher: z.string().trim().max(200).nullable().optional(),
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
@@ -753,7 +764,7 @@ const createRichCustomTaskSchema = z
   })
   .refine(
     (v) =>
-      v.taskType !== "question_bank" ||
+      (v.taskType !== "question_bank" && v.taskType !== "branch_exam") ||
       countsAreConsistent({ total: v.totalCount ?? null, correct: v.correctCount ?? null, wrong: v.wrongCount ?? null, empty: v.emptyCount ?? null }),
     { message: "Toplam, Doğru + Yanlış + Boş toplamına eşit olmalıdır.", path: ["totalCount"] },
   )
@@ -770,6 +781,7 @@ export type CreateRichTaskInput = {
   wrongCount?: number | null;
   emptyCount?: number | null;
   durationMinutes?: number | null;
+  isCompleted?: boolean | null;
   generalExamTrack?: "tyt" | "ayt" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
@@ -814,12 +826,24 @@ export async function createRichCustomTask(input: CreateRichTaskInput) {
   const user = await requireUser(supabase);
 
   const title = buildRichTaskTitle(v);
-  // Only "Soru Çözümü" gets to arrive already "done" -- every other type
-  // (including a bare Toplam-only "Konu Çalışması" target) still needs
-  // its own completion step, same as a coach-assigned one would.
-  const hasFullResults = v.taskType === "question_bank" && v.totalCount != null;
+  // Only "Soru Çözümü"/"Branş Denemesi" ever arrive already "done", and
+  // only when the student explicitly said so via isCompleted -- every
+  // other type (including a bare Toplam-only "Konu Çalışması" target)
+  // still needs its own completion step, same as a coach-assigned one
+  // would.
+  const hasFullResults = (v.taskType === "question_bank" || v.taskType === "branch_exam") && v.isCompleted === true;
   const takesCourseTopic = v.taskType === "question_bank" || v.taskType === "topic_study" || v.taskType === "branch_exam";
   const takesTotalCount = v.taskType !== "extra_custom" && v.taskType !== "general_exam";
+  // A branch exam declared already-complete right here, with real misses,
+  // still owes its topic-by-topic Deneme Analizi -- exactly the same
+  // "Analiz bekliyor" badge/reminder/TaskModal step an already-existing
+  // branch exam gets the moment a coach or student first records its
+  // Doğru/Yanlış/Boş (see handleGoToAnalysis/handleDeferAnalysis in
+  // task-modal.tsx). Without this, a perfect-score exam correctly needs
+  // no follow-up, but one with any wrong/blank answers would otherwise
+  // land already "done" with no visible next step at all -- indistinguishable
+  // from an exam whose analysis was already finished.
+  const hasMissedQuestions = v.taskType === "branch_exam" && ((v.wrongCount ?? 0) + (v.emptyCount ?? 0) > 0);
 
   const { data, error } = await supabase
     .from("student_tasks")
@@ -839,10 +863,14 @@ export async function createRichCustomTask(input: CreateRichTaskInput) {
       correct_count: hasFullResults ? (v.correctCount ?? null) : null,
       wrong_count: hasFullResults ? (v.wrongCount ?? null) : null,
       empty_count: hasFullResults ? (v.emptyCount ?? null) : null,
-      duration_minutes: v.durationMinutes ?? null,
+      // A task declared already-complete never takes a manual duration --
+      // authoritative here, not just a UI hint, so a forged/stale client
+      // payload can't sneak a duration onto an already-done task either.
+      duration_minutes: hasFullResults ? null : (v.durationMinutes ?? null),
       is_coach_assigned: false,
       status: hasFullResults ? "done" : "pending",
       completed: hasFullResults,
+      analysis_pending: hasFullResults && hasMissedQuestions,
     })
     .select("*")
     .single();
