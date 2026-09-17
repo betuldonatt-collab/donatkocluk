@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpen,
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
@@ -23,6 +24,7 @@ const TASK_TYPE_ICONS = {
   branch_exam: Sparkles,
   general_exam: Sparkles,
   extra_custom: ClipboardList,
+  reading: BookOpen,
 };
 
 // Coach-set target (or, once the student records it via task-modal.tsx's
@@ -53,6 +55,20 @@ function taskSubtitle(task: StudentTask): string {
       // No count target at all -- still show a duration-only target
       // (e.g. "solve for 45 minutes", no fixed question count) instead of
       // a bare type label with no goal in sight.
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+    }
+    case "reading": {
+      // Simpler than question_bank/branch_exam above -- reading has no
+      // Doğru/Yanlış/Boş concept, just how many pages got read against
+      // the (optional) page target, e.g. "120/250 sayfa" once progress
+      // starts, or just the bare target/type label before it does.
+      const target = task.total_count !== null ? `/${task.total_count}` : "";
+      if (task.correct_count !== null) {
+        return `${task.correct_count}${target} sayfa${durationSuffix(task)}`;
+      }
+      if (task.total_count !== null) {
+        return `${task.total_count} sayfa${durationSuffix(task)}`;
+      }
       return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
     }
     case "general_exam": {

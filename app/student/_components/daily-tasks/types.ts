@@ -6,7 +6,8 @@ export type TaskType =
   | "topic_study"
   | "branch_exam"
   | "general_exam"
-  | "extra_custom";
+  | "extra_custom"
+  | "reading";
 
 export type TaskStatus = "pending" | "done" | "half_done" | "not_done";
 
@@ -79,6 +80,7 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   branch_exam: "Branş Denemesi",
   general_exam: "Genel Deneme",
   extra_custom: "Ekstra Çalışma",
+  reading: "Kitap Okuma",
 };
 
 // Thick, full-saturation status border -- mirrors the coach panel's own

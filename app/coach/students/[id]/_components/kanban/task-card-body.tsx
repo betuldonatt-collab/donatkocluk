@@ -12,9 +12,17 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   branch_exam: "Branş Denemesi",
   general_exam: "Genel Deneme",
   extra_custom: "Ekstra Çalışma",
+  reading: "Kitap Okuma",
 };
 
 export function courseLabel(courseId: string | null) {
+  // "kitap-okuma" resolves to a real pseudo-course (lib/curriculum's
+  // ROUTINE_COURSES), but showing its generic "Kitap Okuma" name as the
+  // card's TITLE would bury the one thing that actually identifies a
+  // reading task -- the book's own name, which already lives directly in
+  // task.title. Falling back to null here (same as "no course at all")
+  // lets the card title fall through to task.title instead.
+  if (courseId === "kitap-okuma") return null;
   const course = findCourseById(courseId);
   if (!course) return null;
   const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
@@ -63,7 +71,7 @@ function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>):
     .map((id) => resourceNameById?.get(id))
     .filter((name): name is string => !!name);
   const base = resourceNames.length > 0 ? resourceNames.join(" + ") : (TASK_TYPE_LABELS[task.task_type] ?? task.task_type);
-  const countUnit = task.task_type === "branch_exam" ? "adet" : "soru";
+  const countUnit = task.task_type === "branch_exam" ? "adet" : task.task_type === "reading" ? "sayfa" : "soru";
   const count = task.total_count !== null ? ` · ${task.total_count} ${countUnit}` : "";
   const duration = task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
   return `${base}${count}${duration}`;

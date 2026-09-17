@@ -1,0 +1,18 @@
+-- "Kitap Okuma" (Book Reading) -- a new routine task type, no new table
+-- and no new columns. Reuses the exact generic student_tasks columns the
+-- schema comment in 0005_coaching_ecosystem.sql already calls out as
+-- intentionally reused across types:
+--   title          -> the book's name, entered directly (no course/topic,
+--                      same "lives only on the row" convention as an
+--                      extra_custom task's free title)
+--   total_count    -> page target (Sayfa Sayısı), same column
+--                      question_bank/branch_exam use for their own target
+--   correct_count  -> pages read so far, same slot a question task's
+--                      "doğru" count occupies -- wrong_count/empty_count
+--                      stay null, unused for this type
+--   course_id      -> the new 'kitap-okuma' pseudo-course (lib/curriculum's
+--                      ROUTINE_COURSES, alongside paragraf/problem), so it
+--                      routes into the Rutinler lane on both boards via the
+--                      existing isRoutineCourseId() check -- no schema
+--                      change needed for that part either
+alter type public.task_type add value 'reading';

@@ -33,6 +33,7 @@ const TASK_TYPE_OPTIONS: { value: RichTaskType; label: string }[] = [
   { value: "topic_study", label: "Konu Çalışması" },
   { value: "branch_exam", label: "Branş Denemesi" },
   { value: "general_exam", label: "Genel Deneme" },
+  { value: "reading", label: "Kitap Okuma" },
   { value: "extra_custom", label: "Diğer / Serbest" },
 ];
 
@@ -61,6 +62,9 @@ type FormState = {
   generalExamPublisher: string;
   freeTitle: string;
   freeDescription: string;
+  // "Kitap Okuma" only -- the book's name IS the title, no course/topic
+  // involved (same "lives only on the row" shape as freeTitle above).
+  bookTitle: string;
 };
 
 function initialFormState(): FormState {
@@ -78,6 +82,7 @@ function initialFormState(): FormState {
     generalExamPublisher: "",
     freeTitle: "",
     freeDescription: "",
+    bookTitle: "",
   };
 }
 
@@ -142,11 +147,15 @@ export function AddCustomTaskDialog({
   const isBranchExam = value.taskType === "branch_exam";
   const isGeneralExam = value.taskType === "general_exam";
   const isFree = value.taskType === "extra_custom";
-  const showCourse = !isGeneralExam && !isFree;
+  const isReading = value.taskType === "reading";
+  const showCourse = !isGeneralExam && !isFree && !isReading;
   const showTopic = value.taskType === "question_bank" || value.taskType === "topic_study";
   const showResource = value.taskType === "question_bank" || value.taskType === "topic_study" || isBranchExam;
   const showFullCounts = value.taskType === "question_bank";
-  const showTotalOnly = value.taskType === "topic_study" || isBranchExam;
+  // Reading reuses the same single-field "target, filled in later via the
+  // card" shape topic_study/branch_exam already have -- Okunan Sayfa is
+  // logged afterward through TaskModal, same as their own D/Y/B results.
+  const showTotalOnly = value.taskType === "topic_study" || isBranchExam || isReading;
   const showDuration = !isGeneralExam && !isFree;
 
   const course = ALL_COURSES.find((c) => c.id === value.courseId) ?? ALL_COURSES[0];
@@ -172,7 +181,16 @@ export function AddCustomTaskDialog({
   }, [open, showResource, value.courseId, isBranchExam]);
 
   function handleTaskTypeChange(taskType: RichTaskType) {
-    set({ taskType, topicId: "", resource: emptyResourceRow(), totalCount: "", correctCount: "", wrongCount: "", emptyCount: "" });
+    set({
+      taskType,
+      topicId: "",
+      resource: emptyResourceRow(),
+      totalCount: "",
+      correctCount: "",
+      wrongCount: "",
+      emptyCount: "",
+      bookTitle: "",
+    });
   }
 
   function handleCourseChange(courseId: string) {
@@ -212,7 +230,7 @@ export function AddCustomTaskDialog({
       empty: toNumberOrNull(value.emptyCount),
     });
 
-  const canSave = isFree ? !!value.freeTitle.trim() : !totalMismatch;
+  const canSave = isFree ? !!value.freeTitle.trim() : isReading ? !!value.bookTitle.trim() : !totalMismatch;
 
   // A typed-but-not-yet-created resource name is made into a real
   // student_resources row first (if "add to library" is checked) so the
@@ -254,6 +272,7 @@ export function AddCustomTaskDialog({
         branchExamPublisher: isBranchExam ? value.resource.resourceName.trim() || null : null,
         freeTitle: isFree ? value.freeTitle : null,
         freeDescription: isFree ? value.freeDescription : null,
+        bookTitle: isReading ? value.bookTitle : null,
       });
       // createRichCustomTask's own return only carries resource_ids (see
       // its own comment) -- filled in client-side here from what this
@@ -327,6 +346,18 @@ export function AddCustomTaskDialog({
                   <Textarea id="rich-task-free-description" value={value.freeDescription} onChange={(e) => set({ freeDescription: e.target.value })} />
                 </div>
               </>
+            )}
+
+            {isReading && (
+              <div className="space-y-1.5">
+                <Label htmlFor="rich-task-book-title">Kitap Adı</Label>
+                <Input
+                  id="rich-task-book-title"
+                  placeholder="Örn: Fatih Harbiye"
+                  value={value.bookTitle}
+                  onChange={(e) => set({ bookTitle: e.target.value })}
+                />
+              </div>
             )}
 
             {isGeneralExam && (
@@ -430,7 +461,7 @@ export function AddCustomTaskDialog({
             {showTotalOnly && (
               <div className="space-y-1.5">
                 <Label htmlFor="rich-task-total-only" className="text-sm font-semibold">
-                  {isBranchExam ? "Kaç Adet (opsiyonel)" : "Soru Sayısı (opsiyonel)"}
+                  {isBranchExam ? "Kaç Adet (opsiyonel)" : isReading ? "Sayfa Sayısı (opsiyonel)" : "Soru Sayısı (opsiyonel)"}
                 </Label>
                 <Input
                   id="rich-task-total-only"
@@ -439,7 +470,7 @@ export function AddCustomTaskDialog({
                   inputMode="numeric"
                   value={value.totalCount}
                   onChange={(e) => set({ totalCount: sanitizeDigits(e.target.value) })}
-                  placeholder="Örn: 40"
+                  placeholder={isReading ? "Örn: 250" : "Örn: 40"}
                 />
               </div>
             )}
@@ -465,6 +496,9 @@ export function AddCustomTaskDialog({
               <p className="text-muted-foreground text-xs">
                 Sonuçlarını (Doğru/Yanlış/Boş) girmek için görevi oluşturduktan sonra karttan aç.
               </p>
+            )}
+            {isReading && (
+              <p className="text-muted-foreground text-xs">Okunan sayfa sayısını girmek için görevi oluşturduktan sonra karttan aç.</p>
             )}
 
             {error && <p className="text-destructive text-sm">{error}</p>}

@@ -298,6 +298,7 @@ function TaskModalBody({
 
   const isTytBranchExam = task.task_type === "branch_exam" && task.course_id?.startsWith("tyt-");
   const showAnalysisFlow = task.task_type === "branch_exam" || task.task_type === "general_exam";
+  const isReading = task.task_type === "reading";
 
   // Whether this video/topic-study task also carries a real question-count
   // target (set by the coach or the student at creation time -- see
@@ -315,20 +316,38 @@ function TaskModalBody({
   // must never auto-complete from counts: the student logs Doğru/Yanlış/
   // Boş freely, same as any question-count task, but declares the status
   // itself explicitly, same selector a dual task's manual half uses.
-  const isDurationOnlyTarget =
-    (task.task_type === "question_bank" || task.task_type === "branch_exam") &&
-    task.is_coach_assigned &&
-    task.total_count === null;
+  //
+  // A "reading" task with no page target follows the same rule for the
+  // same reason (no target to compare Okunan Sayfa against), but -- unlike
+  // question_bank/branch_exam above -- applies regardless of
+  // is_coach_assigned: reading's Sayfa Hedefi/Okunan Sayfa pair has no
+  // autoCalcMissingField wiring (see the reading block below, a plain
+  // 2-field form with no 4th-field derivation), so a self-created reading
+  // task can just as easily be saved with a page count logged and no
+  // target ever set, not only a coach-assigned one.
+  const isDurationOnlyTarget = isReading
+    ? task.total_count === null
+    : (task.task_type === "question_bank" || task.task_type === "branch_exam") &&
+      task.is_coach_assigned &&
+      task.total_count === null;
 
-  // Pure question-count tasks (question_bank, branch_exam, general_exam)
-  // are entirely score-driven -- their status is always computed from the
-  // entered counts, so they never show the manual status buttons. A
-  // duration-only target is the one exception (see above).
+  // Pure question-count tasks (question_bank, branch_exam, general_exam,
+  // reading) are entirely score-driven -- their status is always computed
+  // from the entered counts, so they never show the manual status buttons.
+  // A duration/page-target-only target is the one exception (see above).
   const isPureCountType =
-    (task.task_type === "question_bank" || task.task_type === "branch_exam" || task.task_type === "general_exam") &&
+    (task.task_type === "question_bank" ||
+      task.task_type === "branch_exam" ||
+      task.task_type === "general_exam" ||
+      isReading) &&
     !isDurationOnlyTarget;
   const showManualButtons = !isPureCountType;
   const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
+  // Reading's own, simpler 2-field block (Sayfa Hedefi + Okunan Sayfa)
+  // instead of the 4-field Toplam/Doğru/Yanlış/Boş grid -- there's no
+  // Yanlış/Boş concept for pages read, and reusing showFlatCounts's grid
+  // would show two fields that mean nothing for this type.
+  const showReadingProgress = isReading;
 
   // Needs the persistent top selector + shared Kaydet flow (merged status,
   // required before saving) rather than the plain auto-status path or the
@@ -369,8 +388,11 @@ function TaskModalBody({
   // actually entered something (not on a freshly-opened, untouched form),
   // and null whenever there's no known Toplam to compare against at all.
   const hasEnteredCounts = correctCount.trim() !== "" || wrongCount.trim() !== "" || emptyCount.trim() !== "";
+  // Reading rides the exact same computeAutoTaskStatus call, wrong/empty
+  // just always 0 -- there's no separate UI for them on this type, so
+  // wrongCount/emptyCount state simply never gets touched.
   const countStatus =
-    showFlatCounts && hasEnteredCounts
+    (showFlatCounts || showReadingProgress) && hasEnteredCounts
       ? computeAutoTaskStatus(toNumberOrNull(totalCount), Number(correctCount) || 0, Number(wrongCount) || 0, Number(emptyCount) || 0)
       : null;
 
@@ -447,6 +469,13 @@ function TaskModalBody({
       // manual selector (dual, or a duration-only target) DOES set
       // patch.status below; the server merges/respects it instead of
       // overwriting it with an auto-computed one.
+    }
+    if (showReadingProgress) {
+      // Sayfa Hedefi + Okunan Sayfa -- wrong_count/empty_count simply never
+      // get touched for this type (stay whatever they already were, always
+      // null in practice), same auto-status rule as showFlatCounts above.
+      patch.total_count = toNumberOrNull(totalCount);
+      patch.correct_count = toNumberOrNull(correctCount);
     }
     if (showSubjectScores) {
       const perSubject = activeGroups.map((g) => ({
@@ -665,6 +694,13 @@ function TaskModalBody({
             </div>
           )}
 
+          {showReadingProgress && (
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnlyField label="Sayfa Hedefi" value={task.total_count} />
+              <ReadOnlyField label="Okunan Sayfa" value={task.correct_count} />
+            </div>
+          )}
+
           {showSubjectScores && task.subject_scores && (
             <div className="space-y-3">
               {Object.entries(task.subject_scores).map(([key, score]) => (
@@ -875,6 +911,20 @@ function TaskModalBody({
                 className="col-span-2 sm:col-span-4"
               />
             )}
+          </div>
+        )}
+
+        {/* Kitap Okuma's own simpler 2-field block -- no Yanlış/Boş
+            equivalent for pages read, so this is deliberately its own grid
+            rather than reusing showFlatCounts's 4-column one. */}
+        {showReadingProgress && (
+          <div className="grid grid-cols-2 gap-3">
+            {task.is_coach_assigned ? (
+              <ReadOnlyField label="Sayfa Hedefi" value={task.total_count} />
+            ) : (
+              <Field label="Sayfa Hedefi" value={totalCount} onChange={setTotalCount} />
+            )}
+            <Field label="Okunan Sayfa" value={correctCount} onChange={setCorrectCount} />
           </div>
         )}
 

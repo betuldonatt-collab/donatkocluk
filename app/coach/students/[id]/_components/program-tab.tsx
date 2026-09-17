@@ -25,6 +25,7 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   branch_exam: "Branş Denemesi",
   general_exam: "Genel Deneme",
   extra_custom: "Ekstra Çalışma",
+  reading: "Kitap Okuma",
 };
 
 function todayISO() {
@@ -52,6 +53,10 @@ function statusLabel(task: DetailTask) {
 }
 
 function taskLabel(task: DetailTask) {
+  // Same reasoning as task-card-body.tsx's courseLabel -- the book's own
+  // name (task.title) is what identifies a reading task, not the generic
+  // "Kitap Okuma" pseudo-course name.
+  if (task.course_id === "kitap-okuma") return task.title;
   const course = findCourseById(task.course_id);
   if (!course) return task.title;
   const prefix = task.course_id?.startsWith("tyt-") ? "TYT " : task.course_id?.startsWith("ayt-") ? "AYT " : "";

@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  BookOpen,
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
@@ -23,6 +24,11 @@ import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask
 // (app/coach/students/[id]/_components/kanban/task-card-body.tsx) --
 // duplicated per this repo's panel-UI convention.
 function courseLabel(courseId: string | null): string | null {
+  // "kitap-okuma" is a real pseudo-course (lib/curriculum's
+  // ROUTINE_COURSES), but its generic name would bury the book's own
+  // title (task.title) that this falls back to below -- see the matching
+  // comment on the coach panel's own courseLabel.
+  if (courseId === "kitap-okuma") return null;
   const course = findCourseById(courseId);
   if (!course) return null;
   const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
@@ -36,6 +42,7 @@ const TASK_TYPE_ICONS = {
   branch_exam: Sparkles,
   general_exam: Sparkles,
   extra_custom: ClipboardList,
+  reading: BookOpen,
 };
 
 // The floor a student can drag a cell down to (see ResizeHandle in
@@ -78,6 +85,13 @@ function cellSubtitle(task: StudentTask): string {
         const progress = `D:${task.correct_count ?? "-"} Y:${task.wrong_count ?? "-"} B:${task.empty_count ?? "-"}`;
         return `${target ? `${target} · ` : ""}${progress}${durationSuffix(task)}`;
       }
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+    }
+    case "reading": {
+      // See taskSubtitle's matching comment in task-card.tsx.
+      const target = task.total_count !== null ? `/${task.total_count}` : "";
+      if (task.correct_count !== null) return `${task.correct_count}${target} sayfa${durationSuffix(task)}`;
+      if (task.total_count !== null) return `${task.total_count} sayfa${durationSuffix(task)}`;
       return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
     }
     case "general_exam": {

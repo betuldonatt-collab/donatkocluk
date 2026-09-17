@@ -940,7 +940,7 @@ export async function getPastWeeksForStudent(studentId: string): Promise<{ weekS
 
 // --- Student detail: Haftalık Görev Ata (task assignment) ---------------
 
-export type AssignableTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "video";
+export type AssignableTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "video" | "reading";
 export type VideoLink = { url: string; title: string | null };
 
 type AssignTaskInput = {
@@ -955,12 +955,16 @@ type AssignTaskInput = {
   generalExamTrack?: "tyt" | "ayt" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
+  // "Kitap Okuma" only -- the book's name, lives directly on the title
+  // column (no course/topic exists for this type), same "no new column"
+  // convention as generalExamPublisher/branchExamPublisher above.
+  bookTitle?: string | null;
 };
 
 const videoLinkSchema = z.object({ url: z.string().trim().max(2000), title: z.string().trim().max(300).nullable() });
 
 const assignTaskInputSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video"]),
+  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading"]),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -970,6 +974,7 @@ const assignTaskInputSchema = z.object({
   generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
+  bookTitle: z.string().trim().max(300).nullable().optional(),
 });
 
 // A day's Görevler section is one combined [task|event] order_index
@@ -1012,7 +1017,9 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
       ? buildGeneralExamTitle(input.generalExamTrack, input.generalExamPublisher)
       : input.taskType === "branch_exam"
         ? buildBranchExamTitle(input.courseId, input.topicId, input.branchExamPublisher)
-        : buildTaskTitle(input.courseId, input.topicId);
+        : input.taskType === "reading"
+          ? input.bookTitle?.trim() || "Kitap Okuma"
+          : buildTaskTitle(input.courseId, input.topicId);
 
   const videoLinkGroups: VideoLink[][] =
     input.taskType === "video" && input.videoLinks && input.videoLinks.length > 0
@@ -1044,8 +1051,13 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
         task_date: taskDate,
         task_type: input.taskType,
         title,
-        course_id: input.courseId || null,
-        topic_id: input.topicId || null,
+        // Forced server-side (not just trusted from the client) so a
+        // "reading" task always lands in the Rutinler lane via the
+        // pseudo-course isRoutineCourseId() checks -- same "kitap-okuma"
+        // id lib/curriculum's ROUTINE_COURSES defines, regardless of what
+        // courseId the form happened to send.
+        course_id: input.taskType === "reading" ? "kitap-okuma" : input.courseId || null,
+        topic_id: input.taskType === "reading" ? null : input.topicId || null,
         total_count: input.totalCount ?? null,
         duration_minutes: input.durationMinutes ?? null,
         video_links: videoLinks,
@@ -1153,7 +1165,7 @@ export async function assignRoutineToWeek(input: AssignTaskInput & { studentId: 
 // --- Student detail: schedule workspace (edit/duplicate/move/delete) -----
 
 const updateAssignedTaskSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video"]).optional(),
+  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading"]).optional(),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -1163,6 +1175,7 @@ const updateAssignedTaskSchema = z.object({
   generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
+  bookTitle: z.string().trim().max(300).nullable().optional(),
 });
 
 // Edits always operate on the ONE existing row -- a "video" task's links
@@ -1183,6 +1196,7 @@ export async function updateAssignedTask(
     generalExamTrack?: "tyt" | "ayt" | null;
     generalExamPublisher?: string | null;
     branchExamPublisher?: string | null;
+    bookTitle?: string | null;
   },
 ) {
   await assertNotImpersonating();
@@ -1201,8 +1215,13 @@ export async function updateAssignedTask(
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input_.taskType !== undefined) patch.task_type = input_.taskType;
-  if (input_.courseId !== undefined) patch.course_id = input_.courseId || null;
-  if (input_.topicId !== undefined) patch.topic_id = input_.topicId || null;
+  if (input_.courseId !== undefined) {
+    // Forced, same as buildTaskRows at create time -- a "reading" task
+    // always lands in the Rutinler lane via the "kitap-okuma" pseudo-course,
+    // regardless of what courseId the form happened to send.
+    patch.course_id = input_.taskType === "reading" ? "kitap-okuma" : input_.courseId || null;
+  }
+  if (input_.topicId !== undefined) patch.topic_id = input_.taskType === "reading" ? null : input_.topicId || null;
   if (input_.totalCount !== undefined) patch.total_count = input_.totalCount;
   if (input_.durationMinutes !== undefined) patch.duration_minutes = input_.durationMinutes;
   if (input_.videoLinks !== undefined) patch.video_links = input_.videoLinks;
@@ -1213,7 +1232,9 @@ export async function updateAssignedTask(
     (input_.courseId !== undefined || input_.topicId !== undefined || input_.branchExamPublisher !== undefined)
   ) {
     patch.title = buildBranchExamTitle(input_.courseId, input_.topicId, input_.branchExamPublisher);
-  } else if (input_.courseId !== undefined || input_.topicId !== undefined) {
+  } else if (input_.taskType === "reading" && input_.bookTitle !== undefined) {
+    patch.title = input_.bookTitle?.trim() || "Kitap Okuma";
+  } else if (input_.taskType !== "reading" && (input_.courseId !== undefined || input_.topicId !== undefined)) {
     patch.title = buildTaskTitle(input_.courseId, input_.topicId);
   }
 

@@ -21,16 +21,17 @@ const DAY_LABELS_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-type RoutineType = "paragraf" | "problem" | "diger";
+type RoutineType = "paragraf" | "problem" | "kitap-okuma" | "diger";
 
 const ROUTINE_TYPE_OPTIONS: { value: RoutineType; label: string }[] = [
   { value: "paragraf", label: "Paragraf" },
   { value: "problem", label: "Problem" },
+  { value: "kitap-okuma", label: "Kitap Okuma" },
   { value: "diger", label: "Diğer" },
 ];
 
 function firstNonRoutineCourseId(): string {
-  return ALL_COURSES.find((c) => c.id !== "paragraf" && c.id !== "problem")?.id ?? ALL_COURSES[0].id;
+  return ALL_COURSES.find((c) => c.id !== "paragraf" && c.id !== "problem" && c.id !== "kitap-okuma")?.id ?? ALL_COURSES[0].id;
 }
 
 // Monday=0..Sunday=6, matching DAY_LABELS_SHORT's own order -- JS's native
@@ -197,22 +198,41 @@ export function TaskDrawer({
     });
   }
 
+  // Kitap Okuma is the one routine whose own task type (reading) actually
+  // matters -- Paragraf/Problem/Diğer never touch taskType at all, they
+  // just repoint courseId under whatever Görev Türü was already picked.
+  // Leaving "reading" set while courseId moves away from "kitap-okuma"
+  // would strand the form showing the Kitap Adı field with no course
+  // picker to fall back on, so every OTHER branch resets it back to the
+  // default question_bank if it was left over from Kitap Okuma.
+  function resetReadingType(taskType: TaskFormValue["taskType"]): TaskFormValue["taskType"] {
+    return taskType === "reading" ? "question_bank" : taskType;
+  }
+
   function handleTabChange(next: "task" | "routine") {
     setTab(next);
     if (next === "routine") {
       setRoutineType("paragraf");
-      setValue((v) => ({ ...v, courseId: "paragraf", topicId: "", resources: [] }));
+      setValue((v) => ({ ...v, courseId: "paragraf", topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     } else {
-      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(), topicId: "", resources: [] }));
+      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(), topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     }
   }
 
   function handleRoutineTypeChange(next: RoutineType) {
     setRoutineType(next);
-    if (next === "paragraf" || next === "problem") {
-      setValue((v) => ({ ...v, courseId: next, topicId: "", resources: [] }));
+    if (next === "kitap-okuma") {
+      setValue((v) => ({ ...v, courseId: next, topicId: "", resources: [], taskType: "reading" }));
+    } else if (next === "paragraf" || next === "problem") {
+      setValue((v) => ({ ...v, courseId: next, topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     } else {
-      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(), topicId: "", resources: [] }));
+      setValue((v) => ({
+        ...v,
+        courseId: firstNonRoutineCourseId(),
+        topicId: "",
+        resources: [],
+        taskType: resetReadingType(v.taskType),
+      }));
     }
   }
 

@@ -88,6 +88,10 @@ export type TaskFormValue = {
   // "Branş Denemesi" only -- same "lives only in the title, never its own
   // column" convention as generalExamPublisher above.
   branchExamPublisher: string;
+  // "Kitap Okuma" only -- the book's name IS the title, entered directly
+  // (no course/topic exists for this type, unlike branchExamPublisher
+  // which suffixes onto a real course+topic title).
+  bookTitle: string;
 };
 
 function emptyResourceRow(): TaskFormResource {
@@ -106,6 +110,7 @@ export function defaultTaskFormValue(): TaskFormValue {
     generalExamTrack: "tyt",
     generalExamPublisher: "",
     branchExamPublisher: "",
+    bookTitle: "",
   };
 }
 
@@ -127,7 +132,14 @@ function parseBranchExamPublisher(title: string): string {
 }
 
 function isAssignableType(t: string): t is AssignableTaskType {
-  return t === "question_bank" || t === "topic_study" || t === "branch_exam" || t === "general_exam" || t === "video";
+  return (
+    t === "question_bank" ||
+    t === "topic_study" ||
+    t === "branch_exam" ||
+    t === "general_exam" ||
+    t === "video" ||
+    t === "reading"
+  );
 }
 
 export function valueFromTask(task: DetailTask | null, courseResourceData?: CourseResourceData): TaskFormValue {
@@ -175,6 +187,9 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     generalExamTrack: generalExam.track,
     generalExamPublisher: generalExam.publisher,
     branchExamPublisher,
+    // The book name IS the title, no suffix-parsing needed (unlike
+    // branchExamPublisher above).
+    bookTitle: taskType === "reading" ? task.title : "",
   };
 }
 
@@ -205,8 +220,12 @@ export function taskFormValueToPayload(value: TaskFormValue) {
 
   return {
     taskType: value.taskType,
-    courseId: value.courseId || null,
-    topicId: value.topicId || null,
+    // Forced here too (not just server-side) so the drawer's own local
+    // state (e.g. the resource picker's course-scoped pool) never reads a
+    // stale courseId left over from whichever type was selected before
+    // switching to Kitap Okuma.
+    courseId: value.taskType === "reading" ? "kitap-okuma" : value.courseId || null,
+    topicId: value.taskType === "reading" ? null : value.topicId || null,
     totalCount: numberOrNull(value.totalCount),
     durationMinutes: numberOrNull(value.durationMinutes),
     videoLinks,
@@ -228,6 +247,7 @@ export function taskFormValueToPayload(value: TaskFormValue) {
             .filter(Boolean)
             .join(" + ") || value.branchExamPublisher.trim() || null
         : null,
+    bookTitle: value.taskType === "reading" ? value.bookTitle.trim() || null : null,
   };
 }
 
@@ -311,6 +331,7 @@ export function TaskFormFields({
   const topics = topicsForCourse(course);
   const isGeneralExam = value.taskType === "general_exam";
   const isBranchExam = value.taskType === "branch_exam";
+  const isReading = value.taskType === "reading";
   // Macro ("whole fruit") subjects lead the Ders picker, atomic ("sliced")
   // ones follow -- ALL_COURSES itself stays atomic-first (its [0] is the
   // universal fallback default for every OTHER task type), so the reorder
@@ -344,11 +365,14 @@ export function TaskFormFields({
   // duration/video), all optional except course. "Branş Denemesi" never
   // asks for a topic (a trial isn't scoped to one topic) and repurposes
   // the count field as a trial-copy quantity instead of a question count.
-  const showCourse = !hideCourseTopic && !isGeneralExam;
-  const showTopic = !hideCourseTopic && !isGeneralExam && !isBranchExam;
+  // "Kitap Okuma" has no course/topic/resource either (the book name IS
+  // the title, see the dedicated Kitap Adı field below) -- Sayfa Sayısı
+  // reuses the same count field question_bank's Soru Sayısı does.
+  const showCourse = !hideCourseTopic && !isGeneralExam && !isReading;
+  const showTopic = !hideCourseTopic && !isGeneralExam && !isBranchExam && !isReading;
   const showCount = !isGeneralExam;
   const showDuration = !isGeneralExam;
-  const showVideoLinks = !isGeneralExam;
+  const showVideoLinks = !isGeneralExam && !isReading;
 
   function set(patch: Partial<TaskFormValue>) {
     onChange({ ...value, ...patch });
@@ -380,33 +404,40 @@ export function TaskFormFields({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="task-form-type">Görev Türü</Label>
-        <select
-          id="task-form-type"
-          className={selectClassName()}
-          value={value.taskType}
-          onChange={(e) => {
-            const taskType = e.target.value as AssignableTaskType;
-            set({
-              taskType,
-              // Branş Denemesi seeds one empty row up front -- it's now
-              // the only place the publisher gets typed (see the removed
-              // standalone Yayınevi field below), so the field the coach
-              // actually needs is visible immediately instead of behind
-              // an extra "Kaynak Ekle" click.
-              resources: taskType === "branch_exam" ? [emptyResourceRow()] : [],
-              totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
-            });
-          }}
-        >
-          {TASK_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Kitap Okuma has no sub-choice to make here -- picking the Rutin
+          Türü pill (task-drawer.tsx) already fixes taskType to "reading"
+          on its own, so this selector (and its now-absent "Kitap Okuma"
+          option) would only show a stale/unmatched value underneath an
+          already-decided pill. */}
+      {!isReading && (
+        <div className="space-y-1.5">
+          <Label htmlFor="task-form-type">Görev Türü</Label>
+          <select
+            id="task-form-type"
+            className={selectClassName()}
+            value={value.taskType}
+            onChange={(e) => {
+              const taskType = e.target.value as AssignableTaskType;
+              set({
+                taskType,
+                // Branş Denemesi seeds one empty row up front -- it's now
+                // the only place the publisher gets typed (see the removed
+                // standalone Yayınevi field below), so the field the coach
+                // actually needs is visible immediately instead of behind
+                // an extra "Kaynak Ekle" click.
+                resources: taskType === "branch_exam" ? [emptyResourceRow()] : [],
+                totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
+              });
+            }}
+          >
+            {TASK_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {isGeneralExam && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -439,6 +470,18 @@ export function TaskFormFields({
               placeholder="Örn: 3D Yayınları"
             />
           </div>
+        </div>
+      )}
+
+      {isReading && (
+        <div className="space-y-1.5">
+          <Label htmlFor="task-form-book-title">Kitap Adı</Label>
+          <Input
+            id="task-form-book-title"
+            value={value.bookTitle}
+            onChange={(e) => set({ bookTitle: e.target.value })}
+            placeholder="Örn: Fatih Harbiye"
+          />
         </div>
       )}
 
@@ -507,7 +550,13 @@ export function TaskFormFields({
       {showCount && (
         <div className="space-y-1.5">
           <Label htmlFor="task-form-count" className="text-sm font-semibold">
-            {isBranchExam ? "Kaç Adet" : value.taskType === "topic_study" ? "Soru Sayısı (opsiyonel)" : "Soru Sayısı / Hedef"}
+            {isBranchExam
+              ? "Kaç Adet"
+              : isReading
+                ? "Sayfa Sayısı (opsiyonel)"
+                : value.taskType === "topic_study"
+                  ? "Soru Sayısı (opsiyonel)"
+                  : "Soru Sayısı / Hedef"}
           </Label>
           <Input
             id="task-form-count"
@@ -516,7 +565,7 @@ export function TaskFormFields({
             inputMode="numeric"
             value={value.totalCount}
             onChange={(e) => set({ totalCount: e.target.value })}
-            placeholder="Örn: 40"
+            placeholder={isReading ? "Örn: 250" : "Örn: 40"}
           />
         </div>
       )}

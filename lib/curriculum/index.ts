@@ -26,18 +26,19 @@ export const AYT_COURSES_BY_TRACK: Record<Track, Course[]> = {
   sozel: aytSozelJson as Course[],
 };
 
-// Two synthetic, non-curriculum "courses" for the coach's daily routines
-// -- Paragraf and Problem practice isn't tied to a specific curriculum
-// subject, so it gets its own pseudo-course entry (empty unit list, which
-// makes topicsForCourse() correctly offer only "Karma" for them) rather
-// than being force-mapped onto e.g. TYT Türkçe.
+// Three synthetic, non-curriculum "courses" for the coach's daily routines
+// -- Paragraf, Problem, and Kitap Okuma practice aren't tied to a specific
+// curriculum subject, so each gets its own pseudo-course entry (empty unit
+// list, which makes topicsForCourse() correctly offer only "Karma" for
+// them) rather than being force-mapped onto e.g. TYT Türkçe.
 export const ROUTINE_COURSES: Course[] = [
   { id: "paragraf", name: "Paragraf", units: [] },
   { id: "problem", name: "Problem", units: [] },
+  { id: "kitap-okuma", name: "Kitap Okuma", units: [] },
 ];
 
 export function isRoutineCourseId(courseId: string | null | undefined): boolean {
-  return courseId === "paragraf" || courseId === "problem";
+  return courseId === "paragraf" || courseId === "problem" || courseId === "kitap-okuma";
 }
 
 // "Whole fruit" branch-exam subjects, coexisting alongside (never

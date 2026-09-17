@@ -120,9 +120,10 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   // carries a real question-count target -- the student logs BOTH a
   // manual status for the video/topic-study half AND question counts for
   // the other half, and the two get merged (mergeDualTaskStatus) into one
-  // overall status. A question_bank/branch_exam task with NO count target
-  // at all (a duration-only target, e.g. "Soru Çözümü · 60 dk") needs the
-  // same explicit declaration for the opposite reason: computeAutoTaskStatus
+  // overall status. A question_bank/branch_exam/reading task with NO count
+  // target at all (a duration-only or page-count-only target, e.g. "Soru
+  // Çözümü · 60 dk" or a page-target-less Kitap Okuma) needs the same
+  // explicit declaration for the opposite reason: computeAutoTaskStatus
   // below can never derive a status from counts without a numeric target to
   // compare against, and per product decision such a task must never
   // auto-complete -- the student declares its status themselves instead.
@@ -131,7 +132,8 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   const dualTarget = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
   const isDual = (existing.task_type === "video" || existing.task_type === "topic_study") && dualTarget !== null;
   const isDurationOnlyTarget =
-    (existing.task_type === "question_bank" || existing.task_type === "branch_exam") && dualTarget === null;
+    (existing.task_type === "question_bank" || existing.task_type === "branch_exam" || existing.task_type === "reading") &&
+    dualTarget === null;
   const needsManualStatus = isDual || isDurationOnlyTarget;
   let dualManualStatus: DualPartStatus | null = null;
   if (needsManualStatus) {
@@ -726,14 +728,14 @@ export async function sendFocusHeartbeat(): Promise<void> {
 //   has the full trial-results/subject-scores flow for those two types)
 //   -- avoids re-building that considerably more complex UI a second
 //   time here.
-export type RichTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom";
+export type RichTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom" | "reading";
 
 const richTaskCountField = z.number().int().min(0).max(10000).nullable().optional();
 
 const createRichCustomTaskSchema = z
   .object({
     taskDate: dateSchema,
-    taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "extra_custom"]),
+    taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "extra_custom", "reading"]),
     courseId: z.string().trim().max(60).nullable().optional(),
     topicId: z.string().trim().max(60).nullable().optional(),
     resourceIds: z.array(uuidSchema).optional(),
@@ -747,6 +749,7 @@ const createRichCustomTaskSchema = z
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
     freeTitle: z.string().trim().max(200).nullable().optional(),
     freeDescription: z.string().trim().max(2000).nullable().optional(),
+    bookTitle: z.string().trim().max(300).nullable().optional(),
   })
   .refine(
     (v) =>
@@ -772,6 +775,9 @@ export type CreateRichTaskInput = {
   branchExamPublisher?: string | null;
   freeTitle?: string | null;
   freeDescription?: string | null;
+  // "Kitap Okuma" only -- the book's name IS the title, same "lives only
+  // on the row, no course/topic" shape as freeTitle above.
+  bookTitle?: string | null;
 };
 
 // Mirrors buildTaskTitle/buildGeneralExamTitle/buildBranchExamTitle in
@@ -781,6 +787,7 @@ export type CreateRichTaskInput = {
 // the same course/topic read identically everywhere titles are shown.
 function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): string {
   if (v.taskType === "extra_custom") return v.freeTitle?.trim() || "Ekstra Çalışma";
+  if (v.taskType === "reading") return v.bookTitle?.trim() || "Kitap Okuma";
 
   if (v.taskType === "general_exam") {
     const prefix = v.generalExamTrack === "ayt" ? "AYT" : "TYT";
@@ -822,7 +829,11 @@ export async function createRichCustomTask(input: CreateRichTaskInput) {
       task_type: v.taskType,
       title,
       description: v.taskType === "extra_custom" ? v.freeDescription?.trim() || null : null,
-      course_id: takesCourseTopic ? v.courseId || null : null,
+      // Forced for reading, same as the coach's own assignTaskToStudent --
+      // routes it into the Rutinler lane via the "kitap-okuma" pseudo-course
+      // (lib/curriculum's ROUTINE_COURSES) regardless of what courseId (none)
+      // the dialog sent.
+      course_id: v.taskType === "reading" ? "kitap-okuma" : takesCourseTopic ? v.courseId || null : null,
       topic_id: v.taskType === "question_bank" || v.taskType === "topic_study" ? v.topicId || null : null,
       total_count: takesTotalCount ? (v.totalCount ?? null) : null,
       correct_count: hasFullResults ? (v.correctCount ?? null) : null,
