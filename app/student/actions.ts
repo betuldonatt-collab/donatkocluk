@@ -1136,3 +1136,38 @@ export async function endFocusSession(taskId: string): Promise<number | null> {
   if (data !== null) revalidatePath("/student");
   return data as number | null;
 }
+
+// Closes the one real gap left in the Focus Timer's persistence story:
+// getActiveFocusSession/startFocusSession above only bank a stale session
+// when the student reopens Süre Tut on that SAME task again. A student who
+// closes the tab mid-session (beforeunload's sendBeacon best-effort pauses
+// it, or even that never fires -- a crash, force-quit, the OS killing a
+// backgrounded mobile tab) and simply never revisits that particular task
+// has their accumulated seconds sitting in focus_sessions forever, never
+// folded into tracked_duration_seconds -- invisible on the task's own
+// badge, Toplam Süre, the Karne, and the stopwatch leaderboard alike, which
+// reads exactly like data loss even though the raw seconds were never
+// actually gone. Called once from fetchHomeData (app/student/page.tsx) on
+// every dashboard load -- not just when a specific task's timer reopens --
+// so a stranded session gets banked the next time the student opens the
+// app at all. Best-effort by design (mirrors heartbeatFocusSession's own
+// "never let this break the primary flow" stance): a failure here should
+// never take the whole dashboard down with it.
+export async function reconcileStaleFocusSessions(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const staleCutoff = new Date(Date.now() - FOCUS_SESSION_STALE_MS).toISOString();
+  const { data: staleRows } = await supabase
+    .from("focus_sessions")
+    .select("task_id, last_heartbeat_at")
+    .eq("student_id", user.id)
+    .lt("last_heartbeat_at", staleCutoff);
+
+  for (const row of staleRows ?? []) {
+    await supabase.rpc("end_focus_session", { p_task_id: row.task_id, p_bank_through: row.last_heartbeat_at });
+  }
+}

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { mondayOf, weekDates } from "@/lib/date";
+import { reconcileStaleFocusSessions } from "./actions";
 import { NextSessionCard } from "./_components/next-session-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
@@ -30,6 +31,12 @@ function getWeekDays(todayIso: string) {
 
 async function fetchHomeData(userId: string) {
   const supabase = await createClient();
+  // Bank any focus session this student left stranded (closed the tab
+  // mid-timer and never reopened that specific task again) before reading
+  // student_tasks below, so a just-banked total is reflected on this very
+  // render instead of waiting for the student to stumble into it some
+  // other way. Best-effort: reconcileStaleFocusSessions never throws.
+  await reconcileStaleFocusSessions();
   const today = todayISO();
   const weekDays = getWeekDays(today);
   const weekStart = weekDays[0].date;

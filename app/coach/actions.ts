@@ -2325,13 +2325,16 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
 
   // Separate, broader query for Toplam Çalışma Süresi -- deliberately not
   // scoped to the 4 exam-shaped task_types examRows above is (video and
-  // extra_custom carry duration_minutes too, and "how long did the
-  // student study" shouldn't silently drop those). Same date range + soft
-  // coach-approval filter as every other Karne metric, for the same
-  // "only coach-vetted data counts toward the official report card" reason.
+  // extra_custom carry tracked_duration_minutes too, and "how long did the
+  // student study" shouldn't silently drop those). Reads tracked_duration_
+  // minutes (actual Süre Tut time), not duration_minutes (a target, never
+  // time spent) -- see lib/karne.ts's computeTotalDurationMinutes. Same
+  // date range + soft coach-approval filter as every other Karne metric,
+  // for the same "only coach-vetted data counts toward the official report
+  // card" reason.
   const { data: durationRows, error: durationError } = await supabase
     .from("student_tasks")
-    .select("duration_minutes")
+    .select("tracked_duration_minutes")
     .eq("student_id", studentIdV)
     .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true")
     .gte("task_date", rangeStart)

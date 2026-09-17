@@ -149,14 +149,9 @@ describe("computeAytScoreBreakdown", () => {
 });
 
 describe("computeTotalDurationMinutes", () => {
-  it("sums duration_minutes across every row, regardless of task type", () => {
-    const rows = [{ duration_minutes: 60 }, { duration_minutes: 45 }, { duration_minutes: 30 }];
+  it("sums tracked_duration_minutes across every row, regardless of task type", () => {
+    const rows = [{ tracked_duration_minutes: 60 }, { tracked_duration_minutes: 45 }, { tracked_duration_minutes: 30 }];
     expect(computeTotalDurationMinutes(rows)).toBe(135);
-  });
-
-  it("treats a null duration as 0, not NaN", () => {
-    const rows = [{ duration_minutes: 60 }, { duration_minutes: null }, { duration_minutes: 20 }];
-    expect(computeTotalDurationMinutes(rows)).toBe(80);
   });
 
   it("returns 0 for an empty list", () => {

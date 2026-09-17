@@ -23,12 +23,17 @@ export function sumTaskCounts(tasks: TaskCounts[]): { correct: number; wrong: nu
   );
 }
 
-export type TaskDuration = { duration_minutes: number | null };
+export type TaskDuration = { tracked_duration_minutes: number };
 
-// Sums Focus Timer / manually-entered minutes across a set of tasks -- same
-// sharing rationale as sumTaskCounts above (student's task-board.tsx today;
-// available for the coach's schedule-board.tsx to reuse later without risking
-// the two panels drifting on identical data).
+// Sums actual Focus Timer tracked minutes across a set of tasks -- NOT
+// duration_minutes, which is a coach's (or a student's own) assigned
+// TARGET, not time actually spent. tracked_duration_minutes only ever
+// grows via a real Süre Tut session (endFocusSession/end_focus_session,
+// app/student/actions.ts), so "Toplam Süre" reflects time genuinely
+// tracked, never an unstarted target. Same sharing rationale as
+// sumTaskCounts above (student's task-board.tsx today; available for the
+// coach's schedule-board.tsx to reuse later without risking the two panels
+// drifting on identical data).
 export function sumTaskDuration(tasks: TaskDuration[]): number {
-  return tasks.reduce((sum, t) => sum + (t.duration_minutes ?? 0), 0);
+  return tasks.reduce((sum, t) => sum + t.tracked_duration_minutes, 0);
 }

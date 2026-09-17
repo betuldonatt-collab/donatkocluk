@@ -127,8 +127,12 @@ export type NetSummary = {
 // range and the same soft-coach-approval filter every other Karne metric
 // respects -- see that function's own comment) -- a null duration
 // (untimed practice) contributes 0, not NaN.
-export function computeTotalDurationMinutes(tasks: { duration_minutes: number | null }[]): number {
-  return tasks.reduce((sum, t) => sum + (t.duration_minutes ?? 0), 0);
+// Sums actual Focus Timer tracked minutes, not duration_minutes (a coach's
+// or student's own assigned TARGET, not time actually spent) -- see
+// lib/scoring.ts's sumTaskDuration for the same distinction on the
+// student's daily/weekly totals.
+export function computeTotalDurationMinutes(tasks: { tracked_duration_minutes: number }[]): number {
+  return tasks.reduce((sum, t) => sum + t.tracked_duration_minutes, 0);
 }
 
 type SubjectScores = Record<string, { correct?: number; wrong?: number; empty?: number }>;
