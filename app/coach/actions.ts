@@ -18,7 +18,7 @@ import {
 } from "@/lib/curriculum";
 import { dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
-import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
+import { mondayOf, stopwatchLogicalDateIso, weekDates } from "@/lib/date";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
   computeAylikKarne,
@@ -629,7 +629,45 @@ export async function lockWeek(studentId: string, weekStart: string) {
     .upsert({ student_id: studentIdV, week_start_date: weekStartV }, { onConflict: "student_id,week_start_date" });
   if (error) throw dbError(error);
 
+  // "Kilitle / Değerlendir" -- locking a week also finalizes it: any task
+  // still sitting untouched ("pending", i.e. the student never checked it
+  // at all) gets force-resolved to "Yapılmadı" so nothing is left in limbo
+  // once the week can no longer be edited. A task the student actually
+  // acted on (half_done/done) is left exactly as they left it -- only the
+  // never-touched ones count as "unchecked" here.
+  const weekEndV = weekDates(weekStartV)[6];
+  const { data: resolvedRows, error: resolveError } = await supabase
+    .from("student_tasks")
+    .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
+    .eq("student_id", studentIdV)
+    .eq("status", "pending")
+    .gte("task_date", weekStartV)
+    .lte("task_date", weekEndV)
+    .select("course_id, topic_id");
+  if (resolveError) throw dbError(resolveError);
+
+  // Mirrors updateTaskProgress's own rule (app/student/actions.ts): a
+  // status flip changes what a topic bucket sums even with the counts
+  // left untouched, so each distinct (course_id, topic_id) touched above
+  // needs the same resync a student's own status change would trigger.
+  // student_daily_stats needs no equivalent call -- it sums every task's
+  // counts for the day regardless of status, and this flip never touches
+  // counts.
+  const topicKeys = new Set(
+    resolvedRows?.filter((r) => r.course_id !== null).map((r) => `${r.course_id}::${r.topic_id ?? "karma"}`) ?? [],
+  );
+  for (const key of topicKeys) {
+    const [courseId, topicId] = key.split("::");
+    const { error: rpcError } = await supabase.rpc("recompute_student_topic_stats", {
+      p_student_id: studentIdV,
+      p_course_id: courseId,
+      p_topic_id: topicId,
+    });
+    if (rpcError) throw dbError(rpcError);
+  }
+
   revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath("/student");
 }
 
 export async function unlockWeek(studentId: string, weekStart: string) {
