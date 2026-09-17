@@ -5,7 +5,7 @@ import { reconcileStaleFocusSessions } from "./actions";
 import { NextSessionCard } from "./_components/next-session-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
-import type { StudentTask } from "./_components/daily-tasks/types";
+import type { StudentFixedTask, StudentTask } from "./_components/daily-tasks/types";
 import type { SessionNeedingRating } from "./_components/types";
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
@@ -52,6 +52,7 @@ async function fetchHomeData(userId: string) {
     { data: lockRows },
     { data: profileRow },
     { data: taskResourceRows },
+    { data: fixedTaskRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -99,6 +100,10 @@ async function fetchHomeData(userId: string) {
         .select("task_id, order_index, student_tasks!inner(student_id), student_resources(name)")
         .eq("student_tasks.student_id", userId)
         .order("order_index", { ascending: true }),
+      // "Sabit Görevler" -- week-independent (no date range), read-only
+      // here (RLS: student_fixed_tasks_student_read). Same student-side
+      // injection ScheduleBoard does for the coach, see task-board.tsx.
+      supabase.from("student_fixed_tasks").select("id, title, day_of_week, start_time, end_time").eq("student_id", userId),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
@@ -126,6 +131,7 @@ async function fetchHomeData(userId: string) {
     nextSession: sessionRows?.[0] ?? null,
     tasks,
     sessionNeedingRating: (ratingSessionRows?.[0] ?? null) as SessionNeedingRating | null,
+    fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     todayLocked: lockedWeeks.has(mondayOf(today)),
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
@@ -135,7 +141,7 @@ async function fetchHomeData(userId: string) {
 export default async function StudentHomePage() {
   const view = await getViewContext("student");
 
-  const { today, weekDays, nextSession, tasks, sessionNeedingRating, todayLocked, routineRowHeights, taskRowHeights } = view
+  const { today, weekDays, nextSession, tasks, sessionNeedingRating, fixedTasks, todayLocked, routineRowHeights, taskRowHeights } = view
     ? await fetchHomeData(view.effectiveUserId)
     : {
         today: todayISO(),
@@ -143,6 +149,7 @@ export default async function StudentHomePage() {
         nextSession: null,
         tasks: [] as StudentTask[],
         sessionNeedingRating: null as SessionNeedingRating | null,
+        fixedTasks: [] as StudentFixedTask[],
         todayLocked: false,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
@@ -172,6 +179,7 @@ export default async function StudentHomePage() {
         today={today}
         weekDays={weekDays}
         initialTasks={tasks}
+        fixedTasks={fixedTasks}
         todayLocked={todayLocked}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}

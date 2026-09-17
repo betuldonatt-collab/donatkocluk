@@ -8,7 +8,7 @@ import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-h
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
 import { STUDENT_NOTES_PAGE_SIZE } from "./constants";
-import type { CoachReportCardRow } from "../../actions";
+import type { CoachReportCardRow, StudentFixedTask } from "../../actions";
 import { DetailTabs } from "./_components/detail-tabs";
 import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
@@ -129,6 +129,7 @@ async function fetchStudentDetail(studentId: string) {
     { data: dailyStatsRows },
     { data: reportCardRows },
     { data: topicStatsRows },
+    { data: fixedTaskRows },
   ] = await Promise.all([
       supabase
         .from("student_tasks")
@@ -192,6 +193,14 @@ async function fetchStudentDetail(studentId: string) {
         .from("student_topic_stats")
         .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count")
         .eq("student_id", studentId),
+      // "Sabit Görevler" -- week-independent (no date range), the Program
+      // tab's own manager list.
+      supabase
+        .from("student_fixed_tasks")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("day_of_week", { ascending: true })
+        .order("start_time", { ascending: true }),
     ]);
 
   // coaching_start_date is so often never set that generateCycleReportCard
@@ -441,6 +450,7 @@ async function fetchStudentDetail(studentId: string) {
     examMistakes: mistakeRows ?? [],
     weekDays,
     weekTasks: (weekTaskRows ?? []) as DetailTask[],
+    fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     courseResourceData,
     today,
     weekStats,
@@ -508,6 +518,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                 branchExams={detail.branchExams}
                 initialWeekDays={detail.weekDays}
                 initialWeekTasks={detail.weekTasks}
+                initialFixedTasks={detail.fixedTasks}
                 courseResourceData={detail.courseResourceData}
                 today={detail.today}
                 initialWeekStats={detail.weekStats}

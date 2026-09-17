@@ -44,6 +44,7 @@ import {
   updateStudentEventOrder,
   type AssignedTaskStatus,
   type StudentEvent,
+  type StudentFixedTask,
 } from "../../../actions";
 import type { DetailTask } from "../types";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
@@ -127,6 +128,7 @@ export function ScheduleBoard({
   initialWeekDays,
   initialTasks,
   initialEvents,
+  fixedTasks,
   courseResourceData: initialCourseResourceData,
   highlightTaskId,
   initialRoutineRowHeights,
@@ -136,6 +138,11 @@ export function ScheduleBoard({
   initialWeekDays: { date: string; label: string }[];
   initialTasks: DetailTask[];
   initialEvents: StudentEvent[];
+  // Week-independent (no per-week refetch) -- the same "Sabit Görevler"
+  // apply to every week this board can navigate to. Never mutated from
+  // here; managed only on the Program tab (see program-tab.tsx's own
+  // comment for why).
+  fixedTasks: StudentFixedTask[];
   courseResourceData: CourseResourceData;
   // Deep-link from a dashboard alert (e.g. "Eksik Deneme Sonucu") -- the
   // matching task's edit drawer auto-opens once below, so the coach lands
@@ -153,6 +160,21 @@ export function ScheduleBoard({
   const [weekDays, setWeekDays] = useState(initialWeekDays);
   const [tasks, setTasks] = useState(initialTasks);
   const [events, setEvents] = useState(initialEvents);
+  // Each visible day's own day-of-week decides which "Sabit Görevler"
+  // apply to it -- same (getUTCDay() + 6) % 7 rotation getWeekDays itself
+  // uses, since this is a rolling (not Monday-aligned) window and a given
+  // date's weekday can't be inferred from its position in the array.
+  const fixedTasksByDate = useMemo(() => {
+    const map = new Map<string, StudentFixedTask[]>();
+    for (const day of weekDays) {
+      const dow = (new Date(`${day.date}T00:00:00Z`).getUTCDay() + 6) % 7;
+      map.set(
+        day.date,
+        fixedTasks.filter((t) => t.day_of_week === dow).sort((a, b) => a.start_time.localeCompare(b.start_time)),
+      );
+    }
+    return map;
+  }, [weekDays, fixedTasks]);
   const [eventDialogState, setEventDialogState] = useState<EventDialogState | null>(null);
   // Stateful (not just the initial prop) so a resource created inline
   // from the drawer's "type new" flow (see handleResourceCreated) is
@@ -745,6 +767,7 @@ export function ScheduleBoard({
                   isToday={day.date === today}
                   isDropTarget={day.date === overDay}
                   events={eventsByDay(day.date)}
+                  fixedTasks={fixedTasksByDate.get(day.date) ?? []}
                   routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
                   regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
                   maxRoutineSlots={maxRoutineSlots}
@@ -837,6 +860,7 @@ function DayColumn({
   isToday,
   isDropTarget,
   events,
+  fixedTasks,
   routineTasks,
   regularTasks,
   maxRoutineSlots,
@@ -862,6 +886,9 @@ function DayColumn({
   isToday: boolean;
   isDropTarget: boolean;
   events: StudentEvent[];
+  // Read-only -- see the "Section 0" render below and migration 0081's
+  // own comment for why these are never draggable/editable here.
+  fixedTasks: StudentFixedTask[];
   routineTasks: DetailTask[];
   regularTasks: DetailTask[];
   maxRoutineSlots: number;
@@ -928,6 +955,32 @@ function DayColumn({
           {day.label}
         </h3>
       </div>
+
+      {/* Section 0: Sabit Görevler -- injected read-only from the
+          student's fixed weekly skeleton (managed on the Program tab,
+          never here -- see migration 0081's own comment for why this is
+          deliberately not draggable/editable/deletable on the board
+          itself). Rendered only when this day actually has any, unlike
+          Rutinler below, since there's no "add" action to offer here. */}
+      {fixedTasks.length > 0 && (
+        <div className="border-border/60 mx-2 mt-2 space-y-1.5 border-b pb-2">
+          <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
+          <div className="space-y-1.5">
+            {fixedTasks.map((ft) => (
+              <div
+                key={ft.id}
+                className="border-border/70 bg-muted/50 text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs"
+              >
+                <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
+                <span className="min-w-0 flex-1 truncate font-medium">{ft.title}</span>
+                <span className="shrink-0 tabular-nums">
+                  {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Section 1: Rutinler -- Paragraf/Problem land here automatically,
           routed purely by course_id, regardless of which "+" created them. */}

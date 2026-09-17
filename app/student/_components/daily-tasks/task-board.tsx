@@ -33,7 +33,7 @@ import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
-import type { StudentTask } from "./types";
+import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
 
 type ViewMode = "today" | "week";
@@ -59,6 +59,31 @@ function addDaysISO(dateStr: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
+// Monday=0..Sunday=6, matching this app's own existing convention
+// (mondayIndexOf/DAY_LABELS_SHORT in the coach's schedule-board.tsx/
+// task-drawer.tsx) -- JS's native getUTCDay() is Sunday=0..Saturday=6, so
+// this just rotates it.
+function dayOfWeekOf(dateIso: string): number {
+  return (new Date(`${dateIso}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+// Read-only "Sabit Görevler" chip -- injected from the student's fixed
+// weekly skeleton (managed by the coach on the Program tab, see migration
+// 0081's own comment for why this is never editable here). Same dashed/
+// locked visual treatment as the coach's own schedule-board.tsx injects,
+// so it reads as the same feature on both panels.
+function FixedTaskChip({ task }: { task: StudentFixedTask }) {
+  return (
+    <div className="border-border/70 bg-muted/50 text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs">
+      <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
+      <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
+      <span className="shrink-0 tabular-nums">
+        {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
+      </span>
+    </div>
+  );
+}
+
 function formatWeekRangeLabel(weekStart: string) {
   const start = new Date(`${weekStart}T00:00:00Z`);
   const end = new Date(start);
@@ -81,6 +106,7 @@ export function TaskBoard({
   today,
   weekDays: initialWeekDays,
   initialTasks,
+  fixedTasks,
   todayLocked,
   initialRoutineRowHeights,
   initialTaskRowHeights,
@@ -88,6 +114,10 @@ export function TaskBoard({
   today: string;
   weekDays: { date: string; label: string }[];
   initialTasks: StudentTask[];
+  // "Sabit Görevler" -- week-independent (no per-week refetch, same as
+  // the coach's own ScheduleBoard), read-only here. Managed only by the
+  // coach, on the Program tab.
+  fixedTasks: StudentFixedTask[];
   todayLocked: boolean;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
@@ -205,6 +235,7 @@ export function TaskBoard({
   const todayTasks = tasks.filter((t) => t.task_date === today);
   const coachTasks = todayTasks.filter((t) => t.is_coach_assigned).sort(byOrder);
   const customTasks = todayTasks.filter((t) => !t.is_coach_assigned).sort(byOrder);
+  const todayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(today));
   // Same split as the coach's own schedule board (Rutinler vs Görevler,
   // routed purely by course_id -- see isRoutineCourseId) so a student
   // sees their day grouped exactly the way the coach assigned it.
@@ -290,6 +321,17 @@ export function TaskBoard({
 
       {view === "today" ? (
         <>
+          {todayFixedTasks.length > 0 && (
+            <div>
+              <span className="text-muted-foreground mb-1.5 block text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
+              <div className="space-y-1.5">
+                {todayFixedTasks.map((t) => (
+                  <FixedTaskChip key={t.id} task={t} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <h2 className="text-foreground mb-3 text-base font-semibold">Bugünün Programı</h2>
             {coachTasks.length === 0 ? (
@@ -419,6 +461,7 @@ export function TaskBoard({
               // per day here.
               const dayRoutineTasks = dayTasks.filter((t) => isRoutineCourseId(t.course_id));
               const dayRegularTasks = dayTasks.filter((t) => !isRoutineCourseId(t.course_id));
+              const dayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(day.date));
               const isToday = day.date === today;
               return (
                 <div
@@ -434,6 +477,21 @@ export function TaskBoard({
                     </h3>
                     {isToday && <span className="text-primary/70 shrink-0 text-[10px] font-normal">Bugün</span>}
                   </div>
+
+                  {/* Section 0: Sabit Görevler -- injected read-only, only
+                      when this day actually has any (see FixedTaskChip's
+                      own comment). Mirrors the coach's own schedule-board.tsx
+                      injection exactly. */}
+                  {dayFixedTasks.length > 0 && (
+                    <div className="border-border/60 mx-2 mt-2 space-y-1.5 border-b pb-2">
+                      <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
+                      <div className="space-y-1.5">
+                        {dayFixedTasks.map((t) => (
+                          <FixedTaskChip key={t.id} task={t} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Section 1: Rutinler -- persistent chrome even when
                       empty, matching the coach's schedule board. Padded out

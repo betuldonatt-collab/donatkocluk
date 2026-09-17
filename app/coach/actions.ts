@@ -936,6 +936,113 @@ export async function deleteStudentEvent(studentId: string, eventId: string) {
   revalidatePath(`/coach/students/${studentIdV}/schedule`);
 }
 
+// --- "Sabit Görevler" (Fixed Tasks) ----------------------------------------
+//
+// The student's recurring weekly skeleton (school hours, sports practice,
+// ...) -- managed on the Program tab (student detail page), then injected
+// read-only into the weekly planner (ScheduleBoard) and the student's own
+// dashboard. See migration 0081 for the full schema rationale: one row per
+// single day (not a days-of-week array, since the coach may write a
+// different schedule per day), no order_index (never part of the
+// tasks/events drag order), no is_active (deleted outright, not paused).
+
+export type StudentFixedTask = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  title: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
+const fixedTaskInputSchema = z
+  .object({
+    title: nonEmptyText(200, "Başlık"),
+    dayOfWeek: z.number().int().min(0).max(6),
+    startTime: timeOnlySchema,
+    endTime: timeOnlySchema,
+  })
+  .refine((v) => v.endTime > v.startTime, { message: "Bitiş saati başlangıçtan sonra olmalı.", path: ["endTime"] });
+
+export async function createFixedTask(
+  studentId: string,
+  input: { title: string; dayOfWeek: number; startTime: string; endTime: string },
+): Promise<StudentFixedTask> {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const inputV = parseInput(fixedTaskInputSchema, input);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+
+  const { data, error } = await supabase
+    .from("student_fixed_tasks")
+    .insert({
+      student_id: studentIdV,
+      coach_id: user.id,
+      title: inputV.title,
+      day_of_week: inputV.dayOfWeek,
+      start_time: inputV.startTime,
+      end_time: inputV.endTime,
+    })
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
+  return data as StudentFixedTask;
+}
+
+export async function updateFixedTask(
+  studentId: string,
+  fixedTaskId: string,
+  input: { title: string; dayOfWeek: number; startTime: string; endTime: string },
+): Promise<StudentFixedTask> {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const fixedTaskIdV = parseInput(uuidSchema, fixedTaskId);
+  const inputV = parseInput(fixedTaskInputSchema, input);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+
+  const { data, error } = await supabase
+    .from("student_fixed_tasks")
+    .update({
+      title: inputV.title,
+      day_of_week: inputV.dayOfWeek,
+      start_time: inputV.startTime,
+      end_time: inputV.endTime,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", fixedTaskIdV)
+    .eq("student_id", studentIdV)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
+  return data as StudentFixedTask;
+}
+
+export async function deleteFixedTask(studentId: string, fixedTaskId: string) {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const fixedTaskIdV = parseInput(uuidSchema, fixedTaskId);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+
+  const { error } = await supabase.from("student_fixed_tasks").delete().eq("id", fixedTaskIdV).eq("student_id", studentIdV);
+  if (error) throw dbError(error);
+
+  revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath(`/coach/students/${studentIdV}/schedule`);
+}
+
 // Past-weeks archive ("Geçmiş Programlar") -- distinct Monday-start weeks
 // (within the last 12 months) that actually have assigned tasks, most
 // recent first, so the coach can jump straight to a week that has

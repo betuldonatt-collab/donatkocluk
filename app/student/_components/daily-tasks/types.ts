@@ -70,6 +70,19 @@ export type StudentTask = {
   week_locked: boolean;
 };
 
+// Mirrors the coach panel's own StudentFixedTask (app/coach/actions.ts) --
+// "Sabit Görevler", the student's recurring weekly skeleton (school
+// hours, sports, ...), managed by the coach on the Program tab and shown
+// here read-only. day_of_week: 0=Monday..6=Sunday, same convention as
+// every other day-of-week value in this app.
+export type StudentFixedTask = {
+  id: string;
+  title: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
 export type TopicMistakeStatus = "wrong" | "blank";
 export type TopicMistake = { course_id: string; topic_id: string; status: TopicMistakeStatus };
 

@@ -3,7 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
 import type { DetailTask, ParagrafProblemEntry } from "../types";
-import type { CoachReportCardRow } from "../../../actions";
+import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
 import { AnalyticsTab } from "./analytics-tab";
 import { ChartsTab } from "./charts-tab";
 import type { DayStat } from "./daily-stats-summary";
@@ -25,6 +25,7 @@ export function DetailTabs({
   examMistakes,
   initialWeekDays,
   initialWeekTasks,
+  initialFixedTasks,
   courseResourceData,
   today,
   initialWeekStats,
@@ -41,6 +42,7 @@ export function DetailTabs({
   examMistakes: MistakeRow[];
   initialWeekDays: { date: string; label: string }[];
   initialWeekTasks: DetailTask[];
+  initialFixedTasks: StudentFixedTask[];
   courseResourceData: CourseResourceData;
   today: string;
   initialWeekStats: DayStat[];
@@ -80,7 +82,12 @@ export function DetailTabs({
       </TabsContent>
 
       <TabsContent value="program" className="pt-4">
-        <ProgramTab studentId={studentId} initialWeekDays={initialWeekDays} initialTasks={initialWeekTasks} />
+        <ProgramTab
+          studentId={studentId}
+          initialWeekDays={initialWeekDays}
+          initialTasks={initialWeekTasks}
+          initialFixedTasks={initialFixedTasks}
+        />
       </TabsContent>
 
       <TabsContent value="kaynak-takibi" className="pt-4">

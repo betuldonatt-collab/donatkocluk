@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Lock, SquareArrowOutUpRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Lock, Pencil, Plus, SquareArrowOutUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { weekDates } from "@/lib/date";
-import { getStudentTasksForWeek } from "../../../actions";
+import { getStudentTasksForWeek, type StudentFixedTask } from "../../../actions";
+import { FixedTaskDialog, type FixedTaskDialogState } from "./fixed-task-dialog";
 import type { DetailTask } from "../types";
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
@@ -67,19 +68,29 @@ function taskLabel(task: DetailTask) {
 // Read-only weekly glance -- the coach edits the schedule on the
 // dedicated /schedule workspace (full-width Kanban board); this tab is
 // just a quick summary embedded in the rest of the student detail page.
+// "Sabit Görevler" (Fixed Tasks) is the one part of this tab that's NOT
+// read-only, though -- it's the manager for the student's recurring
+// weekly skeleton (school hours, sports, ...), see migration 0081. It
+// only lives here, never on the weekly planner itself (ScheduleBoard
+// injects it read-only, doesn't let the coach edit it there -- see that
+// component's own comment).
 export function ProgramTab({
   studentId,
   initialWeekDays,
   initialTasks,
+  initialFixedTasks,
 }: {
   studentId: string;
   initialWeekDays: { date: string; label: string }[];
   initialTasks: DetailTask[];
+  initialFixedTasks: StudentFixedTask[];
 }) {
   const today = todayISO();
   const [weekDays, setWeekDays] = useState(initialWeekDays);
   const [tasks, setTasks] = useState(initialTasks);
   const [loading, setLoading] = useState(false);
+  const [fixedTasks, setFixedTasks] = useState(initialFixedTasks);
+  const [fixedTaskDialog, setFixedTaskDialog] = useState<FixedTaskDialogState | null>(null);
 
   const isCurrentWeek = weekDays.some((d) => d.date === today);
 
@@ -94,8 +105,83 @@ export function ProgramTab({
     }
   }
 
+  function handleFixedTaskCreated(task: StudentFixedTask) {
+    setFixedTasks((prev) => [...prev, task].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)));
+  }
+
+  function handleFixedTaskSaved(task: StudentFixedTask) {
+    setFixedTasks((prev) =>
+      prev
+        .map((t) => (t.id === task.id ? task : t))
+        .sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time)),
+    );
+  }
+
+  function handleFixedTaskDeleted(taskId: string) {
+    setFixedTasks((prev) => prev.filter((t) => t.id !== taskId));
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="text-foreground text-sm font-semibold">Sabit Görevler</h3>
+        <p className="text-muted-foreground text-xs">
+          Öğrencinin her hafta aynı kalan sabit programı (okul, spor gibi) -- haftalık planlayıcıda otomatik olarak,
+          salt okunur şekilde gösterilir.
+        </p>
+        <div className="overflow-x-auto pb-2">
+          <div className="grid min-w-[980px] grid-cols-7 gap-2">
+            {DAY_LABELS.map((dayLabel, dayOfWeek) => {
+              const dayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeek);
+              return (
+                <div key={dayLabel} className="border-border bg-card/40 flex min-h-[100px] flex-col gap-2 rounded-lg border p-2">
+                  <div className="flex items-center justify-between gap-1">
+                    <h4 className="text-foreground truncate text-xs leading-tight font-semibold">{dayLabel}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-5 shrink-0"
+                      onClick={() => setFixedTaskDialog({ mode: "create", dayOfWeek })}
+                      aria-label={`${dayLabel} için sabit görev ekle`}
+                    >
+                      <Plus className="size-3.5" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    {dayFixedTasks.length === 0 ? (
+                      <p className="text-muted-foreground py-3 text-center text-[10px]">—</p>
+                    ) : (
+                      dayFixedTasks.map((t) => (
+                        <div key={t.id} className="border-border bg-muted/30 group relative rounded-md border p-1.5 text-[11px]">
+                          <p className="text-foreground truncate pr-9 font-medium break-words">{t.title}</p>
+                          <p className="text-muted-foreground flex items-center gap-1">
+                            <Clock className="size-2.5 shrink-0" />
+                            {t.start_time.slice(0, 5)}–{t.end_time.slice(0, 5)}
+                          </p>
+                          <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-5"
+                              onClick={() => setFixedTaskDialog({ mode: "edit", task: t })}
+                              aria-label="Sabit görevi düzenle"
+                            >
+                              <Pencil className="size-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button
@@ -188,6 +274,17 @@ export function ProgramTab({
           })}
         </div>
       </div>
+
+      {fixedTaskDialog && (
+        <FixedTaskDialog
+          state={fixedTaskDialog}
+          studentId={studentId}
+          onClose={() => setFixedTaskDialog(null)}
+          onCreated={handleFixedTaskCreated}
+          onSaved={handleFixedTaskSaved}
+          onDeleted={handleFixedTaskDeleted}
+        />
+      )}
     </div>
   );
 }

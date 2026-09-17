@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import type { StudentEvent } from "../../../actions";
+import type { StudentEvent, StudentFixedTask } from "../../../actions";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
 import type { DetailTask } from "../types";
 import { ScheduleBoard } from "./schedule-board";
@@ -37,8 +37,15 @@ function getWeekDays(referenceIso: string) {
 async function fetchScheduleData(studentId: string, weekDays: { date: string; label: string }[]) {
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: weekTaskRows }, { data: resourceRows }, { data: progressRows }, { data: taskResourceRows }, { data: eventRows }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: weekTaskRows },
+    { data: resourceRows },
+    { data: progressRows },
+    { data: taskResourceRows },
+    { data: eventRows },
+    { data: fixedTaskRows },
+  ] = await Promise.all([
       supabase.from("profiles").select("id, full_name").eq("id", studentId).maybeSingle(),
       supabase
         .from("student_tasks")
@@ -68,6 +75,10 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
         .gte("event_date", weekDays[0].date)
         .lte("event_date", weekDays[6].date)
         .order("order_index", { ascending: true }),
+      // Week-independent (no date range) -- "Sabit Görevler" are the same
+      // every week, matched to whichever 7 days are on screen client-side
+      // (see ScheduleBoard's own fixedTasksByDate).
+      supabase.from("student_fixed_tasks").select("*").eq("student_id", studentId),
     ]);
 
   // Only resources/branchExamResources/progress are used on this page
@@ -110,6 +121,7 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
     weekTasks: (weekTaskRows ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[],
     courseResourceData,
     weekEvents: (eventRows ?? []) as StudentEvent[],
+    fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
   };
 }
 
@@ -155,6 +167,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
         initialWeekDays={weekDays}
         initialTasks={data.weekTasks}
         initialEvents={data.weekEvents}
+        fixedTasks={data.fixedTasks}
         courseResourceData={data.courseResourceData}
         highlightTaskId={highlightTaskId}
         initialRoutineRowHeights={rowHeights.routine}
