@@ -172,11 +172,11 @@ export function ProgramTab({
                           taskStatusBorderClass(task.status, task.completed),
                         )}
                       >
-                        <div className="flex items-center gap-1">
-                          <p className="text-foreground min-w-0 flex-1 truncate font-medium">{taskLabel(task)}</p>
-                          {task.is_coach_assigned && <Lock className="text-muted-foreground size-2.5 shrink-0" />}
+                        <div className="flex items-start gap-1">
+                          <p className="text-foreground min-w-0 flex-1 font-medium break-words">{taskLabel(task)}</p>
+                          {task.is_coach_assigned && <Lock className="text-muted-foreground mt-0.5 size-2.5 shrink-0" />}
                         </div>
-                        <p className="text-muted-foreground truncate">
+                        <p className="text-muted-foreground break-words">
                           {TASK_TYPE_LABELS[task.task_type] ?? task.task_type} · {statusLabel(task)}
                         </p>
                       </div>

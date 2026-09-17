@@ -676,7 +676,7 @@ function TaskModalBody({
                     href={link.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary min-w-0 flex-1 truncate text-sm underline-offset-2 hover:underline"
+                    className="text-primary min-w-0 flex-1 text-sm break-words underline-offset-2 hover:underline"
                   >
                     {link.title || "Video"}
                   </a>
@@ -832,10 +832,10 @@ function TaskModalBody({
                   href={link.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-primary flex min-w-0 flex-1 items-center gap-1 truncate text-sm underline-offset-2 hover:underline"
+                  className="text-primary flex min-w-0 flex-1 items-center gap-1 text-sm underline-offset-2 hover:underline"
                 >
                   <PlayCircle className="size-3.5 shrink-0" />
-                  <span className="truncate">{link.title || "Video"}</span>
+                  <span className="break-words">{link.title || "Video"}</span>
                 </a>
                 {link.watched && (
                   <Button

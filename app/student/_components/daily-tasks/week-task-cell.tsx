@@ -149,7 +149,7 @@ function VideoPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="bg-rose-500/10 text-rose-600 mt-0.5 inline-flex max-w-full items-center gap-0.5 rounded px-1 py-0.5 text-[9px] leading-snug">
       <PlayCircle className="size-2.5 shrink-0" />
-      <span className="truncate">{children}</span>
+      <span className="break-words">{children}</span>
     </span>
   );
 }
@@ -158,9 +158,9 @@ function VideoPill({ children }: { children: React.ReactNode }) {
 // link); 2+ collapse into a single "N video" summary pill rather than
 // stacking individual titles -- the cell's height is a free drag, not a
 // fixed tier, so there's no fixed row budget to cap against, just no
-// appetite for an unbounded stack of video rows. Always exactly one line,
-// truncated (or clipped by the cell's own overflow-hidden) if it doesn't
-// fit. Full untruncated list is always one hover away (WeekCellHoverDetail).
+// appetite for an unbounded stack of video rows. Wraps freely (no
+// truncation) same as the rest of the cell; the full list is still one
+// hover away via WeekCellHoverDetail.
 function WeekCellVideoLinks({ videoLinks }: { videoLinks: StudentTask["video_links"] }) {
   if (videoLinks.length === 0) return null;
   if (videoLinks.length === 1) {
@@ -234,11 +234,11 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
 // Compact task box for a single day cell in the weekly matrix -- same
 // click/keyboard behavior as TaskCard (opens the same TaskModal), but a
 // much smaller footprint so several fit inside one grid column. Title,
-// topic, subtitle, and the video indicator are always rendered as a
-// single truncated (ellipsis) line -- the cell's fixed-but-draggable
-// height + overflow-hidden clip whichever rows don't fit when dragged
-// short. The full, untruncated version is one hover away via
-// WeekCellHoverDetail.
+// topic, subtitle, and the video indicator all wrap freely (no
+// truncation) -- the cell's fixed-but-draggable height + overflow-hidden
+// still clips whichever rows don't fit when dragged short; drag the
+// row's own handle taller to reveal more. The same detail is also one
+// hover away via WeekCellHoverDetail.
 export function WeekTaskCell({
   task,
   onClick,
@@ -302,19 +302,20 @@ export function WeekTaskCell({
             </div>
 
             <div className="min-w-0 flex-1 space-y-0.5 overflow-hidden">
-              <div className="flex items-center gap-1">
-                <p className="text-foreground min-w-0 flex-1 truncate text-xs font-semibold leading-snug">{cLabel ?? task.title}</p>
+              <div className="flex items-start gap-1">
+                <p className="text-foreground min-w-0 flex-1 text-xs font-semibold leading-snug break-words">{cLabel ?? task.title}</p>
                 {/* Icon-only indicators (never a text badge row) -- keeps
                     every state, including the rarer analysis-pending /
-                    rejected ones, inside a single title-row's height.
-                    Full text for each is always in the hover detail. */}
-                {task.analysis_pending && <AlertCircle className="size-2.5 shrink-0 text-amber-600" aria-label="Analiz bekliyor" />}
-                {task.rejected_at && <XCircle className="size-2.5 shrink-0 text-rose-600" aria-label="Reddedildi" />}
+                    rejected ones, compact next to a title that can now
+                    wrap. Full text for each is always in the hover
+                    detail. */}
+                {task.analysis_pending && <AlertCircle className="mt-0.5 size-2.5 shrink-0 text-amber-600" aria-label="Analiz bekliyor" />}
+                {task.rejected_at && <XCircle className="mt-0.5 size-2.5 shrink-0 text-rose-600" aria-label="Reddedildi" />}
                 {task.week_locked ? (
-                  <Lock className="text-amber-600 size-2.5 shrink-0" aria-label="Hafta kilitli, salt okunur" />
+                  <Lock className="text-amber-600 mt-0.5 size-2.5 shrink-0" aria-label="Hafta kilitli, salt okunur" />
                 ) : (
                   task.is_coach_assigned && (
-                    <Lock className="text-muted-foreground size-2.5 shrink-0" aria-label="Koç tarafından atandı" />
+                    <Lock className="text-muted-foreground mt-0.5 size-2.5 shrink-0" aria-label="Koç tarafından atandı" />
                   )
                 )}
               </div>
@@ -322,7 +323,7 @@ export function WeekTaskCell({
               {topic && (
                 <p
                   className={cn(
-                    "line-clamp-2 text-[11px] leading-snug break-words",
+                    "text-[11px] leading-snug break-words",
                     topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
                   )}
                 >
@@ -331,15 +332,14 @@ export function WeekTaskCell({
               )}
 
               {/* Which book/kaynak the coach linked, if any -- see the
-                  matching comment on StudentTask.resource_names. Kept
-                  single-line (unlike the title/topic above) -- this grid
-                  cell is tight enough that every extra wrapped line adds
-                  real height pressure across all 7 day columns at once. */}
+                  matching comment on StudentTask.resource_names. Wraps
+                  freely now -- the cell's own resize handle is how extra
+                  height gets reclaimed, not clipping this text. */}
               {task.resource_names.length > 0 && (
-                <p className="text-muted-foreground truncate text-[10px] leading-snug">{task.resource_names.join(" + ")}</p>
+                <p className="text-muted-foreground text-[10px] leading-snug break-words">{task.resource_names.join(" + ")}</p>
               )}
 
-              <p className="text-muted-foreground truncate text-[10px] leading-snug">
+              <p className="text-muted-foreground text-[10px] leading-snug break-words">
                 {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
               </p>
 

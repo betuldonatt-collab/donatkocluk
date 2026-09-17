@@ -85,7 +85,7 @@ function VideoPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="bg-rose-500/10 text-rose-600 inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
       <PlayCircle className="size-3 shrink-0" />
-      <span className="truncate">{children}</span>
+      <span className="break-words">{children}</span>
     </span>
   );
 }
@@ -94,10 +94,9 @@ function VideoPill({ children }: { children: React.ReactNode }) {
 // link); 2+ collapse into a single "N video" summary pill instead of
 // stacking individual titles -- since the card's height is now a free
 // drag rather than a fixed tier, there's no fixed row budget to cap
-// against, just no appetite for an unbounded stack of video rows. Always
-// exactly one line, truncated by VideoPill/the card's own overflow-hidden
-// if it doesn't fit. Full untruncated list is always one hover away
-// (TaskCardHoverDetail).
+// against, just no appetite for an unbounded stack of video rows. Wraps
+// freely (no truncation) same as the rest of the card; the full list is
+// still one hover away (TaskCardHoverDetail).
 function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] }) {
   if (videoLinks.length === 0) return null;
   if (videoLinks.length === 1) {
@@ -111,30 +110,27 @@ function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] 
 }
 
 // Default card content -- course name, topic, subtitle, and a video
-// indicator, each always rendered as a single truncated (ellipsis) line
-// rather than hidden or multi-line clamped. The card's own fixed-but-
-// draggable height + overflow-hidden (see kanban-task-card.tsx/
-// routine-task-card.tsx) clips whichever rows don't fit when dragged
-// short -- deliberately simple, no per-height content profile. Shared by
+// indicator, each wrapping freely (no truncation) rather than being cut
+// off. The card's own fixed-but-draggable height + overflow-hidden (see
+// kanban-task-card.tsx/routine-task-card.tsx) still clips whichever rows
+// don't fit when dragged short -- drag the row's own handle taller to
+// reveal more, rather than the text being cut mid-line. Shared by
 // KanbanTaskCard (draggable, in a day column) and RoutineTaskCard
-// (static, in the Rutinler lane) so the two stay visually identical. Full,
-// untruncated detail lives in TaskCardHoverDetail below, shown in a
-// HoverCard by the card components themselves.
+// (static, in the Rutinler lane) so the two stay visually identical. The
+// same detail is also one hover away via TaskCardHoverDetail below, shown
+// in a HoverCard by the card components themselves.
 export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
 
   return (
     <div className="min-w-0 flex-1 space-y-1 overflow-hidden">
-      <p className="text-foreground truncate text-sm leading-snug font-semibold">{cLabel ?? task.title}</p>
+      <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
 
-      {/* line-clamp-2, not a hard truncate -- was cutting long topic
-          names off with "…" at a glance, forcing a hover just to read
-          the thing the course line already promised was coming. */}
       {topic && (
         <p
           className={cn(
-            "line-clamp-2 text-xs leading-snug break-words",
+            "text-xs leading-snug break-words",
             topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
           )}
         >
@@ -142,7 +138,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
         </p>
       )}
 
-      <p className="text-muted-foreground truncate text-[11px] leading-snug">{subtitleText(task, resourceNameById)}</p>
+      <p className="text-muted-foreground text-[11px] leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
 
       <CardVideoLinks videoLinks={task.video_links} />
     </div>

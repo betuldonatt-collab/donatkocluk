@@ -173,13 +173,12 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
       </div>
 
       <div className="min-w-0 flex-1">
-        {/* items-start (not -center): the title can now wrap to 2 lines
-            (line-clamp-2, was a hard single-line truncate) so long
-            course+topic combinations stop losing their second half to
-            "…" -- centering these badges against a now-possibly-taller
+        {/* items-start (not -center): the title wraps freely now (no
+            line-clamp cap) so a long course+topic combination is never
+            cut off -- centering these badges against a now-possibly-taller
             title would float them awkwardly mid-block. */}
         <div className="flex items-start gap-1.5">
-          <p className="text-foreground line-clamp-2 min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
+          <p className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
           {task.week_locked ? (
             <span
               className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
@@ -210,9 +209,9 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
             task modal (traced to the fetch itself never joining
             task_resources; see resource_names on StudentTask). */}
         {task.resource_names.length > 0 && (
-          <p className="text-muted-foreground line-clamp-1 text-xs break-words">{task.resource_names.join(" + ")}</p>
+          <p className="text-muted-foreground text-xs break-words">{task.resource_names.join(" + ")}</p>
         )}
-        <p className="text-muted-foreground truncate text-xs">
+        <p className="text-muted-foreground text-xs break-words">
           {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : taskSubtitle(task)}
         </p>
         {task.video_links.length > 0 && (
@@ -229,7 +228,7 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
                 )}
               >
                 <PlayCircle className="size-3 shrink-0" />
-                <span className="truncate">{link.title || "Video"}</span>
+                <span className="break-words">{link.title || "Video"}</span>
               </a>
             ))}
           </div>
@@ -239,8 +238,8 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
       {/* Always visible -- was `hidden sm:flex`, which hid it on mobile
           portrait (most phones sit below the 640px sm breakpoint in
           portrait but cross it in landscape), making the button appear
-          to only work in landscape. The row already copes with the
-          narrower space via the title's own line-clamp-2/truncate. */}
+          to only work in landscape. The row copes with the narrower
+          space via the title's own free wrapping. */}
       <FocusTimerTrigger task={task} className="flex shrink-0" />
     </div>
   );
