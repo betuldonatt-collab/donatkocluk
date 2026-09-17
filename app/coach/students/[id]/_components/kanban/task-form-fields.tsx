@@ -133,24 +133,42 @@ function isAssignableType(t: string): t is AssignableTaskType {
 export function valueFromTask(task: DetailTask | null, courseResourceData?: CourseResourceData): TaskFormValue {
   if (!task) return defaultTaskFormValue();
   const courseId = task.course_id ?? ALL_COURSES[0].id;
-  const libraryResources = courseResourceData?.[courseId]?.resources ?? [];
-  const resources: TaskFormResource[] = task.resource_ids.map((id) => ({
-    resourceId: id,
-    resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
-    addToLibrary: true,
-  }));
   // Legacy rows saved before the video/topic_study merge: normalize to
   // topic_study on load so the (now single) dropdown option matches, and
   // any later save of this task naturally completes the migration.
   const rawTaskType = isAssignableType(task.task_type) ? task.task_type : "question_bank";
   const taskType = rawTaskType === "video" ? "topic_study" : rawTaskType;
+  // Same kind split as the picker itself (0044) -- a branch_exam task's
+  // linked resource_ids live in branchExamResources, never the plain
+  // study pool, so looking the name up in the wrong one silently showed
+  // an empty "Yayınevi / Kaynak" field for an already-linked branch exam
+  // task the moment it's reopened for editing.
+  const libraryResources =
+    taskType === "branch_exam"
+      ? (courseResourceData?.[courseId]?.branchExamResources ?? [])
+      : (courseResourceData?.[courseId]?.resources ?? []);
+  const resources: TaskFormResource[] = task.resource_ids.map((id) => ({
+    resourceId: id,
+    resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
+    addToLibrary: true,
+  }));
   const generalExam = taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt" as const, publisher: "" };
   const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
+  // An older branch exam task saved before this field merged into Kaynak
+  // (or one whose linked resource was later removed) has a publisher only
+  // in its title text, no resource row to show it in -- seed one so it's
+  // visible/editable instead of appearing blank, but addToLibrary false:
+  // this row represents text that was never a real library link, and
+  // re-saving without touching it shouldn't start silently creating one.
+  const finalResources =
+    taskType === "branch_exam" && resources.length === 0 && branchExamPublisher
+      ? [{ resourceId: "", resourceName: branchExamPublisher, addToLibrary: false }]
+      : resources;
   return {
     taskType,
     courseId,
     topicId: task.topic_id ?? "",
-    resources,
+    resources: finalResources,
     totalCount: task.total_count?.toString() ?? "",
     durationMinutes: task.duration_minutes?.toString() ?? "",
     videoLinks: (task.video_links ?? []).map((v) => ({ url: v.url, title: v.title ?? "" })),
@@ -192,7 +210,24 @@ export function taskFormValueToPayload(value: TaskFormValue) {
     totalCount: numberOrNull(value.totalCount),
     durationMinutes: numberOrNull(value.durationMinutes),
     videoLinks,
-    branchExamPublisher: value.taskType === "branch_exam" ? value.branchExamPublisher.trim() || null : null,
+    // No separate "Yayınevi" prompt anymore -- the coach already names the
+    // publisher(s) in the Kaynak field just below (showResource's
+    // "Yayınevi / Kaynak" section), so this derives straight from those
+    // resource names instead of asking for the same thing twice. Joined
+    // with " + " for the (less common) multi-resource case, same
+    // convention resource_names.join(" + ") already uses elsewhere in this
+    // app. Falls back to value.branchExamPublisher -- never shown as its
+    // own input anymore, but still seeded by valueFromTask's title parse
+    // when editing an older task -- so re-saving an existing branch exam
+    // without touching its resources doesn't blank out a publisher that
+    // was only ever recorded in the title text.
+    branchExamPublisher:
+      value.taskType === "branch_exam"
+        ? value.resources
+            .map((r) => r.resourceName.trim())
+            .filter(Boolean)
+            .join(" + ") || value.branchExamPublisher.trim() || null
+        : null,
   };
 }
 
@@ -355,7 +390,12 @@ export function TaskFormFields({
             const taskType = e.target.value as AssignableTaskType;
             set({
               taskType,
-              resources: [],
+              // Branş Denemesi seeds one empty row up front -- it's now
+              // the only place the publisher gets typed (see the removed
+              // standalone Yayınevi field below), so the field the coach
+              // actually needs is visible immediately instead of behind
+              // an extra "Kaynak Ekle" click.
+              resources: taskType === "branch_exam" ? [emptyResourceRow()] : [],
               totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
             });
           }}
@@ -402,18 +442,6 @@ export function TaskFormFields({
         </div>
       )}
 
-      {isBranchExam && (
-        <div className="space-y-1.5">
-          <Label htmlFor="task-form-branch-publisher">Yayınevi</Label>
-          <Input
-            id="task-form-branch-publisher"
-            value={value.branchExamPublisher}
-            onChange={(e) => set({ branchExamPublisher: e.target.value })}
-            placeholder="Örn: 3D Yayınları"
-          />
-        </div>
-      )}
-
       {(showCourse || showTopic) && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {showCourse && (
@@ -445,7 +473,12 @@ export function TaskFormFields({
 
       {showResource && (
         <div className="space-y-2">
-          <Label>{isBranchExam ? "Branş Denemesi Kaynakları" : "Kaynaklar (opsiyonel)"}</Label>
+          {/* "Yayınevi / Kaynak" for a branch exam -- same label the
+              Kaynak Takibi stock table already uses for this exact field
+              (app/coach/students/[id]/_components/branch-exam-stock-table.tsx),
+              now doing double duty as the publisher input too (see
+              taskFormValueToPayload's branchExamPublisher derivation). */}
+          <Label>{isBranchExam ? "Yayınevi / Kaynak" : "Kaynaklar (opsiyonel)"}</Label>
           {value.resources.map((r, i) => (
             <div key={i} className="flex items-start gap-2">
               <div className="flex-1">
