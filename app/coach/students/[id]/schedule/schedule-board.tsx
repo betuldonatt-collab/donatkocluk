@@ -11,6 +11,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -166,6 +167,16 @@ export function ScheduleBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeTask = activeId && !isEventDragId(activeId) ? (tasks.find((t) => t.id === activeId) ?? null) : null;
   const activeEvent = activeId && isEventDragId(activeId) ? (events.find((e) => e.id === eventIdFromDragId(activeId)) ?? null) : null;
+  // Which day column to highlight as the current drop target, resolved
+  // centrally (via containerOf, below) from whatever dnd-kit currently
+  // considers the closest droppable -- deliberately NOT each DayColumn's
+  // own useDroppable({ isOver }), since that flips to an individual card's
+  // own nested sortable rect (see the SortableContext comment on
+  // DayColumn) the instant the pointer is over an existing card rather
+  // than empty space, making a per-column isOver flicker on and off while
+  // dragging down a populated day instead of staying lit for the whole
+  // column the way a coach actually needs to see it.
+  const [overDay, setOverDay] = useState<string | null>(null);
   const [weekLocked, setWeekLocked] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
   // Independent per-row height for each lane -- a strict, Excel-like grid
@@ -395,8 +406,19 @@ export function ScheduleBoard({
     setActiveId(event.active.id as string);
   }
 
+  // Drives the drop-target highlight below (DayColumn's isDropTarget) --
+  // fires continuously as the pointer moves, so the highlighted day always
+  // matches whichever one dnd-kit would actually resolve `over` to right
+  // now, same containerOf() resolution handleDragEnd uses for the real
+  // move.
+  function handleDragOver(event: DragOverEvent) {
+    const { over } = event;
+    setOverDay(over ? containerOf(over.id as string) : null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    setOverDay(null);
     const { active, over } = event;
     if (!over) return;
     const activeId = active.id as string;
@@ -705,8 +727,12 @@ export function ScheduleBoard({
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveId(null)}
+        onDragCancel={() => {
+          setActiveId(null);
+          setOverDay(null);
+        }}
       >
         <div className="overflow-x-auto pb-2">
           <div className="grid min-w-[1260px] grid-cols-7 items-start gap-3">
@@ -717,6 +743,7 @@ export function ScheduleBoard({
                   key={day.date}
                   day={day}
                   isToday={day.date === today}
+                  isDropTarget={day.date === overDay}
                   events={eventsByDay(day.date)}
                   routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
                   regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
@@ -808,6 +835,7 @@ export function ScheduleBoard({
 function DayColumn({
   day,
   isToday,
+  isDropTarget,
   events,
   routineTasks,
   regularTasks,
@@ -832,6 +860,7 @@ function DayColumn({
 }: {
   day: { date: string; label: string };
   isToday: boolean;
+  isDropTarget: boolean;
   events: StudentEvent[];
   routineTasks: DetailTask[];
   regularTasks: DetailTask[];
@@ -883,8 +912,15 @@ function DayColumn({
         // the parent grid (see ScheduleBoard) actually shows: a light day
         // stays short and top-aligned instead of stretching to match a
         // packed neighbor.
-        "flex flex-col rounded-lg border",
+        "flex flex-col rounded-lg border transition-colors",
         isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card/40",
+        // Drop-target highlight (isDropTarget, from ScheduleBoard's
+        // centrally-resolved overDay) -- a ring rather than just a border
+        // color change so it stays clearly visible layered on top of
+        // isToday's own tint, giving the coach one unambiguous answer to
+        // "which day am I about to drop this on" regardless of how many
+        // cards are already in the way.
+        isDropTarget && "border-primary bg-primary/10 ring-primary ring-2 ring-offset-1 ring-offset-background",
       )}
     >
       <div className="flex items-center justify-between gap-1 px-2 pt-2">
