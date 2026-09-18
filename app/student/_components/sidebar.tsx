@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
+import { YksCountdown } from "@/components/ui/yks-countdown";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -53,6 +54,7 @@ export function StudentSidebar({ fullName = null }: { fullName?: string | null }
         <Logo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
+      {!effectiveCollapsed && <YksCountdown variant="student" />}
       <nav className="flex flex-col gap-1 px-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = href === "/student" ? pathname === href : pathname.startsWith(href);

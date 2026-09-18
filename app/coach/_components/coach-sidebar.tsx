@@ -7,6 +7,7 @@ import { BarChart3, Bell, Calendar, ChevronLeft, ChevronRight, Home, Settings, T
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
+import { YksCountdown } from "@/components/ui/yks-countdown";
 import { COACH_LANDING_PATH, COACH_NAV_ITEMS, COACH_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -47,6 +48,7 @@ export function CoachSidebar({ unreadCount = 0, fullName = null }: { unreadCount
         <Logo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
+      {!effectiveCollapsed && <YksCountdown variant="coach" />}
       <nav className="flex flex-col gap-1 px-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
