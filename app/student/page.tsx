@@ -58,6 +58,7 @@ async function fetchHomeData(userId: string) {
     { data: profileRow },
     { data: taskResourceRows },
     { data: fixedTaskRows },
+    { data: allTaskDurationRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -109,6 +110,12 @@ async function fetchHomeData(userId: string) {
       // here (RLS: student_fixed_tasks_student_read). Same student-side
       // injection ScheduleBoard does for the coach, see task-board.tsx.
       supabase.from("student_fixed_tasks").select("id, title, day_of_week, start_time, end_time").eq("student_id", userId),
+      // "Tüm Zamanlar" total for the dashboard's own Toplam Süre card --
+      // every task ever, one column only (cheap). tracked_duration_seconds
+      // only ever grows from a real completed Focus Timer session (never a
+      // target), so it needs no status filter -- summing across every
+      // task, any status, is already exactly "real time tracked."
+      supabase.from("student_tasks").select("tracked_duration_seconds").eq("student_id", userId),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
@@ -130,6 +137,10 @@ async function fetchHomeData(userId: string) {
     resource_names: resourceNamesByTask.get(t.id) ?? [],
   })) as StudentTask[];
 
+  const allTimeTrackedMinutes = Math.floor(
+    (allTaskDurationRows ?? []).reduce((sum, r) => sum + (r.tracked_duration_seconds ?? 0), 0) / 60,
+  );
+
   return {
     today,
     weekDays,
@@ -137,6 +148,7 @@ async function fetchHomeData(userId: string) {
     tasks,
     sessionNeedingRating: (ratingSessionRows?.[0] ?? null) as SessionNeedingRating | null,
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
+    allTimeTrackedMinutes,
     todayLocked: lockedWeeks.has(mondayOf(today)),
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
@@ -146,7 +158,18 @@ async function fetchHomeData(userId: string) {
 export default async function StudentHomePage() {
   const view = await getViewContext("student");
 
-  const { today, weekDays, nextSession, tasks, sessionNeedingRating, fixedTasks, todayLocked, routineRowHeights, taskRowHeights } = view
+  const {
+    today,
+    weekDays,
+    nextSession,
+    tasks,
+    sessionNeedingRating,
+    fixedTasks,
+    allTimeTrackedMinutes,
+    todayLocked,
+    routineRowHeights,
+    taskRowHeights,
+  } = view
     ? await fetchHomeData(view.effectiveUserId)
     : {
         today: todayISO(),
@@ -155,6 +178,7 @@ export default async function StudentHomePage() {
         tasks: [] as StudentTask[],
         sessionNeedingRating: null as SessionNeedingRating | null,
         fixedTasks: [] as StudentFixedTask[],
+        allTimeTrackedMinutes: 0,
         todayLocked: false,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
@@ -185,6 +209,7 @@ export default async function StudentHomePage() {
         weekDays={weekDays}
         initialTasks={tasks}
         fixedTasks={fixedTasks}
+        allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}

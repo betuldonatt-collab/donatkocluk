@@ -219,6 +219,15 @@ async function fetchStudentDetail(studentId: string) {
     resourceIdsByTask.set(row.task_id, list);
   }
   const tasks = (allTasks ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[];
+  // All-time tracked minutes for the Karneler tab's own stat card -- reuses
+  // this same already-fetched full-history `allTasks` (no new query).
+  // tracked_duration_seconds only ever grows from a real completed Focus
+  // Timer session (never a target), so unlike total_count/correct_count it
+  // needs no status filter -- summing across every task, any status, is
+  // already exactly "real time tracked."
+  const allTimeTrackedMinutes = Math.floor(
+    (allTasks ?? []).reduce((sum, t) => sum + (t.tracked_duration_seconds ?? 0), 0) / 60,
+  );
   // Soft coach approval: a student's own pending self-created entry
   // (is_coach_assigned: false, is_approved_by_coach: false) is excluded
   // from the Kaynak Takibi and Gelişim Haritası aggregations below until
@@ -451,6 +460,7 @@ async function fetchStudentDetail(studentId: string) {
     weekDays,
     weekTasks: (weekTaskRows ?? []) as DetailTask[],
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
+    allTimeTrackedMinutes,
     courseResourceData,
     today,
     weekStats,
@@ -524,6 +534,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                 initialWeekStats={detail.weekStats}
                 karneCycles={detail.karneCycles}
                 defaultKarneRange={detail.defaultKarneRange}
+                allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
                 initialTab={initialTab}
                 examMistakes={detail.examMistakes}
               />

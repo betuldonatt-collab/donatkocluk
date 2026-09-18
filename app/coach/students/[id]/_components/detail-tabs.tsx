@@ -31,6 +31,7 @@ export function DetailTabs({
   initialWeekStats,
   karneCycles,
   defaultKarneRange,
+  allTimeTrackedMinutes,
   initialTab,
 }: {
   studentId: string;
@@ -48,6 +49,7 @@ export function DetailTabs({
   initialWeekStats: DayStat[];
   karneCycles: CoachReportCardRow[];
   defaultKarneRange: { rangeStart: string; rangeEnd: string } | null;
+  allTimeTrackedMinutes: number;
   initialTab: string;
 }) {
   return (
@@ -95,7 +97,12 @@ export function DetailTabs({
       </TabsContent>
 
       <TabsContent value="karneler" className="pt-4">
-        <KarnelerTab studentId={studentId} cycles={karneCycles} defaultRange={defaultKarneRange} />
+        <KarnelerTab
+          studentId={studentId}
+          cycles={karneCycles}
+          defaultRange={defaultKarneRange}
+          allTimeTrackedMinutes={allTimeTrackedMinutes}
+        />
       </TabsContent>
     </Tabs>
   );

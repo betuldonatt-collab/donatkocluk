@@ -112,6 +112,7 @@ export function TaskBoard({
   weekDays: initialWeekDays,
   initialTasks,
   fixedTasks,
+  allTimeTrackedMinutes,
   todayLocked,
   initialRoutineRowHeights,
   initialTaskRowHeights,
@@ -123,6 +124,12 @@ export function TaskBoard({
   // the coach's own ScheduleBoard), read-only here. Managed only by the
   // coach, on the Program tab.
   fixedTasks: StudentFixedTask[];
+  // All-time sum of tracked_duration_seconds across every task this
+  // student has ever had -- unlike the Günlük/Haftalık totals below
+  // (DybTotalCard), this doesn't depend on `tasks` (only the current
+  // week/today is ever loaded client-side) so it's computed once,
+  // server-side, and passed straight through rather than derived here.
+  allTimeTrackedMinutes: number;
   todayLocked: boolean;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
@@ -250,6 +257,16 @@ export function TaskBoard({
   return (
     <div className="space-y-6">
       <PendingAnalysisAlert tasks={tasks} onOpenTask={(t) => openTask(t, "analysis")} />
+
+      {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/
+          Haftalık Toplam below, this doesn't reset when switching views or
+          navigating weeks, so it lives here instead of inside either
+          view's own footer. */}
+      <div className="border-border bg-muted/30 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm">
+        <CalendarClock className="text-muted-foreground size-4 shrink-0" />
+        <span className="text-muted-foreground">Tüm Zamanlar Toplam Süre:</span>
+        <span className="text-foreground font-semibold tabular-nums">{formatMinutesLabel(allTimeTrackedMinutes)}</span>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="bg-secondary inline-flex w-fit rounded-lg p-1">

@@ -10,7 +10,7 @@ async function fetchKarneList(studentId: string): Promise<KarneListItem[]> {
   // equivalent query.
   const { data } = await supabase
     .from("student_report_cards")
-    .select("id, cycle_number, range_start, range_end, approved_at")
+    .select("id, cycle_number, range_start, range_end, approved_at, stats")
     .eq("student_id", studentId)
     .eq("status", "approved")
     .order("cycle_number", { ascending: false });

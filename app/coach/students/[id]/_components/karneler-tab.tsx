@@ -23,6 +23,7 @@ import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
 import { CYCLE_DAYS, inclusiveDaySpan, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
 import { cn } from "@/lib/utils";
 import { approveReportCard, deleteReportCard, generateCycleReportCard, type CoachReportCardRow } from "../../../actions";
+import { LineChart } from "./charts/line-chart";
 
 type KarneRange = { rangeStart: string; rangeEnd: string };
 
@@ -46,10 +47,16 @@ export function KarnelerTab({
   studentId,
   cycles: initialCycles,
   defaultRange,
+  allTimeTrackedMinutes,
 }: {
   studentId: string;
   cycles: CoachReportCardRow[];
   defaultRange: KarneRange | null;
+  // All-time sum of tracked_duration_seconds across every task this
+  // student has ever had, regardless of cycle -- a genuinely different
+  // number from TotalDurationCard's own totalDurationMinutes below, which
+  // is scoped to one karne cycle (typically ~a month).
+  allTimeTrackedMinutes: number;
 }) {
   const [cycles, setCycles] = useState(initialCycles);
   const [range, setRange] = useState<KarneRange | null>(defaultRange);
@@ -58,6 +65,22 @@ export function KarnelerTab({
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const hasOpenDraft = cycles.some((c) => c.status === "draft");
+
+  // Only approved cycles count toward the "official" trend -- a draft
+  // hasn't been reviewed yet, same "only coach-vetted data" rule every
+  // other Karne aggregate already follows. Oldest-first for a left-to-
+  // right timeline (cycles itself stays newest-first, matching the list
+  // below and handleGenerate's own prepend). Each track's own null cycles
+  // (no exam of that type that period) are skipped independently rather
+  // than coerced to 0, so a missing AYT period doesn't read as a crash to
+  // zero on the chart.
+  const approvedCyclesAsc = cycles.filter((c) => c.status === "approved").slice().reverse();
+  const tytTrend = approvedCyclesAsc
+    .filter((c) => c.stats.tyt.current !== null)
+    .map((c) => ({ date: c.range_start, value: c.stats.tyt.current! }));
+  const aytTrend = approvedCyclesAsc
+    .filter((c) => c.stats.ayt.current !== null)
+    .map((c) => ({ date: c.range_start, value: c.stats.ayt.current! }));
 
   async function handleGenerate() {
     if (!range) return;
@@ -88,6 +111,31 @@ export function KarnelerTab({
       <p className="text-muted-foreground text-sm">
         Öğrenciye onayladıktan sonra görünen karneler -- her dönem için tarih aralığını sen belirlersin.
       </p>
+
+      {/* Cross-cycle progress -- combines "how is the exam net changing"
+          (from every approved cycle's already-fetched stats, no extra
+          query) with "how much time has actually been invested overall"
+          (allTimeTrackedMinutes, unlike TotalDurationCard below which is
+          scoped to one cycle) -- deliberately placed together per product
+          decision, since time invested is the context for reading the
+          net trend next to it. */}
+      {approvedCyclesAsc.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="border-border bg-card rounded-lg border p-4 lg:col-span-1">
+            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Tüm Zamanlar Toplam Süre</p>
+            <p className="text-foreground mt-2 text-2xl font-bold">{formatDuration(allTimeTrackedMinutes)}</p>
+            <p className="text-muted-foreground mt-1 text-xs">Bu sistemde bugüne kadar tutulan toplam süre</p>
+          </div>
+          <div className="border-border bg-card rounded-lg border p-4">
+            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">TYT Net Gelişimi</p>
+            <LineChart data={tytTrend} />
+          </div>
+          <div className="border-border bg-card rounded-lg border p-4">
+            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">AYT Net Gelişimi</p>
+            <LineChart data={aytTrend} color="#f59e0b" />
+          </div>
+        </div>
+      )}
 
       {hasOpenDraft ? (
         <p className="text-muted-foreground text-xs">
