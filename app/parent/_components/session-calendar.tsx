@@ -14,7 +14,7 @@ export type ParentSession = {
 
 const OUTCOME_LABELS: Record<ParentSession["outcome"], string> = {
   pending: "Planlanan",
-  completed: "Tamamlandı",
+  completed: "Görüşme Gerçekleşti",
   not_happened: "Gerçekleşmedi",
 };
 

@@ -11,7 +11,7 @@ import { AddSessionBatchDialog } from "./add-session-batch-dialog";
 
 const OUTCOME_LABELS: Record<DetailSession["outcome"], string> = {
   pending: "Planlanan",
-  completed: "Tamamlandı",
+  completed: "Görüşme Gerçekleşti",
   not_happened: "Gerçekleşmedi",
 };
 
