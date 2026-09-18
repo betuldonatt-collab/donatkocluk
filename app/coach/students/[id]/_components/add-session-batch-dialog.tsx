@@ -11,11 +11,15 @@ import { Label } from "@/components/ui/label";
 import { createPaidSessionBatch } from "../../../actions";
 import type { DetailSession } from "../types";
 
-const DEFAULT_ROW_COUNT = 4;
+const DEFAULT_ROW_COUNT = 1;
 const MAX_ROWS = 20;
 
+function emptyRow() {
+  return { date: "", time: "10:00", meetingUrl: "" };
+}
+
 function defaultRows() {
-  return Array.from({ length: DEFAULT_ROW_COUNT }, () => ({ date: "", time: "10:00" }));
+  return Array.from({ length: DEFAULT_ROW_COUNT }, emptyRow);
 }
 
 // "Parent paid for N sessions" -- lets the coach schedule every date from
@@ -23,7 +27,8 @@ function defaultRows() {
 // single-session dialog N times. Every row created here is pre-marked
 // paid (createPaidSessionBatch, app/coach/actions.ts); outcome stays the
 // normal 'pending' default until the coach evaluates it later, same as
-// any other scheduled session.
+// any other scheduled session. Each row carries its own meeting link --
+// one payment doesn't imply every session shares a single recurring URL.
 export function AddSessionBatchDialog({
   open,
   onOpenChange,
@@ -36,15 +41,14 @@ export function AddSessionBatchDialog({
   onCreated: (sessions: DetailSession[]) => void;
 }) {
   const [rows, setRows] = useState(defaultRows);
-  const [meetingUrl, setMeetingUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function updateRow(index: number, patch: Partial<{ date: string; time: string }>) {
+  function updateRow(index: number, patch: Partial<{ date: string; time: string; meetingUrl: string }>) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
   function addRow() {
-    setRows((prev) => (prev.length >= MAX_ROWS ? prev : [...prev, { date: "", time: "10:00" }]));
+    setRows((prev) => (prev.length >= MAX_ROWS ? prev : [...prev, emptyRow()]));
   }
 
   function removeRow(index: number) {
@@ -53,18 +57,22 @@ export function AddSessionBatchDialog({
 
   function reset() {
     setRows(defaultRows());
-    setMeetingUrl("");
   }
 
-  const validRows = rows.filter((r) => r.date);
-  const canSubmit = validRows.length > 0 && meetingUrl.trim().length > 0;
+  const validRows = rows.filter((r) => r.date && r.meetingUrl.trim());
+  const canSubmit = validRows.length > 0 && validRows.length === rows.length;
 
   async function handleCreate() {
     if (!canSubmit) return;
     setSaving(true);
     try {
-      const scheduledAts = validRows.map((r) => new Date(`${r.date}T${r.time || "00:00"}:00`).toISOString());
-      const sessions = await createPaidSessionBatch({ studentId, scheduledAts, meetingUrl: meetingUrl.trim() });
+      const sessions = await createPaidSessionBatch({
+        studentId,
+        sessions: validRows.map((r) => ({
+          scheduledAt: new Date(`${r.date}T${r.time || "00:00"}:00`).toISOString(),
+          meetingUrl: r.meetingUrl.trim(),
+        })),
+      });
       onCreated(sessions as DetailSession[]);
       reset();
       onOpenChange(false);
@@ -88,28 +96,49 @@ export function AddSessionBatchDialog({
           işaretlenir.
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {rows.map((row, i) => (
-            <div key={i} className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
-                {i === 0 && <Label htmlFor={`batch-date-${i}`}>Tarih</Label>}
-                <Input id={`batch-date-${i}`} type="date" value={row.date} onChange={(e) => updateRow(i, { date: e.target.value })} />
+            <div key={i} className="border-border space-y-2 rounded-lg border p-3">
+              <div className="flex items-end gap-2">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor={`batch-date-${i}`}>Tarih</Label>
+                  <Input
+                    id={`batch-date-${i}`}
+                    type="date"
+                    value={row.date}
+                    onChange={(e) => updateRow(i, { date: e.target.value })}
+                  />
+                </div>
+                <div className="w-28 space-y-1.5">
+                  <Label htmlFor={`batch-time-${i}`}>Saat</Label>
+                  <Input
+                    id={`batch-time-${i}`}
+                    type="time"
+                    value={row.time}
+                    onChange={(e) => updateRow(i, { time: e.target.value })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => removeRow(i)}
+                  disabled={rows.length <= 1}
+                  aria-label="Satırı kaldır"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               </div>
-              <div className="w-28 space-y-1.5">
-                {i === 0 && <Label htmlFor={`batch-time-${i}`}>Saat</Label>}
-                <Input id={`batch-time-${i}`} type="time" value={row.time} onChange={(e) => updateRow(i, { time: e.target.value })} />
+              <div className="space-y-1.5">
+                <Label htmlFor={`batch-meeting-url-${i}`}>Görüşme Linki</Label>
+                <Input
+                  id={`batch-meeting-url-${i}`}
+                  value={row.meetingUrl}
+                  onChange={(e) => updateRow(i, { meetingUrl: e.target.value })}
+                  placeholder="https://meet.google.com/..."
+                />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                onClick={() => removeRow(i)}
-                disabled={rows.length <= 1}
-                aria-label="Satırı kaldır"
-              >
-                <Trash2 className="size-4" />
-              </Button>
             </div>
           ))}
         </div>
@@ -118,16 +147,6 @@ export function AddSessionBatchDialog({
           <Plus className="size-4" />
           Tarih Ekle
         </Button>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="batch-meeting-url">Görüşme Linki</Label>
-          <Input
-            id="batch-meeting-url"
-            value={meetingUrl}
-            onChange={(e) => setMeetingUrl(e.target.value)}
-            placeholder="https://meet.google.com/..."
-          />
-        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

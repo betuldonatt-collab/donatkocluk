@@ -321,17 +321,19 @@ export async function updateSessionPaymentStatus(sessionId: string, isPaid: bool
 
 // "Parent paid for N sessions" -- schedules every date in one submit, all
 // pre-marked paid, so the coach doesn't have to repeat the single-session
-// dialog N times for one payment.
+// dialog N times for one payment. Each row carries its own meeting_url --
+// a payment doesn't imply every session shares one recurring link.
 const createPaidSessionBatchSchema = z.object({
   studentId: uuidSchema,
-  scheduledAts: z.array(z.string().min(1)).min(1, "En az bir tarih gerekli.").max(20, "Tek seferde en fazla 20 görüşme eklenebilir."),
-  meetingUrl: nonEmptyText(2000, "Görüşme linki"),
+  sessions: z
+    .array(z.object({ scheduledAt: z.string().min(1), meetingUrl: nonEmptyText(2000, "Görüşme linki") }))
+    .min(1, "En az bir tarih gerekli.")
+    .max(20, "Tek seferde en fazla 20 görüşme eklenebilir."),
 });
 
 export async function createPaidSessionBatch(input: {
   studentId: string;
-  scheduledAts: string[];
-  meetingUrl: string;
+  sessions: { scheduledAt: string; meetingUrl: string }[];
 }) {
   await assertNotImpersonating();
   const inputV = parseInput(createPaidSessionBatchSchema, input);
@@ -342,11 +344,11 @@ export async function createPaidSessionBatch(input: {
   const { data, error } = await supabase
     .from("coaching_sessions")
     .insert(
-      inputV.scheduledAts.map((scheduledAt) => ({
+      inputV.sessions.map((s) => ({
         coach_id: user.id,
         student_id: inputV.studentId,
-        scheduled_at: scheduledAt,
-        meeting_url: inputV.meetingUrl,
+        scheduled_at: s.scheduledAt,
+        meeting_url: s.meetingUrl,
         is_paid: true,
       })),
     )
