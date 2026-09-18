@@ -319,21 +319,26 @@ export async function updateSessionPaymentStatus(sessionId: string, isPaid: bool
   return data;
 }
 
-// "Parent paid for N sessions" -- schedules every date in one submit, all
-// pre-marked paid, so the coach doesn't have to repeat the single-session
-// dialog N times for one payment. Each row carries its own meeting_url --
-// a payment doesn't imply every session shares one recurring link.
+// Schedules every date in one submit instead of repeating the
+// single-session dialog N times -- typically for "parent paid for N
+// sessions", but isPaid is an explicit per-batch choice, not hardcoded,
+// so the coach can just as well pre-schedule sessions that are still
+// awaiting payment. Every row shares that one status (it's one batch,
+// one payment decision) but carries its own meeting_url -- a payment
+// doesn't imply every session shares one recurring link.
 const createPaidSessionBatchSchema = z.object({
   studentId: uuidSchema,
   sessions: z
     .array(z.object({ scheduledAt: z.string().min(1), meetingUrl: nonEmptyText(2000, "Görüşme linki") }))
     .min(1, "En az bir tarih gerekli.")
     .max(20, "Tek seferde en fazla 20 görüşme eklenebilir."),
+  isPaid: z.boolean(),
 });
 
 export async function createPaidSessionBatch(input: {
   studentId: string;
   sessions: { scheduledAt: string; meetingUrl: string }[];
+  isPaid: boolean;
 }) {
   await assertNotImpersonating();
   const inputV = parseInput(createPaidSessionBatchSchema, input);
@@ -349,7 +354,7 @@ export async function createPaidSessionBatch(input: {
         student_id: inputV.studentId,
         scheduled_at: s.scheduledAt,
         meeting_url: s.meetingUrl,
-        is_paid: true,
+        is_paid: inputV.isPaid,
       })),
     )
     .select("*");

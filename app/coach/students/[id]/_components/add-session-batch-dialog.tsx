@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { createPaidSessionBatch } from "../../../actions";
 import type { DetailSession } from "../types";
 
@@ -41,6 +42,7 @@ export function AddSessionBatchDialog({
   onCreated: (sessions: DetailSession[]) => void;
 }) {
   const [rows, setRows] = useState(defaultRows);
+  const [isPaid, setIsPaid] = useState(true);
   const [saving, setSaving] = useState(false);
 
   function updateRow(index: number, patch: Partial<{ date: string; time: string; meetingUrl: string }>) {
@@ -57,6 +59,7 @@ export function AddSessionBatchDialog({
 
   function reset() {
     setRows(defaultRows());
+    setIsPaid(true);
   }
 
   const validRows = rows.filter((r) => r.date && r.meetingUrl.trim());
@@ -72,11 +75,12 @@ export function AddSessionBatchDialog({
           scheduledAt: new Date(`${r.date}T${r.time || "00:00"}:00`).toISOString(),
           meetingUrl: r.meetingUrl.trim(),
         })),
+        isPaid,
       });
       onCreated(sessions as DetailSession[]);
       reset();
       onOpenChange(false);
-      toast.success(`${sessions.length} görüşme ödendi olarak eklendi.`);
+      toast.success(`${sessions.length} görüşme ${isPaid ? "ödendi" : "ödeme bekliyor"} olarak eklendi.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Görüşmeler eklenemedi.");
     } finally {
@@ -92,9 +96,32 @@ export function AddSessionBatchDialog({
         </DialogHeader>
 
         <p className="text-muted-foreground text-sm">
-          Veli ödeme yaptığında, satın alınan görüşme sayısı kadar tarihi tek seferde ekle. Hepsi &ldquo;Ödendi&rdquo; olarak
-          işaretlenir.
+          Satın alınan (veya planlanan) görüşme sayısı kadar tarihi tek seferde ekle.
         </p>
+
+        <div className="space-y-1.5">
+          <Label>Ödeme Durumu</Label>
+          <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
+            {[
+              { value: true, label: "Ödendi" },
+              { value: false, label: "Ödeme Bekliyor" },
+            ].map((opt) => (
+              <button
+                key={String(opt.value)}
+                type="button"
+                onClick={() => setIsPaid(opt.value)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  isPaid === opt.value
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="space-y-3">
           {rows.map((row, i) => (

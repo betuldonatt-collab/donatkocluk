@@ -91,6 +91,14 @@ export function SessionCalendar({ sessions }: { sessions: ParentSession[] }) {
                 Yaklaşan Görüşme
               </p>
               <p className="text-foreground text-sm font-medium">{formatDate(upcoming.scheduled_at)}</p>
+              <span
+                className={cn(
+                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
+                  upcoming.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
+                )}
+              >
+                {upcoming.is_paid ? "Ödemesi Yapıldı" : "Ödeme Bekliyor"}
+              </span>
             </div>
           </div>
           <div className="text-foreground text-xl font-semibold tabular-nums sm:text-2xl">
