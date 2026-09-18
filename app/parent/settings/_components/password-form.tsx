@@ -43,6 +43,7 @@ export function PasswordForm() {
           id="old-password"
           type="password"
           autoComplete="current-password"
+          className="h-10"
           value={oldPassword}
           onChange={(e) => setOldPassword(e.target.value)}
         />
@@ -53,6 +54,7 @@ export function PasswordForm() {
           id="new-password"
           type="password"
           autoComplete="new-password"
+          className="h-10"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
@@ -63,6 +65,7 @@ export function PasswordForm() {
           id="confirm-password"
           type="password"
           autoComplete="new-password"
+          className="h-10"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
         />
@@ -70,7 +73,7 @@ export function PasswordForm() {
       {mismatch && <p className="text-destructive text-sm">Şifreler eşleşmiyor.</p>}
       {error && <p className="text-destructive text-sm">{error}</p>}
       {success && <p className="text-muted-foreground text-sm">Şifre güncellendi.</p>}
-      <Button type="button" onClick={handleSave} disabled={saving || !oldPassword || !newPassword || mismatch}>
+      <Button type="button" className="h-10" onClick={handleSave} disabled={saving || !oldPassword || !newPassword || mismatch}>
         {saving ? "Kaydediliyor..." : "Şifreyi Güncelle"}
       </Button>
     </div>

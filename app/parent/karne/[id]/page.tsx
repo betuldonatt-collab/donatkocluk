@@ -28,7 +28,7 @@ export default async function ParentKarneDetailPage(props: PageProps<"/parent/ka
 
   if (!cycle) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Link href="/parent/karne" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm">
           <ArrowLeft className="size-4" />
           Karneler
@@ -39,7 +39,7 @@ export default async function ParentKarneDetailPage(props: PageProps<"/parent/ka
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <KarneDetailClient
         cycleNumber={cycle.cycle_number}
         rangeStart={cycle.range_start}

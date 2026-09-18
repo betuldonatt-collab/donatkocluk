@@ -88,7 +88,7 @@ export function WeeklyProgramSheet({ tasks }: { tasks: ProgramTask[] }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" className="h-10">
           <CalendarDays className="size-4" />
           Haftalık Programı İncele
         </Button>

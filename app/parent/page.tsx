@@ -158,7 +158,7 @@ export default async function ParentPage() {
 
   if (!data || !data.student) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <h1 className="text-2xl font-semibold text-foreground">Veli Paneli</h1>
         <p className="text-muted-foreground mt-4 text-sm">
           Hesabınız henüz bir öğrenciyle ilişkilendirilmemiş. Lütfen yönetici ile iletişime geçin.
@@ -181,7 +181,7 @@ export default async function ParentPage() {
   } = data;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>

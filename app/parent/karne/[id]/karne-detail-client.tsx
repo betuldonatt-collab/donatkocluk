@@ -103,7 +103,7 @@ function ScoreBreakdownCard({
   return (
     <div className="border-border bg-card rounded-lg border p-4 print:break-inside-avoid">
       <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{title}</p>
-      <div className="mt-2 flex items-center gap-6">
+      <div className="mt-2 flex flex-wrap items-center gap-3 sm:gap-6">
         <ScorePill label="Toplam Soru" value={grandTotal} tone="total" />
         <ScorePill label="Doğru" value={total.correct} tone="correct" />
         <ScorePill label="Yanlış" value={total.wrong} tone="wrong" />
@@ -144,7 +144,7 @@ function CourseChips({ courses, selectedId, onSelect }: { courses: Course[]; sel
           type="button"
           onClick={() => onSelect(c.id)}
           className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+            "min-h-10 rounded-full border px-3 py-2 text-sm font-medium transition-colors",
             selectedId === c.id
               ? "border-primary bg-primary text-primary-foreground"
               : "border-input bg-card text-muted-foreground hover:text-foreground",
@@ -229,7 +229,7 @@ export function KarneDetailClient({
           </p>
           {approvedAt && <p className="text-muted-foreground text-xs">{formatTimestamp(approvedAt)} tarihinde onaylandı</p>}
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="print:hidden">
+        <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="h-10 print:hidden">
           <Printer className="size-4" />
           Yazdır / PDF Kaydet
         </Button>
@@ -305,7 +305,7 @@ export function KarneDetailClient({
                   type="button"
                   onClick={() => handleTrackChange(t)}
                   className={cn(
-                    "rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                    "min-h-10 rounded-md px-4 py-2.5 text-sm font-medium transition-colors",
                     track === t ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                   )}
                 >

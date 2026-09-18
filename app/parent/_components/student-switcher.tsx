@@ -33,7 +33,7 @@ export function StudentSwitcher({ students, activeStudentId }: { students: Linke
         value={activeStudentId}
         onChange={(e) => handleChange(e.target.value)}
         disabled={switching}
-        className="border-input bg-background h-8 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
+        className="border-input bg-background h-10 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
       >
         {students.map((s) => (
           <option key={s.id} value={s.id}>

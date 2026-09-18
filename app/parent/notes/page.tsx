@@ -47,7 +47,7 @@ export default async function ParentNotesPage() {
   const notes = await fetchApprovedNotes();
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">Koçtan Notlar</h1>
         <p className="text-muted-foreground mt-1 text-sm">Koçun paylaştığı görüşme notları.</p>

@@ -27,10 +27,10 @@ export function PhoneForm({ initialPhone }: { initialPhone: string | null }) {
     <div className="space-y-3">
       <div className="space-y-1.5">
         <Label htmlFor="parent-phone">Telefon</Label>
-        <Input id="parent-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Input id="parent-phone" type="tel" className="h-10" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       {success && <p className="text-muted-foreground text-sm">Telefon güncellendi.</p>}
-      <Button type="button" onClick={handleSave} disabled={saving}>
+      <Button type="button" className="h-10" onClick={handleSave} disabled={saving}>
         {saving ? "Kaydediliyor..." : "Kaydet"}
       </Button>
     </div>

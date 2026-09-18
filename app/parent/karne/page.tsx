@@ -22,7 +22,7 @@ export default async function ParentKarnePage() {
   const cycles = studentId ? await fetchKarneList(studentId) : [];
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <KarneListClient cycles={cycles} />
     </div>
   );

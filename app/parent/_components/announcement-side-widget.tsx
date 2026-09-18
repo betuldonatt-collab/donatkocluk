@@ -70,7 +70,7 @@ export function AnnouncementSideWidget({ announcements }: { announcements: Paren
         type="button"
         onClick={toggle}
         aria-label="Duyuru panelini genişlet"
-        className="fixed top-1/2 right-0 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-purple-300 bg-purple-100 px-2 py-3 text-purple-800 shadow-lg transition-colors hover:bg-purple-200 dark:border-purple-700/50 dark:bg-purple-900/40 dark:text-purple-200 dark:hover:bg-purple-900/60 print:hidden"
+        className="fixed top-1/2 right-0 z-40 flex min-w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-purple-300 bg-purple-100 px-3 py-3 text-purple-800 shadow-lg transition-colors hover:bg-purple-200 dark:border-purple-700/50 dark:bg-purple-900/40 dark:text-purple-200 dark:hover:bg-purple-900/60 print:hidden"
       >
         <Megaphone className="size-4 shrink-0" />
         <span className="text-xs font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180">Duyurular</span>
@@ -89,7 +89,7 @@ export function AnnouncementSideWidget({ announcements }: { announcements: Paren
           type="button"
           onClick={toggle}
           aria-label="Duyuru panelini küçült"
-          className="text-muted-foreground hover:text-foreground shrink-0"
+          className="text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
         >
           <ChevronRight className="size-4" />
         </button>

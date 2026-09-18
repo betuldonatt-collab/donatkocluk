@@ -69,15 +69,22 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
               href={`/parent/karne/${cycle.id}`}
               className="border-border bg-card hover:bg-accent/40 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 transition-colors"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="text-foreground text-sm font-semibold">{cycle.cycle_number}. Dönem</p>
                 <p className="text-muted-foreground text-xs">
                   {formatDate(cycle.range_start)} – {formatDate(cycle.range_end)}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Hidden below sm, not just wrapped -- the chevron already
+                    signals "tap to open," and this full Turkish phrase
+                    ("18 Eylül 2026 tarihinde onaylandı") next to the left
+                    title block was wide enough to push a ~375px viewport
+                    wider than the screen. */}
                 {cycle.approved_at && (
-                  <span className="text-muted-foreground text-xs">{formatTimestamp(cycle.approved_at)} tarihinde onaylandı</span>
+                  <span className="text-muted-foreground hidden text-xs sm:inline">
+                    {formatTimestamp(cycle.approved_at)} tarihinde onaylandı
+                  </span>
                 )}
                 <ChevronRight className="text-muted-foreground size-4" />
               </div>
