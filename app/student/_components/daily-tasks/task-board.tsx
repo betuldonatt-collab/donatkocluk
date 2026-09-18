@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { isRoutineCourseId } from "@/lib/curriculum";
-import { weekDates } from "@/lib/date";
 import { sumTaskCounts, sumTaskDuration } from "@/lib/scoring";
 import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
 import { useRowHeights } from "@/lib/use-row-heights";
@@ -46,13 +45,6 @@ const MONTH_LABELS = [
 ];
 const MONTH_LABELS_SHORT = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
-function getWeekDays(referenceIso: string) {
-  return weekDates(referenceIso).map((date, i) => {
-    const d = new Date(`${date}T00:00:00Z`);
-    return { date, label: `${DAY_LABELS[i]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
-  });
-}
-
 function addDaysISO(dateStr: string, days: number) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -65,6 +57,19 @@ function addDaysISO(dateStr: string, days: number) {
 // this just rotates it.
 function dayOfWeekOf(dateIso: string): number {
   return (new Date(`${dateIso}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+// A rolling 7-day window starting EXACTLY at referenceIso -- deliberately
+// not Monday-aligned, mirroring the coach's own schedule-board.tsx (see
+// its own comment) so Prev/Next below can shift the window by exactly 1
+// day instead of jumping a whole week. Each date's own day-of-week
+// decides its label, not its position in the array.
+function getWeekDays(referenceIso: string) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDaysISO(referenceIso, i);
+    const d = new Date(`${date}T00:00:00Z`);
+    return { date, label: `${DAY_LABELS[dayOfWeekOf(date)]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
+  });
 }
 
 // Read-only "Sabit Görevler" chip -- injected from the student's fixed
@@ -265,17 +270,21 @@ export function TaskBoard({
           ))}
         </div>
 
-        {/* Week navigation -- only meaningful once "Bu Hafta" is showing.
-            A student previously had no way to reach a past (and possibly
-            locked) week at all once it scrolled off the default view. */}
+        {/* Day-by-day navigation -- only meaningful once "Bu Hafta" is
+            showing. Shifts the rolling 7-day window by exactly 1 day
+            (not a whole week), mirroring the coach's own schedule-board.tsx
+            exactly -- a student previously had no way to reach a past
+            (and possibly locked) week at all once it scrolled off the
+            default view; this also lets them nudge the window a single
+            day at a time instead of only ever jumping by 7. */}
         {view === "week" && (
           <>
             <Button
               type="button"
               variant="outline"
               size="icon"
-              onClick={() => loadWeek(getWeekDays(addDaysISO(weekDays[0].date, -7)))}
-              aria-label="Önceki hafta"
+              onClick={() => loadWeek(getWeekDays(addDaysISO(weekDays[0].date, -1)))}
+              aria-label="Bir gün geri"
               disabled={weekLoading}
             >
               <ChevronLeft className="size-4" />
@@ -285,15 +294,15 @@ export function TaskBoard({
               value={weekDays[0].date}
               onChange={(e) => e.target.value && loadWeek(getWeekDays(e.target.value))}
               disabled={weekLoading}
-              aria-label="Belirli bir haftaya git"
+              aria-label="Belirli bir tarihten başlayan 7 günlük görünüme git"
               className="border-input bg-background h-9 rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
             />
             <Button
               type="button"
               variant="outline"
               size="icon"
-              onClick={() => loadWeek(getWeekDays(addDaysISO(weekDays[0].date, 7)))}
-              aria-label="Sonraki hafta"
+              onClick={() => loadWeek(getWeekDays(addDaysISO(weekDays[0].date, 1)))}
+              aria-label="Bir gün ileri"
               disabled={weekLoading}
             >
               <ChevronRight className="size-4" />

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import { mondayOf, weekDates } from "@/lib/date";
+import { mondayOf } from "@/lib/date";
 import { reconcileStaleFocusSessions } from "./actions";
 import { NextSessionCard } from "./_components/next-session-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
@@ -18,14 +18,19 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Monday-through-Sunday week containing `todayISO`, computed in UTC to
-// match todayISO()'s own UTC-based "today" (see fetchHomeData).
-function getWeekDays(todayIso: string) {
-  // weekDates returns Monday..Sunday in order, so the array index doubles
-  // as the DAY_LABELS index directly.
-  return weekDates(todayIso).map((date, i) => {
-    const d = new Date(`${date}T00:00:00Z`);
-    return { date, label: `${DAY_LABELS[i]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
+// A rolling 7-day window starting EXACTLY at referenceIso -- NOT
+// Monday-aligned, mirroring task-board.tsx's own client-side nav (Prev/
+// Next shift by exactly 1 day, not a whole week) so the very first render
+// already matches whatever the board would compute itself after a click.
+// Ported from the coach's own schedule/page.tsx, which established this
+// exact pattern first.
+function getWeekDays(referenceIso: string) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(`${referenceIso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    const date = d.toISOString().slice(0, 10);
+    const dow = (d.getUTCDay() + 6) % 7;
+    return { date, label: `${DAY_LABELS[dow]} ${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]}` };
   });
 }
 
