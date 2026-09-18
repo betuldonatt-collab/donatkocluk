@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { createCalendarBlock, createCoachingSession, deleteCalendarBlock, deleteCoachingSession } from "../../actions";
+import {
+  createCalendarBlock,
+  createCoachingSession,
+  deleteCalendarBlock,
+  deleteCoachingSession,
+  updateSessionPaymentStatus,
+} from "../../actions";
 import { MISSED_REASON_LABELS, type CalendarBlock, type CoachingSession, type RosterStudent } from "../types";
 
 type EventKind = "session" | "block";
@@ -52,6 +59,7 @@ export function CreateEventDialog({
   const [time, setTime] = useState(`${String(defaultHour).padStart(2, "0")}:${String(defaultMinute).padStart(2, "0")}`);
   const [studentId, setStudentId] = useState(roster[0]?.id ?? "");
   const [meetingUrl, setMeetingUrl] = useState("");
+  const [isPaid, setIsPaid] = useState(false);
   const [blockTitle, setBlockTitle] = useState("");
   const [endTime, setEndTime] = useState(
     `${String(Math.min(defaultHour + 1, 23)).padStart(2, "0")}:${String(defaultMinute).padStart(2, "0")}`,
@@ -61,6 +69,7 @@ export function CreateEventDialog({
   function reset() {
     setBlockTitle("");
     setMeetingUrl("");
+    setIsPaid(false);
   }
 
   async function handleCreate() {
@@ -69,7 +78,7 @@ export function CreateEventDialog({
       if (kind === "session") {
         if (!studentId || !meetingUrl.trim()) return;
         const scheduledAt = new Date(`${date}T${time}:00`).toISOString();
-        const session = await createCoachingSession({ studentId, scheduledAt, meetingUrl: meetingUrl.trim() });
+        const session = await createCoachingSession({ studentId, scheduledAt, meetingUrl: meetingUrl.trim(), isPaid });
         onCreatedSession(session as CoachingSession);
       } else {
         if (!blockTitle.trim()) return;
@@ -149,6 +158,12 @@ export function CreateEventDialog({
                 required
               />
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="event-is-paid" checked={isPaid} onCheckedChange={(checked) => setIsPaid(checked === true)} />
+              <Label htmlFor="event-is-paid" className="text-sm font-normal">
+                Ödendi
+              </Label>
+            </div>
           </>
         ) : (
           <>
@@ -191,14 +206,17 @@ export function SessionDetailDialog({
   onOpenChange,
   roster,
   onDeleted,
+  onUpdated,
 }: {
   session: CoachingSession | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roster: RosterStudent[];
   onDeleted: (id: string) => void;
+  onUpdated: (session: CoachingSession) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [togglingPaid, setTogglingPaid] = useState(false);
   if (!session) return null;
 
   const student = roster.find((s) => s.id === session.student_id);
@@ -213,6 +231,18 @@ export function SessionDetailDialog({
       toast.error(e instanceof Error ? e.message : "Görüşme iptal edilemedi.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleTogglePaid() {
+    setTogglingPaid(true);
+    try {
+      const updated = await updateSessionPaymentStatus(session!.id, !session!.is_paid);
+      onUpdated(updated as CoachingSession);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ödeme durumu güncellenemedi.");
+    } finally {
+      setTogglingPaid(false);
     }
   }
 
@@ -233,6 +263,19 @@ export function SessionDetailDialog({
         </DialogHeader>
 
         <div className="space-y-2 text-sm">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 text-xs font-medium",
+                session.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
+              )}
+            >
+              {session.is_paid ? "Ödendi" : "Ödeme Bekliyor"}
+            </span>
+            <Button type="button" variant="outline" size="sm" onClick={handleTogglePaid} disabled={togglingPaid}>
+              {session.is_paid ? "Ödenmedi olarak işaretle" : "Ödendi olarak işaretle"}
+            </Button>
+          </div>
           {session.meeting_url && (
             <p>
               <span className="text-muted-foreground">Link: </span>

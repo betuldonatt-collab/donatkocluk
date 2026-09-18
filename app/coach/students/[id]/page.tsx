@@ -480,7 +480,7 @@ async function fetchStudentDetail(studentId: string) {
   };
 }
 
-const DETAIL_TABS = ["analiz", "gelisim-haritasi", "grafikler", "program", "kaynak-takibi", "karneler"] as const;
+const DETAIL_TABS = ["analiz", "gelisim-haritasi", "grafikler", "program", "kaynak-takibi", "karneler", "gorusmeler"] as const;
 
 export default async function CoachStudentDetailPage(props: PageProps<"/coach/students/[id]">) {
   const { id } = await props.params;
@@ -537,6 +537,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                 allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
                 initialTab={initialTab}
                 examMistakes={detail.examMistakes}
+                sessions={detail.sessions}
               />
             </div>
 

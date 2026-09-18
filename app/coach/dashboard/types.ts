@@ -14,6 +14,7 @@ export type CoachingSession = {
   student_rating: number | null;
   student_feedback: string | null;
   rated_at: string | null;
+  is_paid: boolean;
 };
 
 export type CalendarBlock = {

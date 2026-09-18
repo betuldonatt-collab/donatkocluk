@@ -260,15 +260,17 @@ const createSessionSchema = z.object({
   studentId: uuidSchema,
   scheduledAt: z.string().min(1, "Görüşme zamanı zorunludur."),
   meetingUrl: nonEmptyText(2000, "Görüşme linki"),
+  isPaid: z.boolean(),
 });
 
 export async function createCoachingSession(input: {
   studentId: string;
   scheduledAt: string;
   meetingUrl: string;
+  isPaid?: boolean;
 }) {
   await assertNotImpersonating();
-  const inputV = parseInput(createSessionSchema, input);
+  const inputV = parseInput(createSessionSchema, { isPaid: false, ...input });
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, inputV.studentId);
@@ -280,6 +282,7 @@ export async function createCoachingSession(input: {
       student_id: inputV.studentId,
       scheduled_at: inputV.scheduledAt,
       meeting_url: inputV.meetingUrl,
+      is_paid: inputV.isPaid,
     })
     .select("*")
     .single();
@@ -296,6 +299,63 @@ export async function deleteCoachingSession(sessionId: string) {
   const { error } = await supabase.from("coaching_sessions").delete().eq("id", sessionIdV);
   if (error) throw dbError(error);
   revalidatePath("/coach/dashboard");
+}
+
+export async function updateSessionPaymentStatus(sessionId: string, isPaid: boolean) {
+  await assertNotImpersonating();
+  const sessionIdV = parseInput(uuidSchema, sessionId);
+  const isPaidV = parseInput(z.boolean(), isPaid);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("coaching_sessions")
+    .update({ is_paid: isPaidV, updated_at: new Date().toISOString() })
+    .eq("id", sessionIdV)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath("/coach/dashboard");
+  revalidatePath(`/coach/students/${data.student_id}`);
+  return data;
+}
+
+// "Parent paid for N sessions" -- schedules every date in one submit, all
+// pre-marked paid, so the coach doesn't have to repeat the single-session
+// dialog N times for one payment.
+const createPaidSessionBatchSchema = z.object({
+  studentId: uuidSchema,
+  scheduledAts: z.array(z.string().min(1)).min(1, "En az bir tarih gerekli.").max(20, "Tek seferde en fazla 20 görüşme eklenebilir."),
+  meetingUrl: nonEmptyText(2000, "Görüşme linki"),
+});
+
+export async function createPaidSessionBatch(input: {
+  studentId: string;
+  scheduledAts: string[];
+  meetingUrl: string;
+}) {
+  await assertNotImpersonating();
+  const inputV = parseInput(createPaidSessionBatchSchema, input);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, inputV.studentId);
+
+  const { data, error } = await supabase
+    .from("coaching_sessions")
+    .insert(
+      inputV.scheduledAts.map((scheduledAt) => ({
+        coach_id: user.id,
+        student_id: inputV.studentId,
+        scheduled_at: scheduledAt,
+        meeting_url: inputV.meetingUrl,
+        is_paid: true,
+      })),
+    )
+    .select("*");
+  if (error) throw dbError(error);
+
+  revalidatePath("/coach/dashboard");
+  revalidatePath(`/coach/students/${inputV.studentId}`);
+  return data;
 }
 
 // --- Coach notes ("Koç Notları" on the student detail page) ------------

@@ -9,7 +9,29 @@ export type ParentSession = {
   id: string;
   scheduled_at: string;
   outcome: "pending" | "completed" | "not_happened";
+  is_paid: boolean;
 };
+
+const OUTCOME_LABELS: Record<ParentSession["outcome"], string> = {
+  pending: "Planlanan",
+  completed: "Tamamlandı",
+  not_happened: "Gerçekleşmedi",
+};
+
+const OUTCOME_COLORS: Record<ParentSession["outcome"], string> = {
+  pending: "bg-muted text-muted-foreground",
+  completed: "bg-emerald-500/15 text-emerald-700",
+  not_happened: "bg-rose-500/15 text-rose-700",
+};
+
+function monthGroupKey(iso: string) {
+  return iso.slice(0, 7);
+}
+
+function formatMonthHeading(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+}
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "Şimdi";
@@ -48,6 +70,14 @@ export function SessionCalendar({ sessions }: { sessions: ParentSession[] }) {
     .filter((s) => s.id !== upcoming?.id)
     .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
 
+  const monthGroups = new Map<string, ParentSession[]>();
+  for (const s of past) {
+    const key = monthGroupKey(s.scheduled_at);
+    const bucket = monthGroups.get(key) ?? [];
+    bucket.push(s);
+    monthGroups.set(key, bucket);
+  }
+
   return (
     <div className="space-y-4">
       {upcoming ? (
@@ -74,19 +104,33 @@ export function SessionCalendar({ sessions }: { sessions: ParentSession[] }) {
         </div>
       )}
 
-      {past.length > 0 && (
-        <div className="border-border divide-border overflow-hidden rounded-xl border divide-y">
-          {past.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <span className="text-foreground text-sm">{formatDate(s.scheduled_at)}</span>
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                  s.outcome === "completed" ? "bg-emerald-500/15 text-emerald-700" : "bg-rose-500/15 text-rose-700",
-                )}
-              >
-                {s.outcome === "completed" ? "Tamamlandı" : "Yapılmadı"}
-              </span>
+      {monthGroups.size > 0 && (
+        <div className="space-y-4">
+          {[...monthGroups.entries()].map(([monthKey, monthSessions]) => (
+            <div key={monthKey}>
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                {formatMonthHeading(monthKey)}
+              </p>
+              <div className="border-border divide-border overflow-hidden rounded-xl border divide-y">
+                {monthSessions.map((s) => (
+                  <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                    <span className="text-foreground text-sm">{formatDate(s.scheduled_at)}</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", OUTCOME_COLORS[s.outcome])}>
+                        {OUTCOME_LABELS[s.outcome]}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                          s.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
+                        )}
+                      >
+                        {s.is_paid ? "Ödemesi Yapıldı" : "Ödeme Bekliyor"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

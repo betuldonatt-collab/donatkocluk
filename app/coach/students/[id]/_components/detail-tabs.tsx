@@ -2,7 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
-import type { DetailTask, ParagrafProblemEntry } from "../types";
+import type { DetailSession, DetailTask, ParagrafProblemEntry } from "../types";
 import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
 import { AnalyticsTab } from "./analytics-tab";
 import { ChartsTab } from "./charts-tab";
@@ -11,6 +11,7 @@ import { GelisimHaritasiTab } from "./gelisim-haritasi-tab";
 import { KarnelerTab } from "./karneler-tab";
 import { KaynakTakibiTab, type CourseResourceData } from "./kaynak-takibi-tab";
 import { ProgramTab } from "./program-tab";
+import { SessionsTab } from "./sessions-tab";
 import type { TopicPerformanceRow } from "./topic-performance-map";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
@@ -33,6 +34,7 @@ export function DetailTabs({
   defaultKarneRange,
   allTimeTrackedMinutes,
   initialTab,
+  sessions,
 }: {
   studentId: string;
   topicPerformance: TopicPerformanceRow[];
@@ -51,6 +53,7 @@ export function DetailTabs({
   defaultKarneRange: { rangeStart: string; rangeEnd: string } | null;
   allTimeTrackedMinutes: number;
   initialTab: string;
+  sessions: DetailSession[];
 }) {
   return (
     <Tabs defaultValue={initialTab}>
@@ -61,6 +64,7 @@ export function DetailTabs({
         <TabsTrigger value="program">Program</TabsTrigger>
         <TabsTrigger value="kaynak-takibi">Kaynak Takibi</TabsTrigger>
         <TabsTrigger value="karneler">Karneler</TabsTrigger>
+        <TabsTrigger value="gorusmeler">Görüşmeler</TabsTrigger>
       </TabsList>
 
       <TabsContent value="analiz" className="pt-4">
@@ -103,6 +107,10 @@ export function DetailTabs({
           defaultRange={defaultKarneRange}
           allTimeTrackedMinutes={allTimeTrackedMinutes}
         />
+      </TabsContent>
+
+      <TabsContent value="gorusmeler" className="pt-4">
+        <SessionsTab studentId={studentId} initialSessions={sessions} />
       </TabsContent>
     </Tabs>
   );

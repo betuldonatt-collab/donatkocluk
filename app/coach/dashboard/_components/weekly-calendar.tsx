@@ -29,6 +29,7 @@ export function WeeklyCalendar({
   onCreatedSession,
   onCreatedBlock,
   onDeletedSession,
+  onUpdatedSession,
   onDeletedBlock,
 }: {
   weekDays: { date: string; label: string }[];
@@ -39,6 +40,7 @@ export function WeeklyCalendar({
   onCreatedSession: (session: CoachingSession) => void;
   onCreatedBlock: (block: CalendarBlock) => void;
   onDeletedSession: (id: string) => void;
+  onUpdatedSession: (session: CoachingSession) => void;
   onDeletedBlock: (id: string) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -199,6 +201,10 @@ export function WeeklyCalendar({
         onOpenChange={(open) => !open && setActiveSession(null)}
         roster={roster}
         onDeleted={onDeletedSession}
+        onUpdated={(updated) => {
+          onUpdatedSession(updated);
+          setActiveSession(updated);
+        }}
       />
       <BlockDetailDialog
         block={activeBlock}

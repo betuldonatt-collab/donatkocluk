@@ -59,6 +59,7 @@ export type DetailSession = {
   evaluation_notes: string | null;
   missed_reason: "student_no_show" | "coach_no_show" | "other" | null;
   missed_reason_note: string | null;
+  is_paid: boolean;
 };
 
 export type ParagrafProblemEntry = {

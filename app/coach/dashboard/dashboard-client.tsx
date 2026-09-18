@@ -76,6 +76,7 @@ export function DashboardClient({
           onCreatedSession={handleCreatedSession}
           onCreatedBlock={(block) => setBlocks((prev) => [...prev, block])}
           onDeletedSession={handleDeletedSession}
+          onUpdatedSession={handleEvaluated}
           onDeletedBlock={(id) => setBlocks((prev) => prev.filter((b) => b.id !== id))}
         />
       </div>

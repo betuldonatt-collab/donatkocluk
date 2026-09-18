@@ -65,7 +65,7 @@ export function AnnouncementSideWidget({ announcements }: { announcements: Coach
   }
 
   return (
-    <div className="border-border bg-card fixed top-1/2 right-4 z-40 flex max-h-[70vh] w-72 -translate-y-1/2 flex-col rounded-lg border shadow-lg print:hidden">
+    <div className="border-border bg-card fixed top-1/2 right-4 z-40 flex max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] -translate-y-1/2 flex-col rounded-lg border shadow-lg print:hidden">
       <div className="flex shrink-0 items-start justify-between gap-2 p-4 pb-3">
         <div className="flex items-center gap-2">
           <Megaphone className="text-purple-600 size-4 shrink-0" />

@@ -85,7 +85,7 @@ async function fetchDashboardData() {
         .maybeSingle(),
       supabase
         .from("coaching_sessions")
-        .select("id, scheduled_at, outcome")
+        .select("id, scheduled_at, outcome, is_paid")
         .eq("student_id", studentId)
         .order("scheduled_at", { ascending: false }),
       // Security audit finding: total_count/correct_count/wrong_count used

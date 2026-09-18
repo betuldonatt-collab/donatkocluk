@@ -3,6 +3,7 @@ import { getViewContext } from "@/lib/impersonation";
 import { mondayOf } from "@/lib/date";
 import { reconcileStaleFocusSessions } from "./actions";
 import { NextSessionCard } from "./_components/next-session-card";
+import { RemainingSessionsCard } from "./_components/remaining-sessions-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
 import type { StudentFixedTask, StudentTask } from "./_components/daily-tasks/types";
@@ -59,6 +60,7 @@ async function fetchHomeData(userId: string) {
     { data: taskResourceRows },
     { data: fixedTaskRows },
     { data: allTaskDurationRows },
+    { data: sessionBalanceRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -116,6 +118,12 @@ async function fetchHomeData(userId: string) {
       // target), so it needs no status filter -- summing across every
       // task, any status, is already exactly "real time tracked."
       supabase.from("student_tasks").select("tracked_duration_seconds").eq("student_id", userId),
+      // "Kalan Görüşme Hakkı" -- paid-count minus completed-count, allowed
+      // to go negative on purpose (see 0084_session_payment_tracking.sql)
+      // as a payment reminder, so this is deliberately NOT filtered to
+      // is_paid=true only: a completed-but-unpaid session must still count
+      // against the balance for the negative number to ever appear.
+      supabase.from("coaching_sessions").select("is_paid, outcome").eq("student_id", userId),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
@@ -141,6 +149,10 @@ async function fetchHomeData(userId: string) {
     (allTaskDurationRows ?? []).reduce((sum, r) => sum + (r.tracked_duration_seconds ?? 0), 0) / 60,
   );
 
+  const paidSessionCount = (sessionBalanceRows ?? []).filter((r) => r.is_paid).length;
+  const completedSessionCount = (sessionBalanceRows ?? []).filter((r) => r.outcome === "completed").length;
+  const remainingSessions = paidSessionCount - completedSessionCount;
+
   return {
     today,
     weekDays,
@@ -149,6 +161,7 @@ async function fetchHomeData(userId: string) {
     sessionNeedingRating: (ratingSessionRows?.[0] ?? null) as SessionNeedingRating | null,
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
+    remainingSessions,
     todayLocked: lockedWeeks.has(mondayOf(today)),
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
@@ -166,6 +179,7 @@ export default async function StudentHomePage() {
     sessionNeedingRating,
     fixedTasks,
     allTimeTrackedMinutes,
+    remainingSessions,
     todayLocked,
     routineRowHeights,
     taskRowHeights,
@@ -179,6 +193,7 @@ export default async function StudentHomePage() {
         sessionNeedingRating: null as SessionNeedingRating | null,
         fixedTasks: [] as StudentFixedTask[],
         allTimeTrackedMinutes: 0,
+        remainingSessions: 0,
         todayLocked: false,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
@@ -191,11 +206,12 @@ export default async function StudentHomePage() {
         <p className="text-muted-foreground text-sm">Tekrar hoş geldin!</p>
       </header>
 
-      <div className="mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
         <NextSessionCard
           scheduledAt={nextSession?.scheduled_at ?? null}
           meetingUrl={nextSession?.meeting_url ?? null}
         />
+        <RemainingSessionsCard remaining={remainingSessions} />
       </div>
 
       {sessionNeedingRating && (
