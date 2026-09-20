@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { BellRing } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,17 +37,9 @@ export function useStillStudyingPrompt(taskId: string, elapsedSeconds: number, a
     setConfirmed(multiple);
   }, [taskId, elapsedSeconds]);
 
-  // The prompt is easy to miss in a background tab (e.g. a lecture playing
-  // on YouTube), so surface it in the tab title too.
-  useEffect(() => {
-    if (!due || typeof document === "undefined") return;
-    const original = document.title;
-    document.title = "⏰ Hâlâ çalışıyor musun?";
-    return () => {
-      document.title = original;
-    };
-  }, [due]);
-
+  // (The tab title -- including the "Hâlâ çalışıyor musun?" wording while this
+  // is due -- is owned by whichever component shows the running timer, via
+  // lib/focus-title.ts, so it can carry the live clock at the same time.)
   return { due, confirm };
 }
 

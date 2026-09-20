@@ -110,7 +110,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   // (active-focus-session-widget.tsx) picks it up on every page.
   function handleMinimize() {
     setOpen(false);
-    toast.success("Sayaç arka planda çalışıyor. Sağ alttaki karttan Mola verebilir ya da Bitirebilirsin.");
+    toast.success("Sayaç arka planda çalışıyor. Sağ alttaki karttan Mola verebilir, Bitirebilir ya da ayrı pencerede açabilirsin.");
   }
 
   function handleStart(mode: FocusTimerMode, countdownTargetSeconds: number | null) {

@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Pause, Timer } from "lucide-react";
+import { Pause, PictureInPicture2, Timer } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
 import { focusModalStore } from "@/lib/focus-modal-store";
+import { closePip, isPipSupported, openPip, pipStore, updatePip } from "@/lib/focus-pip";
+import { formatTimerClock, formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
 import {
   endFocusSession,
   getRunningFocusSessions,
@@ -19,28 +22,48 @@ import {
 import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-prompt";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;
+// While the Picture-in-Picture window is open, re-read the server this often
+// (in 500 ms ticks) so a Mola given elsewhere shows up there too.
+const PIP_RESYNC_TICKS = 20;
 
-function formatClock(totalSeconds: number) {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const hours = Math.floor(s / 3600);
-  const minutes = Math.floor((s % 3600) / 60);
-  const seconds = s % 60;
-  const mmss = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  return hours > 0 ? `${hours}:${mmss}` : mmss;
+type LiveSession = RunningFocusSession & { fetchedAt: number };
+
+function elapsedNow(session: LiveSession, now: number) {
+  return session.elapsedSeconds + Math.max(0, (now - session.fetchedAt) / 1000);
+}
+
+// What to show as the big number: the countdown's remaining time, else elapsed.
+function displaySeconds(session: LiveSession, now: number) {
+  const elapsed = elapsedNow(session, now);
+  if (session.mode === "countdown" && session.countdownTargetSeconds !== null) {
+    return Math.max(0, session.countdownTargetSeconds - elapsed);
+  }
+  return elapsed;
+}
+
+function modeLabel(session: LiveSession, now: number) {
+  if (session.mode === "countdown" && session.countdownTargetSeconds !== null) {
+    return displaySeconds(session, now) === 0 ? "Süre doldu" : "Geri sayım";
+  }
+  return "Kronometre çalışıyor";
 }
 
 // Floating "a timer is still running" card, mounted once in the student
-// layout. The fullscreen Focus Timer modal used to END the session when it
-// unmounted (leaving the dashboard) and paused it on tab close; now a
-// session simply keeps running on the server, and this widget is how the
-// student sees and controls it from any page of the platform -- and how the
-// "Hâlâ çalışmaya devam ediyor musun?" check-in reaches them when they're
-// not inside the modal. It hides while the modal itself is open (same timer,
-// no need to show it twice).
+// layout. A running Süre Tut session lives on the server, so it keeps counting
+// through tab switches and page changes; this widget is how the student sees
+// and controls it from any page of the platform -- and how the "Hâlâ çalışmaya
+// devam ediyor musun?" check-in reaches them when they're not inside the
+// fullscreen timer. It hides while the fullscreen timer itself is open (same
+// timer, no need to show it twice).
+//
+// It also hosts the Picture-in-Picture window (lib/focus-pip.ts): because this
+// component lives in the layout it outlasts page navigation, and the window
+// keeps updating on the background ticker even while this tab is hidden.
 export function ActiveFocusSessionWidget() {
   const pathname = usePathname();
   const modalOpen = useSyncExternalStore(focusModalStore.subscribe, focusModalStore.getSnapshot, focusModalStore.getServerSnapshot) > 0;
-  const [sessions, setSessions] = useState<(RunningFocusSession & { fetchedAt: number })[]>([]);
+  const pipOpen = useSyncExternalStore(pipStore.subscribe, pipStore.getSnapshot, pipStore.getServerSnapshot);
+  const [sessions, setSessions] = useState<LiveSession[]>([]);
 
   const refresh = useCallback(async () => {
     const running = await getRunningFocusSessions();
@@ -49,10 +72,11 @@ export function ActiveFocusSessionWidget() {
   }, []);
 
   // Re-read the server whenever something that could have changed it
-  // happens: mount / route change, the modal closing (a session may have been
-  // left running), and the student coming back to this tab or window.
+  // happens: mount / route change, the fullscreen timer closing (a session may
+  // have been left running), and the PiP window opening. While the fullscreen
+  // timer is open the read is skipped -- unless PiP needs the data.
   useEffect(() => {
-    if (modalOpen) return;
+    if (modalOpen && !pipOpen) return;
     let cancelled = false;
     function load() {
       getRunningFocusSessions()
@@ -71,7 +95,7 @@ export function ActiveFocusSessionWidget() {
       cancelled = true;
       clearTimeout(retry);
     };
-  }, [modalOpen, pathname]);
+  }, [modalOpen, pipOpen, pathname]);
 
   useEffect(() => {
     function handleReturn() {
@@ -85,48 +109,92 @@ export function ActiveFocusSessionWidget() {
     };
   }, [refresh]);
 
-  if (modalOpen || sessions.length === 0) return null;
-
   return (
-    <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
-      {sessions.map((session) => (
-        <RunningSessionCard key={session.taskId} session={session} onChanged={refresh} />
-      ))}
-    </div>
+    <>
+      <PipDriver sessions={sessions} active={pipOpen} onResync={refresh} />
+      {!modalOpen && sessions.length > 0 && (
+        <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
+          {sessions.map((session, index) => (
+            <RunningSessionCard
+              key={session.taskId}
+              session={session}
+              onChanged={refresh}
+              ownsTitle={index === 0}
+              pipOpen={pipOpen}
+            />
+          ))}
+        </div>
+      )}
+    </>
   );
+}
+
+// Feeds the Picture-in-Picture window (when open) with the first running
+// session's reading, on the background ticker so it keeps counting while this
+// tab is hidden. Renders nothing.
+function PipDriver({
+  sessions,
+  active,
+  onResync,
+}: {
+  sessions: LiveSession[];
+  active: boolean;
+  onResync: () => Promise<void>;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const ticks = useRef(0);
+
+  useEffect(() => {
+    if (!active) return;
+    return subscribeTick(() => {
+      setNow(Date.now());
+      ticks.current += 1;
+      if (ticks.current % PIP_RESYNC_TICKS === 0) onResync().catch(() => {});
+    });
+  }, [active, onResync]);
+
+  const first = sessions[0];
+  useEffect(() => {
+    if (!active) return;
+    updatePip(
+      first
+        ? { time: formatTimerClock(displaySeconds(first, now)), label: modeLabel(first, now), taskTitle: first.taskTitle, running: true }
+        : { time: "--:--", label: "Çalışan sayaç yok", taskTitle: "", running: false },
+    );
+  }, [active, first, now]);
+
+  return null;
 }
 
 function RunningSessionCard({
   session,
   onChanged,
+  ownsTitle,
+  pipOpen,
 }: {
-  session: RunningFocusSession & { fetchedAt: number };
+  session: LiveSession;
   onChanged: () => Promise<void>;
+  // Only one card drives the browser-tab title (with several sessions the
+  // title would otherwise flip between them).
+  ownsTitle: boolean;
+  pipOpen: boolean;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  // Cards only mount client-side (after the sessions are fetched), so reading
+  // browser capabilities here can't cause a hydration mismatch.
+  const pipSupported = isPipSupported();
 
-  // Live elapsed = the server's figure at fetch time + real time since --
-  // wall-clock, so it stays right however throttled this tab's timers get.
-  const elapsedSeconds = session.elapsedSeconds + Math.max(0, (now - session.fetchedAt) / 1000);
+  const elapsedSeconds = elapsedNow(session, now);
+  const shownSeconds = displaySeconds(session, now);
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    // Re-sync the instant the tab becomes visible again (hidden tabs
-    // throttle setInterval to about once a minute).
-    function sync() {
-      setNow(Date.now());
-    }
-    document.addEventListener("visibilitychange", sync);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", sync);
-    };
-  }, []);
+  // Ticks on the background ticker, not setInterval: a hidden tab throttles
+  // setInterval to about once a minute, which would freeze the tab-title clock.
+  useEffect(() => subscribeTick(() => setNow(Date.now())), []);
 
-  // Coach-visible live status while the widget (rather than the modal) is
-  // what's tracking this session.
+  // Coach-visible live status while the widget (rather than the fullscreen
+  // timer) is what's tracking this session.
   const heartbeatRef = useRef(() => {
     sendFocusHeartbeat().catch(() => {});
     heartbeatFocusSession(session.taskId).catch(() => {});
@@ -139,6 +207,18 @@ function RunningSessionCard({
   }, []);
 
   const { due, confirm } = useStillStudyingPrompt(session.taskId, elapsedSeconds, true);
+
+  // The tab title shows the running time ("⏳ 01:25:30") so it's visible from
+  // the tab bar while the student is on another site.
+  const shownWhole = Math.floor(shownSeconds);
+  useEffect(() => {
+    if (!ownsTitle) return;
+    setTimerTitle(formatTimerTitle(shownWhole, due));
+  }, [ownsTitle, shownWhole, due]);
+  useEffect(() => {
+    if (!ownsTitle) return;
+    return () => setTimerTitle(null);
+  }, [ownsTitle]);
 
   async function handlePause() {
     setBusy(true);
@@ -164,9 +244,9 @@ function RunningSessionCard({
       clearConfirmedMultiple(session.taskId);
       const savedSeconds = creditedSeconds ?? Math.round(elapsedSeconds);
       if (ended.pendingApproval) {
-        toast.warning(`${formatClock(savedSeconds)} çok uzun olduğu için koç onayına gönderildi.`);
+        toast.warning(`${formatTimerClock(savedSeconds)} çok uzun olduğu için koç onayına gönderildi.`);
       } else if (savedSeconds > 0) {
-        toast.success(`${formatClock(savedSeconds)} odaklandın, göreve kaydedildi.`);
+        toast.success(`${formatTimerClock(savedSeconds)} odaklandın, göreve kaydedildi.`);
       }
       await onChanged();
       router.refresh();
@@ -177,10 +257,15 @@ function RunningSessionCard({
     }
   }
 
-  const remaining =
-    session.mode === "countdown" && session.countdownTargetSeconds !== null
-      ? Math.max(0, session.countdownTargetSeconds - elapsedSeconds)
-      : null;
+  async function handlePip() {
+    if (pipOpen) {
+      closePip();
+      return;
+    }
+    // Directly inside the click: browsers only allow this from a user gesture.
+    const result = await openPip();
+    if (result === "failed") toast.error("Pencere açılamadı. Tarayıcın buna izin vermiyor olabilir.");
+  }
 
   return (
     <>
@@ -197,14 +282,23 @@ function RunningSessionCard({
         </div>
         <div className="flex items-end justify-between gap-2">
           <div>
-            <p className="text-foreground text-2xl font-bold tabular-nums">
-              {formatClock(remaining ?? elapsedSeconds)}
-            </p>
-            <p className="text-muted-foreground text-[11px]">
-              {remaining !== null ? (remaining === 0 ? "Süre doldu" : "Geri sayım") : "Kronometre çalışıyor"}
-            </p>
+            <p className="text-foreground text-2xl font-bold tabular-nums">{formatTimerClock(shownSeconds)}</p>
+            <p className="text-muted-foreground text-[11px]">{modeLabel(session, now)}</p>
           </div>
           <div className="flex gap-1.5">
+            {pipSupported && (
+              <Button
+                type="button"
+                variant={pipOpen ? "secondary" : "outline"}
+                size="icon"
+                className="size-8"
+                onClick={handlePip}
+                aria-label={pipOpen ? "Ayrı pencereyi kapat" : "Sayacı ayrı, üstte duran bir pencerede aç"}
+                title={pipOpen ? "Ayrı pencereyi kapat" : "Ayrı pencerede aç (diğer sitelerin üstünde kalır)"}
+              >
+                <PictureInPicture2 className="size-4" />
+              </Button>
+            )}
             <Button type="button" variant="outline" size="sm" onClick={handlePause} disabled={busy}>
               <Pause className="size-3.5" />
               Mola

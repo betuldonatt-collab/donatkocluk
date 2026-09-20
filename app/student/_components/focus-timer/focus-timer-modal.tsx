@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Coffee, History, Minimize2, PartyPopper, Pause, Play } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Coffee, History, Minimize2, PartyPopper, Pause, PictureInPicture2, Play } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
+import { closePip, isPipSupported, openPip, pipStore } from "@/lib/focus-pip";
+import { formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
 import { needsCoachApproval } from "@/lib/focus-approval";
 import { focusModalStore } from "@/lib/focus-modal-store";
 import { FocusTimerBackground, randomFocusTimerAnimationIndex } from "./focus-timer-animations";
@@ -154,12 +158,14 @@ export function FocusTimerModal({
     return () => focusModalStore.closed();
   }, []);
 
+  // Driven by the background ticker rather than setInterval: a hidden tab
+  // throttles setInterval to about once a minute, which would freeze the
+  // running clock (and the tab title below) while the student is on another tab.
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => {
+    return subscribeTick(() => {
       if (startedAtRef.current !== null) setElapsedMs(Date.now() - startedAtRef.current);
-    }, 250);
-    return () => clearInterval(id);
+    });
   }, [running]);
 
   // "Anlık Çalışma Durumu" -- a coach-visible live indicator. Fires once
@@ -224,6 +230,29 @@ export function FocusTimerModal({
   // "Hâlâ çalışmaya devam ediyor musun?" every 3 hours of a running session.
   // The timer is never stopped or trimmed by it (see lib/focus-confirmation).
   const stillStudying = useStillStudyingPrompt(taskId, elapsedSeconds, running && !finishing);
+
+  // The browser-tab title carries the live clock ("⏳ 01:25:30") so it stays
+  // visible from the tab bar while the student is on another site.
+  const shownWhole = Math.floor(displaySeconds);
+  const titleActive = running && !finishing;
+  useEffect(() => {
+    setTimerTitle(titleActive ? formatTimerTitle(shownWhole, stillStudying.due) : null);
+  }, [titleActive, shownWhole, stillStudying.due]);
+  useEffect(() => () => setTimerTitle(null), []);
+
+  // Optional always-on-top Picture-in-Picture window (Chrome/Edge/Safari on
+  // desktop). Shown only where the browser supports it.
+  const pipSupported = isPipSupported();
+  const pipOpen = useSyncExternalStore(pipStore.subscribe, pipStore.getSnapshot, pipStore.getServerSnapshot);
+  async function handlePip() {
+    if (pipOpen) {
+      closePip();
+      return;
+    }
+    // Directly inside the click: browsers only allow this from a user gesture.
+    const result = await openPip();
+    if (result === "failed") toast.error("Pencere açılamadı. Tarayıcın buna izin vermiyor olabilir.");
+  }
 
   function handleStart() {
     clearConfirmedMultiple(taskId);
@@ -520,14 +549,27 @@ export function FocusTimerModal({
               </Button>
             </div>
             {onMinimize && (
-              <button
-                type="button"
-                onClick={onMinimize}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
-              >
-                <Minimize2 className="size-3.5" />
-                Arka planda çalışsın
-              </button>
+              <div className="flex w-full flex-col items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={onMinimize}
+                  className="h-14 w-full max-w-xs gap-2 bg-emerald-600 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700"
+                >
+                  <Minimize2 className="size-5" />
+                  Arka planda çalışsın
+                </Button>
+                <p className="text-muted-foreground max-w-[280px] text-xs">
+                  Bu ekrandan çık, sayaç çalışmaya devam etsin. Sağ alttaki küçük kartta görürsün; sekme başlığında da
+                  süre akar.
+                </p>
+                {pipSupported && (
+                  <Button type="button" variant="outline" onClick={handlePip} className="w-full max-w-xs gap-2">
+                    <PictureInPicture2 className="size-4" />
+                    {pipOpen ? "Ayrı pencereyi kapat" : "Ayrı pencerede aç (YouTube'un üstünde kalır)"}
+                  </Button>
+                )}
+              </div>
             )}
           </>
         )}
