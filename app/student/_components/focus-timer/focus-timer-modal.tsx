@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
+import { needsCoachApproval } from "@/lib/focus-approval";
+import { focusModalStore } from "@/lib/focus-modal-store";
 import { FocusTimerBackground, randomFocusTimerAnimationIndex } from "./focus-timer-animations";
+import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-prompt";
 
 export type FocusTimerMode = "stopwatch" | "countdown";
 
@@ -94,13 +98,17 @@ export function FocusTimerModal({
   // to seed its local display from (this modal has no memory of a session
   // it didn't start itself).
   onResumeSession: () => Promise<{ elapsedSeconds: number } | null>;
-  // Called on "Vazgeç" or an unexpected unmount -- with however many
-  // seconds had accumulated at that point (0 if the session never
-  // started). Persistence itself is server-authoritative now (endFocusSession
-  // re-derives the true elapsed from the session row), so `seconds` here is
-  // only ever used for this modal's own display text.
+  // Called on an explicit "Vazgeç" click -- with however many seconds had
+  // accumulated at that point (0 if the session never started). Persistence
+  // itself is server-authoritative (endFocusSession re-derives the true
+  // elapsed from the session row), so `seconds` here is only ever used for
+  // this modal's own display text. Simply leaving the page does NOT call
+  // this: the session keeps running server-side.
   onCancel: (seconds: number) => void;
-  onFinish: (result: { mode: FocusTimerMode; seconds: number }) => void;
+  // `creditedSeconds` is set only when the student ended the session from
+  // the "Hâlâ çalışmaya devam ediyor musun?" check-in and chose to shorten
+  // the figure; otherwise the full elapsed time is credited.
+  onFinish: (result: { mode: FocusTimerMode; seconds: number; creditedSeconds?: number }) => void;
   // Fired immediately whenever the timer starts/resumes, then every
   // HEARTBEAT_INTERVAL_MS while it keeps running -- see the effect
   // below. Optional so this modal doesn't hard-depend on the server
@@ -114,7 +122,12 @@ export function FocusTimerModal({
   const [running, setRunning] = useState(false);
   const [onBreak, setOnBreak] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [finishing, setFinishing] = useState<{ mode: FocusTimerMode; seconds: number; goalHit: boolean } | null>(null);
+  const [finishing, setFinishing] = useState<{
+    mode: FocusTimerMode;
+    seconds: number;
+    goalHit: boolean;
+    creditedSeconds?: number;
+  } | null>(null);
   // Shown instead of the mode picker while there's a resumable session to
   // decide on -- cleared either by "Süre tutmaya devam et" (jumps straight
   // to the running screen) or "Yeni Başlat" (falls through to the picker;
@@ -126,6 +139,14 @@ export function FocusTimerModal({
   // Picked once per mount -- since the parent only mounts this modal while
   // it's open, every fresh "open" gets its own random pick.
   const backgroundIndex = useMemo(() => randomFocusTimerAnimationIndex(), []);
+
+  // While this fullscreen timer is open the floating widget hides (same
+  // timer); the moment it unmounts, the widget takes over if the session is
+  // still running.
+  useEffect(() => {
+    focusModalStore.opened();
+    return () => focusModalStore.closed();
+  }, []);
 
   useEffect(() => {
     if (!running) return;
@@ -151,88 +172,39 @@ export function FocusTimerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  // Mirrors the latest started/elapsed/finishing/running state after every
-  // render so the unmount cleanup below (a closure fixed at effect-setup
-  // time) and the beforeunload handler further down can still read live
-  // values instead of the ones from their first render.
-  const liveRef = useRef({ started, elapsedMs, finishing, running });
-  useEffect(() => {
-    liveRef.current = { started, elapsedMs, finishing, running };
-  });
-
-  // Guards against reporting a session's elapsed time more than once --
-  // "Vazgeç" and the unmount cleanup below can both fire for the same
-  // close (a Vazgeç click leads straight to the parent unmounting this
-  // modal), and without this guard that would double-count the minutes
-  // when the trigger adds them cumulatively onto the task.
-  const reportedRef = useRef(false);
-
+  // Bitir's celebration screen hands off to the parent after a beat.
   useEffect(() => {
     if (!finishing) return;
     const id = setTimeout(() => {
-      reportedRef.current = true;
-      onFinish({ mode: finishing.mode, seconds: finishing.seconds });
+      onFinish({ mode: finishing.mode, seconds: finishing.seconds, creditedSeconds: finishing.creditedSeconds });
     }, SUCCESS_DISPLAY_MS);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finishing]);
 
-  // Safety net for closing this modal any way other than the normal Bitir
-  // flow above (Vazgeç, or the whole task board unmounting mid-session,
-  // e.g. the student navigating away) -- reports whatever had accumulated
-  // so far instead of silently losing it. If Bitir's own timeout already
-  // claimed the report (or already fired), this is a no-op; if that timeout
-  // gets cut short by this very unmount, `finishing.seconds` (captured
-  // before the countdown to onFinish) is used as the fallback amount.
-  //
-  // The report itself is deferred by one tick (setTimeout(..., 0)) rather
-  // than called straight from the cleanup, and any pending one is cancelled
-  // at the top of the very next setup -- React Strict Mode (on by default
-  // for the app router since Next 13.5.1, see next.config.ts) deliberately
-  // mounts every component, cleans it up, then mounts it again to prove
-  // cleanups are safe to run without lasting effect. Calling onCancel(0)
-  // straight from a bare cleanup fires on that simulated cleanup too,
-  // which calls setOpen(false) in the trigger and closes the modal the
-  // instant it opens. Deferring it means the immediate Strict Mode
-  // remount's setup runs first (in the same tick) and cancels it before
-  // it can ever fire; only a cleanup with no following remount -- a real
-  // unmount -- lets the deferred report actually go through.
-  const pendingUnmountReportRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (pendingUnmountReportRef.current !== null) {
-      clearTimeout(pendingUnmountReportRef.current);
-      pendingUnmountReportRef.current = null;
-    }
-    return () => {
-      pendingUnmountReportRef.current = setTimeout(() => {
-        pendingUnmountReportRef.current = null;
-        if (reportedRef.current) return;
-        reportedRef.current = true;
-        const { started, elapsedMs, finishing } = liveRef.current;
-        const seconds = finishing ? finishing.seconds : started ? Math.round(elapsedMs / 1000) : 0;
-        onCancel(seconds);
-      }, 0);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // NOTE -- what is deliberately NOT here any more:
+  //  * no cleanup that ends the session when this modal unmounts (leaving
+  //    the dashboard used to end it);
+  //  * no beforeunload / sendBeacon that paused it on tab close, refresh or
+  //    navigating to another site (YouTube, ...).
+  // A running session lives on the server (wall-clock timestamps), so it keeps
+  // counting through tab switches, other sites, other pages of the platform
+  // and closed tabs alike. The only things that end or pause it are the
+  // student's own Bitir / Vazgeç / Mola Ver clicks.
 
-  // A real tab close/refresh/crash never runs the React cleanup above --
-  // the JS runtime is torn down immediately, before any of it can fire.
-  // `beforeunload` is the one moment a request kicked off during unload is
-  // reliably delivered, and only via sendBeacon (a plain fetch would be
-  // cancelled mid-flight). The route handler behind it just pauses the
-  // session server-side (banks the live segment, keeps it resumable) --
-  // this is best-effort on top of the 20s heartbeat's own trust boundary,
-  // not the only thing standing between a crash and lost time.
+  // Hidden tabs throttle setInterval (to about once a minute), so the
+  // display can lag while the student is elsewhere. Elapsed is computed from
+  // the wall clock, not counted in ticks -- so nothing is lost, and this just
+  // refreshes the readout the instant they come back.
   useEffect(() => {
-    function handleBeforeUnload() {
-      if (!liveRef.current.running) return;
-      const blob = new Blob([JSON.stringify({ taskId })], { type: "application/json" });
-      navigator.sendBeacon("/api/focus-checkpoint", blob);
+    function handleVisible() {
+      if (document.visibilityState === "visible" && startedAtRef.current !== null) {
+        setElapsedMs(Date.now() - startedAtRef.current);
+      }
     }
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [taskId]);
+    document.addEventListener("visibilitychange", handleVisible);
+    return () => document.removeEventListener("visibilitychange", handleVisible);
+  }, []);
 
   // Picked once when the session actually finishes, not re-rolled while
   // the success screen is showing.
@@ -243,7 +215,12 @@ export function FocusTimerModal({
   const displaySeconds = mode === "countdown" ? Math.max(0, totalSeconds - elapsedSeconds) : elapsedSeconds;
   const countdownDone = mode === "countdown" && elapsedSeconds >= totalSeconds;
 
+  // "Hâlâ çalışmaya devam ediyor musun?" every 3 hours of a running session.
+  // The timer is never stopped or trimmed by it (see lib/focus-confirmation).
+  const stillStudying = useStillStudyingPrompt(taskId, elapsedSeconds, running && !finishing);
+
   function handleStart() {
+    clearConfirmedMultiple(taskId);
     startedAtRef.current = Date.now();
     setElapsedMs(0);
     setStarted(true);
@@ -307,15 +284,26 @@ export function FocusTimerModal({
     setFinishing({ mode, seconds: Math.round(elapsedSeconds), goalHit: countdownDone });
   }
 
+  // "Hayır, bitir" on the check-in: ends the session, crediting either the
+  // full elapsed time (creditedSeconds undefined) or the shorter figure the
+  // student typed.
+  function handleEndFromPrompt(creditedSeconds?: number) {
+    setRunning(false);
+    setFinishing({
+      mode,
+      seconds: creditedSeconds ?? Math.round(elapsedSeconds),
+      goalHit: false,
+      creditedSeconds,
+    });
+  }
+
   // The explicit "Vazgeç" click -- reports whatever's accumulated so far
-  // before closing, then lets the reportedRef guard above no-op the
-  // unmount cleanup that follows it. Bailing straight from the resume
-  // prompt (never actually pressing Devam Et or Yeni Başlat) still banks
-  // that pre-existing session's real elapsed -- same "close and bank
-  // whatever's active" meaning Vazgeç already has everywhere else, it just
-  // happens to apply to a session this modal instance didn't start itself.
+  // before closing. Bailing straight from the resume prompt (never actually
+  // pressing Devam Et or Yeni Başlat) still banks that pre-existing
+  // session's real elapsed -- same "close and bank whatever's active"
+  // meaning Vazgeç already has everywhere else, it just happens to apply to
+  // a session this modal instance didn't start itself.
   function handleCancelClick() {
-    reportedRef.current = true;
     const seconds = started
       ? Math.round(elapsedMs / 1000)
       : resumePromptPending && initialSession
@@ -382,7 +370,9 @@ export function FocusTimerModal({
             <div className="space-y-1">
               <h2 className="text-foreground text-xl font-semibold">{praiseMessage}</h2>
               <p className="text-muted-foreground text-sm">
-                {formatSeconds(finishing.seconds)} boyunca odaklandın. Bu süre göreve kaydedildi.
+                {needsCoachApproval(finishing.seconds)
+                  ? `${formatSeconds(finishing.seconds)} kaydedildi ama 6 saati aştığı için koçunun onayını bekliyor. Onaylanınca sıralamana ve istatistiklerine eklenecek.`
+                  : `${formatSeconds(finishing.seconds)} boyunca odaklandın. Bu süre göreve kaydedildi.`}
               </p>
             </div>
           </>
@@ -401,7 +391,7 @@ export function FocusTimerModal({
               {formatSeconds(initialSession.elapsedSeconds)}
             </p>
             <p className="text-muted-foreground text-sm">
-              {initialSession.status === "running" ? "Başka bir cihazda çalışıyor olabilir" : "Duraklatılmış"}
+              {initialSession.status === "running" ? "Süre arka planda işlemeye devam etti" : "Duraklatılmış"}
             </p>
             <div className="flex items-center gap-3">
               <Button type="button" variant="outline" size="lg" onClick={handleDiscardResume} disabled={resumeActionPending}>
@@ -526,6 +516,14 @@ export function FocusTimerModal({
           </>
         )}
       </div>
+
+      {stillStudying.due && (
+        <StillStudyingPrompt
+          elapsedSeconds={elapsedSeconds}
+          onConfirm={stillStudying.confirm}
+          onEnd={handleEndFromPrompt}
+        />
+      )}
     </div>
   );
 }

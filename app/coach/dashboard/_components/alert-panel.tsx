@@ -2,9 +2,10 @@ import Link from "next/link";
 import { AlertTriangle, CalendarX, ClipboardCheck, ClipboardX, MessageSquareX, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { PendingStudentTask } from "../../actions";
+import type { PendingFocusReview, PendingStudentTask } from "../../actions";
 import type { CoachAlerts } from "../types";
 import { PendingApprovalsPanel } from "./pending-approvals-panel";
+import { PendingFocusReviewsPanel } from "./pending-focus-reviews-panel";
 
 type Item = { key: string; studentId: string; label: string; href?: string };
 
@@ -50,9 +51,11 @@ function AlertCard({
 export function AlertPanel({
   alerts,
   pendingApprovals,
+  focusReviews,
 }: {
   alerts: CoachAlerts;
   pendingApprovals: (PendingStudentTask & { studentId: string; studentName: string | null })[];
+  focusReviews: PendingFocusReview[];
 }) {
   const totalAlerts =
     alerts.inactive.length +
@@ -61,7 +64,8 @@ export function AlertPanel({
     alerts.emptyPrograms.length +
     alerts.pendingReportCards.length +
     alerts.rsvpDeclines.length +
-    pendingApprovals.length;
+    pendingApprovals.length +
+    focusReviews.length;
 
   if (totalAlerts === 0) {
     return (
@@ -135,6 +139,7 @@ export function AlertPanel({
         }))}
       />
       <PendingApprovalsPanel tasks={pendingApprovals} />
+      <PendingFocusReviewsPanel reviews={focusReviews} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { isValidISODateOnly } from "@/lib/chart-range";
 import { countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
+import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
 import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
@@ -3087,4 +3088,147 @@ export async function setStudentCompetitionStatus(studentId: string, status: Com
 
   revalidatePath("/coach/stopwatch");
   revalidatePath("/coach/dashboard");
+}
+
+// --- Onay Bekleyen Süreler: focus sessions over 6 hours (migration 0086) --
+//
+// A Süre Tut session longer than 6 hours is parked in focus_session_reviews
+// instead of being credited (see lib/focus-approval.ts), so it stays out of
+// the leaderboard, charts and totals. The coach decides here.
+
+export type PendingFocusReview = {
+  id: string;
+  studentId: string;
+  studentName: string | null;
+  taskId: string;
+  taskTitle: string;
+  taskDate: string | null;
+  seconds: number;
+  startedAt: string | null;
+  endedAt: string;
+};
+
+// The coach's pending long sessions -- roster-wide, or one student's when
+// studentId is given (the student detail page). Best-effort: it feeds the
+// dashboard, so a failure (e.g. the migration hasn't been run yet) returns
+// [] rather than taking the whole page down.
+export async function getPendingFocusReviews(studentId?: string): Promise<PendingFocusReview[]> {
+  try {
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+
+    let studentIds: string[];
+    if (studentId) {
+      const studentIdV = parseInput(uuidSchema, studentId);
+      await requireCoachAccess(supabase, user.id, studentIdV);
+      studentIds = [studentIdV];
+    } else {
+      const { data: links } = await supabase.from("coach_students").select("student_id").eq("coach_id", user.id);
+      studentIds = (links ?? []).map((l) => l.student_id);
+    }
+    if (studentIds.length === 0) return [];
+
+    const [{ data: rows, error }, { data: profiles }] = await Promise.all([
+      supabase
+        .from("focus_session_reviews")
+        .select("id, student_id, task_id, seconds, started_at, ended_at, student_tasks(title, task_date)")
+        .in("student_id", studentIds)
+        .eq("status", "pending")
+        .order("ended_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name").in("id", studentIds),
+    ]);
+    if (error) {
+      console.error("[getPendingFocusReviews] failed:", error);
+      return [];
+    }
+
+    const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string | null]));
+    return (rows ?? []).map((row) => {
+      const task = Array.isArray(row.student_tasks) ? row.student_tasks[0] : row.student_tasks;
+      return {
+        id: row.id as string,
+        studentId: row.student_id as string,
+        studentName: nameById.get(row.student_id) ?? null,
+        taskId: row.task_id as string,
+        taskTitle: (task?.title as string | undefined) ?? "Çalışma",
+        taskDate: (task?.task_date as string | undefined) ?? null,
+        seconds: row.seconds as number,
+        startedAt: row.started_at as string | null,
+        endedAt: row.ended_at as string,
+      };
+    });
+  } catch (e) {
+    console.error("[getPendingFocusReviews] failed:", e);
+    return [];
+  }
+}
+
+export type FocusReviewDecision = { action: "approve"; approvedMinutes?: number } | { action: "reject" };
+
+// Returns a result object rather than throwing, so the friendly Turkish reason
+// survives the Server Action boundary in production builds.
+export type FocusReviewResult =
+  | { ok: true; status: "approved" | "rejected"; creditedSeconds: number }
+  | { ok: false; error: string; alreadyProcessed?: boolean };
+
+const focusReviewDecisionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("approve"),
+    approvedMinutes: z.number("Süre geçersiz.").int("Süre tam dakika olmalı.").min(1, "Süre en az 1 dakika olmalı.").max(1440, "Süre çok büyük.").optional(),
+  }),
+  z.object({ action: z.literal("reject") }),
+]);
+
+// Approve as recorded, approve a reduced duration (never more than was
+// recorded), or reject. Double-layer authorization: requireCoachAccess here
+// and the same check inside review_focus_session itself.
+export async function reviewFocusSession(reviewId: string, decision: FocusReviewDecision): Promise<FocusReviewResult> {
+  try {
+    await assertNotImpersonating();
+    const reviewIdV = parseInput(uuidSchema, reviewId);
+    const decisionV = parseInput(focusReviewDecisionSchema, decision);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+
+    const { data: review, error: fetchError } = await supabase
+      .from("focus_session_reviews")
+      .select("student_id, seconds, status")
+      .eq("id", reviewIdV)
+      .maybeSingle();
+    if (fetchError) throw dbError(fetchError);
+    if (!review || review.status !== "pending") {
+      return { ok: false, error: "Bu kayıt zaten işlenmiş.", alreadyProcessed: true };
+    }
+    await requireCoachAccess(supabase, user.id, review.student_id);
+
+    let creditedSeconds = 0;
+    let pSeconds: number | null = null;
+    if (decisionV.action === "approve") {
+      creditedSeconds = review.seconds;
+      if (decisionV.approvedMinutes !== undefined) {
+        const seconds = creditedSecondsFromMinutes(decisionV.approvedMinutes, review.seconds);
+        if (seconds === null) {
+          return { ok: false, error: `Süre 1 dakika ile ${formatFocusDuration(review.seconds)} arasında olmalı.` };
+        }
+        creditedSeconds = seconds;
+        pSeconds = seconds === review.seconds ? null : seconds;
+      }
+    }
+
+    const { data: outcome, error } = await supabase.rpc("review_focus_session", {
+      p_review_id: reviewIdV,
+      p_action: decisionV.action,
+      p_seconds: pSeconds,
+    });
+    if (error) throw dbError(error);
+    if (outcome === "already_processed" || outcome === "not_found") {
+      return { ok: false, error: "Bu kayıt zaten işlenmiş.", alreadyProcessed: true };
+    }
+
+    revalidatePath("/coach/dashboard");
+    revalidatePath(`/coach/students/${review.student_id}`);
+    return { ok: true, status: decisionV.action === "approve" ? "approved" : "rejected", creditedSeconds };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
 }

@@ -6,6 +6,7 @@ import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { ImpersonationLockStyles } from "@/components/impersonation-lock-styles";
 import { getDailyStopwatchRanking, type DailyStopwatchRanking } from "./actions";
 import { AnnouncementCenter } from "./_components/announcements/announcement-center";
+import { ActiveFocusSessionWidget } from "./_components/focus-timer/active-focus-session-widget";
 import { StudentSidebar } from "./_components/sidebar";
 import { StopwatchWidget } from "./_components/stopwatch/stopwatch-widget";
 
@@ -78,6 +79,10 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />
       <StopwatchWidget ranking={ranking} />
+      {/* A running Süre Tut timer stays visible and controllable on every
+          page of the panel (not while impersonating: focus_sessions belong
+          to the student, and an admin must never drive their timer). */}
+      {!isImpersonating && <ActiveFocusSessionWidget />}
     </div>
   );
 }

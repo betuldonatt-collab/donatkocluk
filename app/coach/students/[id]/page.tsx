@@ -11,10 +11,11 @@ import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
 import type { ExamType } from "@/lib/exam-type";
 import { STUDENT_NOTES_PAGE_SIZE } from "./constants";
-import type { CoachReportCardRow, StudentFixedTask } from "../../actions";
+import { getPendingFocusReviews, type CoachReportCardRow, type StudentFixedTask } from "../../actions";
 import { DetailTabs } from "./_components/detail-tabs";
 import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
+import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
@@ -521,6 +522,10 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const searchParams = await props.searchParams;
   const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
   const detail = await fetchStudentDetail(id);
+  // This student's Süre Tut sessions over 6 hours, waiting for the coach's
+  // decision (best-effort: [] on failure). Only asked for once the student
+  // resolved, i.e. is actually on this coach's roster.
+  const focusReviews = detail ? await getPendingFocusReviews(id) : [];
   const examType: ExamType = detail?.profile.exam_type ?? "YKS";
   const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
 
@@ -553,6 +558,8 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   subjectCompletion={detail.subjectCompletion}
                 />
               </div>
+
+              <PendingFocusReviewsCard reviews={focusReviews} />
 
               <DetailTabs
                 studentId={id}

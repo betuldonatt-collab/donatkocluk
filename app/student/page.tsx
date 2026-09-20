@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { mondayOf } from "@/lib/date";
 import { reconcileStaleFocusSessions } from "./actions";
+import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
 import { NextSessionCard } from "./_components/next-session-card";
 import { RemainingSessionsCard } from "./_components/remaining-sessions-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
@@ -150,6 +151,32 @@ async function fetchHomeData(userId: string) {
     (allTaskDurationRows ?? []).reduce((sum, r) => sum + (r.tracked_duration_seconds ?? 0), 0) / 60,
   );
 
+  // Süre Tut sessions over 6 hours are held for the coach's approval (migration
+  // 0086) instead of counting immediately -- shown so the student understands
+  // why their time / rank hasn't moved. Pending ones always; decided ones for
+  // two weeks. Best-effort: a failed read (e.g. before the migration is run)
+  // just hides the card.
+  const { data: reviewRows } = await supabase
+    .from("focus_session_reviews")
+    .select("id, seconds, status, approved_seconds, ended_at, reviewed_at, student_tasks(title)")
+    .eq("student_id", userId)
+    .order("ended_at", { ascending: false })
+    .limit(15);
+  const reviewCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const focusReviews: StudentFocusReview[] = (reviewRows ?? [])
+    .filter((r) => r.status === "pending" || new Date(r.reviewed_at ?? r.ended_at).getTime() >= reviewCutoff)
+    .map((r) => {
+      const task = Array.isArray(r.student_tasks) ? r.student_tasks[0] : r.student_tasks;
+      return {
+        id: r.id as string,
+        taskTitle: (task?.title as string | undefined) ?? "Çalışma",
+        seconds: r.seconds as number,
+        status: r.status as StudentFocusReview["status"],
+        approvedSeconds: r.approved_seconds as number | null,
+        endedAt: r.ended_at as string,
+      };
+    });
+
   const paidSessionCount = (sessionBalanceRows ?? []).filter((r) => r.is_paid).length;
   const completedSessionCount = (sessionBalanceRows ?? []).filter((r) => r.outcome === "completed").length;
   const remainingSessions = paidSessionCount - completedSessionCount;
@@ -163,6 +190,7 @@ async function fetchHomeData(userId: string) {
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
     remainingSessions,
+    focusReviews,
     examType: (profileRow?.exam_type ?? "YKS") as ExamType,
     todayLocked: lockedWeeks.has(mondayOf(today)),
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
@@ -182,6 +210,7 @@ export default async function StudentHomePage() {
     fixedTasks,
     allTimeTrackedMinutes,
     remainingSessions,
+    focusReviews,
     examType,
     todayLocked,
     routineRowHeights,
@@ -197,6 +226,7 @@ export default async function StudentHomePage() {
         fixedTasks: [] as StudentFixedTask[],
         allTimeTrackedMinutes: 0,
         remainingSessions: 0,
+        focusReviews: [] as StudentFocusReview[],
         examType: "YKS" as ExamType,
         todayLocked: false,
         routineRowHeights: [] as number[],
@@ -221,6 +251,12 @@ export default async function StudentHomePage() {
       {sessionNeedingRating && (
         <div className="mb-6">
           <SessionRatingBanner session={sessionNeedingRating} />
+        </div>
+      )}
+
+      {focusReviews.length > 0 && (
+        <div className="mb-6">
+          <FocusReviewsCard reviews={focusReviews} />
         </div>
       )}
 

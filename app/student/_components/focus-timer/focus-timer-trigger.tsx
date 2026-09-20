@@ -6,6 +6,7 @@ import { Timer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
 import {
   endFocusSession,
   getActiveFocusSession,
@@ -64,11 +65,18 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     }
   }
 
-  async function handleFinish(result: { mode: FocusTimerMode; seconds: number }) {
+  async function handleFinish(result: { mode: FocusTimerMode; seconds: number; creditedSeconds?: number }) {
     setOpen(false);
     try {
-      await endFocusSession(task.id);
-      if (result.seconds > 0) toast.success(`${formatDuration(result.seconds)} odaklandın, göreve kaydedildi.`);
+      // creditedSeconds is only set when the student shortened the figure
+      // from the "Hâlâ çalışmaya devam ediyor musun?" check-in.
+      const ended = await endFocusSession(task.id, result.creditedSeconds);
+      clearConfirmedMultiple(task.id);
+      if (ended.pendingApproval) {
+        toast.warning(`${formatDuration(result.seconds)} çok uzun olduğu için koç onayına gönderildi.`);
+      } else if (result.seconds > 0) {
+        toast.success(`${formatDuration(result.seconds)} odaklandın, göreve kaydedildi.`);
+      }
     } catch {
       toast.error("Odak süresi kaydedilemedi, tekrar dene.");
     }
@@ -77,8 +85,13 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   async function handleCancel(seconds: number) {
     setOpen(false);
     try {
-      await endFocusSession(task.id);
-      if (seconds > 0) toast.success(`${formatDuration(seconds)} odaklandın, göreve kaydedildi.`);
+      const ended = await endFocusSession(task.id);
+      clearConfirmedMultiple(task.id);
+      if (ended.pendingApproval) {
+        toast.warning(`${formatDuration(seconds)} çok uzun olduğu için koç onayına gönderildi.`);
+      } else if (seconds > 0) {
+        toast.success(`${formatDuration(seconds)} odaklandın, göreve kaydedildi.`);
+      }
     } catch {
       toast.error("Odak süresi kaydedilemedi, tekrar dene.");
     }

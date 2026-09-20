@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
-import { getPendingStudentTasks, syncPendingApprovalNotifications, type PendingStudentTask } from "../actions";
+import {
+  getPendingFocusReviews,
+  getPendingStudentTasks,
+  syncPendingApprovalNotifications,
+  type PendingFocusReview,
+  type PendingStudentTask,
+} from "../actions";
 import { DashboardClient } from "./dashboard-client";
 import { WeekNavigator } from "./_components/week-navigator";
 import type { CoachAlerts, CoachingSession, CalendarBlock, CoachTask, PendingReportCardAlert, RosterStudent, RsvpDeclineAlert } from "./types";
@@ -272,8 +278,12 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
 
   const view = await getViewContext("coach");
 
-  const [data, pendingApprovals] = view
-    ? await Promise.all([fetchDashboardData(view.effectiveUserId, today, weekDays), getPendingStudentTasks()])
+  const [data, pendingApprovals, focusReviews] = view
+    ? await Promise.all([
+        fetchDashboardData(view.effectiveUserId, today, weekDays),
+        getPendingStudentTasks(),
+        getPendingFocusReviews(),
+      ])
     : [
         {
           roster: [] as RosterStudent[],
@@ -291,6 +301,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
           } as CoachAlerts,
         },
         [] as (PendingStudentTask & { studentId: string; studentName: string | null })[],
+        [] as PendingFocusReview[],
       ];
 
   // Notification-side echo of the pending-approvals card above -- see
@@ -317,7 +328,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
           useState, which only runs on mount -- keying on the viewed
           week's Monday forces a fresh mount (and fresh local state) each
           time the coach navigates to a different week. */}
-      <DashboardClient key={weekDays[0].date} today={today} weekDays={weekDays} pendingApprovals={pendingApprovals} {...data} />
+      <DashboardClient key={weekDays[0].date} today={today} weekDays={weekDays} pendingApprovals={pendingApprovals} focusReviews={focusReviews} {...data} />
     </div>
   );
 }
