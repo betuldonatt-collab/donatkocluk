@@ -71,6 +71,10 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
       // creditedSeconds is only set when the student shortened the figure
       // from the "Hâlâ çalışmaya devam ediyor musun?" check-in.
       const ended = await endFocusSession(task.id, result.creditedSeconds);
+      if (!ended.ok) {
+        toast.error(ended.error);
+        return;
+      }
       clearConfirmedMultiple(task.id);
       if (ended.pendingApproval) {
         toast.warning(`${formatDuration(result.seconds)} çok uzun olduğu için koç onayına gönderildi.`);
@@ -86,6 +90,10 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     setOpen(false);
     try {
       const ended = await endFocusSession(task.id);
+      if (!ended.ok) {
+        toast.error(ended.error);
+        return;
+      }
       clearConfirmedMultiple(task.id);
       if (ended.pendingApproval) {
         toast.warning(`${formatDuration(seconds)} çok uzun olduğu için koç onayına gönderildi.`);
@@ -95,6 +103,14 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     } catch {
       toast.error("Odak süresi kaydedilemedi, tekrar dene.");
     }
+  }
+
+  // "Arka planda çalışsın": close the fullscreen timer WITHOUT ending anything.
+  // The session keeps running on the server and the floating widget
+  // (active-focus-session-widget.tsx) picks it up on every page.
+  function handleMinimize() {
+    setOpen(false);
+    toast.success("Sayaç arka planda çalışıyor. Sağ alttaki karttan Mola verebilir ya da Bitirebilirsin.");
   }
 
   function handleStart(mode: FocusTimerMode, countdownTargetSeconds: number | null) {
@@ -161,6 +177,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           onPause={handlePause}
           onResumeSession={handleResumeSession}
           onCancel={handleCancel}
+          onMinimize={handleMinimize}
           onFinish={handleFinish}
           onHeartbeat={handleHeartbeat}
         />

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { needsCoachApproval } from "@/lib/focus-approval";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
-import { dbError } from "@/lib/errors";
+import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
@@ -1064,7 +1065,12 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
       )
       .eq("student_id", user.id)
       .eq("status", "running");
-    if (error) return [];
+    if (error) {
+      // Still best-effort (this feeds a widget in the layout and must never
+      // break a page) -- but logged, so an empty widget is diagnosable.
+      console.error("[getRunningFocusSessions] read failed:", error);
+      return [];
+    }
 
     return (data ?? []).map((row) => {
       const task = Array.isArray(row.student_tasks) ? row.student_tasks[0] : row.student_tasks;
@@ -1076,7 +1082,8 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
         elapsedSeconds: liveElapsedSeconds(row as unknown as FocusSessionRow),
       };
     });
-  } catch {
+  } catch (e) {
+    console.error("[getRunningFocusSessions] failed:", e);
     return [];
   }
 }
@@ -1225,60 +1232,83 @@ export async function heartbeatFocusSession(taskId: string): Promise<void> {
 // their desk hours ago). It can never exceed the real elapsed time, so it
 // can't be used to inflate anything, and it is only ever passed by that
 // explicit student choice -- nothing on the system side trims a session.
-export type EndFocusSessionResult = { totalSeconds: number | null; pendingApproval: boolean };
+// Returns a result instead of throwing: a thrown Error's message is replaced by
+// a generic one in production builds, which left the student with a bare "could
+// not be saved" and us with no idea why. A failure is logged with its Postgres
+// code and returned with a short reference (the SQLSTATE, e.g. 42501 = missing
+// permission) so it can actually be diagnosed; the session itself is untouched
+// on failure, so nothing is lost and ending it can simply be retried.
+export type EndFocusSessionResult =
+  | { ok: true; totalSeconds: number | null; pendingApproval: boolean }
+  | { ok: false; error: string };
 
-export async function endFocusSession(taskId: string, creditedSeconds?: number): Promise<EndFocusSessionResult> {
-  await assertNotImpersonating();
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  const taskIdV = parseInput(uuidSchema, taskId);
-  const creditedV = parseInput(z.number().int().min(0).max(86_400).optional(), creditedSeconds);
+// creditedSeconds is optional; null is accepted as "not given" too, since an
+// omitted argument can arrive as null across the Server Action boundary.
+const creditedSecondsSchema = z.number().int().min(0).max(86_400).nullish();
 
-  const session = await getOwnFocusSession(supabase, user.id, taskIdV);
-  // What this session will bank: its full wall-clock elapsed, or the shorter
-  // figure the student chose. Mirrors the > 6h rule in end_focus_session (the
-  // database is what actually enforces it).
-  const bankedSeconds = session
-    ? creditedV !== undefined
-      ? Math.min(creditedV, liveElapsedSeconds(session))
-      : liveElapsedSeconds(session)
-    : 0;
+export async function endFocusSession(taskId: string, creditedSeconds?: number | null): Promise<EndFocusSessionResult> {
+  try {
+    await assertNotImpersonating();
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const creditedV = parseInput(creditedSecondsSchema, creditedSeconds) ?? undefined;
 
-  if (session && creditedV !== undefined) {
-    // Freeze the row at the chosen amount; end_focus_session below then banks
-    // exactly that (a paused row contributes its accumulated_seconds).
-    const { error: trimError } = await supabase
-      .from("focus_sessions")
-      .update({ status: "paused", run_started_at: null, accumulated_seconds: bankedSeconds })
-      .eq("id", session.id);
-    if (trimError) throw dbError(trimError);
+    const session = await getOwnFocusSession(supabase, user.id, taskIdV);
+    // What this session will bank: its full wall-clock elapsed, or the shorter
+    // figure the student chose. Mirrors the > 6h rule in end_focus_session (the
+    // database is what actually enforces it).
+    const bankedSeconds = session
+      ? creditedV !== undefined
+        ? Math.min(creditedV, liveElapsedSeconds(session))
+        : liveElapsedSeconds(session)
+      : 0;
+
+    if (session && creditedV !== undefined) {
+      // Freeze the row at the chosen amount; end_focus_session below then banks
+      // exactly that (a paused row contributes its accumulated_seconds).
+      const { error: trimError } = await supabase
+        .from("focus_sessions")
+        .update({ status: "paused", run_started_at: null, accumulated_seconds: bankedSeconds })
+        .eq("id", session.id);
+      if (trimError) throw trimError;
+    }
+
+    const { data, error } = await supabase.rpc("end_focus_session", {
+      p_task_id: taskIdV,
+      p_bank_through: new Date().toISOString(),
+    });
+    if (error) throw error;
+
+    if (session) revalidatePath("/student");
+
+    // Only claim "sent to the coach" if the database really parked it: confirm a
+    // fresh pending review exists rather than trusting the prediction above (it
+    // wouldn't, e.g., if migration 0086 hasn't been applied).
+    let pendingApproval = false;
+    if (session && needsCoachApproval(bankedSeconds)) {
+      const { data: review } = await supabase
+        .from("focus_session_reviews")
+        .select("id")
+        .eq("student_id", user.id)
+        .eq("task_id", taskIdV)
+        .eq("status", "pending")
+        .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+        .limit(1);
+      pendingApproval = (review?.length ?? 0) > 0;
+    }
+
+    return { ok: true, totalSeconds: data as number | null, pendingApproval };
+  } catch (e) {
+    console.error("[endFocusSession] failed:", e);
+    Sentry.captureException(e);
+    // PostgREST / Postgres errors carry a short SQLSTATE-style code; other
+    // errors here are already user-facing Turkish messages (impersonation,
+    // validation).
+    const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : null;
+    if (code) return { ok: false, error: `Odak süresi kaydedilemedi (hata kodu: ${code}).` };
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }
-
-  const { data, error } = await supabase.rpc("end_focus_session", {
-    p_task_id: taskIdV,
-    p_bank_through: new Date().toISOString(),
-  });
-  if (error) throw dbError(error);
-
-  if (session) revalidatePath("/student");
-
-  // Only claim "sent to the coach" if the database really parked it: confirm a
-  // fresh pending review exists rather than trusting the prediction above (it
-  // wouldn't, e.g., if migration 0086 hasn't been applied).
-  let pendingApproval = false;
-  if (session && needsCoachApproval(bankedSeconds)) {
-    const { data: review } = await supabase
-      .from("focus_session_reviews")
-      .select("id")
-      .eq("student_id", user.id)
-      .eq("task_id", taskIdV)
-      .eq("status", "pending")
-      .gte("created_at", new Date(Date.now() - 60_000).toISOString())
-      .limit(1);
-    pendingApproval = (review?.length ?? 0) > 0;
-  }
-
-  return { totalSeconds: data as number | null, pendingApproval };
 }
 
 // Banks PAUSED sessions the student never came back to (they took a break

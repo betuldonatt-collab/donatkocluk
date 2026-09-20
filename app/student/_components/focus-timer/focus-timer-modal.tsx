@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Coffee, History, PartyPopper, Pause, Play } from "lucide-react";
+import { Coffee, History, Minimize2, PartyPopper, Pause, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ export function FocusTimerModal({
   onPause,
   onResumeSession,
   onCancel,
+  onMinimize,
   onFinish,
   onHeartbeat,
 }: {
@@ -105,6 +106,11 @@ export function FocusTimerModal({
   // this modal's own display text. Simply leaving the page does NOT call
   // this: the session keeps running server-side.
   onCancel: (seconds: number) => void;
+  // Closes this fullscreen timer WITHOUT ending or pausing the session: it
+  // keeps running on the server and the floating widget takes over on every
+  // page. Without this the only ways out were Bitir / Vazgeç / Mola Ver, all of
+  // which end or pause it.
+  onMinimize?: () => void;
   // `creditedSeconds` is set only when the student ended the session from
   // the "Hâlâ çalışmaya devam ediyor musun?" check-in and chose to shorten
   // the figure; otherwise the full elapsed time is credited.
@@ -513,6 +519,16 @@ export function FocusTimerModal({
                 Bitir
               </Button>
             </div>
+            {onMinimize && (
+              <button
+                type="button"
+                onClick={onMinimize}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium underline-offset-2 hover:underline"
+              >
+                <Minimize2 className="size-3.5" />
+                Arka planda çalışsın
+              </button>
+            )}
           </>
         )}
       </div>

@@ -54,15 +54,22 @@ export function ActiveFocusSessionWidget() {
   useEffect(() => {
     if (modalOpen) return;
     let cancelled = false;
-    getRunningFocusSessions()
-      .then((running) => {
-        if (cancelled) return;
-        const fetchedAt = Date.now();
-        setSessions(running.map((s) => ({ ...s, fetchedAt })));
-      })
-      .catch(() => {});
+    function load() {
+      getRunningFocusSessions()
+        .then((running) => {
+          if (cancelled) return;
+          const fetchedAt = Date.now();
+          setSessions(running.map((s) => ({ ...s, fetchedAt })));
+        })
+        .catch(() => {});
+    }
+    load();
+    // A session that was just started and minimised straight away may not be
+    // written yet when the first read lands -- look once more shortly after.
+    const retry = setTimeout(load, 2000);
     return () => {
       cancelled = true;
+      clearTimeout(retry);
     };
   }, [modalOpen, pathname]);
 
@@ -150,6 +157,10 @@ function RunningSessionCard({
     setBusy(true);
     try {
       const ended = await endFocusSession(session.taskId, creditedSeconds);
+      if (!ended.ok) {
+        toast.error(ended.error);
+        return;
+      }
       clearConfirmedMultiple(session.taskId);
       const savedSeconds = creditedSeconds ?? Math.round(elapsedSeconds);
       if (ended.pendingApproval) {
