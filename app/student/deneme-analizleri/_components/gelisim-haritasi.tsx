@@ -1,41 +1,16 @@
 "use client";
 
-import { useState } from "react";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CourseTabs } from "@/components/course-tabs";
 import { cn } from "@/lib/utils";
 import {
   AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
   AYT_COURSES_BY_TRACK,
-  TRACK_LABELS,
   TYT_BRANCH_EXAM_MACRO_COURSES,
   TYT_COURSES,
-  type Course,
   type Track,
 } from "@/lib/curriculum";
+import type { ExamType } from "@/lib/exam-type";
 import { HEAT_TIER_STYLES, WINDOW_SIZE, heatTier, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
-
-function CourseChips({ courses, selectedId, onSelect }: { courses: Course[]; selectedId: string; onSelect: (id: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {courses.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-            selectedId === c.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input bg-card text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {c.name}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // Spelled out in full sentences rather than the old "1/8 son deneme"
 // shorthand, and explicitly names both branş and genel denemeler in
@@ -87,22 +62,13 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
 // duplicated per this repo's panel-UI convention (the computation itself
 // is shared, see lib/gelisim-haritasi.ts). No Card wrapper -- this page's
 // own DenemeAnalizleriLayout already provides the section header.
-export function GelisimHaritasi({ rows }: { rows: GelisimHaritasiRow[] }) {
-  const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
-  const [track, setTrack] = useState<Track>("sayisal");
-  const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
-
-  function handleTrackChange(nextTrack: Track) {
-    setTrack(nextTrack);
-    setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
-  }
-
+export function GelisimHaritasi({ rows, examType }: { rows: GelisimHaritasiRow[]; examType: ExamType }) {
   // Macro ("whole fruit") branch-exam subjects sit alongside the atomic
   // ("sliced") ones here too, so a mistake logged under a combined "TYT
   // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
-  // "Biyoloji"'s own chips.
+  // "Biyoloji"'s own chips. (LGS has no macro subjects.)
   const tytCourses = [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES];
-  const aytCourses = [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[track], ...AYT_COURSES_BY_TRACK[track]];
+  const aytCoursesFor = (t: Track) => [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[t], ...AYT_COURSES_BY_TRACK[t]];
 
   return (
     <div className="space-y-4">
@@ -117,38 +83,12 @@ export function GelisimHaritasi({ rows }: { rows: GelisimHaritasiRow[] }) {
         ))}
       </div>
 
-      <Tabs defaultValue="tyt">
-        <TabsList>
-          <TabsTrigger value="tyt">TYT</TabsTrigger>
-          <TabsTrigger value="ayt">AYT</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tyt" className="space-y-4 pt-4">
-          <CourseChips courses={tytCourses} selectedId={tytCourseId} onSelect={setTytCourseId} />
-          <TopicGrid courseId={tytCourseId} rows={rows} />
-        </TabsContent>
-
-        <TabsContent value="ayt" className="space-y-4 pt-4">
-          <div className="bg-secondary inline-flex rounded-lg p-1">
-            {(Object.keys(TRACK_LABELS) as Track[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleTrackChange(t)}
-                className={cn(
-                  "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                  track === t ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {TRACK_LABELS[t]}
-              </button>
-            ))}
-          </div>
-
-          <CourseChips courses={aytCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
-          <TopicGrid courseId={aytCourseId} rows={rows} />
-        </TabsContent>
-      </Tabs>
+      <CourseTabs
+        examType={examType}
+        tytCourses={tytCourses}
+        aytCoursesFor={aytCoursesFor}
+        render={(course) => <TopicGrid courseId={course.id} rows={rows} />}
+      />
     </div>
   );
 }

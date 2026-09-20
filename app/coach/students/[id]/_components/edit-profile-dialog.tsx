@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { PROFILE_TERMS } from "@/lib/profile-terms";
 import { type EditableProfileFields, updateStudentProfile } from "../../../actions";
 import type { StudentProfile } from "../types";
 
@@ -20,6 +21,14 @@ function toFormValue(profile: StudentProfile): EditableProfileFields {
     target_university: profile.target_university,
     target_department: profile.target_department,
     target_ranking: profile.target_ranking,
+    // LGS-only columns are sent only for LGS students.
+    ...(profile.exam_type === "LGS"
+      ? {
+          target_high_school: profile.target_high_school,
+          target_percentile: profile.target_percentile,
+          report_card_average: profile.report_card_average,
+        }
+      : {}),
     school_name: profile.school_name,
     sinif_sube: profile.sinif_sube,
     obp: profile.obp,
@@ -92,6 +101,8 @@ export function EditProfileDialog({
   onSaved: (updated: EditableProfileFields) => void;
 }) {
   const formId = useId();
+  const isLgs = profile.exam_type === "LGS";
+  const terms = PROFILE_TERMS[isLgs ? "LGS" : "YKS"];
   const [value, setValue] = useState<EditableProfileFields>(() => toFormValue(profile));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,24 +158,50 @@ export function EditProfileDialog({
 
           <section className="space-y-3">
             <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Akademik Hedefler</p>
-            <TextField
-              id={`${formId}-target-university`}
-              label="Hedef Üniversite"
-              value={value.target_university}
-              onChange={(v) => set({ target_university: v })}
-            />
-            <TextField
-              id={`${formId}-target-department`}
-              label="Hedef Bölüm"
-              value={value.target_department}
-              onChange={(v) => set({ target_department: v })}
-            />
-            <TextField
-              id={`${formId}-target-ranking`}
-              label="Hedef Sıralama"
-              value={value.target_ranking}
-              onChange={(v) => set({ target_ranking: v })}
-            />
+            {isLgs ? (
+              <>
+                <TextField
+                  id={`${formId}-target-high-school`}
+                  label={terms.targetOne}
+                  value={value.target_high_school ?? null}
+                  onChange={(v) => set({ target_high_school: v })}
+                />
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${formId}-target-percentile`}>{terms.targetTwo}</Label>
+                  <Input
+                    id={`${formId}-target-percentile`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    placeholder="Örn: 1.5 (ilk %1,5)"
+                    value={value.target_percentile ?? ""}
+                    onChange={(e) => set({ target_percentile: e.target.value.trim() ? Number(e.target.value) : null })}
+                    className="max-w-[180px]"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <TextField
+                  id={`${formId}-target-university`}
+                  label={terms.targetOne}
+                  value={value.target_university}
+                  onChange={(v) => set({ target_university: v })}
+                />
+                <TextField
+                  id={`${formId}-target-department`}
+                  label={terms.targetTwo}
+                  value={value.target_department}
+                  onChange={(v) => set({ target_department: v })}
+                />
+                <TextField
+                  id={`${formId}-target-ranking`}
+                  label="Hedef Sıralama"
+                  value={value.target_ranking}
+                  onChange={(v) => set({ target_ranking: v })}
+                />
+              </>
+            )}
           </section>
 
           <section className="space-y-3">
@@ -182,13 +219,16 @@ export function EditProfileDialog({
               onChange={(v) => set({ sinif_sube: v })}
             />
             <div className="space-y-1.5">
-              <Label htmlFor={`${formId}-obp`}>OBP</Label>
+              <Label htmlFor={`${formId}-obp`}>{terms.grade}</Label>
               <Input
                 id={`${formId}-obp`}
                 type="number"
                 inputMode="decimal"
-                value={value.obp ?? ""}
-                onChange={(e) => set({ obp: e.target.value.trim() ? Number(e.target.value) : null })}
+                value={(isLgs ? value.report_card_average : value.obp) ?? ""}
+                onChange={(e) => {
+                  const next = e.target.value.trim() ? Number(e.target.value) : null;
+                  set(isLgs ? { report_card_average: next } : { obp: next });
+                }}
                 className="max-w-[140px]"
               />
             </div>
@@ -216,12 +256,14 @@ export function EditProfileDialog({
               checked={value.had_previous_coaching}
               onChange={(v) => set({ had_previous_coaching: v })}
             />
-            <TextField
-              id={`${formId}-yks-ranking`}
-              label="Eski YKS Sıralaması / Notu"
-              value={value.previous_yks_ranking}
-              onChange={(v) => set({ previous_yks_ranking: v })}
-            />
+            {!isLgs && (
+              <TextField
+                id={`${formId}-yks-ranking`}
+                label="Eski YKS Sıralaması / Notu"
+                value={value.previous_yks_ranking}
+                onChange={(v) => set({ previous_yks_ranking: v })}
+              />
+            )}
           </section>
 
           <section className="space-y-3">

@@ -4,18 +4,18 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import type { Track } from "@/lib/curriculum";
+import { CourseTabs } from "@/components/course-tabs";
 import {
   AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
   AYT_COURSES_BY_TRACK,
-  TRACK_LABELS,
   TYT_BRANCH_EXAM_MACRO_COURSES,
   TYT_COURSES,
+  isLgsCourseId,
   type Course,
-  type Track,
 } from "@/lib/curriculum";
-import { computeNet } from "@/lib/scoring";
+import type { ExamType } from "@/lib/exam-type";
+import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { DualMetricChart } from "../../_components/charts/dual-metric-chart";
 import { getMoreBransExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -25,44 +25,16 @@ import { ExamTopicTable } from "../_components/exam-topic-table";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
-function CourseChips({
-  courses,
-  selectedId,
-  onSelect,
-}: {
-  courses: Course[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {courses.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-            selectedId === c.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input bg-card text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {c.name}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function BransAnalysisClient({
   initialExams,
   initialMistakes,
   initialHasMore,
+  examType,
 }: {
   initialExams: StudentTask[];
   initialMistakes: MistakeRow[];
   initialHasMore: boolean;
+  examType: ExamType;
 }) {
   const [exams, setExams] = useState(initialExams);
   const [mistakes, setMistakes] = useState(initialMistakes);
@@ -81,18 +53,9 @@ export function BransAnalysisClient({
     }
   }
 
-  const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
-  const [track, setTrack] = useState<Track>("sayisal");
-  const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
-
   const [activeTask, setActiveTask] = useState<StudentTask | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalOpenKey, setModalOpenKey] = useState(0);
-
-  function handleTrackChange(nextTrack: Track) {
-    setTrack(nextTrack);
-    setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
-  }
 
   function openExam(task: StudentTask) {
     setActiveTask(task);
@@ -112,10 +75,9 @@ export function BransAnalysisClient({
   // Macro ("whole fruit") subjects lead the list, atomic ("sliced") ones
   // follow -- never replacing or nesting them, a coach/student can pick
   // either "Fizik" or "TYT Fen" as fully independent, side-by-side options.
+  // (LGS has no macro subjects -- its branş denemeleri are per-course.)
   const tytBranchCourses = [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES];
-  const aytBranchCourses = [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[track], ...AYT_COURSES_BY_TRACK[track]];
-  const tytCourse = tytBranchCourses.find((c) => c.id === tytCourseId) ?? tytBranchCourses[0];
-  const aytCourse = aytBranchCourses.find((c) => c.id === aytCourseId) ?? aytBranchCourses[0];
+  const aytBranchCoursesFor = (t: Track) => [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[t], ...AYT_COURSES_BY_TRACK[t]];
 
   const mistakesByExam = useMemo(() => {
     const map: Record<string, Set<string>> = {};
@@ -138,7 +100,10 @@ export function BransAnalysisClient({
       .filter((e) => e.correct_count !== null || e.wrong_count !== null)
       .map((e) => ({
         date: e.task_date,
-        a: computeNet(e.correct_count ?? 0, e.wrong_count ?? 0),
+        // LGS nets use 3 wrong : 1 right, YKS 4 : 1.
+        a: isLgsCourseId(course.id)
+          ? computeLgsNet(e.correct_count ?? 0, e.wrong_count ?? 0)
+          : computeNet(e.correct_count ?? 0, e.wrong_count ?? 0),
         b: e.duration_minutes ?? 0,
       }));
 
@@ -166,40 +131,12 @@ export function BransAnalysisClient({
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="tyt">
-        <TabsList>
-          <TabsTrigger value="tyt">TYT</TabsTrigger>
-          <TabsTrigger value="ayt">AYT</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tyt" className="space-y-4">
-          <CourseChips courses={tytBranchCourses} selectedId={tytCourseId} onSelect={setTytCourseId} />
-          {courseSection(tytCourse)}
-        </TabsContent>
-
-        <TabsContent value="ayt" className="space-y-4">
-          <div className="bg-secondary inline-flex rounded-lg p-1">
-            {(Object.keys(TRACK_LABELS) as Track[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleTrackChange(t)}
-                className={cn(
-                  "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                  track === t
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {TRACK_LABELS[t]}
-              </button>
-            ))}
-          </div>
-
-          <CourseChips courses={aytBranchCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
-          {courseSection(aytCourse)}
-        </TabsContent>
-      </Tabs>
+      <CourseTabs
+        examType={examType}
+        tytCourses={tytBranchCourses}
+        aytCoursesFor={aytBranchCoursesFor}
+        render={courseSection}
+      />
 
       {hasMore && (
         <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleLoadMore} disabled={loadingMore}>

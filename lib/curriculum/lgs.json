@@ -1,0 +1,1681 @@
+[
+  {
+    "id": "lgs-matematik",
+    "name": "Matematik",
+    "units": [
+      {
+        "unit": "1. ÜNİTE",
+        "konu": "1.1 Çarpanlar ve Katlar",
+        "topics": [
+          {
+            "id": "lgs-matematik-u0-t0",
+            "name": "Pozitif Tam Sayıların Pozitif Tam Sayı Çarpanları",
+            "frequency": {
+              "2020": 3,
+              "2021": 2,
+              "2022": 1,
+              "2023": 4,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-matematik-u0-t1",
+            "name": "EKOK"
+          },
+          {
+            "id": "lgs-matematik-u0-t2",
+            "name": "EBOB"
+          }
+        ]
+      },
+      {
+        "unit": "1. ÜNİTE",
+        "konu": "1.2 Üslü İfadeler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u1-t0",
+            "name": "Üslü İfadelerle İşlemler",
+            "frequency": {
+              "2020": 3,
+              "2021": 3,
+              "2022": 2,
+              "2023": 3,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-matematik-u1-t1",
+            "name": "Sayıları 10'un Farklı Tam Sayı Kuvvetleri ile İfade Etme ve Çözümleme"
+          },
+          {
+            "id": "lgs-matematik-u1-t2",
+            "name": "Bilimsel Gösterim"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE",
+        "konu": "2.1 Kareköklü İfadeler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u2-t0",
+            "name": "Tam Kare Pozitif Tam Sayıların Karekökünü Bulma",
+            "frequency": {
+              "2020": 5,
+              "2021": 3,
+              "2022": 3,
+              "2023": 5,
+              "2024": 3,
+              "2025": 3
+            }
+          },
+          {
+            "id": "lgs-matematik-u2-t1",
+            "name": "Tam Kare Olmayan Kareköklü Bir Sayının Hangi İki Doğal Sayı Arasında Olduğunu Belirleme"
+          },
+          {
+            "id": "lgs-matematik-u2-t2",
+            "name": "Kareköklü Bir İfadeyi akökb Şeklinde Yazma ve Karekök Dışına Çıkarılmış Katsayıyı Karekök İçine Alma"
+          },
+          {
+            "id": "lgs-matematik-u2-t3",
+            "name": "Kareköklü İfadelerde Çarpma ve Bölme İşlemi"
+          },
+          {
+            "id": "lgs-matematik-u2-t4",
+            "name": "Kareköklü İfadelerde Toplama ve Çıkarma İşlemi"
+          },
+          {
+            "id": "lgs-matematik-u2-t5",
+            "name": "Ondalık İfadelerin Kareköklerini Belirleme"
+          },
+          {
+            "id": "lgs-matematik-u2-t6",
+            "name": "Gerçek Sayılar"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE",
+        "konu": "2.2 Veri Analizi",
+        "topics": [
+          {
+            "id": "lgs-matematik-u3-t0",
+            "name": "Verileri Uygun Grafiklerle Gösterme ve Yorumlama",
+            "frequency": {
+              "2020": 3,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE",
+        "konu": "3.1 Basit Olayların Olma Olasılığı",
+        "topics": [
+          {
+            "id": "lgs-matematik-u4-t0",
+            "name": "Bir Olaya Ait Olası Durumları Belirleme ve Karşılaştırma",
+            "frequency": {
+              "2020": 3,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-matematik-u4-t1",
+            "name": "Bir Olayın Olma Olasılığı"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE",
+        "konu": "3.2 Cebirsel İfadeler ve Özdeşlikler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u5-t0",
+            "name": "Basit Cebirsel İfadeleri Farklı Biçimlerde Yazma",
+            "frequency": {
+              "2020": 3,
+              "2021": 2,
+              "2022": 2,
+              "2023": 4,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-matematik-u5-t1",
+            "name": "Cebirsel İfadelerde Çarpma"
+          },
+          {
+            "id": "lgs-matematik-u5-t2",
+            "name": "Özdeşlikleri Modelleme"
+          },
+          {
+            "id": "lgs-matematik-u5-t3",
+            "name": "Cebirsel İfadeleri Çarpanlara Ayırma"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE",
+        "konu": "4.1 Doğrusal Denklemler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u6-t0",
+            "name": "Birinci Dereceden Bir Bilinmeyenli Denklemler",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 3,
+              "2023": 0,
+              "2024": 3,
+              "2025": 3
+            }
+          },
+          {
+            "id": "lgs-matematik-u6-t1",
+            "name": "Koordinat Sistemi"
+          },
+          {
+            "id": "lgs-matematik-u6-t2",
+            "name": "Doğrusal İlişkiler"
+          },
+          {
+            "id": "lgs-matematik-u6-t3",
+            "name": "Doğrusal Denklemlerin Grafiği"
+          },
+          {
+            "id": "lgs-matematik-u6-t4",
+            "name": "Eğim"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE",
+        "konu": "4.2 Eşitsizlikler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u7-t0",
+            "name": "Birinci Dereceden Bir Bilinmeyenli Eşitsizlikleri Yazma ve Sayı Doğrusunda Gösterme",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 2,
+              "2023": 0,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-matematik-u7-t1",
+            "name": "Birinci Dereceden Bir Bilinmeyenli Eşitsizlikleri Çözme"
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE",
+        "konu": "5.1 Üçgenler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u8-t0",
+            "name": "Üçgende Yükseklik, Kenarortay ve Açıortay",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 2,
+              "2023": 0,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-matematik-u8-t1",
+            "name": "Üçgenin Kenar Uzunlukları Arasındaki İlişki"
+          },
+          {
+            "id": "lgs-matematik-u8-t2",
+            "name": "Üçgenin Kenar Uzunlukları ile Açı Ölçüleri Arasındaki İlişki"
+          },
+          {
+            "id": "lgs-matematik-u8-t3",
+            "name": "Belirli Bir Üçgen Çizme"
+          },
+          {
+            "id": "lgs-matematik-u8-t4",
+            "name": "Pisagor Bağıntısı"
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE",
+        "konu": "5.2 Eşlik ve Benzerlik",
+        "topics": [
+          {
+            "id": "lgs-matematik-u9-t0",
+            "name": "Çokgenlerde Eşlik ve Benzerlik İlişkisi",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-matematik-u9-t1",
+            "name": "Çokgenlerde Eşlik ve Benzerlik Oranı"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE",
+        "konu": "6.1 Dönüşüm Geometrisi",
+        "topics": [
+          {
+            "id": "lgs-matematik-u10-t0",
+            "name": "Öteleme",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-matematik-u10-t1",
+            "name": "Yansıma"
+          },
+          {
+            "id": "lgs-matematik-u10-t2",
+            "name": "Ardışık Öteleme ve Yansıma"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE",
+        "konu": "6.2 Geometrik Cisimler",
+        "topics": [
+          {
+            "id": "lgs-matematik-u11-t0",
+            "name": "Dik Prizmalar",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-matematik-u11-t1",
+            "name": "Dik Dairesel Silindir"
+          },
+          {
+            "id": "lgs-matematik-u11-t2",
+            "name": "Dik Dairesel Silindirin Hacmi"
+          },
+          {
+            "id": "lgs-matematik-u11-t3",
+            "name": "Dik Piramit"
+          },
+          {
+            "id": "lgs-matematik-u11-t4",
+            "name": "Dik Koni"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lgs-fen-bilimleri",
+    "name": "Fen Bilimleri",
+    "units": [
+      {
+        "unit": "1. ÜNİTE: MEVSİMLER VE İKLİM",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u0-t0",
+            "name": "Mevsimlerin Oluşumu",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u0-t1",
+            "name": "İklim ve Hava Hareketleri",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: DNA ve GENETİK KOD",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u1-t0",
+            "name": "DNA ve Genetik Kod",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u1-t1",
+            "name": "Kalıtım",
+            "frequency": {
+              "2020": 2,
+              "2021": 2,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u1-t2",
+            "name": "Mutasyon ve Modifikasyon",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u1-t3",
+            "name": "Adaptasyon",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 2,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u1-t4",
+            "name": "Biyoteknoloji"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: BASINÇ",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u2-t0",
+            "name": "Katı Basıncı",
+            "frequency": {
+              "2020": 5,
+              "2021": 2,
+              "2022": 2,
+              "2023": 5,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u2-t1",
+            "name": "Sıvı Basıncı"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u2-t2",
+            "name": "Açık Hava Basıncı"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u2-t3",
+            "name": "Basıncın Günlük Yaşam ve Teknolojideki Uygulamaları"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: MADDE ve ENDÜSTRİ",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u3-t0",
+            "name": "Periyodik Sistem",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u3-t1",
+            "name": "Fiziksel ve Kimyasal Değişimler",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 2,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u3-t2",
+            "name": "Kimyasal Tepkimeler",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u3-t3",
+            "name": "Asit ve Bazlar",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u3-t4",
+            "name": "Maddenin Isı ile Etkileşimi",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 2,
+              "2023": 0,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u3-t5",
+            "name": "Türkiye'de Kimya Endüstrisi",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE: BASİT MAKİNELER",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u4-t0",
+            "name": "Makaralar",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 2,
+              "2023": 0,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u4-t1",
+            "name": "Kaldıraçlar"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u4-t2",
+            "name": "Eğik Düzlem"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u4-t3",
+            "name": "Çıkrık"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u4-t4",
+            "name": "Dişli Çarklar"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u4-t5",
+            "name": "Kasnaklar"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE: ENERJİ DÖNÜŞÜMLERİ ve ÇEVRE BİLİMİ",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u5-t0",
+            "name": "Besin Zinciri ve Enerji Akışı",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u5-t1",
+            "name": "Enerji Dönüşümleri",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u5-t2",
+            "name": "Madde Döngüleri ve Çevre Sorunları",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u5-t3",
+            "name": "Sürdürülebilir Kalkınma",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: ELEKTRİK YÜKLERİ VE ELEKTRİK ENERJİSİ",
+        "konu": "Elektrik Yükleri ve Elektriklenme",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u6-t0",
+            "name": "Sürtünme ile Elektriklenme",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u6-t1",
+            "name": "Dokunma ile Elektriklenme"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u6-t2",
+            "name": "Etki (Tesir) ile Etkilenme"
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: ELEKTRİK YÜKLERİ VE ELEKTRİK ENERJİSİ",
+        "konu": "Elektrik Yüklü Cisimler",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u7-t0",
+            "name": "Topraklanma",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: ELEKTRİK YÜKLERİ VE ELEKTRİK ENERJİSİ",
+        "konu": "Elektrik Enerjisinin Dönüşümü",
+        "topics": [
+          {
+            "id": "lgs-fen-bilimleri-u8-t0",
+            "name": "Elektrik Enerjisinin Isı ve Işık Enerjisine Dönüşümü",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-fen-bilimleri-u8-t1",
+            "name": "Elektrik Enerjisinin Hareket Enerjisine Dönüşümü"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u8-t2",
+            "name": "Elektrik Enerjisi Nasıl Üretilir?"
+          },
+          {
+            "id": "lgs-fen-bilimleri-u8-t3",
+            "name": "Elektrik Enerjisinin Bilinçli Kullanılmasının Önemi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lgs-din-kulturu",
+    "name": "Din Kültürü",
+    "units": [
+      {
+        "unit": "1. ÜNİTE",
+        "topics": [
+          {
+            "id": "lgs-din-kulturu-u0-t0",
+            "name": "Kader ve Kaza İnancı",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u0-t1",
+            "name": "Kader ve Evrendeki Yasalar"
+          },
+          {
+            "id": "lgs-din-kulturu-u0-t2",
+            "name": "İnsanın İradesi ve Kader",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 2,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u0-t3",
+            "name": "Kader ile İlgili Kavramlar",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u0-t4",
+            "name": "Bir Peygamber Tanıyorum: Hz. Musa",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u0-t5",
+            "name": "Bir Ayet Tanıyorum: Ayet El Kürsi ve Anlamı",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE",
+        "topics": [
+          {
+            "id": "lgs-din-kulturu-u1-t0",
+            "name": "İslam'ın Paylaşmaya ve Yardımlaşmaya Verdiği Önem",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u1-t1",
+            "name": "Zekat ve Sadaka İbadeti",
+            "frequency": {
+              "2020": 4,
+              "2021": 2,
+              "2022": 1,
+              "2023": 3,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u1-t2",
+            "name": "Zekat ve Sadakanın Bireysel ve Toplumsal Faydaları"
+          },
+          {
+            "id": "lgs-din-kulturu-u1-t3",
+            "name": "Bir Peygamber Tanıyorum: Hz. Şuayb",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u1-t4",
+            "name": "Bir Sure Tanıyorum: Maun Suresi ve Anlamı",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE",
+        "topics": [
+          {
+            "id": "lgs-din-kulturu-u2-t0",
+            "name": "Din, Birey ve Toplum",
+            "frequency": {
+              "2020": 2,
+              "2021": 0,
+              "2022": 2,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u2-t1",
+            "name": "Dinin Temel Gayesi",
+            "frequency": {
+              "2020": 0,
+              "2021": 2,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u2-t2",
+            "name": "Bir Peygamber Tanıyorum: Hz. Yusuf",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u2-t3",
+            "name": "Bir Sure Tanıyorum: Asr Suresi ve Anlamı",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE",
+        "topics": [
+          {
+            "id": "lgs-din-kulturu-u3-t0",
+            "name": "Hz. Muhammed'in Doğruluğu ve Güvenilir Kişiliği",
+            "frequency": {
+              "2020": 0,
+              "2021": 3,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t1",
+            "name": "Hz. Muhammed'in Merhametli ve Affedici Oluşu"
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t2",
+            "name": "Hz. Muhammed'in İstişareye Önem Vermesi"
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t3",
+            "name": "Hz. Muhammed'in Davasındaki Cesaret ve Kararlılığı"
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t4",
+            "name": "Hz. Muhammed'in Hakkı Gözetmedeki Hassasiyeti"
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t5",
+            "name": "Hz. Muhammed'in İnsanlara Değer Vermesi"
+          },
+          {
+            "id": "lgs-din-kulturu-u3-t6",
+            "name": "Bir Sure Tanıyorum: Kureyş Suresi ve Anlamı",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE",
+        "topics": [
+          {
+            "id": "lgs-din-kulturu-u4-t0",
+            "name": "İslam Dininin Temel Kaynakları",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u4-t1",
+            "name": "Kuranı Kerimin Ana Konuları",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u4-t2",
+            "name": "Kuranı Kerimin Temel Özellikleri",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-din-kulturu-u4-t3",
+            "name": "Bir Peygamber Tanıyorum: Hz. Nuh",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lgs-turkce",
+    "name": "Türkçe",
+    "units": [
+      {
+        "unit": "1. ÜNİTE: SÖZCÜKTE ANLAM",
+        "topics": [
+          {
+            "id": "lgs-turkce-u0-t0",
+            "name": "Çok Anlamlılık",
+            "frequency": {
+              "2020": 3,
+              "2021": 3,
+              "2022": 2,
+              "2023": 1,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-turkce-u0-t1",
+            "name": "Sözcükler Arası Anlam İlişkileri"
+          },
+          {
+            "id": "lgs-turkce-u0-t2",
+            "name": "Söz Gruplarında Anlam"
+          },
+          {
+            "id": "lgs-turkce-u0-t3",
+            "name": "Yabancı Sözcüklerin Türkçe Karşılıkları"
+          },
+          {
+            "id": "lgs-turkce-u0-t4",
+            "name": "Söz Sanatları"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: CÜMLEDE ANLAM",
+        "topics": [
+          {
+            "id": "lgs-turkce-u1-t0",
+            "name": "Öznel ve Nesnel Anlatım",
+            "frequency": {
+              "2020": 1,
+              "2021": 5,
+              "2022": 3,
+              "2023": 5,
+              "2024": 4,
+              "2025": 3
+            }
+          },
+          {
+            "id": "lgs-turkce-u1-t1",
+            "name": "Cümleler Arasındaki Anlam İlişkileri"
+          },
+          {
+            "id": "lgs-turkce-u1-t2",
+            "name": "Cümle Oluşturma - Cümle Tamamlama"
+          },
+          {
+            "id": "lgs-turkce-u1-t3",
+            "name": "Doğrudan, Dolaylı ve Mecazlı Anlatım"
+          },
+          {
+            "id": "lgs-turkce-u1-t4",
+            "name": "Cümlenin İfade Ettiği Anlam Özellikleri"
+          },
+          {
+            "id": "lgs-turkce-u1-t5",
+            "name": "Cümleye Hakim Olan Duygu"
+          },
+          {
+            "id": "lgs-turkce-u1-t6",
+            "name": "Örtülü Anlam"
+          },
+          {
+            "id": "lgs-turkce-u1-t7",
+            "name": "Deyimler"
+          },
+          {
+            "id": "lgs-turkce-u1-t8",
+            "name": "Atasözleri ve Özdeyişler"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: PARAGRAFTA ANLAM",
+        "topics": [
+          {
+            "id": "lgs-turkce-u2-t0",
+            "name": "Konu, Başlık ve Anahtar Kelime",
+            "frequency": {
+              "2020": 9,
+              "2021": 11,
+              "2022": 8,
+              "2023": 10,
+              "2024": 8,
+              "2025": 10
+            }
+          },
+          {
+            "id": "lgs-turkce-u2-t1",
+            "name": "Ana Düşünce - Ana Duygu"
+          },
+          {
+            "id": "lgs-turkce-u2-t2",
+            "name": "Yardımcı Düşünce"
+          },
+          {
+            "id": "lgs-turkce-u2-t3",
+            "name": "Hikaye Unsurları ve Anlatıcı Türleri"
+          },
+          {
+            "id": "lgs-turkce-u2-t4",
+            "name": "Gerçek ve Kurgusal Unsurlar"
+          },
+          {
+            "id": "lgs-turkce-u2-t5",
+            "name": "Geçiş ve Bağlantı İfadeleri"
+          },
+          {
+            "id": "lgs-turkce-u2-t6",
+            "name": "Metin Oluşturma - Metin Tamamlama"
+          },
+          {
+            "id": "lgs-turkce-u2-t7",
+            "name": "Metni İkiye Bölme - Metnin Akışını Bozan Cümle"
+          },
+          {
+            "id": "lgs-turkce-u2-t8",
+            "name": "Anlatım Biçimleri - Düşünceyi Geliştirme Yolları"
+          },
+          {
+            "id": "lgs-turkce-u2-t9",
+            "name": "Dil ve Anlatım Özellikleri"
+          },
+          {
+            "id": "lgs-turkce-u2-t10",
+            "name": "Metin Karşılaştırma"
+          },
+          {
+            "id": "lgs-turkce-u2-t11",
+            "name": "Metin Türleri"
+          },
+          {
+            "id": "lgs-turkce-u2-t12",
+            "name": "Görsel, Grafik ve Tablo Yorumlama"
+          },
+          {
+            "id": "lgs-turkce-u2-t13",
+            "name": "Sözel Mantık ve Muhakeme"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: FİİLİMSİLER",
+        "topics": [
+          {
+            "id": "lgs-turkce-u3-t0",
+            "name": "İsim Fiil (Ad Eylem)",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-turkce-u3-t1",
+            "name": "Sıfat Fiil (Ortaç)"
+          },
+          {
+            "id": "lgs-turkce-u3-t2",
+            "name": "Zarf Fiil (Bağ Fiil - Ulaç)"
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE: CÜMLENİN ÖGELERİ",
+        "topics": [
+          {
+            "id": "lgs-turkce-u4-t0",
+            "name": "Temel Ögeler",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-turkce-u4-t1",
+            "name": "Yardımcı Ögeler"
+          },
+          {
+            "id": "lgs-turkce-u4-t2",
+            "name": "Vurgu - Ara Söz"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE: FİİLDE ÇATI",
+        "topics": [
+          {
+            "id": "lgs-turkce-u5-t0",
+            "name": "Öznesine Göre Fiiller",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 0,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-turkce-u5-t1",
+            "name": "Nesnesine Göre Fiiller"
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: CÜMLE TÜRLERİ",
+        "topics": [
+          {
+            "id": "lgs-turkce-u6-t0",
+            "name": "Yüklemine ve Anlamına Göre Cümleler",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-turkce-u6-t1",
+            "name": "Yapısına Göre Cümleler"
+          }
+        ]
+      },
+      {
+        "unit": "8. ÜNİTE: YAZIM KURALLARI",
+        "topics": [
+          {
+            "id": "lgs-turkce-u7-t0",
+            "name": "Büyük Harflerin Kullanıldığı Yerler",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-turkce-u7-t1",
+            "name": "\"De, Mi, Ki\"nin Yazımı"
+          },
+          {
+            "id": "lgs-turkce-u7-t2",
+            "name": "Kısaltmaların ve Sayıların Yazımı"
+          },
+          {
+            "id": "lgs-turkce-u7-t3",
+            "name": "Birleşik Sözcüklerin Yazımı ve Yazımı Karıştırılan Sözcükler"
+          }
+        ]
+      },
+      {
+        "unit": "9. ÜNİTE: NOKTALAMA İŞARETLERİ",
+        "topics": [
+          {
+            "id": "lgs-turkce-u8-t0",
+            "name": "Nokta - Virgül",
+            "frequency": {
+              "2020": 1,
+              "2021": 0,
+              "2022": 1,
+              "2023": 1,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-turkce-u8-t1",
+            "name": "Noktalı Virgül - İki Nokta - Üç Nokta"
+          },
+          {
+            "id": "lgs-turkce-u8-t2",
+            "name": "Soru İşareti - Ünlem İşareti - Tırnak İşareti - Kesme İşareti"
+          },
+          {
+            "id": "lgs-turkce-u8-t3",
+            "name": "Ayraç İşareti - Kısa Çizgi - Uzun Çizgi - Eğik Çizgi"
+          }
+        ]
+      },
+      {
+        "unit": "10. ÜNİTE: ANLATIM BOZUKLUKLARI",
+        "topics": [
+          {
+            "id": "lgs-turkce-u9-t0",
+            "name": "Özne Yüklem Uyumsuzluğu",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-turkce-u9-t1",
+            "name": "Öge Eksikliği"
+          },
+          {
+            "id": "lgs-turkce-u9-t2",
+            "name": "Ek Fiil ve Yardımcı Fiil Eksikliği - Eklerin Yanlış Kullanımı"
+          },
+          {
+            "id": "lgs-turkce-u9-t3",
+            "name": "Çatı Uyumsuzluğu - Tamlama Yanlışlığı - Anlam Belirsizliği"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lgs-inkilap-tarihi",
+    "name": "İnkılap Tarihi",
+    "units": [
+      {
+        "unit": "1. ÜNİTE: BİR KAHRAMAN DOĞUYOR",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u0-t0",
+            "name": "Güçlü Avrupa'nın doğuşu ve Osmanlı devleti",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 5,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u0-t1",
+            "name": "Mustafa Kemal'in çocukluğu ve eğitim hayatı"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u0-t2",
+            "name": "Toplumsal Sorunlar ve Çözüm Önerileri"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u0-t3",
+            "name": "Mustafa Kemal'in fikir hayatını etkileyen olaylar ve kişiler"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u0-t4",
+            "name": "Mustafa Kemal'in askerlik hayatı"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: MİLLİ UYANIŞ: BAĞIMSIZLIK YOLUNDA ATILAN ADIMLAR",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u1-t0",
+            "name": "Birinci Dünya savaşının nedenleri",
+            "frequency": {
+              "2020": 5,
+              "2021": 2,
+              "2022": 2,
+              "2023": 2,
+              "2024": 2,
+              "2025": 4
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u1-t1",
+            "name": "Cepheler ve birinci dünya savaşının sonuçları"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u1-t2",
+            "name": "Mondros ateşkes antlaşması ve kuva-yi milliye"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u1-t3",
+            "name": "Misak-ı Milli ve İstanbul'un işgali"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u1-t4",
+            "name": "Milli mücadelenin hazırlık dönemi"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u1-t5",
+            "name": "Büyük millet meclisinin açılması ve Sevr antlaşması"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: MİLLİ BİR DESTAN: YA İSTİKLAL, YA ÖLÜM!",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u2-t0",
+            "name": "Kurtuluş savaşında doğu ve güney cephesi",
+            "frequency": {
+              "2020": 2,
+              "2021": 2,
+              "2022": 3,
+              "2023": 2,
+              "2024": 2,
+              "2025": 3
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u2-t1",
+            "name": "Kurtuluş savaşında 1. ve 2. İnönü savaşları"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u2-t2",
+            "name": "Kurtuluş savaşında Eskişehir - Kütahya muharebeleri, maarif kongresi"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u2-t3",
+            "name": "Sakarya meydan savaşı, büyük taarruz ve Mudanya ateşkes antlaşması"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u2-t4",
+            "name": "Lozan barış antlaşması ve önemi"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u2-t5",
+            "name": "Milli mücadelenin sanata etkisi"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: ATATÜRKÇÜLÜK ve ÇAĞDAŞLAŞAN TÜRKİYE",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u3-t0",
+            "name": "Atatürkçülük ve Atatürk ilkeleri",
+            "frequency": {
+              "2020": 2,
+              "2021": 4,
+              "2022": 0,
+              "2023": 0,
+              "2024": 3,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t1",
+            "name": "Siyasi alanda yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t2",
+            "name": "Hukuk alanında yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t3",
+            "name": "Eğitim ve kültür alanında yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t4",
+            "name": "Toplumsal alanda yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t5",
+            "name": "Ekonomik alanda yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t6",
+            "name": "Sağlık alanında yapılan inkılaplar"
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u3-t7",
+            "name": "Nutuk ve Atatürk ilke ve inkılaplarının temel esasları"
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE: DEMOKRATİKLEŞME ÇABALARI",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u4-t0",
+            "name": "Çok partli hayata geçiş denemeleri",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u4-t1",
+            "name": "Mustafa Kemal'e suikast girişimi ve Cumhuriyete yönelik tehditler"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE: ATATÜRK DÖNEMİ TÜRK DIŞ POLİTİKASI",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u5-t0",
+            "name": "Atatürk dönemi Türk dış poltikası temel ilkeleri",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 1,
+              "2024": 1,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u5-t1",
+            "name": "Türkiye'nin üye olduğu kuruluşlar ve Hatay'ın anavatana katılması"
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: ATATÜRK'ÜN ÖLÜMÜ ve SONRASI",
+        "topics": [
+          {
+            "id": "lgs-inkilap-tarihi-u6-t0",
+            "name": "Atatürk'ün ölümü ve eserleri",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          },
+          {
+            "id": "lgs-inkilap-tarihi-u6-t1",
+            "name": "2. Dünya savaşı ve demokrasi yolunda atılan adımlar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "lgs-ingilizce",
+    "name": "İngilizce",
+    "units": [
+      {
+        "unit": "Üniteler",
+        "topics": [
+          {
+            "id": "lgs-ingilizce-u0-t0",
+            "name": "Unit 1: Friendship",
+            "frequency": {
+              "2020": 2,
+              "2021": 2,
+              "2022": 2,
+              "2023": 4,
+              "2024": 2,
+              "2025": 2
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t1",
+            "name": "Unit 2: Teen life",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 2,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t2",
+            "name": "Unit 3: In the kitchen",
+            "frequency": {
+              "2020": 2,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t3",
+            "name": "Unit 4: On the phone",
+            "frequency": {
+              "2020": 3,
+              "2021": 1,
+              "2022": 1,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t4",
+            "name": "Unit 5: The internet",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 0,
+              "2023": 2,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t5",
+            "name": "Unit 6: Adventures",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t6",
+            "name": "Unit 7: Tourism",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t7",
+            "name": "Unit 8: Chores",
+            "frequency": {
+              "2020": 1,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t8",
+            "name": "Unit 9: Science",
+            "frequency": {
+              "2020": 0,
+              "2021": 1,
+              "2022": 1,
+              "2023": 0,
+              "2024": 1,
+              "2025": 1
+            }
+          },
+          {
+            "id": "lgs-ingilizce-u0-t9",
+            "name": "Unit 10: Natural forces",
+            "frequency": {
+              "2020": 0,
+              "2021": 0,
+              "2022": 0,
+              "2023": 0,
+              "2024": 0,
+              "2025": 0
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

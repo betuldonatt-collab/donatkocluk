@@ -11,11 +11,13 @@ import { findCourseById, TRACK_LABELS, type Track } from "./curriculum";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   inferAytTrackFromScores,
+  LGS_EXAM_SUBJECTS,
+  LGS_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   type AytSubjectGroupKey,
   type SubjectGroupKey,
 } from "./curriculum/subject-groups";
-import { computeNet } from "./scoring";
+import { computeLgsNet, computeNet } from "./scoring";
 
 export type KarneTopicRow = {
   courseId: string;
@@ -29,7 +31,13 @@ export type KarneTopicRow = {
 export type KarneExam = { id: string; task_date: string; task_type: string; course_id: string | null };
 export type KarneMistakeRow = { task_id: string; course_id: string; topic_id: string };
 
-const GENERAL_EXAM_COURSE_IDS = new Set(TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds));
+// LGS's subjects join the set for the same reason as in
+// lib/gelisim-haritasi.ts: callers only ever pass their own student's
+// cohort course ids, so cohorts can't bleed into each other.
+const GENERAL_EXAM_COURSE_IDS = new Set([
+  ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+]);
 
 export function computeAylikKarne(
   courseIds: string[],
@@ -63,7 +71,15 @@ export function computeAylikKarne(
       for (const topic of unit.topics) {
         const key = `${courseId}::${topic.id}`;
         const count = relevant.filter((e) => mistakesByTask.get(e.id)?.has(key)).length;
-        rows.push({ courseId, courseName: course.name, topicId: topic.id, topicName: topic.name, count, windowSize });
+        rows.push({
+          courseId,
+          courseName: course.name,
+          topicId: topic.id,
+          // LGS Alt Konu leaves carry their Konu (see gelisim-haritasi.ts).
+          topicName: unit.konu ? `${unit.konu} › ${topic.name}` : topic.name,
+          count,
+          windowSize,
+        });
       }
     }
   }
@@ -109,6 +125,12 @@ export function inclusiveDaySpan(rangeStart: string, rangeEnd: string): number {
 export type NetSummary = {
   tyt: { current: number | null; previous: number | null };
   ayt: { current: number | null; previous: number | null };
+  // LGS students' report cards: their own net (3 wrong = 1 right) and
+  // per-subject D/Y/B. tyt/ayt stay {null, null} on an LGS cycle, and
+  // these stay absent on every YKS cycle (and on every snapshot saved
+  // before LGS existed), so old archived Karneler still parse unchanged.
+  lgs?: { current: number | null; previous: number | null };
+  lgsScoreBreakdown?: KarneScoreBreakdown;
   scoreBreakdown?: KarneScoreBreakdown;
   // One entry per track the student actually has signal in this cycle
   // (see computeAytScoreBreakdown's own comment) -- absent/empty is
@@ -140,7 +162,8 @@ export type KarneGeneralExam = { task_date: string; title: string; subject_score
 
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention every panel already parses it with.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
@@ -148,8 +171,9 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
 // track. Correct/wrong are averaged first, then netted once on the
 // averages (not averaged-per-exam-then-averaged-again), matching this
 // codebase's established "sum totals, net once" convention (see
-// netChartFor in the analysis clients) so rounding never compounds.
-function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt"): number | null {
+// netChartFor in the analysis clients) so rounding never compounds. LGS
+// nets with its own 3:1 rule, YKS tracks with 4:1.
+function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt" | "lgs"): number | null {
   const inTrack = exams.filter((e) => parseGeneralExamTrack(e.title) === track && e.subject_scores);
   if (inTrack.length === 0) return null;
 
@@ -163,7 +187,8 @@ function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt"): nu
     },
     { correct: 0, wrong: 0 },
   );
-  return computeNet(totals.correct / inTrack.length, totals.wrong / inTrack.length);
+  const netFn = track === "lgs" ? computeLgsNet : computeNet;
+  return netFn(totals.correct / inTrack.length, totals.wrong / inTrack.length);
 }
 
 // "Current" half of a NetSummary for one cycle -- "previous" is filled in
@@ -174,9 +199,13 @@ export function computeNetSummary(
   exams: KarneGeneralExam[],
   rangeStart: string,
   rangeEnd: string,
-): { tyt: number | null; ayt: number | null } {
+): { tyt: number | null; ayt: number | null; lgs: number | null } {
   const inRange = exams.filter((e) => e.task_date >= rangeStart && e.task_date <= rangeEnd);
-  return { tyt: averageNetForTrack(inRange, "tyt"), ayt: averageNetForTrack(inRange, "ayt") };
+  return {
+    tyt: averageNetForTrack(inRange, "tyt"),
+    ayt: averageNetForTrack(inRange, "ayt"),
+    lgs: averageNetForTrack(inRange, "lgs"),
+  };
 }
 
 // --- Karne v2: "Toplam Doğru/Yanlış/Boş" (TYT-only score breakdown) ------
@@ -340,4 +369,57 @@ export function computeAytScoreBreakdown(
     result.push({ track, trackLabel: TRACK_LABELS[track], total, bySubject: bySubjectRows });
   }
   return result;
+}
+
+// --- Karne v2: LGS per-subject D/Y/B ------------------------------------
+//
+// LGS's counterpart to computeTytScoreBreakdown -- same two data shapes
+// (course_id-tagged practice rows + general_exam subject_scores) bucketed
+// into the six real exam subjects (LGS_EXAM_SUBJECTS, whose keys are the
+// `lgs_`-prefixed ones a general exam's subject_scores is stored under).
+// Practice under an "lgs-" course lands in the matching subject; a Karma
+// or routine task with no course simply isn't counted, as in TYT.
+const LGS_COURSE_TO_SUBJECT_KEY = new Map<string, string>(
+  LGS_EXAM_SUBJECTS.flatMap((s) => s.courseIds.map((courseId) => [courseId, s.key] as const)),
+);
+
+export function computeLgsScoreBreakdown(
+  tasks: KarneScoreTask[],
+  exams: KarneGeneralExam[],
+  rangeStart: string,
+  rangeEnd: string,
+): KarneScoreBreakdown {
+  const bySubject = new Map<string, { correct: number; wrong: number; empty: number }>(
+    LGS_EXAM_SUBJECTS.map((s) => [s.key, { correct: 0, wrong: 0, empty: 0 }]),
+  );
+
+  for (const t of tasks) {
+    if (t.task_date < rangeStart || t.task_date > rangeEnd || !t.course_id) continue;
+    const key = LGS_COURSE_TO_SUBJECT_KEY.get(t.course_id);
+    if (!key) continue;
+    const bucket = bySubject.get(key)!;
+    bucket.correct += t.correct_count ?? 0;
+    bucket.wrong += t.wrong_count ?? 0;
+    bucket.empty += t.empty_count ?? 0;
+  }
+
+  for (const e of exams) {
+    if (e.task_date < rangeStart || e.task_date > rangeEnd || !e.subject_scores) continue;
+    if (parseGeneralExamTrack(e.title) !== "lgs") continue;
+    for (const subject of LGS_EXAM_SUBJECTS) {
+      const s = e.subject_scores[subject.key];
+      if (!s) continue;
+      const bucket = bySubject.get(subject.key)!;
+      bucket.correct += s.correct ?? 0;
+      bucket.wrong += s.wrong ?? 0;
+      bucket.empty += s.empty ?? 0;
+    }
+  }
+
+  const rows: KarneSubjectScoreRow[] = LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, ...bySubject.get(s.key)! }));
+  const total = rows.reduce(
+    (acc, r) => ({ correct: acc.correct + r.correct, wrong: acc.wrong + r.wrong, empty: acc.empty + r.empty }),
+    { correct: 0, wrong: 0, empty: 0 },
+  );
+  return { total, bySubject: rows };
 }

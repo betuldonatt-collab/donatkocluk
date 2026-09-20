@@ -24,7 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { Course, Topic } from "@/lib/curriculum";
+import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import type { PipelineBinding } from "@/lib/topic-pipeline";
+import type { Course } from "@/lib/curriculum";
+import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
 
 export type Resource = { id: string; name: string };
 export type ProgressMap = Record<string, { solved: boolean; reviewed: boolean }>;
@@ -52,27 +55,6 @@ function StatCells({ stat }: { stat: TopicStat }) {
   );
 }
 
-type Row = { topic: Topic; unitLabel: string; unitRowSpan: number | null };
-
-// "-" (ünitesiz/bağımsız konu) satırları birleştirilmez — her biri kendi
-// tek satırlık "-" hücresini alır. Gerçek bir ünite adı olan gruplarda ise
-// ardışık konular tek bir rowSpan'lı hücrede birleşir.
-function flattenRows(course: Course): Row[] {
-  const rows: Row[] = [];
-  for (const group of course.units) {
-    if (group.unit === "-") {
-      for (const topic of group.topics) {
-        rows.push({ topic, unitLabel: "-", unitRowSpan: 1 });
-      }
-    } else {
-      group.topics.forEach((topic, i) => {
-        rows.push({ topic, unitLabel: group.unit, unitRowSpan: i === 0 ? group.topics.length : null });
-      });
-    }
-  }
-  return rows;
-}
-
 const ZERO_STAT: TopicStat = { total: 0, correct: 0, wrong: 0, empty: 0 };
 
 export function CourseTable({
@@ -82,6 +64,7 @@ export function CourseTable({
   topicStats,
   onAddResource,
   onToggle,
+  pipeline,
 }: {
   course: Course;
   resources: Resource[];
@@ -89,6 +72,9 @@ export function CourseTable({
   topicStats: CourseTopicStats;
   onAddResource: (name: string) => Promise<void>;
   onToggle: (topicId: string, resourceId: string, field: "solved" | "reviewed") => void;
+  // The per-topic pipeline checkboxes: the cohort's "start" steps sit right
+  // after the topic name, its "end" steps after the last resource column.
+  pipeline?: PipelineBinding;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newResourceName, setNewResourceName] = useState("");
@@ -112,7 +98,11 @@ export function CourseTable({
     }
   }
 
-  const rows = flattenRows(course);
+  // "-" (ünitesiz) topics never merge; real units span their topic count.
+  // An LGS course with a Konu level (Matematik) gets a third column between
+  // Ünite and the topic (then an "Alt Konu"), so all three levels show.
+  const rows = flattenCourseRows(course);
+  const hasKonu = courseHasKonu(course);
 
   return (
     <Card>
@@ -124,6 +114,7 @@ export function CourseTable({
         </Button>
       </CardHeader>
       <CardContent>
+        {pipeline && <PipelineSummaryBar course={course} map={pipeline.map} config={pipeline.config} />}
         <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -134,9 +125,18 @@ export function CourseTable({
               <TableHead className="bg-background sticky left-0 z-20 border-l w-12 align-bottom" rowSpan={2}>
                 Ünite
               </TableHead>
-              <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom" rowSpan={2}>
-                Konu
+              {hasKonu && (
+                <TableHead className="bg-background sticky left-12 z-20 w-44 min-w-44 border-r align-bottom" rowSpan={2}>
+                  Konu
+                </TableHead>
+              )}
+              <TableHead
+                className={cn("bg-background sticky z-20 border-r align-bottom", hasKonu ? "left-[14rem]" : "left-12")}
+                rowSpan={2}
+              >
+                {hasKonu ? "Alt Konu" : "Konu"}
               </TableHead>
+              {pipeline && <PipelineStepHeads steps={pipeline.config.start} />}
               {resources.map((resource) => (
                 <TableHead
                   key={resource.id}
@@ -146,6 +146,7 @@ export function CourseTable({
                   {resource.name}
                 </TableHead>
               ))}
+              {pipeline && <PipelineStepHeads steps={pipeline.config.end} />}
             </TableRow>
             <TableRow>
               <TableHead className="text-center text-xs">Toplam</TableHead>
@@ -191,7 +192,36 @@ export function CourseTable({
                     )}
                   </TableCell>
                 )}
-                <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">{row.topic.name}</TableCell>
+                {hasKonu && row.konuRowSpan !== null && (
+                  <TableCell
+                    rowSpan={row.konuRowSpan}
+                    className="bg-card sticky left-12 z-10 w-44 min-w-44 border-r align-middle font-medium whitespace-normal"
+                  >
+                    {row.konuLabel}
+                  </TableCell>
+                )}
+                <TableCell
+                  // A topic with no Konu of its own (a 2-level subject
+                  // inside a course that has some Konu rows) spans both
+                  // columns instead of leaving the Konu one empty.
+                  colSpan={hasKonu && row.konuLabel === null ? 2 : 1}
+                  className={cn(
+                    "bg-card sticky z-10 border-r font-medium whitespace-normal",
+                    hasKonu && row.konuLabel !== null ? "left-[14rem]" : "left-12",
+                  )}
+                >
+                  {row.topic.name}
+                </TableCell>
+                {pipeline && (
+                  <PipelineCells
+                    steps={pipeline.config.start}
+                    courseName={course.name}
+                    topicName={row.topic.name}
+                    topicId={row.topic.id}
+                    map={pipeline.map}
+                    onToggle={pipeline.onToggle}
+                  />
+                )}
                 {resources.map((resource) => {
                   const key = progressKey(row.topic.id, resource.id);
                   const state = progress[key] ?? { solved: false, reviewed: false };
@@ -214,6 +244,16 @@ export function CourseTable({
                     </Fragment>
                   );
                 })}
+                {pipeline && (
+                  <PipelineCells
+                    steps={pipeline.config.end}
+                    courseName={course.name}
+                    topicName={row.topic.name}
+                    topicId={row.topic.id}
+                    map={pipeline.map}
+                    onToggle={pipeline.onToggle}
+                  />
+                )}
               </TableRow>
             ))}
             {/* Permanent row -- catches every scored task logged without a
@@ -224,12 +264,14 @@ export function CourseTable({
                 appears/disappears. */}
             <TableRow className="bg-muted/40">
               <StatCells stat={topicStats.karma} />
-              <TableCell colSpan={2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
+              <TableCell colSpan={hasKonu ? 3 : 2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
                 Karma
               </TableCell>
+              {pipeline && <PipelineFillerCell count={pipeline.config.start.length} />}
               {resources.map((resource) => (
                 <TableCell key={resource.id} colSpan={2} className="border-l" />
               ))}
+              {pipeline && <PipelineFillerCell count={pipeline.config.end.length} />}
             </TableRow>
           </TableBody>
         </Table>

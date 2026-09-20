@@ -2,7 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
-import type { DetailSession, DetailTask, ParagrafProblemEntry } from "../types";
+import type { DetailSession, DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
 import { AnalyticsTab } from "./analytics-tab";
 import { ChartsTab } from "./charts-tab";
@@ -35,6 +35,8 @@ export function DetailTabs({
   allTimeTrackedMinutes,
   initialTab,
   sessions,
+  examType = "YKS",
+  lgsRoutines = [],
 }: {
   studentId: string;
   topicPerformance: TopicPerformanceRow[];
@@ -54,6 +56,10 @@ export function DetailTabs({
   allTimeTrackedMinutes: number;
   initialTab: string;
   sessions: DetailSession[];
+  // Which cohort's curriculum / net rule the analytic tabs use.
+  examType?: "YKS" | "LGS";
+  // LGS students' Paragraf / Kitap Okuma log (lgs_daily_routines).
+  lgsRoutines?: LgsDailyRoutine[];
 }) {
   return (
     <Tabs defaultValue={initialTab}>
@@ -76,15 +82,22 @@ export function DetailTabs({
           examMistakes={examMistakes}
           weekDays={initialWeekDays}
           courseResourceData={courseResourceData}
+          examType={examType}
         />
       </TabsContent>
 
       <TabsContent value="gelisim-haritasi" className="pt-4">
-        <GelisimHaritasiTab rows={gelisimHaritasi} />
+        <GelisimHaritasiTab rows={gelisimHaritasi} examType={examType} />
       </TabsContent>
 
       <TabsContent value="grafikler" className="pt-4">
-        <ChartsTab paragrafEntries={paragrafEntries} generalExams={generalExams} branchExams={branchExams} />
+        <ChartsTab
+          paragrafEntries={paragrafEntries}
+          generalExams={generalExams}
+          branchExams={branchExams}
+          examType={examType}
+          lgsRoutines={lgsRoutines}
+        />
       </TabsContent>
 
       <TabsContent value="program" className="pt-4">
@@ -97,7 +110,13 @@ export function DetailTabs({
       </TabsContent>
 
       <TabsContent value="kaynak-takibi" className="pt-4">
-        <KaynakTakibiTab studentId={studentId} courseData={courseResourceData} today={today} initialWeekStats={initialWeekStats} />
+        <KaynakTakibiTab
+          studentId={studentId}
+          courseData={courseResourceData}
+          today={today}
+          initialWeekStats={initialWeekStats}
+          examType={examType}
+        />
       </TabsContent>
 
       <TabsContent value="karneler" className="pt-4">

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { KARMA_TOPIC_ID } from "@/lib/curriculum";
+import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
+import { getStudentExamType } from "@/lib/student-exam-type";
 import type { ResourceTotals } from "./_components/totals-summary";
 import { KaynakTakibiClient, type CourseData } from "./kaynak-takibi-client";
 
@@ -9,6 +11,7 @@ const EMPTY_STAT = { total: 0, correct: 0, wrong: 0, empty: 0 };
 export default async function KaynakTakibiPage() {
   const view = await getViewContext("student");
   const supabase = await createClient();
+  const examType = await getStudentExamType();
 
   const courseData: Record<string, CourseData> = {};
 
@@ -38,9 +41,22 @@ export default async function KaynakTakibiPage() {
         .eq("student_id", view.effectiveUserId),
     ]);
 
+    // Per-topic pipeline checkboxes -- the cohort's own table (LGS: 4 steps,
+    // YKS: 2). A missing table (migration not run yet) just reads as empty.
+    const pipelineConfig = PIPELINE_CONFIG[examType];
+    const { data: pipelineRows, error: pipelineError } = await supabase
+      .from(pipelineConfig.table)
+      .select(pipelineSelectColumns(pipelineConfig))
+      .eq("student_id", view.effectiveUserId);
+    if (pipelineError) console.error("[kaynak-takibi] pipeline read failed:", pipelineError);
+    const pipelineByCourse = groupPipelineRows((pipelineRows ?? []) as unknown as PipelineRow[], pipelineConfig);
+
     function courseEntry(courseId: string): CourseData {
-      return (courseData[courseId] ??= { resources: [], branchExamResources: [], progress: {}, topicStats: { byTopic: {}, karma: { ...EMPTY_STAT } } });
+      return (courseData[courseId] ??= { resources: [], branchExamResources: [], progress: {}, pipeline: pipelineByCourse[courseId] ?? {}, topicStats: { byTopic: {}, karma: { ...EMPTY_STAT } } });
     }
+
+    // A course with pipeline ticks but no resources yet still needs its entry.
+    for (const courseId of Object.keys(pipelineByCourse)) courseEntry(courseId);
 
     for (const row of resourceRows ?? []) {
       const entry = courseEntry(row.course_id);
@@ -94,5 +110,5 @@ export default async function KaynakTakibiPage() {
     { ...EMPTY_STAT },
   );
 
-  return <KaynakTakibiClient initialCourseData={courseData} totals={totals} />;
+  return <KaynakTakibiClient initialCourseData={courseData} totals={totals} examType={examType} />;
 }

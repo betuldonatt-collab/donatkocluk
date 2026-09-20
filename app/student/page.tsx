@@ -7,6 +7,7 @@ import { RemainingSessionsCard } from "./_components/remaining-sessions-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
 import type { StudentFixedTask, StudentTask } from "./_components/daily-tasks/types";
+import type { ExamType } from "@/lib/exam-type";
 import type { SessionNeedingRating } from "./_components/types";
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
@@ -95,7 +96,7 @@ async function fetchHomeData(userId: string) {
       // an older pending-analysis task (pendingTaskRows, above) can belong
       // to a week the coach has since locked.
       supabase.from("week_locks").select("week_start_date").eq("student_id", userId),
-      supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px").eq("id", userId).maybeSingle(),
+      supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px, exam_type").eq("id", userId).maybeSingle(),
       // Which book/kaynak (if any) a coach linked to each task -- mirrors
       // the coach panel's own task_resources join (schedule/page.tsx)
       // exactly, just scoped by student_tasks.student_id instead of by
@@ -162,6 +163,7 @@ async function fetchHomeData(userId: string) {
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
     remainingSessions,
+    examType: (profileRow?.exam_type ?? "YKS") as ExamType,
     todayLocked: lockedWeeks.has(mondayOf(today)),
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
@@ -180,6 +182,7 @@ export default async function StudentHomePage() {
     fixedTasks,
     allTimeTrackedMinutes,
     remainingSessions,
+    examType,
     todayLocked,
     routineRowHeights,
     taskRowHeights,
@@ -194,6 +197,7 @@ export default async function StudentHomePage() {
         fixedTasks: [] as StudentFixedTask[],
         allTimeTrackedMinutes: 0,
         remainingSessions: 0,
+        examType: "YKS" as ExamType,
         todayLocked: false,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
@@ -227,6 +231,7 @@ export default async function StudentHomePage() {
         fixedTasks={fixedTasks}
         allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
+        examType={examType}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}
       />

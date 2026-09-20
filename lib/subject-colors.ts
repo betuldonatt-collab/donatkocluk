@@ -18,7 +18,9 @@ export type SubjectFamily =
   | "tarih"
   | "cografya"
   | "felsefe"
-  | "din";
+  | "din"
+  | "fen"
+  | "ingilizce";
 
 // [TYT, AYT, Branş Denemesi] -- every class string is written out in full
 // (never built with string concatenation) so Tailwind's static scanner
@@ -38,6 +40,11 @@ const FAMILY_CLASSES: Record<SubjectFamily, [string, string, string]> = {
   // AYT Sözel curriculum practice and have no TYT sibling of their own.
   felsefe: ["bg-purple-500/6", "bg-purple-500/12", "bg-purple-500/20"],
   din: ["bg-fuchsia-500/6", "bg-fuchsia-500/12", "bg-fuchsia-500/20"],
+  // LGS-only families (TYT/AYT split Fen into Fizik/Kimya/Biyoloji and have
+  // no English section) -- distinct hues from every family above and from
+  // the reserved emerald/amber/rose status colors.
+  fen: ["bg-cyan-500/6", "bg-cyan-500/12", "bg-cyan-500/20"],
+  ingilizce: ["bg-lime-500/6", "bg-lime-500/12", "bg-lime-500/20"],
 };
 
 // Atomic TYT/AYT curriculum course id -> family. Every id here is read
@@ -73,6 +80,12 @@ const COURSE_FAMILY: Record<string, SubjectFamily> = {
   "ayt-sosyoloji": "felsefe",
   "ayt-mantik": "felsefe",
   "ayt-din-kulturu-ve-ahlak-bilgisi": "din",
+  "lgs-turkce": "turkce",
+  "lgs-matematik": "matematik",
+  "lgs-fen-bilimleri": "fen",
+  "lgs-inkilap-tarihi": "tarih",
+  "lgs-din-kulturu": "din",
+  "lgs-ingilizce": "ingilizce",
 };
 
 // Branch-exam "macro" course ids (lib/curriculum's BRANCH_EXAM_MACRO_COURSES)

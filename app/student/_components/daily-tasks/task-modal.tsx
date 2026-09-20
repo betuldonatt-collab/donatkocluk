@@ -16,12 +16,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { autoCalcMissingField, computeAutoTaskStatus, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
+import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
+  LGS_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
   coursesForAytGroup,
   coursesForGroup,
+  coursesForLgsExamSubject,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { cn } from "@/lib/utils";
@@ -98,11 +101,14 @@ function Field({
   value,
   onChange,
   className,
+  invalid,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  // A required box left empty after a failed save attempt -- red outline.
+  invalid?: boolean;
 }) {
   return (
     <div className={cn("min-w-0 space-y-1.5", className)}>
@@ -113,7 +119,8 @@ function Field({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(sanitizeDigits(e.target.value))}
-        className="bg-background"
+        aria-invalid={invalid || undefined}
+        className={cn("bg-background", invalid && "border-destructive focus-visible:ring-destructive/30")}
       />
     </div>
   );
@@ -201,20 +208,23 @@ function toNumberOrNull(v: string) {
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."), the
 // same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
 function subjectGroupsFor(
-  examTrack: "tyt" | "ayt",
+  examTrack: "tyt" | "ayt" | "lgs",
   aytTrack: Track | null,
-): { key: string; label: string; courseIds: string[] }[] {
+): { key: string; label: string; courseIds: string[]; section?: string; questions?: number }[] {
+  if (examTrack === "lgs") return LGS_EXAM_SUBJECTS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
   if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
   return [];
 }
 
-function coursesForActiveGroup(examTrack: "tyt" | "ayt", aytTrack: Track | null, key: string): Course[] {
+function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs", aytTrack: Track | null, key: string): Course[] {
+  if (examTrack === "lgs") return coursesForLgsExamSubject(key);
   if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
   if (aytTrack) return coursesForAytGroup(aytTrack, key);
   return [];
@@ -234,6 +244,9 @@ function TaskModalBody({
   const [step, setStep] = useState<Step>(initialStep);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once a save was refused for a blank Doğru/Yanlış/Boş box, so the
+  // empty boxes get outlined until they're filled.
+  const [showMissingScores, setShowMissingScores] = useState(false);
 
   const [totalCount, setTotalCount] = useState(task.total_count?.toString() ?? "");
   const [correctCount, setCorrectCount] = useState(task.correct_count?.toString() ?? "");
@@ -379,7 +392,20 @@ function TaskModalBody({
       }, 0)
     : (Number(wrongCount) || 0) + (Number(emptyCount) || 0);
 
-  const trackNotChosen = showSubjectScores && examTrack === "ayt" && !aytTrack;
+  // An LGS exam's per-subject Doğru+Yanlış+Boş can never exceed that
+  // subject's real question count (Türkçe 20, İnkılap/Din/İngilizce 10,
+  // Matematik/Fen 20) -- the same caps lgs_general_exams enforces at the DB
+  // level. Folded into trackNotChosen so every save path that already
+  // refuses to run while it's true also refuses on an over-cap subject.
+  const lgsOverCap =
+    showSubjectScores && examTrack === "lgs"
+      ? activeGroups.find((g) => {
+          const s = subjectInputs[g.key];
+          if (!s || g.questions === undefined) return false;
+          return (Number(s.correct) || 0) + (Number(s.wrong) || 0) + (Number(s.empty) || 0) > g.questions;
+        })
+      : undefined;
+  const trackNotChosen = (showSubjectScores && examTrack === "ayt" && !aytTrack) || !!lgsOverCap;
 
   // Doğru+Yanlış+Boş no longer has to add up to Toplam -- that's exactly
   // what "partially completed" means now (see computeAutoTaskStatus,
@@ -521,8 +547,29 @@ function TaskModalBody({
     return false;
   }
 
+  // Genel Deneme (a row per ders) and Branş Denemesi (one D/Y/B set) must
+  // have EVERY Doğru/Yanlış/Boş box filled -- 0 for what wasn't solved.
+  // Shared by the three save paths that call buildCountsPatch(); the server
+  // (updateTaskProgress) re-checks the same rule.
+  function blockedByMissingExamScores(): boolean {
+    let message: string | null = null;
+    if (showSubjectScores) {
+      const anyMissing = activeGroups.some((g) => {
+        const s = subjectInputs[g.key];
+        return !s || isBlankScore(s.correct) || isBlankScore(s.wrong) || isBlankScore(s.empty);
+      });
+      if (anyMissing) message = GENERAL_EXAM_SCORES_REQUIRED;
+    } else if (task.task_type === "branch_exam") {
+      if (isBlankScore(correctCount) || isBlankScore(wrongCount) || isBlankScore(emptyCount)) message = EXAM_SCORES_REQUIRED;
+    }
+    if (!message) return false;
+    setShowMissingScores(true);
+    setError(message);
+    return true;
+  }
+
   async function handleSaveSimple() {
-    if (blockedWithoutManualStatus()) return;
+    if (blockedWithoutManualStatus() || blockedByMissingExamScores()) return;
     setSaving(true);
     setError(null);
     try {
@@ -562,7 +609,7 @@ function TaskModalBody({
 
 
   async function handleGoToAnalysis() {
-    if (blockedWithoutManualStatus()) return;
+    if (blockedWithoutManualStatus() || blockedByMissingExamScores()) return;
     setSaving(true);
     setError(null);
     try {
@@ -579,7 +626,7 @@ function TaskModalBody({
   }
 
   async function handleDeferAnalysis() {
-    if (blockedWithoutManualStatus()) return;
+    if (blockedWithoutManualStatus() || blockedByMissingExamScores()) return;
     setSaving(true);
     setError(null);
     try {
@@ -900,9 +947,24 @@ function TaskModalBody({
             ) : (
               <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
             )}
-            <Field label="Doğru" value={correctCount} onChange={(v) => handleCountFieldChange("correct", v)} />
-            <Field label="Yanlış" value={wrongCount} onChange={(v) => handleCountFieldChange("wrong", v)} />
-            <Field label="Boş" value={emptyCount} onChange={(v) => handleCountFieldChange("empty", v)} />
+            <Field
+              label="Doğru"
+              value={correctCount}
+              onChange={(v) => handleCountFieldChange("correct", v)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(correctCount)}
+            />
+            <Field
+              label="Yanlış"
+              value={wrongCount}
+              onChange={(v) => handleCountFieldChange("wrong", v)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(wrongCount)}
+            />
+            <Field
+              label="Boş"
+              value={emptyCount}
+              onChange={(v) => handleCountFieldChange("empty", v)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(emptyCount)}
+            />
             {isTytBranchExam && (
               <Field
                 label="Süre (dk)"
@@ -969,11 +1031,24 @@ function TaskModalBody({
               </div>
             )}
 
+            {lgsOverCap && (
+              <p className="text-destructive mb-2 text-xs">
+                {lgsOverCap.label} için Doğru + Yanlış + Boş en fazla {lgsOverCap.questions} olabilir.
+              </p>
+            )}
             {activeGroups.length > 0 && (
               <div className="space-y-3">
-                {activeGroups.map((g) => (
+                {activeGroups.map((g, gi) => (
                   <div key={g.key} className="space-y-1.5">
-                    <p className="text-foreground text-sm font-medium">{g.label}</p>
+                    {g.section && g.section !== activeGroups[gi - 1]?.section && (
+                      <p className="text-primary pt-1 text-xs font-semibold tracking-wide uppercase">{g.section}</p>
+                    )}
+                    <p className="text-foreground text-sm font-medium">
+                      {g.label}
+                      {g.questions !== undefined && (
+                        <span className="text-muted-foreground ml-1.5 text-xs font-normal">({g.questions} soru)</span>
+                      )}
+                    </p>
                     <div className="grid grid-cols-3 gap-2">
                       <Field
                         label="Doğru"
@@ -981,6 +1056,7 @@ function TaskModalBody({
                         onChange={(v) =>
                           setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], correct: v } }))
                         }
+                        invalid={showMissingScores && isBlankScore(subjectInputs[g.key].correct)}
                       />
                       <Field
                         label="Yanlış"
@@ -988,6 +1064,7 @@ function TaskModalBody({
                         onChange={(v) =>
                           setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], wrong: v } }))
                         }
+                        invalid={showMissingScores && isBlankScore(subjectInputs[g.key].wrong)}
                       />
                       <Field
                         label="Boş"
@@ -995,6 +1072,7 @@ function TaskModalBody({
                         onChange={(v) =>
                           setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], empty: v } }))
                         }
+                        invalid={showMissingScores && isBlankScore(subjectInputs[g.key].empty)}
                       />
                     </div>
                   </div>

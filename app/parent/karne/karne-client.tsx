@@ -37,6 +37,8 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
   // (see page.tsx's own query).
   const cyclesAsc = cycles.slice().reverse();
   const tytTrend = cyclesAsc.filter((c) => c.stats.tyt.current !== null).map((c) => ({ date: c.range_start, value: c.stats.tyt.current! }));
+  const lgsTrend = cyclesAsc.filter((c) => c.stats.lgs?.current != null).map((c) => ({ date: c.range_start, value: c.stats.lgs!.current! }));
+  const isLgsCohort = cycles.some((c) => c.stats.lgs != null);
   const aytTrend = cyclesAsc.filter((c) => c.stats.ayt.current !== null).map((c) => ({ date: c.range_start, value: c.stats.ayt.current! }));
 
   return (
@@ -47,16 +49,23 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
       </div>
 
       {cycles.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        isLgsCohort ? (
           <div className="border-border bg-card rounded-lg border p-4">
-            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">TYT Net Gelişimi</p>
-            <LineChart data={tytTrend} />
+            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">LGS Net Gelişimi</p>
+            <LineChart data={lgsTrend} />
           </div>
-          <div className="border-border bg-card rounded-lg border p-4">
-            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">AYT Net Gelişimi</p>
-            <LineChart data={aytTrend} color="#f59e0b" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="border-border bg-card rounded-lg border p-4">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">TYT Net Gelişimi</p>
+              <LineChart data={tytTrend} />
+            </div>
+            <div className="border-border bg-card rounded-lg border p-4">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">AYT Net Gelişimi</p>
+              <LineChart data={aytTrend} color="#f59e0b" />
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {cycles.length === 0 ? (

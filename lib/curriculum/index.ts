@@ -5,12 +5,30 @@ import tytJson from "./tyt.json";
 import aytSayisalJson from "./ayt-sayisal.json";
 import aytEaJson from "./ayt-ea.json";
 import aytSozelJson from "./ayt-sozel.json";
+// lgs.json is generated once from the "8. Sınıf - Taslak Dosyası" workbook's
+// Kaynak Takibi sheet (not by parse-curriculum.mjs) -- same shape, plus the
+// optional `konu` level below.
+import lgsJson from "./lgs.json";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
-export type Unit = { unit: string; topics: Topic[] };
+// `konu` is LGS's middle hierarchy level (Ünite -> Konu -> Alt Konu):
+// Matematik (and one Fen ünite) track progress at the Alt Konu level, so
+// each (unit, konu) pair is its own entry here with Alt Konu leaves as its
+// topics. Everywhere else in LGS -- and all of YKS -- Konu itself is the
+// leaf and this stays undefined, so every existing consumer that only
+// reads `unit`/`topics` keeps working unchanged.
+export type Unit = { unit: string; konu?: string; topics: Topic[] };
 export type Course = { id: string; name: string; units: Unit[] };
 
 export const TYT_COURSES: Course[] = tytJson as Course[];
+
+// LGS (8th grade) subjects -- ids are all "lgs-" prefixed so they can never
+// collide with, or be mistaken for, a tyt-/ayt- course.
+export const LGS_COURSES: Course[] = lgsJson as Course[];
+
+export function isLgsCourseId(courseId: string | null | undefined): boolean {
+  return !!courseId && courseId.startsWith("lgs-");
+}
 
 export type Track = "sayisal" | "ea" | "sozel";
 
@@ -133,6 +151,7 @@ const ALL_COURSES: Course[] = [
   ...AYT_COURSES_BY_TRACK.sayisal,
   ...AYT_COURSES_BY_TRACK.ea,
   ...AYT_COURSES_BY_TRACK.sozel,
+  ...LGS_COURSES,
   ...ROUTINE_COURSES,
   ...BRANCH_EXAM_MACRO_COURSES,
 ];
@@ -150,6 +169,18 @@ export const KARMA_TOPIC: Topic = { id: KARMA_TOPIC_ID, name: "Karma" };
 
 export function topicsForCourse(course: Course): Topic[] {
   return [...course.units.flatMap((u) => u.topics), KARMA_TOPIC];
+}
+
+// Same list topicsForCourse gives, shaped for a combobox -- with one
+// difference: an LGS Alt Konu leaf ("EKOK") is meaningless on its own, so
+// it's labeled with its Konu ("1.1 Çarpanlar ve Katlar › EKOK"). Every
+// course without a `konu` level (all of YKS) gets its plain topic name,
+// exactly as before.
+export function topicOptionsForCourse(course: Course): { id: string; label: string }[] {
+  return [
+    ...course.units.flatMap((u) => u.topics.map((t) => ({ id: t.id, label: u.konu ? `${u.konu} › ${t.name}` : t.name }))),
+    { id: KARMA_TOPIC.id, label: KARMA_TOPIC.name },
+  ];
 }
 
 export function findTopicById(courseId: string | null | undefined, topicId: string | null | undefined): Topic | null {

@@ -86,7 +86,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, is_active, exit_category, exit_note, total_session_quota, pool_status")
+      .select("id, full_name, is_active, exit_category, exit_note, total_session_quota, pool_status, exam_type")
       .eq("role", "student")
       .order("full_name"),
     supabase.from("profiles").select("id, full_name").eq("role", "coach").order("full_name"),
@@ -110,7 +110,7 @@ export default async function AdminPage() {
     supabase.from("coach_notes").select("coach_id, student_id, created_at").eq("type", "check_in").order("created_at", { ascending: false }),
     supabase
       .from("signup_requests")
-      .select("id, full_name, phone, requested_role")
+      .select("id, full_name, phone, requested_role, exam_type")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(200),

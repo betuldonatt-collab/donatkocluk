@@ -464,7 +464,7 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
 
   const { data: request, error: fetchError } = await supabase
     .from("signup_requests")
-    .select("full_name, phone, requested_role, status")
+    .select("full_name, phone, requested_role, exam_type, status")
     .eq("id", requestIdV)
     .single();
   if (fetchError) throw dbError(fetchError);
@@ -497,7 +497,14 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
   // matching what that trigger's own comment always claimed it did).
   const { error: roleFixError } = await adminClient
     .from("profiles")
-    .update({ role: request.requested_role })
+    .update({
+      role: request.requested_role,
+      // exam_type defaults to 'YKS' on the profiles column itself, so this
+      // only ever needs to run for an explicit 'LGS' request -- and only
+      // student requests carry a value here at all (see
+      // submitSignupRequest, app/login/actions.ts).
+      ...(request.requested_role === "student" && request.exam_type ? { exam_type: request.exam_type } : {}),
+    })
     .eq("id", createData.user.id);
   if (roleFixError) throw dbError(roleFixError);
 

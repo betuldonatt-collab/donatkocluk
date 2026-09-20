@@ -20,6 +20,9 @@ type StudentRow = Person & {
   exit_category: ExitCategory | null;
   exit_note: string | null;
   total_session_quota: number;
+  // Cohort (profiles.exam_type); LGS students get a badge so the admin can
+  // tell the two cohorts apart at a glance.
+  exam_type?: "YKS" | "LGS";
 };
 type StatusState = { isActive: boolean; exitCategory: ExitCategory | ""; exitNote: string };
 
@@ -157,7 +160,12 @@ export function CoachAssignmentTable({
             const quota = resolveQuota(student.id, quotas, students);
             return (
               <TableRow key={student.id}>
-                <TableCell className="font-medium">{student.full_name ?? "(İsimsiz)"}</TableCell>
+                <TableCell className="font-medium">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {student.full_name ?? "(İsimsiz)"}
+                    {student.exam_type === "LGS" && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">LGS</span>}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <select
                     value={assignments[student.id] ?? ""}

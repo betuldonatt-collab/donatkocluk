@@ -6,7 +6,7 @@
 // the UI components that render it, since a drifted copy here would mean
 // the coach and student literally see different colors for the same data.
 import { findCourseById } from "./curriculum";
-import { TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
+import { LGS_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 
 export type GelisimHaritasiRow = {
   courseId: string;
@@ -45,7 +45,14 @@ export function heatTier(count: number, windowSize: number): HeatTier {
 // general_exam counts toward every course in TYT_SUBJECT_GROUPS
 // regardless of AYT/track -- not re-derived here, just matched for
 // consistency between the two features.
-const GENERAL_EXAM_COURSE_IDS = new Set(TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds));
+// LGS's six subjects join the set: a general exam counts toward every course
+// of ITS cohort. That's safe across cohorts because callers pass only their
+// own student's cohort course ids, so an LGS student is never evaluated
+// against TYT courses (or vice versa).
+const GENERAL_EXAM_COURSE_IDS = new Set([
+  ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+]);
 
 export type TrialExam = { id: string; task_date: string; task_type: string; course_id: string | null };
 // status is optional so an existing caller that doesn't select it (the
@@ -104,7 +111,9 @@ export function computeGelisimHaritasi(
           courseId,
           courseName: course.name,
           topicId: topic.id,
-          topicName: topic.name,
+          // An LGS Alt Konu ("EKOK") means nothing without its Konu; every
+          // course without a konu level (all of YKS) keeps the plain name.
+          topicName: unit.konu ? `${unit.konu} › ${topic.name}` : topic.name,
           count: wrongCount + blankCount,
           wrongCount,
           blankCount,

@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
 import type { StudentProfile } from "../types";
 import { EditProfileDialog } from "./edit-profile-dialog";
 
@@ -34,6 +35,8 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export function ProfileOverviewCard({ studentId, profile: initialProfile }: { studentId: string; profile: StudentProfile }) {
   const [profile, setProfile] = useState(initialProfile);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const isLgs = profile.exam_type === "LGS";
+  const terms = PROFILE_TERMS[isLgs ? "LGS" : "YKS"];
 
   return (
     <Card>
@@ -62,21 +65,30 @@ export function ProfileOverviewCard({ studentId, profile: initialProfile }: { st
 
         <section>
           <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">Akademik Hedefler</p>
-          <Field label="Hedef Üniversite" value={profile.target_university || "—"} />
-          <Field label="Hedef Bölüm" value={profile.target_department || "—"} />
-          <Field label="Hedef Sıralama" value={profile.target_ranking || "—"} />
+          {isLgs ? (
+            <>
+              <Field label={terms.targetOne} value={profile.target_high_school || "—"} />
+              <Field label={terms.targetTwo} value={formatPercentile(profile.target_percentile)} />
+            </>
+          ) : (
+            <>
+              <Field label={terms.targetOne} value={profile.target_university || "—"} />
+              <Field label={terms.targetTwo} value={profile.target_department || "—"} />
+              <Field label="Hedef Sıralama" value={profile.target_ranking || "—"} />
+            </>
+          )}
         </section>
 
         <section>
           <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">Akademik Durum</p>
           <Field label="Okul" value={profile.school_name || "—"} />
           <Field label="Sınıf/Şube" value={profile.sinif_sube || "—"} />
-          <Field label="OBP" value={profile.obp ?? "—"} />
+          <Field label={terms.grade} value={(isLgs ? profile.report_card_average : profile.obp) ?? "—"} />
           <Field label="Dershaneye Gidiyor mu?" value={<YesNo value={profile.attends_dershane} />} />
           <Field label="Deneme Kulübüne Gidiyor mu?" value={<YesNo value={profile.attends_deneme_kulubu} />} />
           <Field label="Özel Ders Alıyor mu?" value={<YesNo value={profile.has_private_tutor} />} />
           <Field label="Daha Önce Koçluk Almış mı?" value={<YesNo value={profile.had_previous_coaching} />} />
-          <Field label="Eski YKS Sıralaması / Notu" value={profile.previous_yks_ranking || "—"} />
+          {!isLgs && <Field label="Eski YKS Sıralaması / Notu" value={profile.previous_yks_ranking || "—"} />}
         </section>
 
         <section>

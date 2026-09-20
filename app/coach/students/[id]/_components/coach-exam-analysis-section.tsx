@@ -7,16 +7,20 @@ import { cn } from "@/lib/utils";
 import {
   AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
   AYT_COURSES_BY_TRACK,
+  LGS_COURSES,
   TRACK_LABELS,
   TYT_BRANCH_EXAM_MACRO_COURSES,
   TYT_COURSES,
   type Track,
 } from "@/lib/curriculum";
+import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
+  LGS_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   coursesForAytGroup,
   coursesForGroup,
+  coursesForLgsGroup,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { deleteAssignedTask, getTaskTopicMistakesForCoach } from "../../../actions";
@@ -30,7 +34,8 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // Mirrors buildGeneralExamTitle/parseGeneralExamTitle's own convention --
 // duplicated per call site across this app, not imported.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
@@ -79,6 +84,7 @@ export function CoachExamAnalysisSection({
   examMistakes,
   weekDays,
   courseResourceData: initialCourseResourceData,
+  examType = "YKS",
 }: {
   studentId: string;
   branchExams: DetailTask[];
@@ -86,7 +92,9 @@ export function CoachExamAnalysisSection({
   examMistakes: MistakeRow[];
   weekDays: { date: string; label: string }[];
   courseResourceData: CourseResourceData;
+  examType?: ExamType;
 }) {
+  const isLgs = examType === "LGS";
   const [exams, setExams] = useState<DetailTask[]>([...initialBranchExams, ...initialGeneralExams]);
   const [mistakes, setMistakes] = useState(examMistakes);
   const [courseResourceData, setCourseResourceData] = useState(initialCourseResourceData);
@@ -95,8 +103,10 @@ export function CoachExamAnalysisSection({
   const [examMode, setExamMode] = useState<ExamMode>("brans");
   const [mainTrack, setMainTrack] = useState<"tyt" | "ayt">("tyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState(TYT_COURSES[0].id);
-  const [genelGroupKey, setGenelGroupKey] = useState(TYT_SUBJECT_GROUPS[0].key as string);
+  const [branchCourseId, setBranchCourseId] = useState<string>(isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id);
+  const [genelGroupKey, setGenelGroupKey] = useState<string>(
+    isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+  );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
     setMainTrack(next);
@@ -114,14 +124,22 @@ export function CoachExamAnalysisSection({
   // Macro ("whole fruit") subjects lead the list, atomic ("sliced") ones
   // follow -- never replacing or nesting them, so the coach can
   // independently assign/review either "Fizik" or "TYT Fen" as a branch exam.
-  const branchCourses =
-    mainTrack === "tyt"
+  // LGS has no TYT/AYT split or macro subjects: one flat course list and the
+  // two real sessions (Sözel / Sayısal) as the Genel Deneme groups.
+  const branchCourses = isLgs
+    ? LGS_COURSES
+    : mainTrack === "tyt"
       ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
       : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytSubTrack], ...AYT_COURSES_BY_TRACK[aytSubTrack]];
-  const genelGroups = mainTrack === "tyt" ? TYT_SUBJECT_GROUPS : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
+  const genelGroups = isLgs
+    ? LGS_SUBJECT_GROUPS
+    : mainTrack === "tyt"
+      ? TYT_SUBJECT_GROUPS
+      : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
-  const genelCoursesInGroup =
-    mainTrack === "tyt" ? coursesForGroup(genelGroupKey as (typeof TYT_SUBJECT_GROUPS)[number]["key"]) : coursesForAytGroup(aytSubTrack, genelGroupKey);
+  const genelCoursesInGroup = isLgs
+    ? coursesForLgsGroup(genelGroupKey)
+    : mainTrack === "tyt" ? coursesForGroup(genelGroupKey as (typeof TYT_SUBJECT_GROUPS)[number]["key"]) : coursesForAytGroup(aytSubTrack, genelGroupKey);
 
   const mistakesByExam = useMemo(() => {
     const map: Record<string, Set<string>> = {};
@@ -141,8 +159,10 @@ export function CoachExamAnalysisSection({
     .filter(
       (e) =>
         e.task_type === "general_exam" &&
-        parseGeneralExamTrack(e.title) === mainTrack &&
-        (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack),
+        (isLgs
+          ? parseGeneralExamTrack(e.title) === "lgs"
+          : parseGeneralExamTrack(e.title) === mainTrack &&
+            (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
     )
     .slice()
     .sort((a, b) => b.task_date.localeCompare(a.task_date));
@@ -201,15 +221,17 @@ export function CoachExamAnalysisSection({
           value={examMode}
           onChange={setExamMode}
         />
-        <TrackToggle
-          options={[
-            { value: "tyt", label: "TYT" },
-            { value: "ayt", label: "AYT" },
-          ]}
-          value={mainTrack}
-          onChange={handleMainTrackChange}
-        />
-        {mainTrack === "ayt" && (
+        {!isLgs && (
+          <TrackToggle
+            options={[
+              { value: "tyt", label: "TYT" },
+              { value: "ayt", label: "AYT" },
+            ]}
+            value={mainTrack}
+            onChange={handleMainTrackChange}
+          />
+        )}
+        {!isLgs && mainTrack === "ayt" && (
           <TrackToggle
             options={(Object.keys(TRACK_LABELS) as Track[]).map((t) => ({ value: t, label: TRACK_LABELS[t] }))}
             value={aytSubTrack}

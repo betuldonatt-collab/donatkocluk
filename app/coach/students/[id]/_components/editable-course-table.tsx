@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { Course, Topic } from "@/lib/curriculum";
+import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import type { PipelineBinding } from "@/lib/topic-pipeline";
+import type { Course } from "@/lib/curriculum";
+import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
 
 function progressKey(topicId: string, resourceId: string) {
@@ -37,24 +40,6 @@ function StatCells({ stat }: { stat: TopicStat }) {
   );
 }
 
-type Row = { topic: Topic; unitLabel: string; unitRowSpan: number | null };
-
-function flattenRows(course: Course): Row[] {
-  const rows: Row[] = [];
-  for (const group of course.units) {
-    if (group.unit === "-") {
-      for (const topic of group.topics) {
-        rows.push({ topic, unitLabel: "-", unitRowSpan: 1 });
-      }
-    } else {
-      group.topics.forEach((topic, i) => {
-        rows.push({ topic, unitLabel: group.unit, unitRowSpan: i === 0 ? group.topics.length : null });
-      });
-    }
-  }
-  return rows;
-}
-
 // Coach-editable mirror of the student's Kaynak Takibi course table --
 // same row/column structure, but the coach can add resources and toggle
 // checkboxes on the student's behalf. Always renders the full syllabus
@@ -70,6 +55,7 @@ export function EditableCourseTable({
   onArchiveResource,
   onReactivateResource,
   onDeleteResource,
+  pipeline,
 }: {
   course: Course;
   resources: ResourceRef[];
@@ -82,6 +68,9 @@ export function EditableCourseTable({
   onArchiveResource: (resourceId: string) => void;
   onReactivateResource: (resourceId: string) => void;
   onDeleteResource: (resourceId: string) => Promise<void>;
+  // The per-topic pipeline checkboxes: the cohort's "start" steps sit right
+  // after the topic name, its "end" steps after the last resource column.
+  pipeline?: PipelineBinding;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newResourceName, setNewResourceName] = useState("");
@@ -122,7 +111,9 @@ export function EditableCourseTable({
     setDialogOpen(false);
   }
 
-  const rows = flattenRows(course);
+  // LGS Matematik-style courses add a Konu level between Ünite and topic.
+  const rows = flattenCourseRows(course);
+  const hasKonu = courseHasKonu(course);
 
   return (
     <Card>
@@ -134,6 +125,7 @@ export function EditableCourseTable({
         </Button>
       </CardHeader>
       <CardContent>
+        {pipeline && <PipelineSummaryBar course={course} map={pipeline.map} config={pipeline.config} />}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -144,9 +136,18 @@ export function EditableCourseTable({
                 <TableHead className="bg-background sticky left-0 z-20 border-l w-12 align-bottom" rowSpan={2}>
                   Ünite
                 </TableHead>
-                <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom" rowSpan={2}>
-                  Konu
+                {hasKonu && (
+                  <TableHead className="bg-background sticky left-12 z-20 w-44 min-w-44 border-r align-bottom" rowSpan={2}>
+                    Konu
+                  </TableHead>
+                )}
+                <TableHead
+                  className={cn("bg-background sticky z-20 border-r align-bottom", hasKonu ? "left-[14rem]" : "left-12")}
+                  rowSpan={2}
+                >
+                  {hasKonu ? "Alt Konu" : "Konu"}
                 </TableHead>
+                {pipeline && <PipelineStepHeads steps={pipeline.config.start} />}
                 {resources.map((resource) => (
                   <TableHead
                     key={resource.id}
@@ -192,6 +193,7 @@ export function EditableCourseTable({
                     </div>
                   </TableHead>
                 ))}
+                {pipeline && <PipelineStepHeads steps={pipeline.config.end} />}
               </TableRow>
               <TableRow>
                 <TableHead className="text-center text-xs">Toplam</TableHead>
@@ -235,7 +237,33 @@ export function EditableCourseTable({
                       )}
                     </TableCell>
                   )}
-                  <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">{row.topic.name}</TableCell>
+                  {hasKonu && row.konuRowSpan !== null && (
+                    <TableCell
+                      rowSpan={row.konuRowSpan}
+                      className="bg-card sticky left-12 z-10 w-44 min-w-44 border-r align-middle font-medium whitespace-normal"
+                    >
+                      {row.konuLabel}
+                    </TableCell>
+                  )}
+                  <TableCell
+                    colSpan={hasKonu && row.konuLabel === null ? 2 : 1}
+                    className={cn(
+                      "bg-card sticky z-10 border-r font-medium whitespace-normal",
+                      hasKonu && row.konuLabel !== null ? "left-[14rem]" : "left-12",
+                    )}
+                  >
+                    {row.topic.name}
+                  </TableCell>
+                  {pipeline && (
+                    <PipelineCells
+                      steps={pipeline.config.start}
+                      courseName={course.name}
+                      topicName={row.topic.name}
+                      topicId={row.topic.id}
+                      map={pipeline.map}
+                      onToggle={pipeline.onToggle}
+                    />
+                  )}
                   {resources.map((resource) => {
                     const key = progressKey(row.topic.id, resource.id);
                     const state = progress[key] ?? { solved: false, reviewed: false };
@@ -258,6 +286,16 @@ export function EditableCourseTable({
                       </Fragment>
                     );
                   })}
+                  {pipeline && (
+                    <PipelineCells
+                      steps={pipeline.config.end}
+                      courseName={course.name}
+                      topicName={row.topic.name}
+                      topicId={row.topic.id}
+                      map={pipeline.map}
+                      onToggle={pipeline.onToggle}
+                    />
+                  )}
                 </TableRow>
               ))}
               {/* Permanent row -- catches every scored task logged without a
@@ -266,12 +304,14 @@ export function EditableCourseTable({
                   discrepancy. */}
               <TableRow className="bg-muted/40">
                 <StatCells stat={topicStats.karma} />
-                <TableCell colSpan={2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
+                <TableCell colSpan={hasKonu ? 3 : 2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
                   Karma
                 </TableCell>
+                {pipeline && <PipelineFillerCell count={pipeline.config.start.length} />}
                 {resources.map((resource) => (
                   <TableCell key={resource.id} colSpan={2} className="border-l" />
                 ))}
+                {pipeline && <PipelineFillerCell count={pipeline.config.end.length} />}
               </TableRow>
             </TableBody>
           </Table>

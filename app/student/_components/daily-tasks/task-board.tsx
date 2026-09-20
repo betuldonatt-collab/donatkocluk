@@ -28,6 +28,7 @@ import { sumTaskCounts, sumTaskDuration } from "@/lib/scoring";
 import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
 import { useRowHeights } from "@/lib/use-row-heights";
 import { deleteCustomTask, getPastWeeksForStudent, getTasksForWeek, updateTaskOrder } from "../../actions";
+import type { ExamType } from "@/lib/exam-type";
 import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
@@ -116,6 +117,7 @@ export function TaskBoard({
   todayLocked,
   initialRoutineRowHeights,
   initialTaskRowHeights,
+  examType = "YKS",
 }: {
   today: string;
   weekDays: { date: string; label: string }[];
@@ -140,6 +142,9 @@ export function TaskBoard({
   // adjust for there.
   initialRoutineRowHeights: number[];
   initialTaskRowHeights: number[];
+  // The student's cohort -- picks which subjects Ek Çalışma Ekle and the
+  // task modal offer; the board itself is identical for both.
+  examType?: ExamType;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -406,7 +411,7 @@ export function TaskBoard({
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-foreground text-base font-semibold">Diğer / Ekstra Çalışmalarım</h2>
-              <AddCustomTaskDialog taskDate={today} onCreated={handleCreated} disabled={todayLocked} />
+              <AddCustomTaskDialog taskDate={today} onCreated={handleCreated} disabled={todayLocked} examType={examType} />
             </div>
             {customTasks.length === 0 ? (
               <p className="text-muted-foreground text-sm">Henüz ekstra bir çalışma eklemedin.</p>

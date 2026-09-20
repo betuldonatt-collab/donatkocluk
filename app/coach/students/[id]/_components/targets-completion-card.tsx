@@ -6,6 +6,7 @@ import { CalendarPlus, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
 import type { CompletionStats, StudentProfile, SubjectCompletion } from "../types";
 
 function CompletionBar({ label, pct }: { label: string; pct: number | null }) {
@@ -57,26 +58,47 @@ export function TargetsCompletionCard({
             Hedefler
           </p>
           <div className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-muted-foreground text-xs">Hedef Üniversite</p>
-              <p className="text-foreground font-medium">{profile.target_university || "—"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs">Hedef Bölüm</p>
-              <p className="text-foreground font-medium">{profile.target_department || "—"}</p>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-muted-foreground text-xs">Hedef Sıralama</p>
-              <p className="text-foreground font-medium">{profile.target_ranking || "—"}</p>
-            </div>
+            {profile.exam_type === "LGS" ? (
+              <>
+                <div>
+                  <p className="text-muted-foreground text-xs">{PROFILE_TERMS.LGS.targetOne}</p>
+                  <p className="text-foreground font-medium">{profile.target_high_school || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">{PROFILE_TERMS.LGS.targetTwo}</p>
+                  <p className="text-foreground font-medium">{formatPercentile(profile.target_percentile)}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-muted-foreground text-xs">Hedef Üniversite</p>
+                  <p className="text-foreground font-medium">{profile.target_university || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Hedef Bölüm</p>
+                  <p className="text-foreground font-medium">{profile.target_department || "—"}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-muted-foreground text-xs">Hedef Sıralama</p>
+                  <p className="text-foreground font-medium">{profile.target_ranking || "—"}</p>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
           <CompletionBar label="Genel" pct={completion.overall} />
-          <CompletionBar label="TYT" pct={completion.tyt} />
-          <CompletionBar label="AYT" pct={completion.ayt} />
+          {/* TYT/AYT split is a YKS notion; for LGS these would be two
+              permanently empty bars. */}
+          {profile.exam_type !== "LGS" && (
+            <>
+              <CompletionBar label="TYT" pct={completion.tyt} />
+              <CompletionBar label="AYT" pct={completion.ayt} />
+            </>
+          )}
         </section>
 
         {subjectCompletion.length > 0 && (

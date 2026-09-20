@@ -8,21 +8,17 @@ import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
 import { isValidISODateOnly } from "@/lib/chart-range";
 import { countsAreConsistent } from "@/lib/count-fields";
-import {
-  AYT_COURSES_BY_TRACK,
-  BRANCH_EXAM_MACRO_COURSES,
-  findCourseById,
-  findTopicById,
-  isBranchExamMacroCourseId,
-  TYT_COURSES,
-} from "@/lib/curriculum";
-import { dbError } from "@/lib/errors";
+import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
+import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/curriculum";
+import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
+import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf, stopwatchLogicalDateIso, weekDates } from "@/lib/date";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
   computeAylikKarne,
   computeAytScoreBreakdown,
+  computeLgsScoreBreakdown,
   computeNetSummary,
   computeTotalDurationMinutes,
   computeTytScoreBreakdown,
@@ -31,15 +27,15 @@ import {
   type KarneTopicRow,
   type NetSummary,
 } from "@/lib/karne";
+import {
+  PIPELINE_CONFIG,
+  pipelineStepSchema,
+  validatePipelineStep,
+  type PipelineActionResult,
+  type PipelineStepInput,
+} from "@/lib/topic-pipeline";
 import { STUDENT_NOTES_PAGE_SIZE } from "./students/[id]/constants";
 
-const ALL_CURRICULUM_COURSE_IDS = [
-  ...TYT_COURSES.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
-  ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
-];
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -88,8 +84,8 @@ function buildTaskTitle(courseId: string | null | undefined, topicId: string | n
 // "Genel Deneme" has no course/topic at all -- per the coach's request,
 // the TYT/AYT track and publisher live only in the title text (no new
 // columns), e.g. "TYT Genel Deneme - 3D Yayınları".
-function buildGeneralExamTitle(track: "tyt" | "ayt" | null | undefined, publisher: string | null | undefined): string {
-  const prefix = track === "ayt" ? "AYT" : "TYT";
+function buildGeneralExamTitle(track: "tyt" | "ayt" | "lgs" | null | undefined, publisher: string | null | undefined): string {
+  const prefix = track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : "TYT";
   const pub = publisher?.trim();
   return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
 }
@@ -1164,7 +1160,7 @@ type AssignTaskInput = {
   totalCount?: number | null;
   durationMinutes?: number | null;
   videoLinks?: VideoLink[];
-  generalExamTrack?: "tyt" | "ayt" | null;
+  generalExamTrack?: "tyt" | "ayt" | "lgs" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
   // "Kitap Okuma" only -- the book's name, lives directly on the title
@@ -1183,7 +1179,7 @@ const assignTaskInputSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1384,7 +1380,7 @@ const updateAssignedTaskSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1405,7 +1401,7 @@ export async function updateAssignedTask(
     totalCount?: number | null;
     durationMinutes?: number | null;
     videoLinks?: VideoLink[];
-    generalExamTrack?: "tyt" | "ayt" | null;
+    generalExamTrack?: "tyt" | "ayt" | "lgs" | null;
     generalExamPublisher?: string | null;
     branchExamPublisher?: string | null;
     bookTitle?: string | null;
@@ -2104,6 +2100,47 @@ export async function toggleStudentResourceProgress(input: {
   revalidatePath(`/coach/students/${inputV.studentId}`);
 }
 
+// Coach-side twin of the student's setTopicPipelineStep (app/student/
+// kaynak-takibi/actions.ts): ticks / unticks one pipeline step for a student
+// on this coach's roster. The table and legal steps follow the STUDENT's
+// cohort (double-layer check: requireCoachAccess here, the *_coach_all
+// policies in RLS).
+//
+// Returns a result object rather than throwing, for the same reason as the
+// student twin: a thrown message would be stripped to a generic one in
+// production builds.
+export async function setStudentTopicPipelineStep(studentId: string, input: PipelineStepInput): Promise<PipelineActionResult> {
+  try {
+    await assertNotImpersonating();
+    const studentIdV = parseInput(uuidSchema, studentId);
+    const inputV = parseInput(pipelineStepSchema, input);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    await requireCoachAccess(supabase, user.id, studentIdV);
+
+    const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", studentIdV).maybeSingle();
+    const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
+    validatePipelineStep(examType, inputV);
+
+    const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
+      {
+        student_id: studentIdV,
+        course_id: inputV.courseId,
+        topic_id: inputV.topicId,
+        [inputV.step]: inputV.value,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "student_id,course_id,topic_id" },
+    );
+    if (error) throw dbError(error);
+
+    revalidatePath(`/coach/students/${studentIdV}`);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
+}
+
 // Soft delete (Group 4a) -- hides the resource from the "add to a new
 // task" combobox (ResourceCombobox filters to is_active) while every
 // historical checkbox/stat tied to it stays exactly as it was. The
@@ -2186,6 +2223,11 @@ export type EditableProfileFields = {
   target_university: string | null;
   target_department: string | null;
   target_ranking: string | null;
+  // LGS students only: sent by the edit dialog for that cohort, left out
+  // (undefined) otherwise so a YKS edit never writes them.
+  target_high_school?: string | null;
+  target_percentile?: number | null;
+  report_card_average?: number | null;
   school_name: string | null;
   sinif_sube: string | null;
   obp: number | null;
@@ -2206,6 +2248,19 @@ const editableProfileFieldsSchema = z.object({
   target_university: z.string().trim().max(200).nullable(),
   target_department: z.string().trim().max(200).nullable(),
   target_ranking: z.string().trim().max(60).nullable(),
+  target_high_school: z.string().trim().max(200).nullable().optional(),
+  target_percentile: z
+    .number("Hedef yüzdelik dilim geçersiz.")
+    .min(0, "Hedef yüzdelik dilim 0 ile 100 arasında olmalı.")
+    .max(100, "Hedef yüzdelik dilim 0 ile 100 arasında olmalı.")
+    .nullable()
+    .optional(),
+  report_card_average: z
+    .number("Karne ortalaması geçersiz.")
+    .min(0, "Karne ortalaması 0 ile 100 arasında olmalı.")
+    .max(100, "Karne ortalaması 0 ile 100 arasında olmalı.")
+    .nullable()
+    .optional(),
   school_name: z.string().trim().max(200).nullable(),
   sinif_sube: z.string().trim().max(40).nullable(),
   obp: z.number().min(0).max(100).nullable(),
@@ -2323,10 +2378,12 @@ const coachTrialMistakeSchema = z.object({
 
 const saveCoachTrialResultsSchema = z
   .object({
+    // Toplam is derived (D+Y+B) when left blank; the three below are
+    // required -- 0 for what wasn't solved (same rule as the student forms).
     totalCount: z.number().int().min(0).max(10000).nullable(),
-    correctCount: z.number().int().min(0).max(10000).nullable(),
-    wrongCount: z.number().int().min(0).max(10000).nullable(),
-    emptyCount: z.number().int().min(0).max(10000).nullable(),
+    correctCount: z.number(EXAM_SCORES_REQUIRED).int(EXAM_SCORES_REQUIRED).min(0, "Doğru sayısı negatif olamaz.").max(10000),
+    wrongCount: z.number(EXAM_SCORES_REQUIRED).int(EXAM_SCORES_REQUIRED).min(0, "Yanlış sayısı negatif olamaz.").max(10000),
+    emptyCount: z.number(EXAM_SCORES_REQUIRED).int(EXAM_SCORES_REQUIRED).min(0, "Boş sayısı negatif olamaz.").max(10000),
     mistakes: z.array(coachTrialMistakeSchema),
   })
   .refine(
@@ -2363,7 +2420,7 @@ export async function saveCoachTrialResults(
   const { data, error } = await supabase
     .from("student_tasks")
     .update({
-      total_count: inputV.totalCount,
+      total_count: inputV.totalCount ?? inputV.correctCount + inputV.wrongCount + inputV.emptyCount,
       correct_count: inputV.correctCount,
       wrong_count: inputV.wrongCount,
       empty_count: inputV.emptyCount,
@@ -2436,7 +2493,7 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   await requireCoachAccess(supabase, user.id, studentIdV);
 
   const [{ data: profile }, { data: link }, { data: lastCycle }, { data: openDraft }] = await Promise.all([
-    supabase.from("profiles").select("coaching_start_date").eq("id", studentIdV).maybeSingle(),
+    supabase.from("profiles").select("coaching_start_date, exam_type").eq("id", studentIdV).maybeSingle(),
     supabase.from("coach_students").select("created_at").eq("coach_id", user.id).eq("student_id", studentIdV).maybeSingle(),
     supabase
       .from("student_report_cards")
@@ -2515,24 +2572,34 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
     .lte("task_date", rangeEnd);
   if (durationError) throw dbError(durationError);
 
-  const topicMistakes = computeAylikKarne(ALL_CURRICULUM_COURSE_IDS, exams, mistakeRows ?? [], rangeStart, rangeEnd);
+  const isLgs = profile?.exam_type === "LGS";
+  const topicMistakes = computeAylikKarne(curriculumCourseIdsFor(isLgs ? "LGS" : "YKS"), exams, mistakeRows ?? [], rangeStart, rangeEnd);
   const currentNet = computeNetSummary(exams as KarneGeneralExam[], rangeStart, rangeEnd);
-  // Same `exams` array serves both params below: the course_id-tagged
-  // practice rows (question_bank/topic_study/branch_exam) and the
-  // general_exam rows (course_id always null) are disjoint subsets of it,
-  // so computeTytScoreBreakdown's own internal filtering picks each row
-  // up exactly once, in whichever half actually applies to it.
-  const scoreBreakdown = computeTytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd);
-  const aytScoreBreakdown = computeAytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd);
   const totalDurationMinutes = computeTotalDurationMinutes(durationRows ?? []);
   const previousStats = lastCycle?.stats as NetSummary | undefined;
-  const stats: NetSummary = {
-    tyt: { current: currentNet.tyt, previous: previousStats?.tyt.current ?? null },
-    ayt: { current: currentNet.ayt, previous: previousStats?.ayt.current ?? null },
-    scoreBreakdown,
-    aytScoreBreakdown,
-    totalDurationMinutes,
-  };
+  // Same `exams` array serves both params of every score breakdown: the
+  // course_id-tagged practice rows (question_bank/topic_study/branch_exam)
+  // and the general_exam rows (course_id always null) are disjoint subsets
+  // of it, so each breakdown's own internal filtering picks each row up
+  // exactly once, in whichever half actually applies to it.
+  const stats: NetSummary = isLgs
+    ? {
+        // An LGS report card has no TYT/AYT half -- kept {null, null} only
+        // because NetSummary requires them -- and carries its own net
+        // (3 wrong = 1 right) and six-subject D/Y/B instead.
+        tyt: { current: null, previous: null },
+        ayt: { current: null, previous: null },
+        lgs: { current: currentNet.lgs, previous: previousStats?.lgs?.current ?? null },
+        lgsScoreBreakdown: computeLgsScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        totalDurationMinutes,
+      }
+    : {
+        tyt: { current: currentNet.tyt, previous: previousStats?.tyt.current ?? null },
+        ayt: { current: currentNet.ayt, previous: previousStats?.ayt.current ?? null },
+        scoreBreakdown: computeTytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        aytScoreBreakdown: computeAytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        totalDurationMinutes,
+      };
 
   const { data, error } = await supabase
     .from("student_report_cards")

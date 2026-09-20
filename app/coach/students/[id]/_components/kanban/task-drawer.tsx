@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { addStudentResource, assignRoutineToWeek, assignTaskToStudent, updateAssignedTask } from "../../../../actions";
 import type { DetailTask } from "../../types";
 import type { CourseResourceData } from "../kaynak-takibi-tab";
-import { ALL_COURSES, TaskFormFields, defaultTaskFormValue, taskFormValueToPayload, valueFromTask, type TaskFormValue } from "./task-form-fields";
+import type { ExamType } from "@/lib/exam-type";
+import { TaskFormFields, defaultTaskFormValue, firstCourseIdFor, taskFormValueToPayload, valueFromTask, type TaskFormValue } from "./task-form-fields";
 import { TrialResultsSection } from "./trial-results-section";
 
 export type TaskDrawerState =
@@ -30,8 +31,14 @@ const ROUTINE_TYPE_OPTIONS: { value: RoutineType; label: string }[] = [
   { value: "diger", label: "Diğer" },
 ];
 
-function firstNonRoutineCourseId(): string {
-  return ALL_COURSES.find((c) => c.id !== "paragraf" && c.id !== "problem" && c.id !== "kitap-okuma")?.id ?? ALL_COURSES[0].id;
+// LGS has no Problem routine (it's a YKS-only practice) -- its Rutin Türü
+// row is Paragraf / Kitap Okuma / Diğer.
+function routineOptionsFor(examType: ExamType) {
+  return examType === "LGS" ? ROUTINE_TYPE_OPTIONS.filter((o) => o.value !== "problem") : ROUTINE_TYPE_OPTIONS;
+}
+
+function firstNonRoutineCourseId(examType: ExamType): string {
+  return firstCourseIdFor(examType);
 }
 
 // Monday=0..Sunday=6, matching DAY_LABELS_SHORT's own order -- JS's native
@@ -75,6 +82,7 @@ export function TaskDrawer({
   onCreated,
   onSaved,
   onResourceCreated,
+  examType = "YKS",
 }: {
   state: TaskDrawerState;
   onClose: () => void;
@@ -84,14 +92,17 @@ export function TaskDrawer({
   onCreated: (tasks: DetailTask[]) => void;
   onSaved: (task: DetailTask) => void;
   onResourceCreated: (courseId: string, kind: "study" | "branch_exam", resource: { id: string; name: string }) => void;
+  // Which cohort's subjects/routines this drawer offers -- everything else
+  // about it (drag, multi-day, resources, videos) is identical.
+  examType?: ExamType;
 }) {
   const initialTab = state.mode === "create-multi" ? (state.initialTab ?? "task") : "task";
   const [tab, setTab] = useState<"task" | "routine">(initialTab);
   const [routineType, setRoutineType] = useState<RoutineType>("paragraf");
   const [value, setValue] = useState<TaskFormValue>(() => {
     if (state.mode === "edit") return valueFromTask(state.task, courseResourceData);
-    if (initialTab === "routine") return { ...defaultTaskFormValue(), courseId: "paragraf" };
-    return defaultTaskFormValue();
+    if (initialTab === "routine") return { ...defaultTaskFormValue(examType), courseId: "paragraf" };
+    return defaultTaskFormValue(examType);
   });
   // Which of the CURRENTLY VISIBLE 7 days (weekDays, as passed down from
   // the schedule board's own rolling window) to create on -- indices into
@@ -215,7 +226,7 @@ export function TaskDrawer({
       setRoutineType("paragraf");
       setValue((v) => ({ ...v, courseId: "paragraf", topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     } else {
-      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(), topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
+      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(examType), topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     }
   }
 
@@ -228,7 +239,7 @@ export function TaskDrawer({
     } else {
       setValue((v) => ({
         ...v,
-        courseId: firstNonRoutineCourseId(),
+        courseId: firstNonRoutineCourseId(examType),
         topicId: "",
         resources: [],
         taskType: resetReadingType(v.taskType),
@@ -344,7 +355,7 @@ export function TaskDrawer({
             <div className="space-y-1.5">
               <Label>Rutin Türü</Label>
               <div className="flex flex-wrap gap-1.5">
-                {ROUTINE_TYPE_OPTIONS.map((opt) => (
+                {routineOptionsFor(examType).map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
@@ -368,6 +379,7 @@ export function TaskDrawer({
             onChange={setValue}
             courseResourceData={courseResourceData}
             hideCourseTopic={showRoutineForm && isRoutineCoursePicked}
+            examType={examType}
           />
 
           {state.mode === "edit" && (state.task.task_type === "branch_exam" || state.task.task_type === "general_exam") && (

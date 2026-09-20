@@ -76,7 +76,7 @@ async function fetchDirectoryData(page: number) {
       supabase
         .from("profiles")
         .select(
-          "id, full_name, avatar_url, pool_status, pool_status_changed_at, total_session_quota, admin_notes, academic_track, last_active_at",
+          "id, full_name, avatar_url, pool_status, pool_status_changed_at, total_session_quota, admin_notes, academic_track, last_active_at, exam_type",
           { count: "exact" },
         )
         .eq("role", "student")
@@ -175,13 +175,25 @@ export default async function StudentDirectoryPage({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {student.academic_track ? (
-                      <span className="bg-secondary text-secondary-foreground rounded px-1.5 py-0.5 text-xs">
-                        {TRACK_LABELS[student.academic_track as AcademicTrack]}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={
+                          student.exam_type === "LGS"
+                            ? "rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                            : "bg-secondary text-secondary-foreground rounded px-1.5 py-0.5 text-[10px] font-medium"
+                        }
+                      >
+                        {student.exam_type === "LGS" ? "LGS" : "YKS"}
                       </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
+                      {student.academic_track ? (
+                        <span className="bg-secondary text-secondary-foreground rounded px-1.5 py-0.5 text-xs">
+                          {/* Fallback keeps an unexpected value from rendering an empty chip. */}
+                          {TRACK_LABELS[student.academic_track as AcademicTrack] ?? student.academic_track}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {student.coachName ? (

@@ -1,4 +1,4 @@
-import { AlertTriangle, Wallet } from "lucide-react";
+import { AlertTriangle, BookOpen } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ export function RemainingSessionsCard({ remaining }: { remaining: number }) {
           isNegative ? "bg-rose-500/15" : "bg-primary/15",
         )}
       >
-        {isNegative ? <AlertTriangle className="size-5 text-rose-600" /> : <Wallet className="text-primary size-5" />}
+        {isNegative ? <AlertTriangle className="size-5 text-rose-600" /> : <BookOpen className="text-primary size-5" />}
       </div>
       <div>
         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Kalan Görüşme Hakkı</p>

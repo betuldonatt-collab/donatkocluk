@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { EXAMS_PAGE_SIZE } from "../../constants";
 import type { StudentTask } from "../../_components/daily-tasks/types";
+import { getStudentExamType } from "@/lib/student-exam-type";
 import { GenelAnalysisClient } from "./genel-analysis-client";
 
 async function fetchGenelData(userId: string) {
@@ -34,10 +35,11 @@ async function fetchGenelData(userId: string) {
 
 export default async function GenelAnalysisPage() {
   const view = await getViewContext("student");
+  const examType = await getStudentExamType();
 
   const { exams, mistakes, hasMore } = view
     ? await fetchGenelData(view.effectiveUserId)
     : { exams: [], mistakes: [], hasMore: false };
 
-  return <GenelAnalysisClient initialExams={exams} initialMistakes={mistakes} initialHasMore={hasMore} />;
+  return <GenelAnalysisClient initialExams={exams} initialMistakes={mistakes} initialHasMore={hasMore} examType={examType} />;
 }

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { normalizeTr } from "@/lib/curriculum";
 
-export type ComboboxOption = { id: string; label: string };
+// `group` is optional: consecutive options sharing one render under a
+// single small heading (LGS's SÖZEL / SAYISAL subject grouping). Options
+// without it -- every existing YKS picker -- render exactly as before.
+export type ComboboxOption = { id: string; label: string; group?: string };
 
 // Searchable dropdown -- typing "tyt mat" filters down to "TYT Matematik"
 // regardless of case or Turkish diacritics (see normalizeTr). Verbatim
@@ -75,22 +78,26 @@ export function SmartCombobox({
             {filtered.length === 0 ? (
               <p className="text-muted-foreground px-3 py-2 text-sm">Sonuç yok</p>
             ) : (
-              filtered.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => {
-                    onChange(o.id);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                  className={cn(
-                    "hover:bg-accent flex w-full items-center px-3 py-1.5 text-left text-sm",
-                    o.id === value && "bg-accent/60 font-medium",
+              filtered.map((o, i) => (
+                <Fragment key={o.id}>
+                  {o.group && o.group !== filtered[i - 1]?.group && (
+                    <p className="text-muted-foreground px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide uppercase">{o.group}</p>
                   )}
-                >
-                  {o.label}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(o.id);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className={cn(
+                      "hover:bg-accent flex w-full items-center px-3 py-1.5 text-left text-sm",
+                      o.id === value && "bg-accent/60 font-medium",
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                </Fragment>
               ))
             )}
           </div>

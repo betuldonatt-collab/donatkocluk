@@ -1,18 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, TYT_COURSES } from "@/lib/curriculum";
+import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
+import type { ExamType } from "@/lib/exam-type";
+import { getStudentExamType } from "@/lib/student-exam-type";
 import { GelisimHaritasi } from "../_components/gelisim-haritasi";
 
-const ALL_CURRICULUM_COURSE_IDS = [
-  ...TYT_COURSES.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
-  ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
-];
-
-async function fetchGelisimHaritasi(userId: string): Promise<GelisimHaritasiRow[]> {
+async function fetchGelisimHaritasi(userId: string, examType: ExamType): Promise<GelisimHaritasiRow[]> {
   const supabase = await createClient();
   // Soft coach approval: exclude a student's own pending self-created
   // exams from this analytics view until a coach approves them (see
@@ -34,12 +28,13 @@ async function fetchGelisimHaritasi(userId: string): Promise<GelisimHaritasiRow[
       ? await supabase.from("student_task_topic_mistakes").select("task_id, course_id, topic_id, status").in("task_id", examIds)
       : { data: [] };
 
-  return computeGelisimHaritasi(ALL_CURRICULUM_COURSE_IDS, exams, mistakeRows ?? []);
+  return computeGelisimHaritasi(curriculumCourseIdsFor(examType), exams, mistakeRows ?? []);
 }
 
 export default async function GelisimHaritasiPage() {
   const view = await getViewContext("student");
-  const rows = view ? await fetchGelisimHaritasi(view.effectiveUserId) : [];
+  const examType = await getStudentExamType();
+  const rows = view ? await fetchGelisimHaritasi(view.effectiveUserId, examType) : [];
 
-  return <GelisimHaritasi rows={rows} />;
+  return <GelisimHaritasi rows={rows} examType={examType} />;
 }

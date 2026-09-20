@@ -58,6 +58,9 @@ export function LoginForm({
   const [signupRole, setSignupRole] = useState(
     SIGNUP_ROLE_OPTIONS.some((o) => o.value === role) ? role : "student",
   );
+  // Only meaningful for a student account -- parent/coach requests never
+  // send this field at all (see submitSignupRequest, ./actions.ts).
+  const [signupExamType, setSignupExamType] = useState("YKS");
 
   // Admin accounts are never self-service -- no request tab is offered
   // for this role, full stop.
@@ -153,6 +156,21 @@ export function LoginForm({
                 ))}
               </select>
             </div>
+            {signupRole === "student" && (
+              <div className="space-y-2">
+                <Label htmlFor="request-exam-type">Sınav Türü</Label>
+                <select
+                  id="request-exam-type"
+                  name="examType"
+                  value={signupExamType}
+                  onChange={(e) => setSignupExamType(e.target.value)}
+                  className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                >
+                  <option value="YKS">YKS (Lise)</option>
+                  <option value="LGS">LGS (8. Sınıf)</option>
+                </select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="request-name">Ad Soyad</Label>
               <Input id="request-name" name="fullName" required />

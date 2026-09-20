@@ -1,7 +1,9 @@
+import { BookOpen } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { computeNet } from "@/lib/scoring";
+import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
 import { CompletionBar } from "./_components/completion-bar";
 import { LineChart } from "./_components/line-chart";
@@ -14,7 +16,8 @@ type GeneralExam = { id: string; title: string; task_date: string; subject_score
 
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention the student/coach panels already parse.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
@@ -23,7 +26,8 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
 // Unlike the student's own Genel Analiz page, this doesn't split AYT by
 // track (sayısal/EA/sözel/YDT) -- the parent view just wants one line per
 // exam type, not the track-selector complexity.
-function netChartFor(exams: GeneralExam[]) {
+// netFn is the cohort's own negative-marking rule (YKS 4:1, LGS 3:1).
+function netChartFor(exams: GeneralExam[], netFn: (correct: number, wrong: number) => number = computeNet) {
   return exams
     .filter((e) => e.subject_scores)
     .slice()
@@ -33,7 +37,7 @@ function netChartFor(exams: GeneralExam[]) {
         (acc, s) => ({ correct: acc.correct + (s.correct ?? 0), wrong: acc.wrong + (s.wrong ?? 0) }),
         { correct: 0, wrong: 0 },
       );
-      return { date: e.task_date, value: computeNet(totals.correct, totals.wrong) };
+      return { date: e.task_date, value: netFn(totals.correct, totals.wrong) };
     });
 }
 
@@ -80,7 +84,7 @@ async function fetchDashboardData() {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, is_active, total_session_quota")
+        .select("id, full_name, is_active, total_session_quota, exam_type")
         .eq("id", studentId)
         .maybeSingle(),
       supabase
@@ -138,6 +142,10 @@ async function fetchDashboardData() {
   const exams = (examRows ?? []) as GeneralExam[];
   const tytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "tyt"));
   const aytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "ayt"));
+  const lgsNetChartData = netChartFor(
+    exams.filter((e) => parseGeneralExamTrack(e.title) === "lgs"),
+    computeLgsNet,
+  );
 
   return {
     student: profile,
@@ -150,6 +158,8 @@ async function fetchDashboardData() {
     programTasks,
     tytNetChartData,
     aytNetChartData,
+    lgsNetChartData,
+    examType: (profile.exam_type ?? "YKS") as "YKS" | "LGS",
   };
 }
 
@@ -178,6 +188,8 @@ export default async function ParentPage() {
     programTasks,
     tytNetChartData,
     aytNetChartData,
+    lgsNetChartData,
+    examType,
   } = data;
 
   return (
@@ -185,8 +197,14 @@ export default async function ParentPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Toplam Görüşme: {totalQuota} | Tamamlanan: {completedCount} | Kalan: {remaining}
+          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 text-sm">
+            <span>
+              Toplam Görüşme: {totalQuota} | Tamamlanan: {completedCount} |
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <BookOpen className="size-3.5" />
+              Kalan: {remaining}
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -222,6 +240,19 @@ export default async function ParentPage() {
           </CardContent>
         </Card>
 
+        {examType === "LGS" ? (
+          // An LGS student's parent sees only LGS's own exam chart -- never
+          // the TYT/AYT ones (and its net is LGS's 3:1, not YKS's 4:1).
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">LGS Genel Deneme</CardTitle>
+              <CardDescription>Tüm derslerin toplamı üzerinden net değişimi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LineChart data={lgsNetChartData} />
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader>
@@ -242,6 +273,7 @@ export default async function ParentPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         <section>
           <h2 className="text-foreground mb-3 text-base font-semibold">Görüşmeler</h2>

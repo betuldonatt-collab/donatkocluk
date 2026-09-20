@@ -48,7 +48,12 @@ export function CoachSidebar({ unreadCount = 0, fullName = null }: { unreadCount
         <Logo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
-      {!effectiveCollapsed && <YksCountdown variant="coach" />}
+      {/* A coach's roster spans both cohorts, so both countdowns show
+          stacked here -- unlike the student sidebar, there's no single
+          "which exam" to pick for a panel-wide widget. Each pill already
+          carries its own mx-3/mb-3 spacing, so they stack directly. */}
+      {!effectiveCollapsed && <YksCountdown variant="coach" examType="YKS" />}
+      {!effectiveCollapsed && <YksCountdown variant="coach" examType="LGS" />}
       <nav className="flex flex-col gap-1 px-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);

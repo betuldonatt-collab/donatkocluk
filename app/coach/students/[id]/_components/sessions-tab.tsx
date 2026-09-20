@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,10 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
           <p className="text-foreground text-lg font-semibold tabular-nums">{completedCount}</p>
         </div>
         <div className="px-4 py-3 text-center">
-          <p className="text-muted-foreground text-xs">Kalan</p>
+          <p className="text-muted-foreground flex items-center justify-center gap-1 text-xs">
+            <BookOpen className="size-3" />
+            Kalan
+          </p>
           <p className={cn("text-lg font-semibold tabular-nums", remaining < 0 ? "text-rose-600" : "text-foreground")}>
             {remaining}
           </p>

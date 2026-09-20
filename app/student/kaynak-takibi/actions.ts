@@ -5,8 +5,15 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
-import { dbError } from "@/lib/errors";
+import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
+import {
+  PIPELINE_CONFIG,
+  pipelineStepSchema,
+  validatePipelineStep,
+  type PipelineActionResult,
+  type PipelineStepInput,
+} from "@/lib/topic-pipeline";
 
 // courseId is a curriculum slug (e.g. "tyt-turkce"), never a UUID -- see
 // addOwnBranchExamResource below, which already validated this
@@ -147,4 +154,49 @@ export async function updateOwnBranchExamStock(resourceId: string, totalStock: n
   if (error) throw dbError(error);
 
   revalidatePath("/student/kaynak-takibi");
+}
+
+// Per-topic pipeline checkbox on the Kaynak Takibi table: tick / untick one
+// step. LGS students write lgs_topic_pipeline_status (4 steps), YKS students
+// yks_topic_pipeline_status (2 steps) -- the table and the legal steps come
+// from the student's own cohort, never from the client. A partial upsert:
+// only the touched column is written, so the other steps keep their value
+// (and default to false when the row is first created).
+//
+// Returns a result object rather than throwing: a thrown Error's message is
+// stripped to a generic one in production builds when it crosses the Server
+// Action boundary (the same reason app/student/kaynak-kutuphanesi/actions.ts
+// returns results), so returning is what lets the toast show the real,
+// user-safe reason. dbError() already logs + reports database failures.
+export async function setTopicPipelineStep(input: PipelineStepInput): Promise<PipelineActionResult> {
+  try {
+    await assertNotImpersonating();
+    const inputV = parseInput(pipelineStepSchema, input);
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Oturum bulunamadı." };
+
+    const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", user.id).maybeSingle();
+    const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
+    validatePipelineStep(examType, inputV);
+
+    const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
+      {
+        student_id: user.id,
+        course_id: inputV.courseId,
+        topic_id: inputV.topicId,
+        [inputV.step]: inputV.value,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "student_id,course_id,topic_id" },
+    );
+    if (error) throw dbError(error);
+
+    revalidatePath("/student/kaynak-takibi");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
 }

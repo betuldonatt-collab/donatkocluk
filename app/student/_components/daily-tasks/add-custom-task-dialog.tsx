@@ -10,7 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, isBranchExamMacroCourseId, TYT_COURSES, topicsForCourse, type Course } from "@/lib/curriculum";
+import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
+import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, isBranchExamMacroCourseId, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, type Course } from "@/lib/curriculum";
+import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
+import type { ExamType } from "@/lib/exam-type";
 import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actions";
 import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from "../../actions";
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
@@ -75,7 +78,7 @@ type FormState = {
   // defaults to) rather than guessing "yes" just because it's the first
   // type selected.
   isCompleted: boolean;
-  generalExamTrack: "tyt" | "ayt";
+  generalExamTrack: "tyt" | "ayt" | "lgs";
   generalExamPublisher: string;
   freeTitle: string;
   freeDescription: string;
@@ -84,10 +87,10 @@ type FormState = {
   bookTitle: string;
 };
 
-function initialFormState(): FormState {
+function initialFormState(examType: ExamType): FormState {
   return {
     taskType: "question_bank",
-    courseId: ALL_COURSES[0].id,
+    courseId: examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
     topicId: "",
     resources: [],
     totalCount: "",
@@ -96,7 +99,7 @@ function initialFormState(): FormState {
     emptyCount: "",
     durationMinutes: "",
     isCompleted: false,
-    generalExamTrack: "tyt",
+    generalExamTrack: examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     freeTitle: "",
     freeDescription: "",
@@ -118,7 +121,18 @@ function sanitizeDigits(v: string) {
   return v.replace(/[^0-9]/g, "");
 }
 
-function CountField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function CountField({
+  label,
+  value,
+  onChange,
+  invalid,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  // A required box left empty after a refused save -- red outline.
+  invalid?: boolean;
+}) {
   return (
     <div className="min-w-0 space-y-1.5">
       <Label>{label}</Label>
@@ -128,7 +142,8 @@ function CountField({ label, value, onChange }: { label: string; value: string; 
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(sanitizeDigits(e.target.value))}
-        className="bg-background"
+        aria-invalid={invalid || undefined}
+        className={cn("bg-background", invalid && "border-destructive focus-visible:ring-destructive/30")}
       />
     </div>
   );
@@ -149,19 +164,25 @@ export function AddCustomTaskDialog({
   taskDate,
   onCreated,
   disabled,
+  examType = "YKS",
 }: {
   taskDate: string;
   onCreated: (task: StudentTask) => void;
+  // Which cohort's subjects the Ders picker offers (LGS: its six subjects,
+  // grouped SÖZEL / SAYISAL); everything else here is identical.
+  examType?: ExamType;
   // The RLS insert policy already rejects this once the day's week is
   // locked (student_tasks_student_insert_custom, migration 0037) -- this
   // just keeps the button from opening a dialog that can only ever fail.
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState<FormState>(initialFormState);
+  const isLgs = examType === "LGS";
+  const [value, setValue] = useState<FormState>(() => initialFormState(examType));
   const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMissingScores, setShowMissingScores] = useState(false);
 
   const isBranchExam = value.taskType === "branch_exam";
   const isGeneralExam = value.taskType === "general_exam";
@@ -193,9 +214,14 @@ export function AddCustomTaskDialog({
 
   // Branş Denemesi's Ders picker leads with the macro groupings, same
   // order the coach's own form uses -- every other type stays atomic-only.
-  const courseOptions = isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES] : ALL_COURSES;
-  const course = courseOptions.find((c) => c.id === value.courseId) ?? ALL_COURSES[0];
-  const topics = topicsForCourse(course);
+  // LGS has no macro subjects (its branş denemeleri are per single subject)
+  // and its own six-course list, offered SÖZEL first then SAYISAL.
+  const courseList: Course[] = isLgs ? LGS_COURSES : isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES] : ALL_COURSES;
+  const courseOptions: { id: string; label: string; group?: string }[] = isLgs
+    ? lgsCourseOptions()
+    : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));
+  const course = courseList.find((c) => c.id === value.courseId) ?? courseList[0];
+  const topicOptions = topicOptionsForCourse(course);
 
   function set(patch: Partial<FormState>) {
     setValue((v) => ({ ...v, ...patch }));
@@ -326,7 +352,21 @@ export function AddCustomTaskDialog({
     return resolved.filter((r): r is { id: string; name: string } => r !== null);
   }
 
+  // A Branş Denemesi declared already completed must carry its Doğru/Yanlış/
+  // Boş -- 0 for what wasn't solved. (Soru Çözümü keeps its looser rule: a
+  // partly solved set is a legitimate "Yarım Yapıldı".) createRichCustomTask
+  // re-checks this on the server.
+  const branchScoresMissing =
+    showFullCounts &&
+    isBranchExam &&
+    (isBlankScore(value.correctCount) || isBlankScore(value.wrongCount) || isBlankScore(value.emptyCount));
+
   async function handleCreate() {
+    if (branchScoresMissing) {
+      setShowMissingScores(true);
+      setError(EXAM_SCORES_REQUIRED);
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
@@ -370,7 +410,7 @@ export function AddCustomTaskDialog({
       // repeating it as a "Kaynak: X" line would just be a duplicate.
       const resourceNames = isBranchExam ? [] : resolvedResources.map((r) => r.name).filter(Boolean);
       onCreated({ ...task, resource_names: resourceNames } as StudentTask);
-      setValue(initialFormState());
+      setValue(initialFormState(examType));
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bir hata oluştu.");
@@ -381,7 +421,7 @@ export function AddCustomTaskDialog({
 
   function handleOpenChange(next: boolean) {
     if (next) {
-      setValue(initialFormState());
+      setValue(initialFormState(examType));
       setError(null);
     }
     setOpen(next);
@@ -481,7 +521,10 @@ export function AddCustomTaskDialog({
             )}
 
             {isGeneralExam && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className={cn("grid grid-cols-1 gap-3", !isLgs && "sm:grid-cols-2")}>
+                {/* LGS has exactly one general exam format -- no TYT/AYT-style
+                    Sınav Türü to choose between. */}
+                {!isLgs && (
                 <div className="space-y-1.5">
                   <Label>Sınav Türü</Label>
                   <div className="flex gap-1.5">
@@ -503,6 +546,7 @@ export function AddCustomTaskDialog({
                     ))}
                   </div>
                 </div>
+                )}
                 <div className="space-y-1.5">
                   <Label htmlFor="rich-task-general-publisher">Yayınevi</Label>
                   <Input
@@ -521,7 +565,7 @@ export function AddCustomTaskDialog({
                   <div className="space-y-1.5">
                     <Label>Ders</Label>
                     <SmartCombobox
-                      options={courseOptions.map((c) => ({ id: c.id, label: courseLabel(c) }))}
+                      options={courseOptions}
                       value={value.courseId}
                       onChange={handleCourseChange}
                       placeholder="Ders ara..."
@@ -533,7 +577,7 @@ export function AddCustomTaskDialog({
                   <div className="space-y-1.5">
                     <Label>Konu</Label>
                     <SmartCombobox
-                      options={topics.map((t) => ({ id: t.id, label: t.name }))}
+                      options={topicOptions}
                       value={value.topicId}
                       onChange={(topicId) => set({ topicId })}
                       placeholder="Konu ara..."
@@ -585,9 +629,24 @@ export function AddCustomTaskDialog({
               <div className="space-y-1.5">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <CountField label="Toplam" value={value.totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
-                  <CountField label="Doğru" value={value.correctCount} onChange={(v) => handleCountFieldChange("correct", v)} />
-                  <CountField label="Yanlış" value={value.wrongCount} onChange={(v) => handleCountFieldChange("wrong", v)} />
-                  <CountField label="Boş" value={value.emptyCount} onChange={(v) => handleCountFieldChange("empty", v)} />
+                  <CountField
+                    label="Doğru"
+                    value={value.correctCount}
+                    onChange={(v) => handleCountFieldChange("correct", v)}
+                    invalid={showMissingScores && isBranchExam && isBlankScore(value.correctCount)}
+                  />
+                  <CountField
+                    label="Yanlış"
+                    value={value.wrongCount}
+                    onChange={(v) => handleCountFieldChange("wrong", v)}
+                    invalid={showMissingScores && isBranchExam && isBlankScore(value.wrongCount)}
+                  />
+                  <CountField
+                    label="Boş"
+                    value={value.emptyCount}
+                    onChange={(v) => handleCountFieldChange("empty", v)}
+                    invalid={showMissingScores && isBranchExam && isBlankScore(value.emptyCount)}
+                  />
                 </div>
                 {totalMismatch && <p className="text-destructive text-xs">Toplam, Doğru + Yanlış + Boş toplamına eşit değil.</p>}
               </div>

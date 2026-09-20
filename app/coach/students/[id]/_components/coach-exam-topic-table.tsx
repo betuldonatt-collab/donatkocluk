@@ -6,27 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { Course, Topic } from "@/lib/curriculum";
+import type { Course } from "@/lib/curriculum";
+import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
 import type { DetailTask } from "../types";
-
-type Row = { topic: Topic; unitLabel: string; unitRowSpan: number | null };
-
-// Same unit-rowSpan flattening as the student panel's own ExamTopicTable.
-function flattenRows(course: Course): Row[] {
-  const rows: Row[] = [];
-  for (const group of course.units) {
-    if (group.unit === "-") {
-      for (const topic of group.topics) {
-        rows.push({ topic, unitLabel: "-", unitRowSpan: 1 });
-      }
-    } else {
-      group.topics.forEach((topic, i) => {
-        rows.push({ topic, unitLabel: group.unit, unitRowSpan: i === 0 ? group.topics.length : null });
-      });
-    }
-  }
-  return rows;
-}
 
 function formatExamDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
@@ -58,7 +40,9 @@ export function CoachExamTopicTable({
   onOpenExam: (task: DetailTask) => void;
   onDelete: (taskId: string) => void;
 }) {
-  const rows = flattenRows(course);
+  // LGS Matematik-style courses add a Konu level between Ünite and topic.
+  const rows = flattenCourseRows(course);
+  const hasKonu = courseHasKonu(course);
 
   return (
     <Card>
@@ -71,7 +55,14 @@ export function CoachExamTopicTable({
             <TableHeader>
               <TableRow>
                 <TableHead className="bg-background sticky left-0 z-20 w-12 align-bottom">Ünite</TableHead>
-                <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom">Konu</TableHead>
+                {hasKonu && (
+                  <TableHead className="bg-background sticky left-12 z-20 w-44 min-w-44 border-r align-bottom">Konu</TableHead>
+                )}
+                <TableHead
+                  className={cn("bg-background sticky z-20 border-r align-bottom", hasKonu ? "left-[14rem]" : "left-12")}
+                >
+                  {hasKonu ? "Alt Konu" : "Konu"}
+                </TableHead>
                 {exams.map((exam) => (
                   <TableHead key={exam.id} className="border-l p-0 text-center">
                     <div className="flex w-full flex-col items-center gap-1 px-2 py-2 text-center">
@@ -137,7 +128,21 @@ export function CoachExamTopicTable({
                       )}
                     </TableCell>
                   )}
-                  <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
+                  {hasKonu && row.konuRowSpan !== null && (
+                    <TableCell
+                      rowSpan={row.konuRowSpan}
+                      className="bg-card sticky left-12 z-10 w-44 min-w-44 border-r align-middle font-medium whitespace-normal"
+                    >
+                      {row.konuLabel}
+                    </TableCell>
+                  )}
+                  <TableCell
+                    colSpan={hasKonu && row.konuLabel === null ? 2 : 1}
+                    className={cn(
+                      "bg-card sticky z-10 border-r font-medium whitespace-normal",
+                      hasKonu && row.konuLabel !== null ? "left-[14rem]" : "left-12",
+                    )}
+                  >
                     {row.topic.name}
                   </TableCell>
                   {exams.map((exam) => {

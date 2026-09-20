@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { BookOpen, Users } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 
@@ -16,6 +17,9 @@ type StudentRow = {
   remaining_sessions: number;
   target_university: string | null;
   target_department: string | null;
+  target_high_school: string | null;
+  target_percentile: number | null;
+  exam_type: "YKS" | "LGS";
   completionPct: number | null;
 };
 
@@ -28,7 +32,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
   const [{ data: profiles }, { data: taskRows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department")
+      .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
     supabase.from("student_tasks").select("student_id, status").in("student_id", studentIds),
   ]);
@@ -51,6 +55,12 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 }
 
 function formatTarget(row: StudentRow) {
+  // LGS students: "Lise — %percentile" instead of university — department.
+  if (row.exam_type === "LGS") {
+    const percentile = row.target_percentile !== null ? formatPercentile(row.target_percentile) : null;
+    if (row.target_high_school && percentile) return `${row.target_high_school} — ${percentile}`;
+    return row.target_high_school || percentile || "—";
+  }
   if (row.target_university && row.target_department) return `${row.target_university} — ${row.target_department}`;
   return row.target_university || row.target_department || "—";
 }
@@ -89,7 +99,12 @@ export default async function CoachStudentsPage() {
                 <TableHead>Program Tamamlama</TableHead>
                 <TableHead>Veli Ad Soyad</TableHead>
                 <TableHead>Veli Tel No</TableHead>
-                <TableHead>Kalan Görüşme</TableHead>
+                <TableHead>
+                  <span className="inline-flex items-center gap-1">
+                    <BookOpen className="size-3.5" />
+                    Kalan Görüşme
+                  </span>
+                </TableHead>
                 <TableHead>Öğrenci Hedefi</TableHead>
                 <TableHead />
               </TableRow>

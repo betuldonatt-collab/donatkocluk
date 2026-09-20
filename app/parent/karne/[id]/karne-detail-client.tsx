@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Printer, TrendingDown, TrendingUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CourseTabs } from "@/components/course-tabs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
@@ -210,6 +211,9 @@ export function KarneDetailClient({
     setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
   }
   const aytCourses = AYT_COURSES_BY_TRACK[track];
+  // A cycle generated for an LGS student carries stats.lgs (see
+  // generateCycleReportCard); YKS cycles never do.
+  const isLgs = stats.lgs !== undefined;
 
   return (
     <div className="space-y-6 print:space-y-4">
@@ -246,6 +250,22 @@ export function KarneDetailClient({
 
       <section className="space-y-4 print:break-inside-avoid">
         <h3 className="text-foreground text-sm font-semibold">Net Gelişimi</h3>
+        {isLgs ? (
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">LGS</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NetCard label="LGS Genel Deneme Ortalama Net" current={stats.lgs!.current} previous={stats.lgs!.previous} />
+              {stats.lgsScoreBreakdown && (
+                <ScoreBreakdownCard
+                  title="Toplam Doğru / Yanlış / Boş"
+                  total={stats.lgsScoreBreakdown.total}
+                  bySubject={stats.lgsScoreBreakdown.bySubject}
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">TYT</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -273,6 +293,8 @@ export function KarneDetailClient({
             ))}
           </div>
         </div>
+          </>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -286,6 +308,9 @@ export function KarneDetailClient({
           ))}
         </div>
 
+        {isLgs ? (
+          <CourseTabs examType="LGS" render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+        ) : (
         <Tabs defaultValue="tyt">
           <TabsList className="print:hidden">
             <TabsTrigger value="tyt">TYT</TabsTrigger>
@@ -317,6 +342,7 @@ export function KarneDetailClient({
             <TopicGrid courseId={aytCourseId} rows={topicRows} />
           </TabsContent>
         </Tabs>
+        )}
       </section>
     </div>
   );

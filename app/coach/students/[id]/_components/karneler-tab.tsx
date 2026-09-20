@@ -9,6 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { CourseTabs } from "@/components/course-tabs";
 import { dateToISO, isoToDate, isValidISODateOnly } from "@/lib/chart-range";
 import {
   AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
@@ -81,6 +82,13 @@ export function KarnelerTab({
   const aytTrend = approvedCyclesAsc
     .filter((c) => c.stats.ayt.current !== null)
     .map((c) => ({ date: c.range_start, value: c.stats.ayt.current! }));
+  // A cycle generated for an LGS student carries stats.lgs (see
+  // generateCycleReportCard); a student is one cohort throughout, so any
+  // such cycle means the LGS trend chart replaces the TYT/AYT pair.
+  const isLgsCohort = cycles.some((c) => c.stats.lgs !== undefined);
+  const lgsTrend = approvedCyclesAsc
+    .filter((c) => c.stats.lgs?.current != null)
+    .map((c) => ({ date: c.range_start, value: c.stats.lgs!.current! }));
 
   async function handleGenerate() {
     if (!range) return;
@@ -126,14 +134,23 @@ export function KarnelerTab({
             <p className="text-foreground mt-2 text-2xl font-bold">{formatDuration(allTimeTrackedMinutes)}</p>
             <p className="text-muted-foreground mt-1 text-xs">Bu sistemde bugüne kadar tutulan toplam süre</p>
           </div>
-          <div className="border-border bg-card rounded-lg border p-4">
-            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">TYT Net Gelişimi</p>
-            <LineChart data={tytTrend} />
-          </div>
-          <div className="border-border bg-card rounded-lg border p-4">
-            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">AYT Net Gelişimi</p>
-            <LineChart data={aytTrend} color="#f59e0b" />
-          </div>
+          {isLgsCohort ? (
+            <div className="border-border bg-card rounded-lg border p-4 lg:col-span-2">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">LGS Net Gelişimi</p>
+              <LineChart data={lgsTrend} />
+            </div>
+          ) : (
+            <>
+              <div className="border-border bg-card rounded-lg border p-4">
+                <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">TYT Net Gelişimi</p>
+                <LineChart data={tytTrend} />
+              </div>
+              <div className="border-border bg-card rounded-lg border p-4">
+                <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">AYT Net Gelişimi</p>
+                <LineChart data={aytTrend} color="#f59e0b" />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -429,6 +446,7 @@ function ReportCardReview({
 }) {
   const stats = cycle.stats as NetSummary;
   const topicRows = cycle.topic_mistakes as KarneTopicRow[];
+  const isLgs = stats.lgs !== undefined;
   const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
   const [track, setTrack] = useState<Track>("sayisal");
   const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
@@ -488,6 +506,21 @@ function ReportCardReview({
     <div className="space-y-4">
       {stats.totalDurationMinutes !== undefined && <TotalDurationCard totalDurationMinutes={stats.totalDurationMinutes} />}
 
+      {isLgs ? (
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">LGS</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <NetCard label="LGS Genel Deneme Ortalama Net" current={stats.lgs!.current} previous={stats.lgs!.previous} />
+            {stats.lgsScoreBreakdown && (
+              <ScoreBreakdownCard
+                title="Toplam Doğru / Yanlış / Boş"
+                total={stats.lgsScoreBreakdown.total}
+                bySubject={stats.lgsScoreBreakdown.bySubject}
+              />
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="space-y-3">
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">TYT</p>
@@ -517,6 +550,7 @@ function ReportCardReview({
           </div>
         </div>
       </div>
+      )}
 
       <div className="space-y-3">
         <h4 className="text-foreground text-sm font-semibold">Konu Bazlı Hata Sıklığı</h4>
@@ -529,6 +563,10 @@ function ReportCardReview({
           ))}
         </div>
 
+        {isLgs ? (
+          <CourseTabs examType="LGS" render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+        ) : (
+        <>
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">TYT</p>
           <CourseChips courses={tytCourses} selectedId={tytCourseId} onSelect={setTytCourseId} />
@@ -554,6 +592,8 @@ function ReportCardReview({
           <CourseChips courses={aytCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
           <TopicGrid courseId={aytCourseId} rows={topicRows} />
         </div>
+        </>
+        )}
       </div>
 
       <div className="space-y-2">

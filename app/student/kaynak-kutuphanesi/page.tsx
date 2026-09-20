@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
+import { getStudentExamType } from "@/lib/student-exam-type";
 import { KaynakKutuphanesiClient } from "./kaynak-kutuphanesi-client";
 
 export type LibraryResource = { id: string; name: string; courseId: string };
@@ -7,6 +8,7 @@ export type LibraryResource = { id: string; name: string; courseId: string };
 export default async function KaynakKutuphanesiPage() {
   const view = await getViewContext("student");
   const supabase = await createClient();
+  const examType = await getStudentExamType();
 
   const { data: rows } = view
     ? await supabase
@@ -22,5 +24,5 @@ export default async function KaynakKutuphanesiPage() {
     courseId: r.course_id,
   }));
 
-  return <KaynakKutuphanesiClient initialResources={resources} />;
+  return <KaynakKutuphanesiClient initialResources={resources} examType={examType} />;
 }

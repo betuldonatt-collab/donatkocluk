@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeAytScoreBreakdown,
+  computeLgsScoreBreakdown,
   computeNetSummary,
   computeTotalDurationMinutes,
   computeTytScoreBreakdown,
@@ -210,10 +211,47 @@ describe("computeNetSummary", () => {
   });
 
   it("returns null (not NaN or 0) for an empty exam list", () => {
-    expect(computeNetSummary([], "2026-01-01", "2026-01-31")).toEqual({ tyt: null, ayt: null });
+    expect(computeNetSummary([], "2026-01-01", "2026-01-31")).toEqual({ tyt: null, ayt: null, lgs: null });
   });
 });
 
 function computeNetOf(correct: number, wrong: number) {
   return Math.round((correct - wrong / 4) * 100) / 100;
 }
+
+describe("computeLgsScoreBreakdown", () => {
+  const range = ["2026-01-01", "2026-01-28"] as const;
+
+  it("buckets practice by lgs- course and ignores YKS courses / out-of-range tasks", () => {
+    const tasks: KarneScoreTask[] = [
+      { task_date: "2026-01-05", course_id: "lgs-matematik", correct_count: 10, wrong_count: 3, empty_count: 2 },
+      { task_date: "2026-01-06", course_id: "tyt-matematik", correct_count: 99, wrong_count: 99, empty_count: 99 },
+      { task_date: "2026-02-01", course_id: "lgs-matematik", correct_count: 50, wrong_count: 50, empty_count: 50 },
+    ];
+    const result = computeLgsScoreBreakdown(tasks, [], ...range);
+    const mat = result.bySubject.find((r) => r.key === "lgs_matematik")!;
+    expect(mat).toMatchObject({ correct: 10, wrong: 3, empty: 2 });
+    expect(result.total).toEqual({ correct: 10, wrong: 3, empty: 2 });
+  });
+
+  it("folds only LGS general exams' lgs_* subject_scores in, not TYT ones", () => {
+    const exams: KarneGeneralExam[] = [
+      {
+        task_date: "2026-01-10",
+        title: "LGS Genel Deneme - X Yayınları",
+        subject_scores: { lgs_turkce: { correct: 15, wrong: 3, empty: 2 } },
+      },
+      {
+        task_date: "2026-01-11",
+        title: "TYT Genel Deneme - X Yayınları",
+        subject_scores: { lgs_turkce: { correct: 40, wrong: 0, empty: 0 } },
+      },
+    ];
+    const result = computeLgsScoreBreakdown([], exams, ...range);
+    expect(result.bySubject.find((r) => r.key === "lgs_turkce")).toMatchObject({ correct: 15, wrong: 3, empty: 2 });
+  });
+
+  it("always returns all six subjects", () => {
+    expect(computeLgsScoreBreakdown([], [], ...range).bySubject).toHaveLength(6);
+  });
+});

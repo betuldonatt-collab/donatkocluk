@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
+import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
 import { dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
@@ -98,12 +99,36 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
 
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
-    .select("student_id, is_coach_assigned, task_type, total_count, correct_count, wrong_count, empty_count")
+    .select("student_id, is_coach_assigned, task_type, title, total_count, correct_count, wrong_count, empty_count")
     .eq("id", taskIdV)
     .maybeSingle();
   if (fetchError) throw dbError(fetchError);
   if (!existing || existing.student_id !== user.id) {
     throw new Error("Bu görev sana ait değil.");
+  }
+
+  // Genel / Branş Denemesi results: every Doğru/Yanlış/Boş box is required
+  // (0 for what wasn't solved) -- the same rule the forms check before
+  // submitting, enforced here too so a forged or stale client can't save
+  // blank (null) scores. A Genel Deneme needs a full row for every ders; a
+  // Branş Denemesi needs all three counts once any of them is being written
+  // (judged on the values the row will END UP with, so a partial patch on
+  // top of already-complete counts still passes).
+  if (existing.task_type === "general_exam" && patchV.subject_scores) {
+    if (isGeneralExamScoresIncomplete(existing.title, patchV.subject_scores)) {
+      throw new Error(GENERAL_EXAM_SCORES_REQUIRED);
+    }
+  }
+  if (
+    existing.task_type === "branch_exam" &&
+    ("correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV)
+  ) {
+    const finalCorrect = "correct_count" in patchV ? patchV.correct_count : existing.correct_count;
+    const finalWrong = "wrong_count" in patchV ? patchV.wrong_count : existing.wrong_count;
+    const finalEmpty = "empty_count" in patchV ? patchV.empty_count : existing.empty_count;
+    if (finalCorrect == null || finalWrong == null || finalEmpty == null) {
+      throw new Error(EXAM_SCORES_REQUIRED);
+    }
   }
 
   // Coach-assigned Toplam is the coach's own call -- the student only
@@ -755,13 +780,20 @@ const createRichCustomTaskSchema = z
     // mı?". Ignored for every other task type (each already has its own
     // always-pending or always-full-results shape).
     isCompleted: z.boolean().nullable().optional(),
-    generalExamTrack: z.enum(["tyt", "ayt"]).nullable().optional(),
+    generalExamTrack: z.enum(["tyt", "ayt", "lgs"]).nullable().optional(),
     generalExamPublisher: z.string().trim().max(200).nullable().optional(),
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
     freeTitle: z.string().trim().max(200).nullable().optional(),
     freeDescription: z.string().trim().max(2000).nullable().optional(),
     bookTitle: z.string().trim().max(300).nullable().optional(),
   })
+  .refine(
+    (v) =>
+      v.taskType !== "branch_exam" ||
+      v.isCompleted !== true ||
+      (v.correctCount != null && v.wrongCount != null && v.emptyCount != null),
+    { message: EXAM_SCORES_REQUIRED, path: ["correctCount"] },
+  )
   .refine(
     (v) =>
       (v.taskType !== "question_bank" && v.taskType !== "branch_exam") ||
@@ -782,7 +814,7 @@ export type CreateRichTaskInput = {
   emptyCount?: number | null;
   durationMinutes?: number | null;
   isCompleted?: boolean | null;
-  generalExamTrack?: "tyt" | "ayt" | null;
+  generalExamTrack?: "tyt" | "ayt" | "lgs" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
   freeTitle?: string | null;
@@ -802,7 +834,7 @@ function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): stri
   if (v.taskType === "reading") return v.bookTitle?.trim() || "Kitap Okuma";
 
   if (v.taskType === "general_exam") {
-    const prefix = v.generalExamTrack === "ayt" ? "AYT" : "TYT";
+    const prefix = v.generalExamTrack === "ayt" ? "AYT" : v.generalExamTrack === "lgs" ? "LGS" : "TYT";
     const pub = v.generalExamPublisher?.trim();
     return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
   }

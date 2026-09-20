@@ -31,6 +31,7 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 const REQUESTABLE_ROLES = new Set(["student", "parent", "coach"]);
+const EXAM_TYPES = new Set(["YKS", "LGS"]);
 
 export type AuthFormState = {
   error?: string;
@@ -150,6 +151,7 @@ export async function submitSignupRequest(
   const fullNameRaw = String(formData.get("fullName") ?? "");
   const phoneRaw = String(formData.get("phone") ?? "");
   const role = String(formData.get("role") ?? "student");
+  const examTypeRaw = String(formData.get("examType") ?? "");
 
   let fullName: string;
   try {
@@ -164,11 +166,14 @@ export async function submitSignupRequest(
   if (!phone) {
     return { error: "Geçerli bir telefon numarası gir (05XX XXX XX XX)." };
   }
+  // Only a student request carries a cohort -- parent/coach requests leave
+  // this null regardless of what the form sent.
+  const examType = role === "student" && EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null;
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("signup_requests")
-    .insert({ full_name: fullName, phone, requested_role: role });
+    .insert({ full_name: fullName, phone, requested_role: role, exam_type: examType });
 
   if (error) {
     // dbError logs the full raw Postgres error (message/code/details/hint)

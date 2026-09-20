@@ -10,6 +10,8 @@ type SignupRequest = {
   full_name: string;
   phone: string;
   requested_role: "student" | "parent" | "coach";
+  // Only student requests carry a cohort (copied onto the profile on approval).
+  exam_type?: "YKS" | "LGS" | null;
 };
 
 const ROLE_LABELS: Record<SignupRequest["requested_role"], string> = {
@@ -57,6 +59,17 @@ export function PendingSignupRequests({ requests }: { requests: SignupRequest[] 
               <span className="bg-secondary rounded px-1.5 py-0.5 font-medium">
                 {ROLE_LABELS[request.requested_role]}
               </span>
+              {request.requested_role === "student" && request.exam_type && (
+                <span
+                  className={
+                    request.exam_type === "LGS"
+                      ? "rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                      : "bg-secondary rounded px-1.5 py-0.5 text-[10px] font-medium"
+                  }
+                >
+                  {request.exam_type}
+                </span>
+              )}
               <span className="text-foreground text-sm font-medium">{request.full_name}</span>
               <span className="text-muted-foreground">{request.phone}</span>
             </div>

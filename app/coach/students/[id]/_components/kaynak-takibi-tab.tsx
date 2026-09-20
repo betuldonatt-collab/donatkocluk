@@ -3,19 +3,14 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-import {
-  AYT_COURSES_BY_TRACK,
-  TRACK_LABELS,
-  TYT_COURSES,
-  type Course,
-  type Track,
-} from "@/lib/curriculum";
+import { CourseTabs } from "@/components/course-tabs";
+import type { ExamType } from "@/lib/exam-type";
+import { PIPELINE_CONFIG, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
 import {
   addBranchExamResource,
   addStudentResource,
   archiveStudentResource,
+  setStudentTopicPipelineStep,
   deleteStudentResource,
   reactivateStudentResource,
   toggleStudentResourceProgress,
@@ -32,7 +27,14 @@ export type TopicStat = { total: number; correct: number; wrong: number; empty: 
 export type CourseTopicStats = { byTopic: Record<string, TopicStat>; karma: TopicStat };
 export type CourseResourceData = Record<
   string,
-  { resources: ResourceRef[]; branchExamResources: BranchExamResourceRef[]; progress: ResourceProgressMap; topicStats: CourseTopicStats }
+  {
+    resources: ResourceRef[];
+    branchExamResources: BranchExamResourceRef[];
+    progress: ResourceProgressMap;
+    topicStats: CourseTopicStats;
+    // Per-topic pipeline ticks (the student's cohort steps), topicId -> checkboxes.
+    pipeline?: PipelineMap;
+  }
 >;
 
 const EMPTY_COURSE_DATA = {
@@ -42,36 +44,6 @@ const EMPTY_COURSE_DATA = {
   topicStats: { byTopic: {}, karma: { total: 0, correct: 0, wrong: 0, empty: 0 } },
 };
 
-function CourseChips({
-  courses,
-  selectedId,
-  onSelect,
-}: {
-  courses: Course[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {courses.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-            selectedId === c.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input bg-card text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {c.name}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // Fully interactive for the coach -- can add resources and toggle
 // progress checkboxes on the student's behalf (RLS scopes every write to
 // students on this coach's roster; see migration 0014).
@@ -80,22 +52,15 @@ export function KaynakTakibiTab({
   courseData,
   today,
   initialWeekStats,
+  examType = "YKS",
 }: {
   studentId: string;
   courseData: CourseResourceData;
   today: string;
   initialWeekStats: DayStat[];
+  examType?: ExamType;
 }) {
   const [data, setData] = useState<CourseResourceData>(courseData);
-  const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
-  const [track, setTrack] = useState<Track>("sayisal");
-  const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
-
-  function handleTrackChange(nextTrack: Track) {
-    setTrack(nextTrack);
-    setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
-  }
-
   function getData(courseId: string) {
     return data[courseId] ?? EMPTY_COURSE_DATA;
   }
@@ -232,6 +197,29 @@ export function KaynakTakibiTab({
     });
   }
 
+  function handleTogglePipeline(courseId: string, topicId: string, step: PipelineStepKey) {
+    const nextValue = !((data[courseId]?.pipeline ?? {})[topicId]?.[step] ?? false);
+
+    const apply = (value: boolean) =>
+      setData((prev) => {
+        const c = prev[courseId] ?? EMPTY_COURSE_DATA;
+        const pipeline = c.pipeline ?? {};
+        const state = pipeline[topicId] ?? {};
+        return { ...prev, [courseId]: { ...c, pipeline: { ...pipeline, [topicId]: { ...state, [step]: value } } } };
+      });
+
+    apply(nextValue);
+    const rollback = (message: string) => {
+      apply(!nextValue);
+      toast.error(message);
+    };
+    setStudentTopicPipelineStep(studentId, { courseId, topicId, step, value: nextValue })
+      .then((res) => {
+        if (!res.ok) rollback(res.error);
+      })
+      .catch(() => rollback("Adım kaydedilemedi, geri alındı."));
+  }
+
   function handleToggle(courseId: string, topicId: string, resourceId: string, field: "solved" | "reviewed") {
     const current = data[courseId] ?? EMPTY_COURSE_DATA;
     const key = `${topicId}::${resourceId}`;
@@ -257,87 +245,45 @@ export function KaynakTakibiTab({
     });
   }
 
-  const aytCourses = AYT_COURSES_BY_TRACK[track];
-  const tytCourse = TYT_COURSES.find((c) => c.id === tytCourseId) ?? TYT_COURSES[0];
-  const aytCourse = aytCourses.find((c) => c.id === aytCourseId) ?? aytCourses[0];
-
-  const tytData = getData(tytCourseId);
-  const aytData = getData(aytCourseId);
-
   return (
     <div className="space-y-4">
       <DailyStatsSummary studentId={studentId} today={today} initialWeekStats={initialWeekStats} />
 
-      <Tabs defaultValue="tyt">
-      <TabsList>
-        <TabsTrigger value="tyt">TYT</TabsTrigger>
-        <TabsTrigger value="ayt">AYT</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="tyt" className="space-y-4 pt-4">
-        <CourseChips courses={TYT_COURSES} selectedId={tytCourseId} onSelect={setTytCourseId} />
-        <EditableCourseTable
-          course={tytCourse}
-          resources={tytData.resources}
-          progress={tytData.progress}
-          topicStats={tytData.topicStats}
-          onAddResource={(name) => handleAddResource(tytCourseId, name)}
-          onToggle={(topicId, resourceId, field) => handleToggle(tytCourseId, topicId, resourceId, field)}
-          onArchiveResource={(resourceId) => handleArchiveResource(tytCourseId, resourceId)}
-          onReactivateResource={(resourceId) => handleReactivateResource(tytCourseId, resourceId)}
-          onDeleteResource={(resourceId) => handleDeleteResource(tytCourseId, resourceId)}
-        />
-        <BranchExamStockTable
-          resources={tytData.branchExamResources}
-          onAdd={(name, totalStock, remainingStock) => handleAddBranchExamResource(tytCourseId, name, totalStock, remainingStock)}
-          onUpdateStock={(resourceId, newTotalStock) => handleUpdateBranchExamStock(tytCourseId, resourceId, newTotalStock)}
-          onArchive={(resourceId) => handleArchiveBranchExamResource(tytCourseId, resourceId)}
-          onReactivate={(resourceId) => handleReactivateBranchExamResource(tytCourseId, resourceId)}
-          onDelete={(resourceId) => handleDeleteBranchExamResource(tytCourseId, resourceId)}
-        />
-      </TabsContent>
-
-      <TabsContent value="ayt" className="space-y-4 pt-4">
-        <div className="bg-secondary inline-flex rounded-lg p-1">
-          {(Object.keys(TRACK_LABELS) as Track[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => handleTrackChange(t)}
-              className={cn(
-                "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                track === t
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {TRACK_LABELS[t]}
-            </button>
-          ))}
-        </div>
-
-        <CourseChips courses={aytCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
-        <EditableCourseTable
-          course={aytCourse}
-          resources={aytData.resources}
-          progress={aytData.progress}
-          topicStats={aytData.topicStats}
-          onAddResource={(name) => handleAddResource(aytCourseId, name)}
-          onToggle={(topicId, resourceId, field) => handleToggle(aytCourseId, topicId, resourceId, field)}
-          onArchiveResource={(resourceId) => handleArchiveResource(aytCourseId, resourceId)}
-          onReactivateResource={(resourceId) => handleReactivateResource(aytCourseId, resourceId)}
-          onDeleteResource={(resourceId) => handleDeleteResource(aytCourseId, resourceId)}
-        />
-        <BranchExamStockTable
-          resources={aytData.branchExamResources}
-          onAdd={(name, totalStock, remainingStock) => handleAddBranchExamResource(aytCourseId, name, totalStock, remainingStock)}
-          onUpdateStock={(resourceId, newTotalStock) => handleUpdateBranchExamStock(aytCourseId, resourceId, newTotalStock)}
-          onArchive={(resourceId) => handleArchiveBranchExamResource(aytCourseId, resourceId)}
-          onReactivate={(resourceId) => handleReactivateBranchExamResource(aytCourseId, resourceId)}
-          onDelete={(resourceId) => handleDeleteBranchExamResource(aytCourseId, resourceId)}
-        />
-      </TabsContent>
-      </Tabs>
+      <CourseTabs
+        examType={examType}
+        render={(course) => {
+          const courseId = course.id;
+          const courseData = getData(courseId);
+          return (
+            <>
+              <EditableCourseTable
+                course={course}
+                resources={courseData.resources}
+                progress={courseData.progress}
+                topicStats={courseData.topicStats}
+                onAddResource={(name) => handleAddResource(courseId, name)}
+                onToggle={(topicId, resourceId, field) => handleToggle(courseId, topicId, resourceId, field)}
+                onArchiveResource={(resourceId) => handleArchiveResource(courseId, resourceId)}
+                onReactivateResource={(resourceId) => handleReactivateResource(courseId, resourceId)}
+                onDeleteResource={(resourceId) => handleDeleteResource(courseId, resourceId)}
+                pipeline={{
+                  config: PIPELINE_CONFIG[examType],
+                  map: courseData.pipeline ?? {},
+                  onToggle: (topicId, step) => handleTogglePipeline(courseId, topicId, step),
+                }}
+              />
+              <BranchExamStockTable
+                resources={courseData.branchExamResources}
+                onAdd={(name, totalStock, remainingStock) => handleAddBranchExamResource(courseId, name, totalStock, remainingStock)}
+                onUpdateStock={(resourceId, newTotalStock) => handleUpdateBranchExamStock(courseId, resourceId, newTotalStock)}
+                onArchive={(resourceId) => handleArchiveBranchExamResource(courseId, resourceId)}
+                onReactivate={(resourceId) => handleReactivateBranchExamResource(courseId, resourceId)}
+                onDelete={(resourceId) => handleDeleteBranchExamResource(courseId, resourceId)}
+              />
+            </>
+          );
+        }}
+      />
     </div>
   );
 }

@@ -3,7 +3,66 @@
 // so their track (sayisal/ea/sozel) is recovered from which of the disjoint
 // key-sets below is present in a given exam's subject_scores -- see
 // inferAytTrackFromScores.
-import { AYT_COURSES_BY_TRACK, TYT_COURSES, type Course, type Track } from "./index";
+import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES, type Course, type Track } from "./index";
+
+// LGS's real exam is two sessions: Sözel (Türkçe 20, İnkılap 10, Din
+// Kültürü 10, İngilizce 10) then Sayısal (Matematik 20, Fen 20). `questions`
+// is each subject's real question count -- the same caps 0085 enforces on
+// lgs_general_exams, kept here so the shared task UI can enforce them too.
+export const LGS_SUBJECT_GROUPS: { key: "sozel" | "sayisal"; label: string; courseIds: string[] }[] = [
+  { key: "sozel", label: "SÖZEL", courseIds: ["lgs-turkce", "lgs-inkilap-tarihi", "lgs-din-kulturu", "lgs-ingilizce"] },
+  { key: "sayisal", label: "SAYISAL", courseIds: ["lgs-matematik", "lgs-fen-bilimleri"] },
+];
+
+export const LGS_QUESTION_COUNTS: Record<string, number> = {
+  "lgs-turkce": 20,
+  "lgs-inkilap-tarihi": 10,
+  "lgs-din-kulturu": 10,
+  "lgs-ingilizce": 10,
+  "lgs-matematik": 20,
+  "lgs-fen-bilimleri": 20,
+};
+
+// A real LGS general exam is scored per SUBJECT (six of them, capped at each
+// subject's own question count), not per TYT-style group -- so its
+// student_tasks.subject_scores are keyed by these six. The keys are
+// deliberately `lgs_`-prefixed: TYT's own keys ("turkce", "matematik",
+// "fen", ...) would collide with unprefixed ones, and every YKS aggregator
+// reading subject_scores would silently start folding LGS scores in.
+export const LGS_EXAM_SUBJECTS: {
+  key: string;
+  label: string;
+  section: "SÖZEL" | "SAYISAL";
+  courseIds: string[];
+  questions: number;
+}[] = [
+  { key: "lgs_turkce", label: "Türkçe", section: "SÖZEL", courseIds: ["lgs-turkce"], questions: 20 },
+  { key: "lgs_inkilap", label: "İnkılap Tarihi", section: "SÖZEL", courseIds: ["lgs-inkilap-tarihi"], questions: 10 },
+  { key: "lgs_din", label: "Din Kültürü", section: "SÖZEL", courseIds: ["lgs-din-kulturu"], questions: 10 },
+  { key: "lgs_ingilizce", label: "İngilizce", section: "SÖZEL", courseIds: ["lgs-ingilizce"], questions: 10 },
+  { key: "lgs_matematik", label: "Matematik", section: "SAYISAL", courseIds: ["lgs-matematik"], questions: 20 },
+  { key: "lgs_fen", label: "Fen Bilimleri", section: "SAYISAL", courseIds: ["lgs-fen-bilimleri"], questions: 20 },
+];
+
+export function coursesForLgsExamSubject(key: string): Course[] {
+  const subject = LGS_EXAM_SUBJECTS.find((s) => s.key === key);
+  if (!subject) return [];
+  return subject.courseIds.map((id) => LGS_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
+}
+
+// The LGS Ders picker: SÖZEL subjects first, then SAYISAL, each option
+// tagged with its group so the combobox can render the two headings.
+export function lgsCourseOptions(): { id: string; label: string; group: string }[] {
+  return LGS_SUBJECT_GROUPS.flatMap((g) => coursesForLgsGroup(g.key).map((c) => ({ id: c.id, label: c.name, group: g.label })));
+}
+
+export function coursesForLgsGroup(key: string): Course[] {
+  const group = LGS_SUBJECT_GROUPS.find((g) => g.key === key);
+  if (!group) return [];
+  return group.courseIds
+    .map((id) => LGS_COURSES.find((c) => c.id === id))
+    .filter((c): c is Course => !!c);
+}
 
 export type SubjectGroupKey = "turkce" | "sosyal" | "matematik" | "fen";
 

@@ -5,25 +5,34 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import { cn } from "@/lib/utils";
-import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
-import { AYT_SUBJECT_GROUPS_BY_TRACK, TYT_SUBJECT_GROUPS, inferAytTrackFromScores } from "@/lib/curriculum/subject-groups";
-import { computeNet } from "@/lib/scoring";
+import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
+import type { ExamType } from "@/lib/exam-type";
+import {
+  AYT_SUBJECT_GROUPS_BY_TRACK,
+  LGS_EXAM_SUBJECTS,
+  TYT_SUBJECT_GROUPS,
+  inferAytTrackFromScores,
+} from "@/lib/curriculum/subject-groups";
+import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { ChartRangePicker } from "./charts/chart-range-picker";
 import { DualMetricChart } from "./charts/dual-metric-chart";
+import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
-import type { DetailTask, ParagrafProblemEntry } from "../types";
+import type { DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention buildGeneralExamTitle/parseGeneralExamTitle
 // use coach-side when creating the task.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
-  return title.toUpperCase().startsWith("AYT") ? "ayt" : "tyt";
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  const t = title.toUpperCase();
+  if (t.startsWith("LGS")) return "lgs";
+  return t.startsWith("AYT") ? "ayt" : "tyt";
 }
 
 type ExamMode = "genel" | "brans";
 type MainTrack = "tyt" | "ayt";
 
-const GENEL_COLORS = ["var(--primary)", "#f59e0b", "#10b981", "#8b5cf6"];
+const GENEL_COLORS = ["var(--primary)", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4"];
 
 function seriesFor(groups: { key: string; label: string }[]): StackedSeries[] {
   return groups.map((g, i) => ({ key: g.key, label: g.label, color: GENEL_COLORS[i % GENEL_COLORS.length] }));
@@ -65,11 +74,20 @@ export function ChartsTab({
   paragrafEntries,
   generalExams,
   branchExams,
+  examType = "YKS",
+  lgsRoutines = [],
 }: {
   paragrafEntries: ParagrafProblemEntry[];
   generalExams: DetailTask[];
   branchExams: DetailTask[];
+  examType?: ExamType;
+  // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines instead of
+  // paragraf_problem_entries.
+  lgsRoutines?: LgsDailyRoutine[];
 }) {
+  const isLgs = examType === "LGS";
+  // The net rule for everything on this tab: LGS 3 wrong : 1 right, YKS 4 : 1.
+  const netOf = isLgs ? computeLgsNet : computeNet;
   const [examMode, setExamMode] = useState<ExamMode>("genel");
 
   // Branş Denemesi course picker: a Track -> Course cascade over the full
@@ -79,7 +97,7 @@ export function ChartsTab({
   // the list entirely.
   const [mainTrack, setMainTrack] = useState<MainTrack>("tyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState(TYT_COURSES[0].id);
+  const [branchCourseId, setBranchCourseId] = useState<string>(isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id);
 
   function handleMainTrackChange(next: MainTrack) {
     setMainTrack(next);
@@ -92,7 +110,7 @@ export function ChartsTab({
     setBranchCourseId(AYT_COURSES_BY_TRACK[next][0].id);
   }
 
-  const branchCourses = mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack];
+  const branchCourses = isLgs ? LGS_COURSES : mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack];
 
   // Paragraf/Problem chart date range -- paragrafEntries is already this
   // student's full, unpaginated history (fetched once server-side), so
@@ -113,18 +131,41 @@ export function ChartsTab({
     b: e.problem_sure,
   }));
 
+  // LGS: Paragraf (3:1 net + duration) and Kitap Okuma (pages/day) from the
+  // daily routine rows; a row can carry just one of the two.
+  const sortedLgs = lgsRoutines
+    .filter((r) => isDateInChartRange(r.entry_date, chartRange))
+    .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+  const lgsParagrafSeries = sortedLgs
+    .filter((r) => r.paragraf_correct + r.paragraf_wrong + r.paragraf_empty > 0 || (r.paragraf_duration_minutes ?? 0) > 0)
+    .map((r) => ({
+      date: r.entry_date,
+      a: computeLgsNet(r.paragraf_correct, r.paragraf_wrong),
+      b: r.paragraf_duration_minutes ?? 0,
+    }));
+  const lgsKitapSeries = sortedLgs
+    .filter((r) => r.book_pages_read !== null)
+    .map((r) => ({ date: r.entry_date, value: r.book_pages_read! }));
+
   // Breakdown by subject group (Türkçe/Sosyal/Matematik/Fen for TYT, or the
   // relevant AYT sections for the selected track) instead of one summed
   // total, so the coach can see exactly which section is driving the exam's
   // overall net.
-  const genelGroups = mainTrack === "tyt" ? TYT_SUBJECT_GROUPS : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
+  // LGS's general exam is scored per subject (six of them, keyed lgs_*).
+  const genelGroups = isLgs
+    ? LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label }))
+    : mainTrack === "tyt"
+      ? TYT_SUBJECT_GROUPS
+      : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const genelSeries = seriesFor(genelGroups);
   const genelBreakdownData = generalExams
     .filter(
       (e) =>
         e.subject_scores &&
-        parseGeneralExamTrack(e.title) === mainTrack &&
-        (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack),
+        (isLgs
+          ? parseGeneralExamTrack(e.title) === "lgs"
+          : parseGeneralExamTrack(e.title) === mainTrack &&
+            (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
     )
     .slice()
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
@@ -133,7 +174,7 @@ export function ChartsTab({
       values: Object.fromEntries(
         genelGroups.map((g) => {
           const s = e.subject_scores?.[g.key];
-          return [g.key, s ? computeNet(s.correct ?? 0, s.wrong ?? 0) : 0];
+          return [g.key, s ? netOf(s.correct ?? 0, s.wrong ?? 0) : 0];
         }),
       ),
     }));
@@ -144,7 +185,7 @@ export function ChartsTab({
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
     .map((e) => ({
       date: e.task_date,
-      a: computeNet(e.correct_count ?? 0, e.wrong_count ?? 0),
+      a: netOf(e.correct_count ?? 0, e.wrong_count ?? 0),
       b: e.duration_minutes ?? 0,
     }));
 
@@ -163,19 +204,31 @@ export function ChartsTab({
             <CardDescription>Net ve süre değişimi</CardDescription>
           </CardHeader>
           <CardContent>
-            <DualMetricChart data={paragrafSeries} labelA="Net" labelB="Süre" unitB=" dk" />
+            <DualMetricChart data={isLgs ? lgsParagrafSeries : paragrafSeries} labelA="Net" labelB="Süre" unitB=" dk" />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Problem Gelişimi</CardTitle>
-            <CardDescription>Net ve süre değişimi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DualMetricChart data={problemSeries} labelA="Net" labelB="Süre" unitB=" dk" />
-          </CardContent>
-        </Card>
+        {isLgs ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Kitap Okuma Gelişimi</CardTitle>
+              <CardDescription>Günlük okunan sayfa sayısı</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LineChart data={lgsKitapSeries} color="#f59e0b" unit=" sf" />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Problem Gelişimi</CardTitle>
+              <CardDescription>Net ve süre değişimi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DualMetricChart data={problemSeries} labelA="Net" labelB="Süre" unitB=" dk" />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>
@@ -202,15 +255,17 @@ export function ChartsTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <TrackToggle
-              options={[
-                { value: "tyt", label: "TYT" },
-                { value: "ayt", label: "AYT" },
-              ]}
-              value={mainTrack}
-              onChange={handleMainTrackChange}
-            />
-            {mainTrack === "ayt" && (
+            {!isLgs && (
+              <TrackToggle
+                options={[
+                  { value: "tyt", label: "TYT" },
+                  { value: "ayt", label: "AYT" },
+                ]}
+                value={mainTrack}
+                onChange={handleMainTrackChange}
+              />
+            )}
+            {!isLgs && mainTrack === "ayt" && (
               <TrackToggle
                 options={(Object.keys(TRACK_LABELS) as Track[]).map((t) => ({ value: t, label: TRACK_LABELS[t] }))}
                 value={aytSubTrack}

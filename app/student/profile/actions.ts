@@ -22,6 +22,10 @@ export type ProfilePatch = Partial<{
   target_university: string | null;
   target_department: string | null;
   target_ranking: string | null;
+  // LGS counterparts of target_university / target_department / obp.
+  target_high_school: string | null;
+  target_percentile: number | null;
+  report_card_average: number | null;
   school_name: string | null;
   obp: number | null;
   attends_dershane: boolean;
@@ -45,6 +49,17 @@ const profilePatchSchema = z
     target_university: text(200),
     target_department: text(200),
     target_ranking: text(60),
+    target_high_school: text(200),
+    target_percentile: z
+      .number("Hedef yüzdelik dilim geçersiz.")
+      .min(0, "Hedef yüzdelik dilim 0 ile 100 arasında olmalı.")
+      .max(100, "Hedef yüzdelik dilim 0 ile 100 arasında olmalı.")
+      .nullable(),
+    report_card_average: z
+      .number("Karne ortalaması geçersiz.")
+      .min(0, "Karne ortalaması 0 ile 100 arasında olmalı.")
+      .max(100, "Karne ortalaması 0 ile 100 arasında olmalı.")
+      .nullable(),
     school_name: text(200),
     obp: z.number().min(0).max(500).nullable(),
     attends_dershane: z.boolean(),

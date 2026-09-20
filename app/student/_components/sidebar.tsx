@@ -35,12 +35,30 @@ const NAV_ITEMS = [
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function StudentSidebar({ fullName = null }: { fullName?: string | null }) {
+export function StudentSidebar({
+  fullName = null,
+  examType = "YKS",
+}: {
+  fullName?: string | null;
+  examType?: "YKS" | "LGS";
+}) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
   const isMobile = useIsMobileViewport();
   const effectiveCollapsed = collapsed && !isMobile;
+  // LGS students get every page a YKS student does; only the Paragraf/
+  // Problem page is renamed (it is Paragraf / Kitap Okuma for them).
+  const navItems = NAV_ITEMS.map((item) =>
+    examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item,
+  );
+
+  // The guided tour walks the same list -- same rename.
+  const tourItems = STUDENT_NAV_ITEMS.map((item) =>
+    examType === "LGS" && item.href === "/student/paragraf-problem"
+      ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
+      : item,
+  );
 
   return (
     <aside
@@ -54,9 +72,9 @@ export function StudentSidebar({ fullName = null }: { fullName?: string | null }
         <Logo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
-      {!effectiveCollapsed && <YksCountdown variant="student" />}
+      {!effectiveCollapsed && <YksCountdown variant="student" examType={examType} />}
       <nav className="flex flex-col gap-1 px-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === "/student" ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -84,7 +102,7 @@ export function StudentSidebar({ fullName = null }: { fullName?: string | null }
         {!effectiveCollapsed && fullName && (
           <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
         )}
-        <TourTrigger role="student" welcome={STUDENT_WELCOME_STEP} items={STUDENT_NAV_ITEMS} landingPath={STUDENT_LANDING_PATH} collapsed={effectiveCollapsed} />
+        <TourTrigger role="student" welcome={STUDENT_WELCOME_STEP} items={tourItems} landingPath={STUDENT_LANDING_PATH} collapsed={effectiveCollapsed} />
       </div>
 
       {/* Floating rail toggle, half-hanging off the sidebar's own right

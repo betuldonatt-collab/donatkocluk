@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
+import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
+import { cn } from "@/lib/utils";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
+  LGS_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   coursesForAytGroup,
   coursesForGroup,
+  coursesForLgsGroup,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { getTaskTopicMistakesForCoach, saveCoachTrialResults } from "../../../../actions";
@@ -22,17 +26,20 @@ import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selecto
 
 // Mirrors task-modal.tsx's own parseGeneralExamTitle track-recovery
 // (duplicated, not imported -- that lives under app/student).
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
-function subjectGroupsFor(examTrack: "tyt" | "ayt", aytTrack: Track | null) {
+function subjectGroupsFor(examTrack: "tyt" | "ayt" | "lgs", aytTrack: Track | null) {
+  if (examTrack === "lgs") return LGS_SUBJECT_GROUPS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
   if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
   return [];
 }
 
-function coursesForActiveGroup(examTrack: "tyt" | "ayt", aytTrack: Track | null, key: string): Course[] {
+function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs", aytTrack: Track | null, key: string): Course[] {
+  if (examTrack === "lgs") return coursesForLgsGroup(key);
   if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
   if (aytTrack) return coursesForAytGroup(aytTrack, key);
   return [];
@@ -46,7 +53,18 @@ function sanitizeDigits(v: string) {
   return v.replace(/[^0-9]/g, "");
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  invalid,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  // A required box left empty after a refused save -- red outline.
+  invalid?: boolean;
+}) {
   return (
     <div className="space-y-1">
       <Label className="text-muted-foreground text-xs">{label}</Label>
@@ -56,7 +74,8 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(sanitizeDigits(e.target.value))}
-        className="h-8"
+        aria-invalid={invalid || undefined}
+        className={cn("h-8", invalid && "border-destructive focus-visible:ring-destructive/30")}
       />
     </div>
   );
@@ -87,6 +106,8 @@ export function TrialResultsSection({
   const [mistakesLoaded, setMistakesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once a save was refused for a blank Doğru/Yanlış/Boş box.
+  const [showMissingScores, setShowMissingScores] = useState(false);
 
   const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
   const [aytTrack, setAytTrack] = useState<Track | null>(() => inferAytTrackFromScores(task.subject_scores));
@@ -165,6 +186,13 @@ export function TrialResultsSection({
   }
 
   async function handleSave() {
+    // Doğru / Yanlış / Boş are all required (0 for what wasn't solved);
+    // Toplam is derived by the server if left blank.
+    if (isBlankScore(correctCount) || isBlankScore(wrongCount) || isBlankScore(emptyCount)) {
+      setShowMissingScores(true);
+      setError(EXAM_SCORES_REQUIRED);
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
@@ -190,9 +218,24 @@ export function TrialResultsSection({
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
-        <Field label="Doğru" value={correctCount} onChange={(v) => handleCountFieldChange("correct", v)} />
-        <Field label="Yanlış" value={wrongCount} onChange={(v) => handleCountFieldChange("wrong", v)} />
-        <Field label="Boş" value={emptyCount} onChange={(v) => handleCountFieldChange("empty", v)} />
+        <Field
+          label="Doğru"
+          value={correctCount}
+          onChange={(v) => handleCountFieldChange("correct", v)}
+          invalid={showMissingScores && isBlankScore(correctCount)}
+        />
+        <Field
+          label="Yanlış"
+          value={wrongCount}
+          onChange={(v) => handleCountFieldChange("wrong", v)}
+          invalid={showMissingScores && isBlankScore(wrongCount)}
+        />
+        <Field
+          label="Boş"
+          value={emptyCount}
+          onChange={(v) => handleCountFieldChange("empty", v)}
+          invalid={showMissingScores && isBlankScore(emptyCount)}
+        />
       </div>
 
       {totalMismatch && (

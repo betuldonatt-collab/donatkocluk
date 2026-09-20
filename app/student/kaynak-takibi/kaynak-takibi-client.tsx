@@ -3,46 +3,43 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { CourseTabs } from "@/components/course-tabs";
 import { BranchExamStockTable, type BranchExamResourceRef } from "./_components/branch-exam-stock-table";
 import { CourseTable, type CourseTopicStats, type ProgressMap, type Resource } from "./_components/course-table";
 import { TotalsSummary, type ResourceTotals } from "./_components/totals-summary";
-import {
-  AYT_COURSES_BY_TRACK,
-  TRACK_LABELS,
-  TYT_COURSES,
-  type Course,
-  type Track,
-} from "@/lib/curriculum";
+import type { Course } from "@/lib/curriculum";
+import type { ExamType } from "@/lib/exam-type";
 import {
   addOwnBranchExamResource,
   addResource as addResourceAction,
+  setTopicPipelineStep,
   toggleResourceProgress,
   updateOwnBranchExamStock,
 } from "./actions";
+import { PIPELINE_CONFIG, type PipelineConfig, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
 
 export type CourseData = {
   resources: Resource[];
   branchExamResources: BranchExamResourceRef[];
   progress: ProgressMap;
+  // Per-topic pipeline ticks (the cohort's own steps), topicId -> checkboxes.
+  pipeline: PipelineMap;
   topicStats: CourseTopicStats;
 };
 
 const EMPTY_TOPIC_STATS: CourseTopicStats = { byTopic: {}, karma: { total: 0, correct: 0, wrong: 0, empty: 0 } };
-const EMPTY_COURSE_DATA: CourseData = { resources: [], branchExamResources: [], progress: {}, topicStats: EMPTY_TOPIC_STATS };
+const EMPTY_COURSE_DATA: CourseData = { resources: [], branchExamResources: [], progress: {}, pipeline: {}, topicStats: EMPTY_TOPIC_STATS };
 
 export function KaynakTakibiClient({
   initialCourseData,
   totals,
+  examType,
 }: {
   initialCourseData: Record<string, CourseData>;
   totals: ResourceTotals;
+  examType: ExamType;
 }) {
   const [courseData, setCourseData] = useState<Record<string, CourseData>>(initialCourseData);
-  const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
-  const [track, setTrack] = useState<Track>("sayisal");
-  const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
 
   function getData(courseId: string): CourseData {
     return courseData[courseId] ?? EMPTY_COURSE_DATA;
@@ -100,6 +97,29 @@ export function KaynakTakibiClient({
     });
   }
 
+  function togglePipeline(courseId: string, topicId: string, step: PipelineStepKey) {
+    const nextValue = !((courseData[courseId] ?? EMPTY_COURSE_DATA).pipeline[topicId]?.[step] ?? false);
+
+    const apply = (value: boolean) =>
+      setCourseData((prev) => {
+        const c = prev[courseId] ?? EMPTY_COURSE_DATA;
+        const state = c.pipeline[topicId] ?? {};
+        return { ...prev, [courseId]: { ...c, pipeline: { ...c.pipeline, [topicId]: { ...state, [step]: value } } } };
+      });
+
+    apply(nextValue);
+    const rollback = (message: string) => {
+      toast.error(message);
+      // Roll back the optimistic flip so the UI matches what's actually saved.
+      apply(!nextValue);
+    };
+    setTopicPipelineStep({ courseId, topicId, step, value: nextValue })
+      .then((res) => {
+        if (!res.ok) rollback(res.error);
+      })
+      .catch(() => rollback("Güncellenemedi, tekrar dene."));
+  }
+
   async function addBranchExamResource(courseId: string, name: string, totalStock: number, remainingStock: number) {
     try {
       const resource = await addOwnBranchExamResource(courseId, name, totalStock, remainingStock);
@@ -146,13 +166,6 @@ export function KaynakTakibiClient({
     });
   }
 
-  function handleTrackChange(nextTrack: Track) {
-    setTrack(nextTrack);
-    setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
-  }
-
-  const aytCourses = AYT_COURSES_BY_TRACK[track];
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6">
@@ -167,105 +180,36 @@ export function KaynakTakibiClient({
         <TotalsSummary totals={totals} />
       </div>
 
-      <Tabs defaultValue="tyt">
-        <TabsList>
-          <TabsTrigger value="tyt">TYT</TabsTrigger>
-          <TabsTrigger value="ayt">AYT</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tyt" className="space-y-4">
-          <CourseChips
-            courses={TYT_COURSES}
-            selectedId={tytCourseId}
-            onSelect={setTytCourseId}
-          />
+      <CourseTabs
+        examType={examType}
+        render={(course) => (
           <ActiveCourseTable
-            courses={TYT_COURSES}
-            selectedId={tytCourseId}
+            course={course}
             getData={getData}
             addResource={addResource}
             toggleProgress={toggleProgress}
+            pipelineConfig={PIPELINE_CONFIG[examType]}
+            togglePipeline={togglePipeline}
             addBranchExamResource={addBranchExamResource}
             updateBranchExamStock={updateBranchExamStock}
           />
-        </TabsContent>
-
-        <TabsContent value="ayt" className="space-y-4">
-          <div className="inline-flex rounded-lg bg-secondary p-1">
-            {(Object.keys(TRACK_LABELS) as Track[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleTrackChange(t)}
-                className={cn(
-                  "rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                  track === t
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {TRACK_LABELS[t]}
-              </button>
-            ))}
-          </div>
-
-          <CourseChips courses={aytCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
-          <ActiveCourseTable
-            courses={aytCourses}
-            selectedId={aytCourseId}
-            getData={getData}
-            addResource={addResource}
-            toggleProgress={toggleProgress}
-            addBranchExamResource={addBranchExamResource}
-            updateBranchExamStock={updateBranchExamStock}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-function CourseChips({
-  courses,
-  selectedId,
-  onSelect,
-}: {
-  courses: Course[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {courses.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-            selectedId === c.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-input bg-card text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {c.name}
-        </button>
-      ))}
+        )}
+      />
     </div>
   );
 }
 
 function ActiveCourseTable({
-  courses,
-  selectedId,
+  course,
   getData,
   addResource,
   toggleProgress,
+  pipelineConfig,
+  togglePipeline,
   addBranchExamResource,
   updateBranchExamStock,
 }: {
-  courses: Course[];
-  selectedId: string;
+  course: Course;
   getData: (courseId: string) => CourseData;
   addResource: (courseId: string, name: string) => Promise<void>;
   toggleProgress: (
@@ -274,10 +218,11 @@ function ActiveCourseTable({
     resourceId: string,
     field: "solved" | "reviewed",
   ) => void;
+  pipelineConfig: PipelineConfig;
+  togglePipeline: (courseId: string, topicId: string, step: PipelineStepKey) => void;
   addBranchExamResource: (courseId: string, name: string, totalStock: number, remainingStock: number) => Promise<void>;
   updateBranchExamStock: (courseId: string, resourceId: string, totalStock: number, remainingStock: number) => void;
 }) {
-  const course = courses.find((c) => c.id === selectedId) ?? courses[0];
   const data = getData(course.id);
 
   return (
@@ -289,6 +234,11 @@ function ActiveCourseTable({
         topicStats={data.topicStats}
         onAddResource={(name) => addResource(course.id, name)}
         onToggle={(topic, resourceId, field) => toggleProgress(course.id, topic, resourceId, field)}
+        pipeline={{
+          config: pipelineConfig,
+          map: data.pipeline,
+          onToggle: (topicId, step) => togglePipeline(course.id, topicId, step),
+        }}
       />
       <BranchExamStockTable
         resources={data.branchExamResources}

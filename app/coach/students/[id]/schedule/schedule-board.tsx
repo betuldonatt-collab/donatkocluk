@@ -59,6 +59,7 @@ import {
   statusClasses,
   TaskCardBody,
 } from "../_components/kanban/task-card-body";
+import type { ExamType } from "@/lib/exam-type";
 import { TaskDrawer, type TaskDrawerState } from "../_components/kanban/task-drawer";
 
 const DAY_PREFIX = "day:";
@@ -133,6 +134,7 @@ export function ScheduleBoard({
   highlightTaskId,
   initialRoutineRowHeights,
   initialTaskRowHeights,
+  examType = "YKS",
 }: {
   studentId: string;
   initialWeekDays: { date: string; label: string }[];
@@ -155,6 +157,9 @@ export function ScheduleBoard({
   // flash of the wrong heights while a client fetch resolves.
   initialRoutineRowHeights: number[];
   initialTaskRowHeights: number[];
+  // The viewed student's cohort -- only used to pick which subjects the
+  // assign/edit drawer offers; the board itself is identical for both.
+  examType?: ExamType;
 }) {
   const today = todayISO();
   const [weekDays, setWeekDays] = useState(initialWeekDays);
@@ -837,6 +842,7 @@ export function ScheduleBoard({
           onCreated={handleCreated}
           onSaved={handleSaved}
           onResourceCreated={handleResourceCreated}
+          examType={examType}
         />
       )}
 

@@ -50,9 +50,12 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
 
   const [, { data: profile }] = await Promise.all([
     touchPresence(view.effectiveUserId, isImpersonating),
-    createClient().then((supabase) => supabase.from("profiles").select("full_name").eq("id", view.effectiveUserId).maybeSingle()),
+    createClient().then((supabase) =>
+      supabase.from("profiles").select("full_name, exam_type").eq("id", view.effectiveUserId).maybeSingle(),
+    ),
   ]);
   const fullName = profile?.full_name ?? null;
+  const examType = profile?.exam_type ?? "YKS";
   const announcements = isImpersonating ? [] : await fetchStudentAnnouncements(view.effectiveUserId);
   // get_daily_stopwatch_ranking() resolves auth.uid() from the real
   // session, not the impersonated target -- there's no "effective user"
@@ -70,7 +73,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<StudentSidebar fullName={fullName} />}>
+      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />

@@ -11,11 +11,15 @@ import {
   AYT_COURSES_BY_TRACK,
   BRANCH_EXAM_MACRO_COURSES,
   isBranchExamMacroCourseId,
+  isLgsCourseId,
+  LGS_COURSES,
   ROUTINE_COURSES,
   TYT_COURSES,
-  topicsForCourse,
+  topicOptionsForCourse,
   type Course,
 } from "@/lib/curriculum";
+import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
+import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
 import type { DetailTask } from "../../types";
 import type { CourseResourceData } from "../kaynak-takibi-tab";
@@ -27,6 +31,7 @@ export const ALL_COURSES: Course[] = [
   ...AYT_COURSES_BY_TRACK.sayisal,
   ...AYT_COURSES_BY_TRACK.ea,
   ...AYT_COURSES_BY_TRACK.sozel,
+  ...LGS_COURSES,
   ...ROUTINE_COURSES,
   ...BRANCH_EXAM_MACRO_COURSES,
 ];
@@ -83,7 +88,7 @@ export type TaskFormValue = {
   // these two live only in form state and get folded into the saved
   // title string (buildGeneralExamTitle in actions.ts), never persisted
   // as their own columns.
-  generalExamTrack: "tyt" | "ayt";
+  generalExamTrack: "tyt" | "ayt" | "lgs";
   generalExamPublisher: string;
   // "Branş Denemesi" only -- same "lives only in the title, never its own
   // column" convention as generalExamPublisher above.
@@ -98,16 +103,36 @@ function emptyResourceRow(): TaskFormResource {
   return { resourceId: "", resourceName: "", addToLibrary: true };
 }
 
-export function defaultTaskFormValue(): TaskFormValue {
+// The Ders options a cohort is offered. LGS gets its own six subjects
+// (SÖZEL first, then SAYISAL, grouped) plus the Paragraf / Kitap Okuma
+// routine pseudo-courses -- never Problem, which is a YKS routine. YKS is
+// exactly what it always was, minus the LGS courses now living in
+// ALL_COURSES for lookups.
+export function courseOptionsFor(examType: ExamType, isBranchExam: boolean): { id: string; label: string; group?: string }[] {
+  if (examType === "LGS") {
+    return [
+      ...lgsCourseOptions(),
+      ...ROUTINE_COURSES.filter((c) => c.id !== "problem").map((c) => ({ id: c.id, label: c.name })),
+    ];
+  }
+  const atomic = ALL_COURSES.filter((c) => !isBranchExamMacroCourseId(c.id) && !isLgsCourseId(c.id));
+  return (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomic] : atomic).map((c) => ({ id: c.id, label: courseLabel(c) }));
+}
+
+export function firstCourseIdFor(examType: ExamType): string {
+  return examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id;
+}
+
+export function defaultTaskFormValue(examType: ExamType = "YKS"): TaskFormValue {
   return {
     taskType: "question_bank",
-    courseId: ALL_COURSES[0].id,
+    courseId: firstCourseIdFor(examType),
     topicId: "",
     resources: [],
     totalCount: "",
     durationMinutes: "",
     videoLinks: [],
-    generalExamTrack: "tyt",
+    generalExamTrack: examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     branchExamPublisher: "",
     bookTitle: "",
@@ -117,9 +142,10 @@ export function defaultTaskFormValue(): TaskFormValue {
 // Reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
 // editing an existing general-exam task pre-fills the track/publisher
 // fields instead of showing them blank.
-function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt"; publisher: string } {
-  const match = title.match(/^(TYT|AYT)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
-  return { track: match?.[1].toLowerCase() === "ayt" ? "ayt" : "tyt", publisher: match?.[2]?.trim() ?? "" };
+function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt" | "lgs"; publisher: string } {
+  const match = title.match(/^(TYT|AYT|LGS)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
+  const track = match?.[1].toLowerCase();
+  return { track: track === "ayt" ? "ayt" : track === "lgs" ? "lgs" : "tyt", publisher: match?.[2]?.trim() ?? "" };
 }
 
 // Reverses buildBranchExamTitle's " - Yayınevi" suffix (app/coach/actions.ts)
@@ -164,7 +190,8 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
     addToLibrary: true,
   }));
-  const generalExam = taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt" as const, publisher: "" };
+  const generalExam: { track: "tyt" | "ayt" | "lgs"; publisher: string } =
+    taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt", publisher: "" };
   const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
   // An older branch exam task saved before this field merged into Kaynak
   // (or one whose linked resource was later removed) has a publisher only
@@ -318,6 +345,7 @@ export function TaskFormFields({
   onChange,
   courseResourceData,
   hideCourseTopic,
+  examType = "YKS",
 }: {
   value: TaskFormValue;
   onChange: (next: TaskFormValue) => void;
@@ -326,21 +354,23 @@ export function TaskFormFields({
   // before this renders -- showing the Ders/Konu pickers again would
   // just invite the coach to accidentally pick something else.
   hideCourseTopic?: boolean;
+  // Which cohort's subjects to offer (and whether a general exam asks for
+  // a TYT/AYT choice at all) -- the rest of this form is cohort-agnostic.
+  examType?: ExamType;
 }) {
-  const course = ALL_COURSES.find((c) => c.id === value.courseId) ?? ALL_COURSES[0];
-  const topics = topicsForCourse(course);
+  const isLgs = examType === "LGS";
+  const course = ALL_COURSES.find((c) => c.id === value.courseId) ?? ALL_COURSES.find((c) => c.id === firstCourseIdFor(examType)) ?? ALL_COURSES[0];
+  const topicOptions = topicOptionsForCourse(course);
   const isGeneralExam = value.taskType === "general_exam";
   const isBranchExam = value.taskType === "branch_exam";
   const isReading = value.taskType === "reading";
   // Macro ("whole fruit") subjects lead the Ders picker, atomic ("sliced")
   // ones follow -- ALL_COURSES itself stays atomic-first (its [0] is the
   // universal fallback default for every OTHER task type), so the reorder
-  // happens only here, in the branch_exam-only display list.
-  const atomicCourseOptions = ALL_COURSES.filter((c) => !isBranchExamMacroCourseId(c.id));
-  const courseOptions = (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomicCourseOptions] : atomicCourseOptions).map((c) => ({
-    id: c.id,
-    label: courseLabel(c),
-  }));
+  // happens only here, in the branch_exam-only display list (see
+  // courseOptionsFor). LGS has no macro subjects -- its branş denemeleri
+  // are per single subject.
+  const courseOptions = courseOptionsFor(examType, isBranchExam);
   // A course's resources are split by kind (0044) -- branch_exam tasks
   // only ever offer that course's branch-trial inventory, question_bank
   // tasks only ever offer its plain study resources. The two pools are
@@ -440,27 +470,31 @@ export function TaskFormFields({
       )}
 
       {isGeneralExam && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Sınav Türü</Label>
-            <div className="flex gap-1.5">
-              {GENERAL_EXAM_TRACK_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => set({ generalExamTrack: opt.value })}
-                  className={cn(
-                    "flex-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    value.generalExamTrack === opt.value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-card text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
+        <div className={cn("grid grid-cols-1 gap-3", !isLgs && "sm:grid-cols-2")}>
+          {/* LGS has exactly one general exam format, so there's no
+              TYT/AYT-style Sınav Türü to choose between. */}
+          {!isLgs && (
+            <div className="space-y-1.5">
+              <Label>Sınav Türü</Label>
+              <div className="flex gap-1.5">
+                {GENERAL_EXAM_TRACK_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => set({ generalExamTrack: opt.value })}
+                    className={cn(
+                      "flex-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                      value.generalExamTrack === opt.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="task-form-publisher">Yayınevi</Label>
             <Input
@@ -503,7 +537,7 @@ export function TaskFormFields({
             <div className="space-y-1.5">
               <Label>Konu</Label>
               <SmartCombobox
-                options={topics.map((t) => ({ id: t.id, label: t.name }))}
+                options={topicOptions}
                 value={value.topicId}
                 onChange={(topicId) => set({ topicId })}
                 placeholder="Konu ara..."

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Save } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { PROFILE_TERMS } from "@/lib/profile-terms";
 import { updateProfile, type ProfilePatch } from "./actions";
 
 export type ProfileData = {
@@ -23,6 +25,10 @@ export type ProfileData = {
   target_university: string | null;
   target_department: string | null;
   target_ranking: string | null;
+  target_high_school: string | null;
+  target_percentile: number | null;
+  report_card_average: number | null;
+  exam_type: "YKS" | "LGS";
   school_name: string | null;
   obp: number | null;
   attends_dershane: boolean;
@@ -43,6 +49,9 @@ type FormState = {
   target_university: string;
   target_department: string;
   target_ranking: string;
+  target_high_school: string;
+  target_percentile: string;
+  report_card_average: string;
   school_name: string;
   obp: string;
   attends_dershane: boolean;
@@ -64,6 +73,9 @@ function toFormState(p: ProfileData | null): FormState {
     target_university: p?.target_university ?? "",
     target_department: p?.target_department ?? "",
     target_ranking: p?.target_ranking ?? "",
+    target_high_school: p?.target_high_school ?? "",
+    target_percentile: p?.target_percentile?.toString() ?? "",
+    report_card_average: p?.report_card_average?.toString() ?? "",
     school_name: p?.school_name ?? "",
     obp: p?.obp?.toString() ?? "",
     attends_dershane: p?.attends_dershane ?? false,
@@ -89,6 +101,11 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
   const [form, setForm] = useState<FormState>(() => toFormState(initialProfile));
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  // LGS students see LGS terms and edit the LGS columns; the YKS-shaped
+  // fields (university / department / ranking / OBP / old YKS result) are
+  // neither shown nor sent for them, so they're never touched.
+  const isLgs = initialProfile?.exam_type === "LGS";
+  const terms = PROFILE_TERMS[isLgs ? "LGS" : "YKS"];
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -103,21 +120,34 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
         phone: form.phone.trim() || null,
         parent_name: form.parent_name.trim() || null,
         parent_phone: form.parent_phone.trim() || null,
-        target_university: form.target_university.trim() || null,
-        target_department: form.target_department.trim() || null,
-        target_ranking: form.target_ranking.trim() || null,
+        ...(isLgs
+          ? {
+              target_high_school: form.target_high_school.trim() || null,
+              target_percentile: form.target_percentile.trim() === "" ? null : Number(form.target_percentile),
+              report_card_average: form.report_card_average.trim() === "" ? null : Number(form.report_card_average),
+            }
+          : {
+              target_university: form.target_university.trim() || null,
+              target_department: form.target_department.trim() || null,
+              target_ranking: form.target_ranking.trim() || null,
+              obp: form.obp.trim() === "" ? null : Number(form.obp),
+              previous_yks_ranking: form.previous_yks_ranking.trim() || null,
+            }),
         school_name: form.school_name.trim() || null,
-        obp: form.obp.trim() === "" ? null : Number(form.obp),
         attends_dershane: form.attends_dershane,
         attends_deneme_kulubu: form.attends_deneme_kulubu,
         has_private_tutor: form.has_private_tutor,
         had_previous_coaching: form.had_previous_coaching,
-        previous_yks_ranking: form.previous_yks_ranking.trim() || null,
         favorite_subjects: form.favorite_subjects.trim() || null,
         difficult_subjects: form.difficult_subjects.trim() || null,
       };
       await updateProfile(patch);
       setSavedAt(Date.now());
+    } catch (e) {
+      // Previously an out-of-range value made the save reject with nothing
+      // shown at all -- surface the (Turkish, user-safe) reason.
+      setSavedAt(null);
+      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
     } finally {
       setSaving(false);
     }
@@ -161,15 +191,35 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
           <CardTitle className="text-base">Akademik Hedefler</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Hedef Üniversite" value={form.target_university} onChange={(v) => set("target_university", v)} />
-          <Field label="Hedef Bölüm" value={form.target_department} onChange={(v) => set("target_department", v)} />
-          <Field
-            label="Hedef Sıralama"
-            value={form.target_ranking}
-            onChange={(v) => set("target_ranking", v)}
-            placeholder="Örn: 50.000-60.000"
-            className="sm:col-span-2"
-          />
+          {isLgs ? (
+            <>
+              <Field
+                label={terms.targetOne}
+                value={form.target_high_school}
+                onChange={(v) => set("target_high_school", v)}
+                placeholder="Örn: Ankara Fen Lisesi"
+              />
+              <Field
+                label={terms.targetTwo}
+                value={form.target_percentile}
+                onChange={(v) => set("target_percentile", v)}
+                type="number"
+                placeholder="Örn: 1.5 (ilk %1,5)"
+              />
+            </>
+          ) : (
+            <>
+              <Field label={terms.targetOne} value={form.target_university} onChange={(v) => set("target_university", v)} />
+              <Field label={terms.targetTwo} value={form.target_department} onChange={(v) => set("target_department", v)} />
+              <Field
+                label="Hedef Sıralama"
+                value={form.target_ranking}
+                onChange={(v) => set("target_ranking", v)}
+                placeholder="Örn: 50.000-60.000"
+                className="sm:col-span-2"
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -180,7 +230,17 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
         <CardContent className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Okul Adı" value={form.school_name} onChange={(v) => set("school_name", v)} />
-            <Field label="OBP" value={form.obp} onChange={(v) => set("obp", v)} type="number" />
+            {isLgs ? (
+              <Field
+                label={terms.grade}
+                value={form.report_card_average}
+                onChange={(v) => set("report_card_average", v)}
+                type="number"
+                placeholder="Örn: 92.5"
+              />
+            ) : (
+              <Field label="OBP" value={form.obp} onChange={(v) => set("obp", v)} type="number" />
+            )}
           </div>
 
           <div className="space-y-3">
@@ -206,15 +266,17 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="previous-yks">Eski YKS Sıralaması / Notu</Label>
-            <Input
-              id="previous-yks"
-              value={form.previous_yks_ranking}
-              onChange={(e) => set("previous_yks_ranking", e.target.value)}
-              placeholder="Örn: 2025 YKS: 120.000. sıra"
-            />
-          </div>
+          {!isLgs && (
+            <div className="space-y-1.5">
+              <Label htmlFor="previous-yks">Eski YKS Sıralaması / Notu</Label>
+              <Input
+                id="previous-yks"
+                value={form.previous_yks_ranking}
+                onChange={(e) => set("previous_yks_ranking", e.target.value)}
+                placeholder="Örn: 2025 YKS: 120.000. sıra"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

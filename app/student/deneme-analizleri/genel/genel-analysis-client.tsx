@@ -7,15 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { TRACK_LABELS, type Track } from "@/lib/curriculum";
+import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
+  LGS_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   coursesForAytGroup,
   coursesForGroup,
+  coursesForLgsGroup,
   inferAytTrackFromScores,
   type SubjectGroupKey,
 } from "@/lib/curriculum/subject-groups";
-import { computeNet } from "@/lib/scoring";
+import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { LineChart } from "../../_components/charts/line-chart";
 import { getMoreGenelExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -25,13 +28,14 @@ import { ExamTopicTable } from "../_components/exam-topic-table";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
-// General-exam tasks have no course_id -- the TYT/AYT track lives only in
+// General-exam tasks have no course_id -- the TYT/AYT/LGS track lives only in
 // the title text, same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
-function netChartFor(exams: StudentTask[]) {
+function netChartFor(exams: StudentTask[], netFn: (c: number, w: number) => number = computeNet) {
   // Overall net = sum of correct/wrong across all subjects, netted once
   // on the totals (not summed per-subject net) so rounding never compounds.
   return exams
@@ -43,7 +47,7 @@ function netChartFor(exams: StudentTask[]) {
         (acc, s) => ({ correct: acc.correct + (s.correct ?? 0), wrong: acc.wrong + (s.wrong ?? 0) }),
         { correct: 0, wrong: 0 },
       );
-      return { date: e.task_date, value: computeNet(totals.correct, totals.wrong) };
+      return { date: e.task_date, value: netFn(totals.correct, totals.wrong) };
     });
 }
 
@@ -51,10 +55,12 @@ export function GenelAnalysisClient({
   initialExams,
   initialMistakes,
   initialHasMore,
+  examType,
 }: {
   initialExams: StudentTask[];
   initialMistakes: MistakeRow[];
   initialHasMore: boolean;
+  examType: ExamType;
 }) {
   const [exams, setExams] = useState(initialExams);
   const [mistakes, setMistakes] = useState(initialMistakes);
@@ -62,6 +68,7 @@ export function GenelAnalysisClient({
   const [loadingMore, setLoadingMore] = useState(false);
   const [groupKey, setGroupKey] = useState<SubjectGroupKey>("turkce");
   const [aytTrack, setAytTrack] = useState<Track>("sayisal");
+  const [lgsGroupKey, setLgsGroupKey] = useState<string>(LGS_SUBJECT_GROUPS[0].key);
   const [aytGroupKey, setAytGroupKey] = useState(AYT_SUBJECT_GROUPS_BY_TRACK.sayisal[0].key as string);
 
   const [activeTask, setActiveTask] = useState<StudentTask | null>(null);
@@ -121,6 +128,81 @@ export function GenelAnalysisClient({
 
   const tytCoursesInGroup = coursesForGroup(groupKey);
   const aytCoursesInGroup = coursesForAytGroup(aytTrack, aytGroupKey);
+
+  // LGS: one cohort-wide list (no TYT/AYT split), 3 wrong : 1 right net,
+  // and the two real sessions (Sözel / Sayısal) as the group pills.
+  const lgsExams = exams
+    .filter((e) => parseGeneralExamTrack(e.title) === "lgs")
+    .sort((a, b) => b.task_date.localeCompare(a.task_date));
+  const lgsNetChartData = netChartFor(lgsExams, computeLgsNet);
+  const lgsCoursesInGroup = coursesForLgsGroup(lgsGroupKey);
+
+  const modalAndMore = (
+    <>
+      {hasMore && (
+        <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleLoadMore} disabled={loadingMore}>
+          {loadingMore ? "Yükleniyor..." : "Daha Fazla Yükle"}
+        </Button>
+      )}
+
+      <TaskModal
+        task={activeTask}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onSaved={handleSaved}
+        initialStep="analysis"
+        openKey={modalOpenKey}
+      />
+    </>
+  );
+
+  if (examType === "LGS") {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Genel Net Gelişimi</CardTitle>
+            <CardDescription>Tüm derslerin toplamı üzerinden LGS genel deneme net değişimi (3 yanlış 1 doğruyu götürür)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LineChart data={lgsNetChartData} />
+          </CardContent>
+        </Card>
+
+        <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1">
+          {LGS_SUBJECT_GROUPS.map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setLgsGroupKey(g.key)}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+                lgsGroupKey === g.key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          {lgsCoursesInGroup.map((course) => (
+            <ExamTopicTable
+              key={course.id}
+              course={course}
+              exams={lgsExams}
+              mistakesByExam={mistakesByExam}
+              onOpenExam={openExam}
+            />
+          ))}
+        </div>
+
+        {modalAndMore}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -233,20 +315,7 @@ export function GenelAnalysisClient({
         </TabsContent>
       </Tabs>
 
-      {hasMore && (
-        <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleLoadMore} disabled={loadingMore}>
-          {loadingMore ? "Yükleniyor..." : "Daha Fazla Yükle"}
-        </Button>
-      )}
-
-      <TaskModal
-        task={activeTask}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        onSaved={handleSaved}
-        initialStep="analysis"
-        openKey={modalOpenKey}
-      />
+      {modalAndMore}
     </div>
   );
 }

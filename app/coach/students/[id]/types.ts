@@ -10,6 +10,10 @@ export type StudentProfile = {
   target_university: string | null;
   target_department: string | null;
   target_ranking: string | null;
+  // LGS counterparts of target_university / target_department / obp.
+  target_high_school: string | null;
+  target_percentile: number | null;
+  report_card_average: number | null;
   school_name: string | null;
   sinif_sube: string | null;
   obp: number | null;
@@ -21,6 +25,7 @@ export type StudentProfile = {
   favorite_subjects: string | null;
   difficult_subjects: string | null;
   remaining_sessions: number;
+  exam_type: "YKS" | "LGS";
 };
 
 export type VideoLink = { url: string; title: string | null };
@@ -71,6 +76,20 @@ export type ParagrafProblemEntry = {
   problem_dogru: number;
   problem_yanlis: number;
   problem_sure: number;
+};
+
+// One lgs_daily_routines row (migration 0087): an LGS student's Paragraf
+// session and Kitap Okuma page count for a day, each optional.
+export type LgsDailyRoutine = {
+  id: string;
+  entry_date: string;
+  paragraf_correct: number;
+  paragraf_wrong: number;
+  paragraf_empty: number;
+  paragraf_duration_minutes: number | null;
+  book_title: string | null;
+  book_author: string | null;
+  book_pages_read: number | null;
 };
 
 export type CompletionStats = {

@@ -2,11 +2,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, KARMA_TOPIC_ID, TYT_COURSES, findCourseById } from "@/lib/curriculum";
+import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById } from "@/lib/curriculum";
+import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
+import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
+import type { ExamType } from "@/lib/exam-type";
 import { STUDENT_NOTES_PAGE_SIZE } from "./constants";
 import type { CoachReportCardRow, StudentFixedTask } from "../../actions";
 import { DetailTabs } from "./_components/detail-tabs";
@@ -22,18 +25,11 @@ import type {
   DetailCoachNote,
   DetailSession,
   DetailTask,
+  LgsDailyRoutine,
   ParagrafProblemEntry,
   StudentProfile,
   SubjectCompletion,
 } from "./types";
-
-const ALL_CURRICULUM_COURSE_IDS = [
-  ...TYT_COURSES.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
-  ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
-];
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 const MONTH_LABELS = [
@@ -56,7 +52,11 @@ function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
   // Genel Deneme has no course_id -- its TYT/AYT track lives only in the
   // title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."),
   // per the coach's request to avoid a dedicated column for it.
-  if (task.task_type === "general_exam") return task.title.toUpperCase().startsWith("AYT") ? "ayt" : "tyt";
+  if (task.task_type === "general_exam") {
+    const title = task.title.toUpperCase();
+    if (title.startsWith("LGS")) return "other";
+    return title.startsWith("AYT") ? "ayt" : "tyt";
+  }
   if (task.course_id?.startsWith("tyt-")) return "tyt";
   if (task.course_id?.startsWith("ayt-")) return "ayt";
   return "other";
@@ -113,6 +113,10 @@ async function fetchStudentDetail(studentId: string) {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", studentId).maybeSingle();
   if (!profile) return null;
+
+  // The cohort decides which curriculum the analytics below cover.
+  const examType: ExamType = profile.exam_type === "LGS" ? "LGS" : "YKS";
+  const curriculumCourseIds = curriculumCourseIdsFor(examType);
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
@@ -212,6 +216,27 @@ async function fetchStudentDetail(studentId: string) {
   // every other query above.
   const { data: coachLink } = await supabase.from("coach_students").select("created_at").eq("student_id", studentId).maybeSingle();
 
+  // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines (migration
+  // 0087) rather than paragraf_problem_entries.
+  const { data: lgsRoutineRows } =
+    examType === "LGS"
+      ? await supabase
+          .from("lgs_daily_routines")
+          .select("id, entry_date, paragraf_correct, paragraf_wrong, paragraf_empty, paragraf_duration_minutes, book_title, book_author, book_pages_read")
+          .eq("student_id", studentId)
+          .order("entry_date", { ascending: true })
+      : { data: [] };
+
+  // Per-topic pipeline ticks (the student's cohort table: LGS 4 steps, YKS 2),
+  // keyed course -> topic. A missing table reads as empty.
+  const pipelineConfig = PIPELINE_CONFIG[examType];
+  const { data: pipelineRows, error: pipelineError } = await supabase
+    .from(pipelineConfig.table)
+    .select(pipelineSelectColumns(pipelineConfig))
+    .eq("student_id", studentId);
+  if (pipelineError) console.error("[coach student detail] pipeline read failed:", pipelineError);
+  const pipelineByCourse = groupPipelineRows((pipelineRows ?? []) as unknown as PipelineRow[], pipelineConfig);
+
   const resourceIdsByTask = new Map<string, string[]>();
   for (const row of taskResourceRows ?? []) {
     const list = resourceIdsByTask.get(row.task_id) ?? [];
@@ -261,6 +286,9 @@ async function fetchStudentDetail(studentId: string) {
       progress: {},
       topicStats: structuredClone(EMPTY_TOPIC_STATS),
     });
+  }
+  for (const [courseId, pipeline] of Object.entries(pipelineByCourse)) {
+    courseEntry(courseId).pipeline = pipeline;
   }
   for (const row of resourceRows ?? []) {
     const entry = courseEntry(row.course_id);
@@ -352,23 +380,25 @@ async function fetchStudentDetail(studentId: string) {
       courseExamCounts.set(e.course_id, (courseExamCounts.get(e.course_id) ?? 0) + 1);
     }
     if (e.task_type === "general_exam") {
-      for (const group of TYT_SUBJECT_GROUPS) {
-        for (const cid of group.courseIds) {
-          courseExamCounts.set(cid, (courseExamCounts.get(cid) ?? 0) + 1);
-        }
+      // An LGS general exam covers every LGS course; a YKS one the TYT groups.
+      const generalCourseIds = /^LGS\b/i.test(e.title)
+        ? LGS_COURSES.map((c) => c.id)
+        : TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds);
+      for (const cid of generalCourseIds) {
+        courseExamCounts.set(cid, (courseExamCounts.get(cid) ?? 0) + 1);
       }
     }
   }
 
   // Windowed sibling of the all-time map below -- see lib/gelisim-haritasi.ts.
-  const gelisimHaritasi: GelisimHaritasiRow[] = computeGelisimHaritasi(ALL_CURRICULUM_COURSE_IDS, allExams, mistakeRows ?? []);
+  const gelisimHaritasi: GelisimHaritasiRow[] = computeGelisimHaritasi(curriculumCourseIds, allExams, mistakeRows ?? []);
 
   // Full-spectrum performance map: every topic in every curriculum course
   // (not just ones the student has actually been examined on yet), so the
   // coach can browse any course's chip and see a clean topic list -- a
   // 0-mistake topic is real "good news" signal, not just an absence of
   // data.
-  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = ALL_CURRICULUM_COURSE_IDS.flatMap((courseId) => {
+  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = curriculumCourseIds.flatMap((courseId) => {
     const course = findCourseById(courseId);
     if (!course) return [];
     const sampleSize = courseExamCounts.get(courseId) ?? 0;
@@ -380,7 +410,9 @@ async function fetchStudentDetail(studentId: string) {
           courseId,
           courseName: course.name,
           topicId: topic.id,
-          topicName: topic.name,
+          // LGS's Konu level is part of the name so same-named Alt Konu rows
+          // under different Konu (e.g. "Örnekler") stay distinguishable.
+          topicName: u.konu ? `${u.konu} › ${topic.name}` : topic.name,
           count: c?.count ?? 0,
           examTitles: c?.examTitles ?? [],
           sampleSize,
@@ -454,6 +486,8 @@ async function fetchStudentDetail(studentId: string) {
     notes,
     notesHasMore: notes.length === STUDENT_NOTES_PAGE_SIZE,
     paragrafEntries,
+    lgsRoutines: (lgsRoutineRows ?? []) as LgsDailyRoutine[],
+    examType,
     generalExams: tasks.filter((t) => t.task_type === "general_exam"),
     branchExams: tasks.filter((t) => t.task_type === "branch_exam"),
     examMistakes: mistakeRows ?? [],
@@ -486,8 +520,9 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const { id } = await props.params;
   const searchParams = await props.searchParams;
   const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
-  const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
   const detail = await fetchStudentDetail(id);
+  const examType: ExamType = detail?.profile.exam_type ?? "YKS";
+  const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -536,6 +571,8 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                 defaultKarneRange={detail.defaultKarneRange}
                 allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
                 initialTab={initialTab}
+                examType={examType}
+                lgsRoutines={detail.lgsRoutines}
                 examMistakes={detail.examMistakes}
                 sessions={detail.sessions}
               />

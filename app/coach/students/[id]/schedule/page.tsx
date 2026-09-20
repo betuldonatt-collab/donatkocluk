@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import type { StudentEvent, StudentFixedTask } from "../../../actions";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
+import type { ExamType } from "@/lib/exam-type";
 import type { DetailTask } from "../types";
 import { ScheduleBoard } from "./schedule-board";
 
@@ -46,7 +47,7 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
     { data: eventRows },
     { data: fixedTaskRows },
   ] = await Promise.all([
-      supabase.from("profiles").select("id, full_name").eq("id", studentId).maybeSingle(),
+      supabase.from("profiles").select("id, full_name, exam_type").eq("id", studentId).maybeSingle(),
       supabase
         .from("student_tasks")
         .select("*")
@@ -117,7 +118,7 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
   }
 
   return {
-    profile: profile as { id: string; full_name: string | null } | null,
+    profile: profile as { id: string; full_name: string | null; exam_type: ExamType } | null,
     weekTasks: (weekTaskRows ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[],
     courseResourceData,
     weekEvents: (eventRows ?? []) as StudentEvent[],
@@ -172,6 +173,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
         highlightTaskId={highlightTaskId}
         initialRoutineRowHeights={rowHeights.routine}
         initialTaskRowHeights={rowHeights.task}
+        examType={data.profile?.exam_type ?? "YKS"}
       />
     </div>
   );

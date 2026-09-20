@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
+import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
 import { PasswordForm } from "./_components/password-form";
 import { PhoneForm } from "./_components/phone-form";
 import { ThemeToggle } from "./_components/theme-toggle";
@@ -20,7 +21,7 @@ async function fetchSettingsData() {
   const { data: student } = studentId
     ? await supabase
         .from("profiles")
-        .select("full_name, school_name, target_university, target_department, city")
+        .select("full_name, school_name, target_university, target_department, target_high_school, target_percentile, exam_type, city")
         .eq("id", studentId)
         .maybeSingle()
     : { data: null };
@@ -64,12 +65,22 @@ export default async function ParentSettingsPage() {
                   <p className="text-foreground font-medium">{data.student.school_name ?? "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Hedef Üniversite</p>
-                  <p className="text-foreground font-medium">{data.student.target_university ?? "—"}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {data.student.exam_type === "LGS" ? PROFILE_TERMS.LGS.targetOne : PROFILE_TERMS.YKS.targetOne}
+                  </p>
+                  <p className="text-foreground font-medium">
+                    {(data.student.exam_type === "LGS" ? data.student.target_high_school : data.student.target_university) ?? "—"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Hedef Bölüm</p>
-                  <p className="text-foreground font-medium">{data.student.target_department ?? "—"}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {data.student.exam_type === "LGS" ? PROFILE_TERMS.LGS.targetTwo : PROFILE_TERMS.YKS.targetTwo}
+                  </p>
+                  <p className="text-foreground font-medium">
+                    {data.student.exam_type === "LGS"
+                      ? formatPercentile(data.student.target_percentile)
+                      : (data.student.target_department ?? "—")}
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-xs">Şehir</p>

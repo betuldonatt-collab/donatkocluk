@@ -37,3 +37,10 @@ export type TaskDuration = { tracked_duration_minutes: number };
 export function sumTaskDuration(tasks: TaskDuration[]): number {
   return tasks.reduce((sum, t) => sum + t.tracked_duration_minutes, 0);
 }
+
+// LGS's negative marking is 3 wrong = 1 right (YKS's computeNet above is
+// 4:1) -- a separate function rather than a parameter, so a call site can
+// never silently apply the wrong cohort's rule by forgetting an argument.
+export function computeLgsNet(dogru: number, yanlis: number) {
+  return Math.round((dogru - yanlis / 3) * 100) / 100;
+}
