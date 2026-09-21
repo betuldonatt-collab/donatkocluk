@@ -11,7 +11,7 @@ import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
 import type { ExamType } from "@/lib/exam-type";
 import { STUDENT_NOTES_PAGE_SIZE } from "./constants";
-import { getPendingFocusReviews, getWeeklyTemplates, type CoachReportCardRow, type StudentFixedTask } from "../../actions";
+import { getPendingFocusReviews, type CoachReportCardRow, type StudentFixedTask } from "../../actions";
 import { DetailTabs } from "./_components/detail-tabs";
 import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
@@ -526,7 +526,6 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   // decision (best-effort: [] on failure). Only asked for once the student
   // resolved, i.e. is actually on this coach's roster.
   const focusReviews = detail ? await getPendingFocusReviews(id) : [];
-  const templates = detail ? (await getWeeklyTemplates()).filter((t) => t.examType === (detail.profile.exam_type ?? "YKS")) : [];
   const examType: ExamType = detail?.profile.exam_type ?? "YKS";
   const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
 
@@ -557,8 +556,6 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   profile={detail.profile}
                   completion={detail.completion}
                   subjectCompletion={detail.subjectCompletion}
-                  templates={templates}
-                  today={detail.today}
                 />
               </div>
 

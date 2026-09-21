@@ -1,8 +1,7 @@
 import type { ExamType } from "@/lib/exam-type";
 
 // The "Rutin Türü" choices offered when a coach assigns a routine (the daily
-// practice lane above the regular tasks). Shared by the assign drawer and the
-// weekly-template item editor so both offer exactly the same set.
+// practice lane above the regular tasks), per cohort -- see routineOptionsFor.
 export type RoutineType = "paragraf" | "problem" | "kitap-okuma" | "yeni-nesil-mat-dozu" | "diger";
 
 export const ROUTINE_TYPE_OPTIONS: { value: RoutineType; label: string }[] = [

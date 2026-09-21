@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
-import type { WeeklyTemplate } from "../../../actions";
 import type { CompletionStats, StudentProfile, SubjectCompletion } from "../types";
-import { ApplyTemplateDialog } from "./apply-template-dialog";
 
 function CompletionBar({ label, pct }: { label: string; pct: number | null }) {
   return (
@@ -36,13 +34,8 @@ export function TargetsCompletionCard({
   profile,
   completion,
   subjectCompletion,
-  templates,
-  today,
 }: {
   studentId: string;
-  // The coach's weekly templates for this student's cohort ("Şablon Uygula").
-  templates: WeeklyTemplate[];
-  today: string;
   profile: StudentProfile;
   completion: CompletionStats;
   subjectCompletion: SubjectCompletion[];
@@ -51,15 +44,12 @@ export function TargetsCompletionCard({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <CardTitle className="text-base">Hedefler ve İlerleme</CardTitle>
-        <div className="flex flex-wrap justify-end gap-2">
-          <ApplyTemplateDialog studentId={studentId} templates={templates} today={today} />
-          <Button type="button" size="sm" asChild>
-            <Link href={`/coach/students/${studentId}/schedule`}>
-              <CalendarPlus className="size-4" />
-              Haftalık Görev Ata / Program Ekle
-            </Link>
-          </Button>
-        </div>
+        <Button type="button" size="sm" asChild>
+          <Link href={`/coach/students/${studentId}/schedule`}>
+            <CalendarPlus className="size-4" />
+            Haftalık Görev Ata / Program Ekle
+          </Link>
+        </Button>
       </CardHeader>
       <CardContent className="space-y-5">
         <section>

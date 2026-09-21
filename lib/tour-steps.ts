@@ -74,11 +74,6 @@ export const COACH_NAV_ITEMS: TourNavItem[] = [
     ],
   },
   {
-    href: "/coach/templates",
-    label: "Şablonlar",
-    blurb: "Tekrar eden haftalık programını bir kez kur, öğrencinin sayfasından tek tıkla uygula.",
-  },
-  {
     href: "/coach/stopwatch",
     label: "Kronometre Yarışması",
     blurb: "Öğrencilerinin çalışma sürelerini ve sıralamasını buradan izlersin.",
