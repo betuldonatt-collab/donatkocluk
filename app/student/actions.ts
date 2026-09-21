@@ -1421,9 +1421,41 @@ export async function reconcileStaleFocusSessions(): Promise<void> {
 // updateTaskProgress above, and the same rule applied here when photos are added
 // to a task that is already marked done.
 
+// `detail` says exactly which step failed ("task" = reading the task, "upload" =
+// writing to Storage, "record" = saving the path on the task, "remove" = deleting
+// the file) plus the underlying code/message, so a failure can be diagnosed from
+// the screen without digging through server logs.
 export type EvidenceResult =
   | { ok: true; paths: string[]; reviewStatus: string; status: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; detail?: string };
+
+// A failure at one named step of an evidence action.
+class EvidenceStepError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string,
+  ) {
+    super(message);
+  }
+}
+
+const STEP_MESSAGES: Record<string, string> = {
+  task: "Görev bilgisi okunamadı.",
+  upload: "Fotoğraf depolamaya yüklenemedi.",
+  record: "Fotoğraf yüklendi ama göreve kaydedilemedi.",
+  remove: "Fotoğraf silinemedi.",
+};
+
+// Logs the real error (server log + Sentry, tagged with the step) and turns it
+// into an EvidenceStepError carrying the step, the error code/status and message.
+function evidenceStepError(step: keyof typeof STEP_MESSAGES, error: unknown): EvidenceStepError {
+  console.error(`[evidence:${step}]`, error);
+  Sentry.captureException(error, { tags: { evidence_step: step } });
+  const e = (error ?? {}) as { message?: unknown; code?: unknown; statusCode?: unknown; status?: unknown };
+  const code = e.code ?? e.statusCode ?? e.status;
+  const message = typeof e.message === "string" ? e.message.slice(0, 200) : null;
+  return new EvidenceStepError(STEP_MESSAGES[step], [step, code, message].filter((x) => x !== null && x !== undefined && x !== "").join(" · "));
+}
 
 async function loadOwnEvidence(supabase: SupabaseClient, userId: string, taskId: string) {
   const { data, error } = await supabase
@@ -1434,15 +1466,16 @@ async function loadOwnEvidence(supabase: SupabaseClient, userId: string, taskId:
     .eq("id", taskId)
     .eq("student_id", userId)
     .maybeSingle();
-  if (error) throw dbError(error);
+  if (error) throw evidenceStepError("task", error);
   if (!data) throw new Error("Bu görev sana ait değil.");
   return { ...data, paths: (data.evidence_image_paths ?? []) as string[] };
 }
 
-function evidenceError(label: string, e: unknown): { ok: false; error: string } {
+function evidenceError(label: string, e: unknown): { ok: false; error: string; detail?: string } {
+  if (e instanceof EvidenceStepError) return { ok: false, error: e.message, detail: e.detail };
   console.error(`[${label}] failed:`, e);
   Sentry.captureException(e);
-  return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR, detail: `${label} · ${e instanceof Error ? e.name : typeof e}` };
 }
 
 export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceResult> {
@@ -1459,10 +1492,14 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
     const task = await loadOwnEvidence(supabase, user.id, taskId);
 
     const path = evidencePath(user.id, taskId, crypto.randomUUID(), file.type);
+    // Sent as plain bytes rather than the File object the Server Action received:
+    // that object comes from the framework's own FormData implementation, and a
+    // raw buffer avoids any cross-implementation quirk when it is re-posted to Storage.
+    const bytes = new Uint8Array(await file.arrayBuffer());
     const { error: uploadError } = await supabase.storage
       .from(EVIDENCE_BUCKET)
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) throw uploadError;
+      .upload(path, bytes, { contentType: file.type, upsert: false });
+    if (uploadError) throw evidenceStepError("upload", uploadError);
 
     const paths = [...task.paths, path];
     // Photos added to a task already marked done / half done put it back in
@@ -1488,7 +1525,7 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
     if (updateError) {
       // e.g. the coach locked this week meanwhile -- don't leave an orphan file.
       await supabase.storage.from(EVIDENCE_BUCKET).remove([path]);
-      throw dbError(updateError);
+      throw evidenceStepError("record", updateError);
     }
 
     if (hold) await resyncAfterStatusChange(supabase, task);
@@ -1506,12 +1543,19 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
 }
 
 // A held / released task changes what counts as "done" for its day and topic.
+// Best-effort: the photo and the review state are already saved, so a hiccup in
+// these rollups must not turn a successful upload into an error (they re-sync on
+// the student's next save anyway).
 async function resyncAfterStatusChange(
   supabase: SupabaseClient,
   task: { task_date: string; course_id: string | null; topic_id: string | null; student_id: string },
 ) {
-  await recomputeDailyStats(supabase, task.student_id, task.task_date);
-  if (task.course_id) await recomputeTopicStats(supabase, task.student_id, task.course_id, task.topic_id);
+  try {
+    await recomputeDailyStats(supabase, task.student_id, task.task_date);
+    if (task.course_id) await recomputeTopicStats(supabase, task.student_id, task.course_id, task.topic_id);
+  } catch (e) {
+    console.error("[evidence:resync] stats rollup failed (upload itself succeeded):", e);
+  }
 }
 
 export async function removeTaskEvidence(taskId: string, path: string): Promise<EvidenceResult> {
@@ -1545,7 +1589,7 @@ export async function removeTaskEvidence(taskId: string, path: string): Promise<
       : { evidence_image_paths: paths, updated_at: new Date().toISOString() };
 
     const { error: updateError } = await supabase.from("student_tasks").update(update).eq("id", taskIdV).eq("student_id", user.id);
-    if (updateError) throw dbError(updateError);
+    if (updateError) throw evidenceStepError("record", updateError);
 
     const { error: removeError } = await supabase.storage.from(EVIDENCE_BUCKET).remove([path]);
     if (removeError) console.error("[removeTaskEvidence] could not delete the file:", removeError);

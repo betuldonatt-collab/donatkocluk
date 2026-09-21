@@ -37,8 +37,8 @@ export function EvidenceUploader({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [urls, setUrls] = useState<string[]>([]);
-  const [busy, setBusy] = useState<"compress" | "upload" | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<{ phase: "compress" | "upload"; index: number; total: number } | null>(null);
+  const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
   const [viewing, setViewing] = useState(false);
 
   // Signed thumbnails for the photos already stored; refetched whenever the list changes.
@@ -61,34 +61,52 @@ export function EvidenceUploader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, pathsKey]);
 
-  async function handleFile(file: File | undefined) {
-    if (!file) return;
+  // The gallery picker allows several photos at once. They are compressed and
+  // uploaded one after another (each upload appends to the task's photo list, so
+  // running them in parallel would overwrite each other); the first failure stops
+  // the batch and says which photo and which step failed.
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return;
     setError(null);
-    try {
-      setBusy("compress");
-      const compressed = await compressImage(file);
-      setBusy("upload");
-      const form = new FormData();
-      form.set("taskId", taskId);
-      form.set("file", compressed);
-      const result = await uploadTaskEvidence(form);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+    let uploaded = 0;
+    for (const [i, file] of files.entries()) {
+      const label = files.length > 1 ? `${i + 1}. fotoğraf: ` : "";
+      try {
+        setBusy({ phase: "compress", index: i + 1, total: files.length });
+        const compressed = await compressImage(file);
+        setBusy({ phase: "upload", index: i + 1, total: files.length });
+        const form = new FormData();
+        form.set("taskId", taskId);
+        form.set("file", compressed);
+        const result = await uploadTaskEvidence(form);
+        if (!result.ok) {
+          console.error("[evidence upload] server refused the photo:", result);
+          setError({ message: label + result.error, detail: result.detail });
+          break;
+        }
+        uploaded += 1;
+        onChange({ paths: result.paths, reviewStatus: result.reviewStatus as ReviewStatus, status: result.status });
+      } catch (e) {
+        // Thrown here (not returned by the action): the browser could not decode or
+        // shrink the photo, or the request itself failed (too large, offline).
+        console.error("[evidence upload] client-side failure:", e);
+        setError({
+          message: label + "Fotoğraf işlenemedi veya gönderilemedi. Başka bir fotoğraf dene.",
+          detail: `client · ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`.slice(0, 220),
+        });
+        break;
       }
-      onChange({ paths: result.paths, reviewStatus: result.reviewStatus as ReviewStatus, status: result.status });
-    } catch {
-      setError("Fotoğraf işlenemedi. Başka bir fotoğraf dene.");
-    } finally {
-      setBusy(null);
     }
+    if (files.length > 1 && uploaded > 0) console.info(`[evidence upload] ${uploaded}/${files.length} photos uploaded`);
+    setBusy(null);
   }
 
   async function handleRemove(path: string) {
     setError(null);
     const result = await removeTaskEvidence(taskId, path);
     if (!result.ok) {
-      setError(result.error);
+      console.error("[evidence remove] failed:", result);
+      setError({ message: result.error, detail: result.detail });
       return;
     }
     onChange({ paths: result.paths, reviewStatus: result.reviewStatus as ReviewStatus, status: result.status });
@@ -159,7 +177,7 @@ export function EvidenceUploader({
         capture="environment"
         className="hidden"
         onChange={(e) => {
-          void handleFile(e.target.files?.[0]);
+          void handleFiles(Array.from(e.target.files ?? []));
           e.target.value = "";
         }}
       />
@@ -167,15 +185,26 @@ export function EvidenceUploader({
         ref={galleryRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={(e) => {
-          void handleFile(e.target.files?.[0]);
+          void handleFiles(Array.from(e.target.files ?? []));
           e.target.value = "";
         }}
       />
 
-      {busy && <p className="text-muted-foreground text-xs">{busy === "compress" ? "Fotoğraf küçültülüyor..." : "Yükleniyor..."}</p>}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {busy && (
+        <p className="text-muted-foreground text-xs">
+          {busy.total > 1 ? `Fotoğraf ${busy.index}/${busy.total}: ` : ""}
+          {busy.phase === "compress" ? "küçültülüyor..." : "yükleniyor..."}
+        </p>
+      )}
+      {error && (
+        <div className="space-y-0.5">
+          <p className="text-destructive text-xs">{error.message}</p>
+          {error.detail && <p className="text-muted-foreground font-mono text-[10px] break-all">Hata detayı: {error.detail}</p>}
+        </div>
+      )}
       <p className="text-muted-foreground text-[11px]">
         Fotoğraflar otomatik küçültülür; sadece koçun görebilir. Fotoğraflı görevi tamamlandı olarak işaretlediğinde koçun onayına gider.
       </p>

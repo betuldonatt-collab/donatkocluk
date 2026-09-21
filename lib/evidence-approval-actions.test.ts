@@ -10,7 +10,14 @@ type Row = Record<string, unknown>;
 const USER = "u1";
 const TASK = "11111111-1111-4111-8111-111111111111";
 
-const state: { task: Row; updates: { table: string; payload: Row }[] } = { task: {}, updates: [] };
+const state: {
+  task: Row;
+  updates: { table: string; payload: Row }[];
+  uploadError: unknown;
+  removed: string[][];
+  updateError: unknown;
+  rpcError: unknown;
+} = { task: {}, updates: [], uploadError: null, removed: [], updateError: null, rpcError: null };
 
 function baseTask(overrides: Row = {}): Row {
   return {
@@ -41,6 +48,7 @@ function builder(table: string) {
   const rows = (single: boolean) => {
     if (table === "coach_students") return { data: { student_id: USER }, error: null };
     if (table === "student_tasks") {
+      if (op === "update" && state.updateError) return { data: null, error: state.updateError };
       const row = op === "update" ? { ...state.task, ...payload } : state.task;
       return { data: single ? row : [row], error: null };
     }
@@ -64,10 +72,18 @@ const supabase = {
   auth: { getUser: async () => ({ data: { user: { id: USER } } }) },
   from: (table: string) => builder(table),
   rpc: () => {
-    const p = Promise.resolve({ data: {}, error: null });
+    const p = Promise.resolve({ data: state.rpcError ? null : {}, error: state.rpcError });
     return Object.assign(p, { single: () => p });
   },
-  storage: { from: () => ({ remove: async () => ({ error: null }) }) },
+  storage: {
+    from: () => ({
+      upload: async () => ({ data: null, error: state.uploadError }),
+      remove: async (paths: string[]) => {
+        state.removed.push(paths);
+        return { error: null };
+      },
+    }),
+  },
 };
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => supabase }));
@@ -75,7 +91,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/impersonation", () => ({ assertNotImpersonating: async () => {}, getViewContext: async () => null }));
 vi.mock("@sentry/nextjs", () => ({ captureException: () => {} }));
 
-import { updateTaskProgress } from "../app/student/actions";
+import { updateTaskProgress, uploadTaskEvidence } from "../app/student/actions";
 import { approveStudentTask, rejectStudentTask } from "../app/coach/actions";
 
 function taskUpdate(): Row {
@@ -85,7 +101,80 @@ function taskUpdate(): Row {
 beforeEach(() => {
   state.task = baseTask();
   state.updates = [];
+  state.uploadError = null;
+  state.removed = [];
+  state.updateError = null;
+  state.rpcError = null;
   vi.spyOn(console, "error").mockImplementation(() => {});
+});
+
+function photoForm(): FormData {
+  const form = new FormData();
+  form.set("taskId", TASK);
+  form.set("file", new File([new Uint8Array(1000)], "kanit.jpg", { type: "image/jpeg" }));
+  return form;
+}
+
+describe("uploadTaskEvidence", () => {
+  it("adds the photo to the task's list without holding a task that is not completed", async () => {
+    state.task = baseTask({ evidence_image_paths: [], status: "pending" });
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.paths).toHaveLength(1);
+    expect(result.paths[0]).toMatch(new RegExp(`^${USER}/${TASK}/[0-9a-f-]+\\.jpg$`));
+    expect(taskUpdate()).toMatchObject({ evidence_image_paths: result.paths });
+    expect(taskUpdate()).not.toHaveProperty("evidence_review_status");
+  });
+
+  it("has no photo limit", async () => {
+    state.task = baseTask({ evidence_image_paths: Array.from({ length: 12 }, (_, i) => `${USER}/${TASK}/${i}.jpg`), status: "pending" });
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result.ok && result.paths).toHaveLength(13);
+  });
+
+  it("sends a task that is already done back for review when a photo is added", async () => {
+    state.task = baseTask({ evidence_image_paths: [], status: "done" });
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result).toMatchObject({ ok: true, reviewStatus: "pending", status: "pending" });
+    expect(taskUpdate()).toMatchObject({ status: "pending", evidence_review_status: "pending", evidence_pending_status: "done" });
+  });
+
+  it("still succeeds when the stats rollup afterwards fails", async () => {
+    state.task = baseTask({ evidence_image_paths: [], status: "done" });
+    state.rpcError = { code: "XX000", message: "rollup broke" };
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result.ok).toBe(true);
+  });
+
+  it("names the Storage step (with code and message) when the upload is refused", async () => {
+    state.uploadError = { statusCode: "403", message: "new row violates row-level security policy" };
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result).toEqual({
+      ok: false,
+      error: "Fotoğraf depolamaya yüklenemedi.",
+      detail: "upload · 403 · new row violates row-level security policy",
+    });
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("names the record step and deletes the orphaned file when saving the path fails", async () => {
+    state.task = baseTask({ evidence_image_paths: [], status: "pending" });
+    state.updateError = { code: "P0001", message: "A task with evidence photos needs the coach's approval" };
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result).toMatchObject({ ok: false, error: "Fotoğraf yüklendi ama göreve kaydedilemedi." });
+    expect(!result.ok && result.detail).toContain("record · P0001");
+    expect(state.removed).toHaveLength(1);
+  });
+
+  it("rejects a non-image file before touching Storage", async () => {
+    const form = new FormData();
+    form.set("taskId", TASK);
+    form.set("file", new File(["x"], "a.pdf", { type: "application/pdf" }));
+    const result = await uploadTaskEvidence(form);
+    expect(result.ok).toBe(false);
+    expect(state.updates).toHaveLength(0);
+  });
 });
 
 describe("student completes a task", () => {
