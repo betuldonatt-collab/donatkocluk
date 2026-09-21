@@ -7,8 +7,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LgsExamScoreGrid, emptyLgsInputs, lgsInputsIncomplete, lgsOverCapSubject } from "@/components/lgs-exam-score-grid";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
-import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
+import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
 import { cn } from "@/lib/utils";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
 import {
@@ -110,6 +111,10 @@ export function TrialResultsSection({
   const [showMissingScores, setShowMissingScores] = useState(false);
 
   const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
+  // LGS Genel Deneme gets the same per-subject form as the student's
+  // (LgsExamScoreGrid); every other exam keeps the one overall D/Y/B entry.
+  const isLgsGeneral = task.task_type === "general_exam" && examTrack === "lgs";
+  const [lgsInputs, setLgsInputs] = useState(() => emptyLgsInputs(task.subject_scores));
   const [aytTrack, setAytTrack] = useState<Track | null>(() => inferAytTrackFromScores(task.subject_scores));
 
   useEffect(() => {
@@ -186,6 +191,40 @@ export function TrialResultsSection({
   }
 
   async function handleSave() {
+    if (isLgsGeneral) {
+      if (lgsInputsIncomplete(lgsInputs)) {
+        setShowMissingScores(true);
+        setError(GENERAL_EXAM_SCORES_REQUIRED);
+        return;
+      }
+      const over = lgsOverCapSubject(lgsInputs);
+      if (over) {
+        setError(`${over.label} için Doğru + Yanlış en fazla ${over.questions} olabilir.`);
+        return;
+      }
+      setError(null);
+      setSaving(true);
+      try {
+        const rows = Object.fromEntries(
+          Object.entries(lgsInputs).map(([key, v]) => [key, { correct: Number(v.correct), wrong: Number(v.wrong), empty: Number(v.empty) }]),
+        );
+        const sum = (f: "correct" | "wrong" | "empty") => Object.values(rows).reduce((n, r) => n + r[f], 0);
+        const updated = await saveCoachTrialResults(studentId, task.id, {
+          totalCount: sum("correct") + sum("wrong") + sum("empty"),
+          correctCount: sum("correct"),
+          wrongCount: sum("wrong"),
+          emptyCount: sum("empty"),
+          subjectScores: rows,
+          mistakes: mistakes.map((m) => ({ courseId: m.course_id, topicId: m.topic_id, status: m.status })),
+        });
+        onSaved(updated as DetailTask);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     // Doğru / Yanlış / Boş are all required (0 for what wasn't solved);
     // Toplam is derived by the server if left blank.
     if (isBlankScore(correctCount) || isBlankScore(wrongCount) || isBlankScore(emptyCount)) {
@@ -216,6 +255,9 @@ export function TrialResultsSection({
     <div className="border-border space-y-3 rounded-lg border p-3">
       <p className="text-foreground text-sm font-semibold">Sonuçları Gir</p>
 
+      {isLgsGeneral && <LgsExamScoreGrid inputs={lgsInputs} onChange={setLgsInputs} showMissing={showMissingScores} />}
+
+      {!isLgsGeneral && (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
         <Field
@@ -237,8 +279,9 @@ export function TrialResultsSection({
           invalid={showMissingScores && isBlankScore(emptyCount)}
         />
       </div>
+      )}
 
-      {totalMismatch && (
+      {totalMismatch && !isLgsGeneral && (
         <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-md px-3 py-2 text-xs">
           <AlertTriangle className="size-3.5 shrink-0" />
           Toplam, Doğru + Yanlış + Boş toplamına eşit değil.
@@ -276,7 +319,7 @@ export function TrialResultsSection({
 
       {error && <p className="text-destructive text-xs">{error}</p>}
 
-      <Button type="button" size="sm" onClick={handleSave} disabled={saving || trackNotChosen || totalMismatch}>
+      <Button type="button" size="sm" onClick={handleSave} disabled={saving || trackNotChosen || (totalMismatch && !isLgsGeneral)}>
         {saving ? "Kaydediliyor..." : "Sonuçları Kaydet"}
       </Button>
     </div>

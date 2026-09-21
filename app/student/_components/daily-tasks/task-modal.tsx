@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { autoCalcMissingField, computeAutoTaskStatus, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
+import { LgsExamScoreGrid, emptyLgsInputs } from "@/components/lgs-exam-score-grid";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
 import {
@@ -282,7 +283,11 @@ function TaskModalBody({
 
   const [subjectInputs, setSubjectInputs] = useState<Record<string, { correct: string; wrong: string; empty: string }>>(
     () =>
-      Object.fromEntries(
+      // LGS: Boş is derived from Doğru/Yanlış (LgsExamScoreGrid), so a stored
+      // exam is re-seeded through the same rule.
+      examTrack === "lgs"
+        ? emptyLgsInputs(task.subject_scores)
+        : Object.fromEntries(
         activeGroups.map((g) => {
           const existing = task.subject_scores?.[g.key] ?? EMPTY_SUBJECT_SCORE;
           return [
@@ -1031,12 +1036,15 @@ function TaskModalBody({
               </div>
             )}
 
-            {lgsOverCap && (
+            {lgsOverCap && examTrack !== "lgs" && (
               <p className="text-destructive mb-2 text-xs">
                 {lgsOverCap.label} için Doğru + Yanlış + Boş en fazla {lgsOverCap.questions} olabilir.
               </p>
             )}
-            {activeGroups.length > 0 && (
+            {examTrack === "lgs" && (
+              <LgsExamScoreGrid inputs={subjectInputs} onChange={setSubjectInputs} showMissing={showMissingScores} />
+            )}
+            {examTrack !== "lgs" && activeGroups.length > 0 && (
               <div className="space-y-3">
                 {activeGroups.map((g, gi) => (
                   <div key={g.key} className="space-y-1.5">

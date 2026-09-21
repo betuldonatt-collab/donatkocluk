@@ -9,6 +9,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { isValidISODateOnly } from "@/lib/chart-range";
 import { countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
+import { normalizeLgsScores } from "@/lib/lgs-exam";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
 import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
@@ -2386,6 +2387,18 @@ const saveCoachTrialResultsSchema = z
     wrongCount: z.number(EXAM_SCORES_REQUIRED).int(EXAM_SCORES_REQUIRED).min(0, "Yanlış sayısı negatif olamaz.").max(10000),
     emptyCount: z.number(EXAM_SCORES_REQUIRED).int(EXAM_SCORES_REQUIRED).min(0, "Boş sayısı negatif olamaz.").max(10000),
     mistakes: z.array(coachTrialMistakeSchema),
+    // LGS Genel Deneme only: the per-subject Doğru/Yanlış rows (Boş is derived
+    // server-side). When present they replace the flat counts above.
+    subjectScores: z
+      .record(
+        z.string(),
+        z.object({
+          correct: z.number().int().min(0).max(100).nullable(),
+          wrong: z.number().int().min(0).max(100).nullable(),
+          empty: z.number().int().min(0).max(100).nullable().optional(),
+        }),
+      )
+      .optional(),
   })
   .refine(
     (v) =>
@@ -2408,6 +2421,7 @@ export async function saveCoachTrialResults(
     wrongCount: number | null;
     emptyCount: number | null;
     mistakes: { courseId: string; topicId: string; status: "wrong" | "blank" }[];
+    subjectScores?: Record<string, { correct: number | null; wrong: number | null; empty?: number | null }>;
   },
 ) {
   await assertNotImpersonating();
@@ -2418,13 +2432,33 @@ export async function saveCoachTrialResults(
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
+  // LGS Genel Deneme: per-subject rows, validated and rolled up here (Boş is
+  // derived from each subject's question count, Doğru + Yanlış cannot exceed it).
+  let lgs: Extract<ReturnType<typeof normalizeLgsScores>, { ok: true }> | null = null;
+  if (inputV.subjectScores) {
+    const { data: existing, error: existingError } = await supabase
+      .from("student_tasks")
+      .select("task_type, title")
+      .eq("id", taskIdV)
+      .eq("student_id", studentIdV)
+      .maybeSingle();
+    if (existingError) throw dbError(existingError);
+    if (!existing || existing.task_type !== "general_exam" || !/^LGS/i.test(existing.title)) {
+      throw new Error("Ders bazlı sonuç yalnızca LGS Genel Deneme için girilebilir.");
+    }
+    const normalized = normalizeLgsScores(inputV.subjectScores);
+    if (!normalized.ok) throw new Error(normalized.error);
+    lgs = normalized;
+  }
+
   const { data, error } = await supabase
     .from("student_tasks")
     .update({
-      total_count: inputV.totalCount ?? inputV.correctCount + inputV.wrongCount + inputV.emptyCount,
-      correct_count: inputV.correctCount,
-      wrong_count: inputV.wrongCount,
-      empty_count: inputV.emptyCount,
+      total_count: lgs ? lgs.totals.total : (inputV.totalCount ?? inputV.correctCount + inputV.wrongCount + inputV.emptyCount),
+      correct_count: lgs ? lgs.totals.correct : inputV.correctCount,
+      wrong_count: lgs ? lgs.totals.wrong : inputV.wrongCount,
+      empty_count: lgs ? lgs.totals.empty : inputV.emptyCount,
+      ...(lgs ? { subject_scores: lgs.scores } : {}),
       status: "done",
       updated_at: new Date().toISOString(),
     })

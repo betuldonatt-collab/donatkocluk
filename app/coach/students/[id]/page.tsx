@@ -17,6 +17,8 @@ import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
 import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
+import { LgsExamHistory } from "@/components/lgs-exam-history";
+import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import type { TopicPerformanceRow } from "./_components/topic-performance-map";
@@ -560,6 +562,8 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
               </div>
 
               <PendingFocusReviewsCard reviews={focusReviews} />
+
+              {examType === "LGS" && <LgsExamHistory exams={buildLgsExamHistory(detail.generalExams)} />}
 
               <DetailTabs
                 studentId={id}
