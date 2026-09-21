@@ -120,3 +120,33 @@ export function applyPhotoDecisions(
   for (const d of decisions) if (paths.includes(d.path)) next[d.path] = d.decision;
   return next;
 }
+
+// --- Duplicate guard ---------------------------------------------------------
+// The same file picked twice is recognised by name + size + last-modified time.
+
+type PickedFile = { name: string; size: number; lastModified: number };
+
+export function evidenceFileSignature(file: PickedFile): string {
+  return `${file.name}|${file.size}|${file.lastModified}`;
+}
+
+// Splits a pick into the files that are new and a count of the ones refused: a
+// file already on the task (`known` signatures) or repeated inside the same pick.
+export function splitDuplicateFiles<T extends PickedFile>(
+  files: T[],
+  known: Iterable<string>,
+): { fresh: { file: T; signature: string }[]; duplicates: number } {
+  const taken = new Set(known);
+  const fresh: { file: T; signature: string }[] = [];
+  let duplicates = 0;
+  for (const file of files) {
+    const signature = evidenceFileSignature(file);
+    if (taken.has(signature)) {
+      duplicates += 1;
+      continue;
+    }
+    taken.add(signature);
+    fresh.push({ file, signature });
+  }
+  return { fresh, duplicates };
+}

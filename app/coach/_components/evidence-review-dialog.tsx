@@ -15,8 +15,9 @@ import {
 // plus "Tümünü Onayla" / "Tümünü Reddet". Verdicts are picked first and saved
 // together ("Kararları Kaydet"), so the coach can look at all the photos before
 // anything reaches the student; the bulk buttons save immediately. If ANY photo is
-// rejected the task goes back to the student. A task that is not waiting for review
-// opens read-only, showing the verdicts it already has.
+// rejected the task goes back to the student. The buttons are there whenever the
+// task has photos -- even before the student has marked it done, so the coach can
+// already flag a bad photo (an approval then only records the verdict).
 //
 // Mount it only while it is open -- it loads the (signed) photo URLs when it mounts.
 export function EvidenceReviewDialog({
@@ -35,7 +36,7 @@ export function EvidenceReviewDialog({
 }) {
   const [photos, setPhotos] = useState<CoachEvidencePhoto[]>([]);
   const [decisions, setDecisions] = useState<(PhotoVerdict | null)[]>([]);
-  const [reviewable, setReviewable] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState("none");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +48,7 @@ export function EvidenceReviewDialog({
       if (result.ok) {
         setPhotos(result.photos);
         setDecisions(result.photos.map((p) => p.status));
-        setReviewable(result.reviewStatus === "pending");
+        setReviewStatus(result.reviewStatus);
       } else {
         setError(result.error);
       }
@@ -94,10 +95,14 @@ export function EvidenceReviewDialog({
       loading={loading}
       error={error}
       review={
-        reviewable
+        photos.length > 0
           ? {
               decisions,
               busy,
+              note:
+                reviewStatus === "pending"
+                  ? undefined
+                  : "Öğrenci bu görevi henüz onaya göndermedi (ya da daha önce karara bağlandı). Vereceğin kararlar fotoğraflara işlenir; reddedersen öğrenci kırmızı çerçeveyle görür.",
               onDecide: (i, decision) => setDecisions((prev) => prev.map((d, idx) => (idx === i ? decision : d))),
               onApproveAll: () => void submit(all("approved")),
               onRejectAll: () => void submit(all("rejected")),

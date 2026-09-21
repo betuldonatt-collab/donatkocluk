@@ -313,13 +313,45 @@ describe("per-photo review by the coach", () => {
     expect(taskUpdate().evidence_photo_status).toEqual({ [A]: "approved" });
   });
 
-  it("does nothing for a task that is not waiting for review", async () => {
-    state.task = baseTask({ evidence_review_status: "none" });
+  it("a task with no photos has nothing to review", async () => {
+    state.task = baseTask({ evidence_review_status: "none", evidence_image_paths: [] });
     expect(await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }])).toEqual({
       success: false,
       code: "ALREADY_PROCESSED",
     });
     expect(state.updates).toHaveLength(0);
+  });
+
+  it("records verdicts on a task the student has not sent for review, without completing it", async () => {
+    state.task = baseTask({ evidence_review_status: "none", status: "pending" });
+    const result = await reviewEvidencePhotos(TASK, [
+      { path: A, decision: "approved" },
+      { path: B, decision: "approved" },
+    ]);
+    expect(result).toEqual({ success: true, outcome: "approved" });
+    const update = taskUpdate();
+    expect(update).toMatchObject({ evidence_review_status: "approved", evidence_photo_status: { [A]: "approved", [B]: "approved" } });
+    expect(update).not.toHaveProperty("status");
+    expect(update).not.toHaveProperty("completed");
+  });
+
+  it("a rejection on a not-yet-submitted task flags it for the student without touching its status", async () => {
+    state.task = baseTask({ evidence_review_status: "none", status: "pending" });
+    const result = await reviewEvidencePhotos(TASK, [{ path: A, decision: "rejected" }]);
+    expect(result).toEqual({ success: true, outcome: "rejected" });
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected" });
+    expect(taskUpdate()).not.toHaveProperty("status");
+  });
+
+  it("rejecting a photo of an already approved, completed task takes the completion back", async () => {
+    state.task = baseTask({
+      evidence_review_status: "approved",
+      status: "done",
+      evidence_photo_status: { [A]: "approved", [B]: "approved" },
+    });
+    const result = await reviewEvidencePhotos(TASK, [{ path: B, decision: "rejected" }]);
+    expect(result).toEqual({ success: true, outcome: "rejected" });
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected", status: "pending", completed: false });
   });
 
   it("the bulk Onayla / Reddet buttons give every photo the same verdict", async () => {

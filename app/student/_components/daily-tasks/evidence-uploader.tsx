@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, Hourglass, ImagePlus, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { EvidenceLightbox, REJECTED_PHOTO_TEXT } from "@/components/evidence-lightbox";
 import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
+import { splitDuplicateFiles } from "@/lib/task-evidence";
 import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../../actions";
 
 // "Kanıt Fotoğrafı": the student attaches photos of their finished work (e.g. a
@@ -21,6 +23,31 @@ import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../
 // shows where the review stands.
 
 type ReviewStatus = "none" | "pending" | "approved" | "rejected";
+
+// Duplicate guard: the same file picked twice (same name, size and last-modified
+// time) is refused. The photos in Storage are recompressed copies, so their
+// original identity is remembered per task in this browser (path -> signature)
+// and forgotten again when a photo is deleted.
+export const DUPLICATE_PHOTO_MESSAGE = "aynı fotoğrafı yükledin kontrol et.";
+
+const signatureKey = (taskId: string) => `evidence-signatures:${taskId}`;
+
+function loadSignatures(taskId: string, currentPaths: string[]): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(signatureKey(taskId)) ?? "{}") as Record<string, string>;
+    return Object.fromEntries(Object.entries(raw).filter(([path]) => currentPaths.includes(path)));
+  } catch {
+    return {};
+  }
+}
+
+function saveSignatures(taskId: string, signatures: Record<string, string>) {
+  try {
+    localStorage.setItem(signatureKey(taskId), JSON.stringify(signatures));
+  } catch {
+    // Private mode / storage disabled: duplicates are then only caught within this session.
+  }
+}
 type PhotoStatus = Record<string, "approved" | "rejected">;
 
 export function EvidenceUploader({
@@ -46,6 +73,9 @@ export function EvidenceUploader({
   const [busy, setBusy] = useState<{ phase: "compress" | "upload"; index: number; total: number } | null>(null);
   const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
   const [viewing, setViewing] = useState(false);
+  // Signatures of the photos added since this modal opened (path -> signature) --
+  // covers a browser where localStorage is unavailable.
+  const sessionSignatures = useRef<Record<string, string>>({});
 
   // Signed thumbnails for the photos already stored; refetched whenever the list changes.
   const pathsKey = paths.join("|");
@@ -71,9 +101,18 @@ export function EvidenceUploader({
   // uploaded one after another (each upload appends to the task's photo list, so
   // running them in parallel would overwrite each other); the first failure stops
   // the batch and says which photo and which step failed.
-  async function handleFiles(files: File[]) {
+  async function handleFiles(picked: File[]) {
+    let files = picked;
     if (files.length === 0) return;
     setError(null);
+
+    // Refuse a file that is already on this task (or repeated inside this pick).
+    const signatures = { ...loadSignatures(taskId, paths), ...sessionSignatures.current };
+    const { fresh, duplicates } = splitDuplicateFiles(files, Object.values(signatures));
+    if (duplicates > 0) toast.warning(DUPLICATE_PHOTO_MESSAGE);
+    files = fresh.map((f) => f.file);
+    if (files.length === 0) return;
+
     let uploaded = 0;
     for (const [i, file] of files.entries()) {
       const label = files.length > 1 ? `${i + 1}. fotoğraf: ` : "";
@@ -91,6 +130,10 @@ export function EvidenceUploader({
           break;
         }
         uploaded += 1;
+        // Remember which original file became this stored photo.
+        const newPath = result.paths[result.paths.length - 1];
+        sessionSignatures.current[newPath] = fresh[i].signature;
+        saveSignatures(taskId, { ...loadSignatures(taskId, result.paths), [newPath]: fresh[i].signature });
         onChange({
           paths: result.paths,
           reviewStatus: result.reviewStatus as ReviewStatus,
@@ -120,6 +163,8 @@ export function EvidenceUploader({
       setError({ message: result.error, detail: result.detail });
       return;
     }
+    delete sessionSignatures.current[path];
+    saveSignatures(taskId, loadSignatures(taskId, result.paths));
     onChange({
       paths: result.paths,
       reviewStatus: result.reviewStatus as ReviewStatus,
@@ -130,7 +175,7 @@ export function EvidenceUploader({
 
   return (
     <div className="space-y-2">
-      <Label>Kanıt Fotoğrafı</Label>
+      <Label>Çözdüğün testlerin fotoğrafını buraya yükleyebilirsin.</Label>
 
       {reviewStatus === "pending" && (
         <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">

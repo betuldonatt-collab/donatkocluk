@@ -7,7 +7,9 @@ import {
   isEvidencePathFor,
   shouldHoldForEvidenceReview,
   applyPhotoDecisions,
+  evidenceFileSignature,
   evidenceOutcome,
+  splitDuplicateFiles,
   normalizePhotoStatus,
   withoutPath,
   withoutRejected,
@@ -128,5 +130,31 @@ describe("photo status helpers", () => {
         { path: "nope", decision: "approved" },
       ]),
     ).toEqual({ a: "approved", b: "rejected" });
+  });
+});
+
+describe("duplicate photo guard", () => {
+  const photo = (name: string, size: number, lastModified: number) => ({ name, size, lastModified });
+
+  it("recognises the same file by name, size and last-modified time", () => {
+    expect(evidenceFileSignature(photo("IMG_1.jpg", 2048, 111))).toBe("IMG_1.jpg|2048|111");
+  });
+
+  it("refuses a file that is already on the task", () => {
+    const known = [evidenceFileSignature(photo("IMG_1.jpg", 2048, 111))];
+    const { fresh, duplicates } = splitDuplicateFiles([photo("IMG_1.jpg", 2048, 111), photo("IMG_2.jpg", 4096, 222)], known);
+    expect(duplicates).toBe(1);
+    expect(fresh.map((f) => f.file.name)).toEqual(["IMG_2.jpg"]);
+  });
+
+  it("refuses the same file picked twice in one selection but keeps the first", () => {
+    const { fresh, duplicates } = splitDuplicateFiles([photo("a.jpg", 1, 1), photo("a.jpg", 1, 1), photo("b.jpg", 1, 1)], []);
+    expect(duplicates).toBe(1);
+    expect(fresh).toHaveLength(2);
+  });
+
+  it("treats a file with a different size or time as a different photo", () => {
+    const known = [evidenceFileSignature(photo("a.jpg", 1, 1))];
+    expect(splitDuplicateFiles([photo("a.jpg", 2, 1), photo("a.jpg", 1, 2)], known).duplicates).toBe(0);
   });
 });

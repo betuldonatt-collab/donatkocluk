@@ -29,6 +29,8 @@ export type EvidenceReviewControls = {
   onRejectAll: () => void;
   onSave: () => void;
   busy: boolean;
+  // Shown above the buttons, e.g. when the task is not waiting for review yet.
+  note?: string;
 };
 
 export const REJECTED_PHOTO_TEXT = "Koçun bu fotoğrafı onaylamadı";
@@ -66,7 +68,7 @@ export function EvidenceLightbox({
     >
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Kanıt Fotoğrafı</DialogTitle>
+          <DialogTitle>Çözdüğün testlerin fotoğrafını buraya yükleyebilirsin.</DialogTitle>
           <DialogDescription>{title}</DialogDescription>
         </DialogHeader>
 
@@ -91,7 +93,7 @@ export function EvidenceLightbox({
                 <img
                   src={photos[current].url}
                   alt={`Kanıt fotoğrafı ${current + 1}`}
-                  className="bg-muted mx-auto max-h-[60dvh] w-auto max-w-full object-contain"
+                  className="bg-muted mx-auto max-h-[50dvh] w-auto max-w-full object-contain"
                 />
               </a>
             </div>
@@ -135,6 +137,17 @@ export function EvidenceLightbox({
                   {state === "rejected" ? REJECTED_PHOTO_TEXT : "Koç bu fotoğrafı onayladı"}
                 </p>
               )
+            )}
+
+            {review && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                <p className="text-muted-foreground text-xs">
+                  {decidedCount}/{photos.length} fotoğraf için karar verildi.
+                </p>
+                <Button type="button" size="sm" disabled={review.busy || decidedCount < photos.length} onClick={review.onSave}>
+                  {review.busy ? "Kaydediliyor..." : "Kararları Kaydet"}
+                </Button>
+              </div>
             )}
 
             {photos.length > 1 && (
@@ -191,9 +204,8 @@ export function EvidenceLightbox({
 
         {review && photos.length > 0 && !loading && !error && (
           <DialogFooter className="flex-col gap-2 sm:flex-col sm:items-stretch">
-            <p className="text-muted-foreground text-xs">
-              {decidedCount}/{photos.length} fotoğraf için karar verildi. Bir fotoğraf bile reddedilirse görev öğrenciye geri gönderilir.
-            </p>
+            {review.note && <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">{review.note}</p>}
+            <p className="text-muted-foreground text-xs">Bir fotoğraf bile reddedilirse görev öğrenciye geri gönderilir.</p>
             <div className="flex flex-wrap gap-2 sm:justify-end">
               <Button type="button" variant="outline" size="sm" disabled={review.busy} onClick={review.onApproveAll}>
                 Tümünü Onayla
@@ -207,9 +219,6 @@ export function EvidenceLightbox({
                 onClick={review.onRejectAll}
               >
                 Tümünü Reddet
-              </Button>
-              <Button type="button" size="sm" disabled={review.busy || decidedCount < photos.length} onClick={review.onSave}>
-                {review.busy ? "Kaydediliyor..." : "Kararları Kaydet"}
               </Button>
             </div>
           </DialogFooter>

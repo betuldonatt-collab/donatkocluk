@@ -1699,45 +1699,63 @@ async function applyEvidenceDecisions(
 ): Promise<ReviewEvidenceResult> {
   const { data: task, error: fetchError } = await supabase
     .from("student_tasks")
-    .select("student_id, task_date, evidence_image_paths, evidence_photo_status, evidence_review_status, evidence_pending_status")
+    .select("student_id, task_date, status, evidence_image_paths, evidence_photo_status, evidence_review_status, evidence_pending_status")
     .eq("id", taskId)
     .maybeSingle();
   if (fetchError) throw dbError(fetchError);
   if (!task) return { success: false, code: "ALREADY_PROCESSED" };
   await requireCoachAccess(supabase, coachId, task.student_id);
-  if (task.evidence_review_status !== "pending") return { success: false, code: "ALREADY_PROCESSED" };
 
   const paths = (task.evidence_image_paths ?? []) as string[];
+  if (paths.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
+
   const decisions = "all" in decide ? paths.map((path) => ({ path, decision: decide.all })) : decide.list;
   const photoStatus = applyPhotoDecisions(paths, normalizePhotoStatus(task.evidence_photo_status), decisions);
   const outcome = evidenceOutcome(paths, photoStatus);
+
+  // A task waiting for review (the student marked it done with photos) is settled
+  // by the verdicts: approved applies the outcome they claimed, rejected sends it
+  // back. A task that is NOT waiting -- photos attached before it was marked done,
+  // one already approved or rejected -- just records the verdicts: a rejection still
+  // flags the task for the student, and takes back a completion that was already
+  // approved, but an approval never marks anything done that the student did not
+  // claim.
+  const wasPending = task.evidence_review_status === "pending";
+  const wasCompleted = task.status === "done" || task.status === "half_done";
   const claimed = task.evidence_pending_status ?? "done";
   const base = { evidence_photo_status: photoStatus, updated_at: new Date().toISOString() };
-  const update =
-    outcome === "approved"
-      ? { ...base, evidence_review_status: "approved", evidence_pending_status: null, status: claimed, completed: claimed === "done" }
-      : outcome === "rejected"
-        ? {
-            ...base,
-            evidence_review_status: "rejected",
-            evidence_pending_status: null,
-            status: "pending",
-            completed: false,
-            rejection_reason: "Koç kanıt fotoğrafını onaylamadı.",
-          }
-        : base;
+  let update: Record<string, unknown> = base;
+  let statusChanged = false;
+  if (outcome === "approved") {
+    update = {
+      ...base,
+      evidence_review_status: "approved",
+      evidence_pending_status: null,
+      ...(wasPending ? { status: claimed, completed: claimed === "done" } : {}),
+    };
+    statusChanged = wasPending;
+  } else if (outcome === "rejected") {
+    update = {
+      ...base,
+      evidence_review_status: "rejected",
+      evidence_pending_status: null,
+      rejection_reason: "Koç kanıt fotoğrafını onaylamadı.",
+      ...(wasPending || wasCompleted ? { status: "pending", completed: false } : {}),
+    };
+    statusChanged = wasCompleted;
+  }
 
   const { data, error } = await supabase
     .from("student_tasks")
     .update(update)
     .eq("id", taskId)
-    .eq("evidence_review_status", "pending")
+    .eq("evidence_review_status", task.evidence_review_status)
     .select("*");
   if (error) throw dbError(error);
   if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
 
-  if (outcome === "approved") {
-    // The task now counts as done: resync its topic bucket and the student's day total.
+  if (statusChanged) {
+    // Whether the task counts as done changed: resync its topic bucket and the student's day total.
     if (data[0].course_id) await recomputeTopicStats(supabase, task.student_id, data[0].course_id, data[0].topic_id);
     await recomputeDailyStatsForStudent(supabase, task.student_id, task.task_date);
   }
