@@ -101,7 +101,7 @@ export function EvidenceLightbox({
             {review ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className={cn("text-sm font-medium", state === "rejected" ? "text-red-600" : state === "approved" ? "text-emerald-700" : "text-muted-foreground")}>
-                  {state === "rejected" ? "Reddedildi" : state === "approved" ? "Onaylandı" : "Henüz karar verilmedi"}
+                  {state === "rejected" ? "Fotoğraf reddedildi" : state === "approved" ? "Fotoğraf onaylandı" : "Henüz karar verilmedi"}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -134,7 +134,7 @@ export function EvidenceLightbox({
             ) : (
               state && (
                 <p className={cn("text-sm font-semibold", state === "rejected" ? "text-red-600" : "text-emerald-700")}>
-                  {state === "rejected" ? REJECTED_PHOTO_TEXT : "Koç bu fotoğrafı onayladı"}
+                  {state === "rejected" ? REJECTED_PHOTO_TEXT : "Fotoğraf onaylandı"}
                 </p>
               )
             )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completionCounts, completionPercent, tasksDueSoFar } from "./completion";
+import { completionCounts, completionPercent, completionStart, tasksDueSoFar } from "./completion";
 
 // 2026-09-23 is a Wednesday; its week runs Mon 2026-09-21 .. Sun 2026-09-27.
 const WED = "2026-09-23";
@@ -63,5 +63,38 @@ describe("completionCounts / completionPercent", () => {
   it("on Sunday the whole week counts", () => {
     const tasks = [task("2026-09-21", "done"), task("2026-09-27", "pending")];
     expect(completionPercent(completionCounts(tasks, "2026-09-27"))).toBe(50);
+  });
+});
+
+describe("lock-day start", () => {
+  it("starts on the day the week was locked instead of Monday", () => {
+    expect(completionStart(WED, "2026-09-22T08:30:00Z")).toBe("2026-09-22");
+    const tasks = [task("2026-09-21", "not_done"), task("2026-09-22", "done"), task("2026-09-23", "done"), task("2026-09-24", "pending")];
+    // Monday's missed task is before the lock day: not counted.
+    expect(completionCounts(tasks, WED, "2026-09-22T08:30:00Z")).toEqual({ done: 2, total: 2 });
+    expect(completionPercent(completionCounts(tasks, WED, "2026-09-22T08:30:00Z"))).toBe(100);
+  });
+
+  it("uses only the date part of the lock timestamp", () => {
+    expect(completionStart(WED, "2026-09-23T23:59:59Z")).toBe("2026-09-23");
+    expect(completionStart(WED, "2026-09-23")).toBe("2026-09-23");
+  });
+
+  it("falls back to Monday when the week is not locked", () => {
+    expect(completionStart(WED, null)).toBe("2026-09-21");
+    expect(completionStart(WED, undefined)).toBe("2026-09-21");
+  });
+
+  it("never starts before the week itself (a lock from the Sunday before)", () => {
+    expect(completionStart(WED, "2026-09-20T18:00:00Z")).toBe("2026-09-21");
+  });
+
+  it("locked today: only today's tasks are due", () => {
+    const tasks = [task("2026-09-21", "not_done"), task("2026-09-23", "done"), task("2026-09-24", "pending")];
+    expect(completionCounts(tasks, WED, "2026-09-23T06:00:00Z")).toEqual({ done: 1, total: 1 });
+  });
+
+  it("is null when nothing lies between the lock day and today", () => {
+    expect(completionPercent(completionCounts([task("2026-09-24", "pending")], WED, "2026-09-23T06:00:00Z"))).toBeNull();
   });
 });

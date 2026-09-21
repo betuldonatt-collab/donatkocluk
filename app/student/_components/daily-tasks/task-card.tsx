@@ -210,7 +210,12 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
           )}
           {task.evidence_review_status === "rejected" && (
             <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
-              Kanıt onaylanmadı
+              Fotoğraflar onaylanmadı
+            </span>
+          )}
+          {task.evidence_review_status === "approved" && (task.evidence_image_paths?.length ?? 0) > 0 && (
+            <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+              Fotoğraflar onaylandı
             </span>
           )}
         </div>

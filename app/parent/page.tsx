@@ -55,10 +55,11 @@ function getWeekRange(referenceIso: string) {
 
 type WeekTask = { task_date: string; status: "pending" | "done" | "half_done" | "not_done" };
 
-// Counts only what is due so far this week (Monday..today): tomorrow's tasks are
-// in neither the numerator nor the denominator (lib/completion.ts).
-function computeWeeklyCompletionPct(tasks: WeekTask[], today: string) {
-  return completionPercent(completionCounts(tasks, today));
+// Counts only what is due so far this week (from the day the schedule was locked,
+// Monday if not locked, up to today): tomorrow's tasks are in neither the numerator
+// nor the denominator (lib/completion.ts).
+function computeWeeklyCompletionPct(tasks: WeekTask[], today: string, lockedAt: string | null) {
+  return completionPercent(completionCounts(tasks, today, lockedAt));
 }
 
 // Softened per product decision: sums only the total questions solved --
@@ -81,8 +82,14 @@ async function fetchDashboardData() {
   const today = todayISO();
   const { start, end } = getWeekRange(today);
 
-  const [{ data: profile }, { data: sessionRows }, { data: weekTaskRows }, { data: dailyStatsRows }, { data: examRows }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: sessionRows },
+    { data: weekTaskRows },
+    { data: dailyStatsRows },
+    { data: examRows },
+    { data: weekLockRow },
+  ] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, full_name, is_active, total_session_quota, exam_type")
@@ -129,6 +136,8 @@ async function fetchDashboardData() {
         .eq("student_id", studentId)
         .eq("task_type", "general_exam")
         .order("task_date", { ascending: false }),
+      // When this week's schedule was locked: where the weekly completion starts counting.
+      supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", start).maybeSingle(),
     ]);
 
   if (!profile) return { student: null };
@@ -154,7 +163,7 @@ async function fetchDashboardData() {
     completedCount,
     remaining: Math.max(0, profile.total_session_quota - completedCount),
     sessions,
-    weeklyCompletionPct: computeWeeklyCompletionPct(weekTasks, today),
+    weeklyCompletionPct: computeWeeklyCompletionPct(weekTasks, today, (weekLockRow?.locked_at ?? null) as string | null),
     weekStat,
     programTasks,
     tytNetChartData,

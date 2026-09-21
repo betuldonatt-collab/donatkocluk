@@ -96,7 +96,7 @@ async function fetchHomeData(userId: string) {
       // Every locked week for this student, not just the current one --
       // an older pending-analysis task (pendingTaskRows, above) can belong
       // to a week the coach has since locked.
-      supabase.from("week_locks").select("week_start_date").eq("student_id", userId),
+      supabase.from("week_locks").select("week_start_date, locked_at").eq("student_id", userId),
       supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px, exam_type").eq("id", userId).maybeSingle(),
       // Which book/kaynak (if any) a coach linked to each task -- mirrors
       // the coach panel's own task_resources join (schedule/page.tsx)
@@ -193,6 +193,9 @@ async function fetchHomeData(userId: string) {
     focusReviews,
     examType: (profileRow?.exam_type ?? "YKS") as ExamType,
     todayLocked: lockedWeeks.has(mondayOf(today)),
+    // When the coach locked THIS week's schedule: where the student's
+    // progress bar starts counting (lib/completion.ts).
+    progressLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === mondayOf(today))?.locked_at ?? null) as string | null,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
   };
@@ -213,6 +216,7 @@ export default async function StudentHomePage() {
     focusReviews,
     examType,
     todayLocked,
+    progressLockedAt,
     routineRowHeights,
     taskRowHeights,
   } = view
@@ -229,6 +233,7 @@ export default async function StudentHomePage() {
         focusReviews: [] as StudentFocusReview[],
         examType: "YKS" as ExamType,
         todayLocked: false,
+        progressLockedAt: null as string | null,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
       };
@@ -267,6 +272,7 @@ export default async function StudentHomePage() {
         fixedTasks={fixedTasks}
         allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
+        progressLockedAt={progressLockedAt}
         examType={examType}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}

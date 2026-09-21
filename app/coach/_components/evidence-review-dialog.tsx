@@ -75,7 +75,7 @@ export function EvidenceReviewDialog({
       }
       toast.success(
         result.outcome === "approved"
-          ? "Tüm fotoğraflar onaylandı, görev tamamlandı."
+          ? "Fotoğraflar onaylandı — görev tamamlandı."
           : result.outcome === "rejected"
             ? "Görev öğrenciye geri gönderildi."
             : "Kararlar kaydedildi.",

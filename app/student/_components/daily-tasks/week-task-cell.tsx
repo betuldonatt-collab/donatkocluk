@@ -236,7 +236,13 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
       {task.evidence_review_status === "rejected" && (
         <p className="flex items-center gap-1 text-xs font-medium text-rose-700">
           <XCircle className="size-3.5 shrink-0" />
-          Kanıt onaylanmadı
+          Fotoğraflar onaylanmadı
+        </p>
+      )}
+      {task.evidence_review_status === "approved" && (task.evidence_image_paths?.length ?? 0) > 0 && (
+        <p className="flex items-center gap-1 text-xs font-medium text-emerald-700">
+          <CheckCircle2 className="size-3.5 shrink-0" />
+          Fotoğraflar onaylandı
         </p>
       )}
     </div>

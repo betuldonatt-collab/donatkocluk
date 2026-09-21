@@ -33,6 +33,7 @@ import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
+import { WeekProgressBar } from "./week-progress-bar";
 import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
 
@@ -115,6 +116,7 @@ export function TaskBoard({
   fixedTasks,
   allTimeTrackedMinutes,
   todayLocked,
+  progressLockedAt,
   initialRoutineRowHeights,
   initialTaskRowHeights,
   examType = "YKS",
@@ -133,6 +135,9 @@ export function TaskBoard({
   // server-side, and passed straight through rather than derived here.
   allTimeTrackedMinutes: number;
   todayLocked: boolean;
+  // When the coach locked the current week's schedule (null = not locked):
+  // where the progress bar starts counting.
+  progressLockedAt: string | null;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
   // app/student/page.tsx so the very first render already matches their
@@ -147,6 +152,10 @@ export function TaskBoard({
   examType?: ExamType;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
+  // The progress bar is always about the CURRENT week, however far the grid below
+  // is browsed (loadWeek swaps `tasks` for the browsed week's) -- so it reads its
+  // own copy, kept in step with every save/create/delete.
+  const [progressTasks, setProgressTasks] = useState(initialTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
   // The initial week IS the current week, so its lock state is exactly
   // todayLocked -- reused here instead of re-deriving it, since navigating
@@ -204,14 +213,17 @@ export function TaskBoard({
       toast.info("Fotoğraflı görev koçun onayına gönderildi.");
     }
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+    setProgressTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
   function handleCreated(task: StudentTask) {
     setTasks((prev) => [...prev, task]);
+    setProgressTasks((prev) => [...prev, task]);
   }
 
   async function handleDelete(taskId: string) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setProgressTasks((prev) => prev.filter((t) => t.id !== taskId));
     await deleteCustomTask(taskId);
   }
 
@@ -266,6 +278,8 @@ export function TaskBoard({
   return (
     <div className="space-y-6">
       <PendingAnalysisAlert tasks={tasks} onOpenTask={(t) => openTask(t, "analysis")} />
+
+      <WeekProgressBar tasks={progressTasks} today={today} lockedAt={progressLockedAt} />
 
       {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/
           Haftalık Toplam below, this doesn't reset when switching views or

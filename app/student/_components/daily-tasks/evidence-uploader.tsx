@@ -196,7 +196,7 @@ export function EvidenceUploader({
       {reviewStatus === "pending" && (
         <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
           <Hourglass className="mt-0.5 size-3.5 shrink-0" />
-          Koç onayı bekleniyor. Fotoğraflar incelenip onaylandığında görev tamamlandı sayılır.
+          Koçun fotoğraflarına bakıyor. Fotoğraflar onaylandığında görev tamamlandı sayılır.
         </div>
       )}
       {reviewStatus === "rejected" && (
@@ -206,7 +206,7 @@ export function EvidenceUploader({
         </div>
       )}
       {reviewStatus === "approved" && paths.length > 0 && (
-        <p className="text-xs text-emerald-700">Koç bu görevin fotoğraflarını onayladı.</p>
+        <p className="text-xs text-emerald-700">Fotoğraflar onaylandı.</p>
       )}
 
       {paths.length > 0 && (
@@ -255,7 +255,7 @@ export function EvidenceUploader({
                   </button>
                 </div>
                 {verdict === "rejected" && <p className="text-xs leading-snug font-semibold text-red-600">{REJECTED_PHOTO_TEXT}</p>}
-                {verdict === "approved" && <p className="text-[11px] leading-snug text-emerald-700">Koç onayladı</p>}
+                {verdict === "approved" && <p className="text-[11px] leading-snug text-emerald-700">Fotoğraf onaylandı</p>}
               </div>
             );
           })}

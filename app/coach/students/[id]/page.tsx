@@ -20,7 +20,7 @@ import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
-import { tasksDueSoFar } from "@/lib/completion";
+import { completionStart, tasksDueSoFar } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import type { TopicPerformanceRow } from "./_components/topic-performance-map";
 import type { WeakTopicRow } from "./weak-topic-map";
@@ -69,8 +69,8 @@ function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
 // Program completion counts only what is due so far this week (Monday..today,
 // lib/completion.ts) -- tasks scheduled for tomorrow or later are in neither
 // the numerator nor the denominator.
-function computeCompletionStats(allTasks: DetailTask[], today: string): CompletionStats {
-  const tasks = tasksDueSoFar(allTasks, today);
+function computeCompletionStats(allTasks: DetailTask[], today: string, lockedAt: string | null): CompletionStats {
+  const tasks = tasksDueSoFar(allTasks, today, lockedAt);
   const buckets = {
     overall: { done: 0, total: 0 },
     tyt: { done: 0, total: 0 },
@@ -92,9 +92,9 @@ function computeCompletionStats(allTasks: DetailTask[], today: string): Completi
 // Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
 // (paragraf/problem) aren't real curriculum subjects, so they're excluded
 // here even though they're valid course_ids elsewhere in the app.
-function computeSubjectCompletion(allTasks: DetailTask[], today: string): SubjectCompletion[] {
+function computeSubjectCompletion(allTasks: DetailTask[], today: string, lockedAt: string | null): SubjectCompletion[] {
   const buckets = new Map<string, { done: number; total: number }>();
-  for (const t of tasksDueSoFar(allTasks, today)) {
+  for (const t of tasksDueSoFar(allTasks, today, lockedAt)) {
     if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
     const bucket = buckets.get(t.course_id) ?? { done: 0, total: 0 };
     bucket.total += 1;
@@ -128,6 +128,15 @@ async function fetchStudentDetail(studentId: string) {
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
+  // When this week's schedule was locked: where the completion percentages start
+  // counting (lib/completion.ts). No lock yet -> the week's Monday.
+  const { data: weekLockRow } = await supabase
+    .from("week_locks")
+    .select("locked_at")
+    .eq("student_id", studentId)
+    .eq("week_start_date", weekDays[0].date)
+    .maybeSingle();
+  const progressLockedAt = (weekLockRow?.locked_at ?? null) as string | null;
 
   const [
     { data: allTasks },
@@ -486,8 +495,10 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
-    completion: computeCompletionStats(tasks, today),
-    subjectCompletion: computeSubjectCompletion(tasks, today),
+    completion: computeCompletionStats(tasks, today, progressLockedAt),
+    subjectCompletion: computeSubjectCompletion(tasks, today, progressLockedAt),
+    progressFrom: completionStart(today, progressLockedAt),
+    progressFromLock: progressLockedAt !== null,
     topicPerformance: topicPerformanceWithQuestions,
     gelisimHaritasi,
     sessions,
@@ -563,6 +574,8 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   profile={detail.profile}
                   completion={detail.completion}
                   subjectCompletion={detail.subjectCompletion}
+                  progressFrom={detail.progressFrom}
+                  progressFromLock={detail.progressFromLock}
                 />
               </div>
 

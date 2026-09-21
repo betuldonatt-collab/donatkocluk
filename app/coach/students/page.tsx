@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { completionCounts, completionPercent } from "@/lib/completion";
+import { mondayOf } from "@/lib/date";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
@@ -30,16 +31,19 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
   const studentIds = (links ?? []).map((l) => l.student_id);
   if (studentIds.length === 0) return [];
 
-  const [{ data: profiles }, { data: taskRows }] = await Promise.all([
+  // This week's lock per student: where each one's completion starts counting.
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: profiles }, { data: taskRows }, { data: lockRows }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
     supabase.from("student_tasks").select("student_id, status, task_date").in("student_id", studentIds),
+    supabase.from("week_locks").select("student_id, locked_at").in("student_id", studentIds).eq("week_start_date", mondayOf(today)),
   ]);
 
-  // Only this week's tasks that are due by today count (lib/completion.ts).
-  const today = new Date().toISOString().slice(0, 10);
+  // Only tasks from the lock day (Monday if not locked) up to today count (lib/completion.ts).
+  const lockedAtByStudent = new Map((lockRows ?? []).map((r) => [r.student_id, r.locked_at as string]));
   const tasksByStudent = new Map<string, { task_date: string; status: string }[]>();
   for (const t of taskRows ?? []) {
     const list = tasksByStudent.get(t.student_id) ?? [];
@@ -49,7 +53,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 
   return (profiles ?? []).map((p) => ({
     ...p,
-    completionPct: completionPercent(completionCounts(tasksByStudent.get(p.id) ?? [], today)),
+    completionPct: completionPercent(completionCounts(tasksByStudent.get(p.id) ?? [], today, lockedAtByStudent.get(p.id))),
   }));
 }
 
@@ -116,7 +120,7 @@ export default async function CoachStudentsPage() {
                       {completionDotClass(row.completionPct) && (
                         <span
                           className={cn("size-2 shrink-0 rounded-full", completionDotClass(row.completionPct))}
-                          title={`Bu hafta bugüne kadar tamamlama: %${row.completionPct}`}
+                          title={`Bugüne kadarki tamamlama: %${row.completionPct}`}
                         />
                       )}
                       {row.full_name ?? "İsimsiz Öğrenci"}

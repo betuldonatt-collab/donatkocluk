@@ -34,11 +34,17 @@ export function TargetsCompletionCard({
   profile,
   completion,
   subjectCompletion,
+  progressFrom,
+  progressFromLock,
 }: {
   studentId: string;
   profile: StudentProfile;
   completion: CompletionStats;
   subjectCompletion: SubjectCompletion[];
+  // The first day the percentages count, and whether that is the day the week was
+  // locked (otherwise the week's Monday).
+  progressFrom: string;
+  progressFromLock: boolean;
 }) {
   return (
     <Card>
@@ -90,7 +96,10 @@ export function TargetsCompletionCard({
 
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
-          <p className="text-muted-foreground -mt-2 text-xs">Bu haftanın başından bugüne kadar olan görevler; sonraki günler sayılmaz.</p>
+          <p className="text-muted-foreground -mt-2 text-xs">
+            {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
+            {progressFromLock ? " (programın kilitlendiği gün)" : " (haftanın başı)"} ile bugün arasındaki görevler; sonraki günler sayılmaz.
+          </p>
           <CompletionBar label="Genel" pct={completion.overall} />
           {/* TYT/AYT split is a YKS notion; for LGS these would be two
               permanently empty bars. */}
