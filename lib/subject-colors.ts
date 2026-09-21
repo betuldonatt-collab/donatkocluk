@@ -111,9 +111,19 @@ const MACRO_CLASSES: Record<string, string> = {
 // (each panel keeps its own function name/call site, per this repo's
 // per-panel UI-duplication convention; only the color data itself is
 // shared here, since it's pure lookup with nothing panel-specific in it).
+// Routines that get a look of their own (instead of the neutral routine grey)
+// so they're recognisable at a glance in the Rutinler lane. Yeni Nesil Mat
+// Dozu is violet -- a hue LGS has no subject family in (Fizik, the only
+// violet family, is YKS-only) -- and stronger than a subject tint.
+const ROUTINE_CLASSES: Record<string, string> = {
+  "yeni-nesil-mat-dozu": "bg-violet-500/25",
+};
+
 export function subjectBackgroundClass(courseId: string | null, taskType: string): string {
   if (taskType === "general_exam") return "bg-indigo-500/20"; // unchanged from before this system
   if (courseId) {
+    const routineClass = ROUTINE_CLASSES[courseId];
+    if (routineClass) return routineClass;
     const macroClass = MACRO_CLASSES[courseId];
     if (macroClass) return macroClass;
     const family = COURSE_FAMILY[courseId];

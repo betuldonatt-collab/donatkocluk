@@ -68,9 +68,18 @@ describe("topicsForCourse", () => {
 });
 
 describe("isRoutineCourseId", () => {
-  it("recognizes both routine pseudo-courses", () => {
+  it("recognizes every routine pseudo-course", () => {
     expect(isRoutineCourseId("paragraf")).toBe(true);
     expect(isRoutineCourseId("problem")).toBe(true);
+    expect(isRoutineCourseId("kitap-okuma")).toBe(true);
+    expect(isRoutineCourseId("yeni-nesil-mat-dozu")).toBe(true);
+  });
+
+  it("every routine pseudo-course is recognized and has no units", () => {
+    for (const c of ROUTINE_COURSES) {
+      expect(isRoutineCourseId(c.id)).toBe(true);
+      expect(c.units).toHaveLength(0);
+    }
   });
 
   it("rejects a real curriculum course id", () => {

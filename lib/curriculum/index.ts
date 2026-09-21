@@ -44,19 +44,29 @@ export const AYT_COURSES_BY_TRACK: Record<Track, Course[]> = {
   sozel: aytSozelJson as Course[],
 };
 
-// Three synthetic, non-curriculum "courses" for the coach's daily routines
-// -- Paragraf, Problem, and Kitap Okuma practice aren't tied to a specific
-// curriculum subject, so each gets its own pseudo-course entry (empty unit
-// list, which makes topicsForCourse() correctly offer only "Karma" for
-// them) rather than being force-mapped onto e.g. TYT Türkçe.
+// Synthetic, non-curriculum "courses" for the coach's daily routines --
+// Paragraf, Problem, Kitap Okuma and Yeni Nesil Mat Dozu practice aren't tied
+// to a specific curriculum subject, so each gets its own pseudo-course entry
+// (empty unit list, which makes topicsForCourse() correctly offer only "Karma"
+// for them) rather than being force-mapped onto e.g. TYT Türkçe. Problem is
+// YKS-only and Yeni Nesil Mat Dozu (the LGS "new generation" math question
+// dose) is LGS-only; the coach's pickers filter accordingly.
+export const YENI_NESIL_MAT_DOZU_ID = "yeni-nesil-mat-dozu";
+
 export const ROUTINE_COURSES: Course[] = [
   { id: "paragraf", name: "Paragraf", units: [] },
   { id: "problem", name: "Problem", units: [] },
   { id: "kitap-okuma", name: "Kitap Okuma", units: [] },
+  { id: YENI_NESIL_MAT_DOZU_ID, name: "Yeni Nesil Mat Dozu", units: [] },
 ];
 
 export function isRoutineCourseId(courseId: string | null | undefined): boolean {
-  return courseId === "paragraf" || courseId === "problem" || courseId === "kitap-okuma";
+  return (
+    courseId === "paragraf" ||
+    courseId === "problem" ||
+    courseId === "kitap-okuma" ||
+    courseId === YENI_NESIL_MAT_DOZU_ID
+  );
 }
 
 // "Whole fruit" branch-exam subjects, coexisting alongside (never

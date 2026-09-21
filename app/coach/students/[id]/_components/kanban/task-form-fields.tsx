@@ -14,6 +14,7 @@ import {
   isLgsCourseId,
   LGS_COURSES,
   ROUTINE_COURSES,
+  YENI_NESIL_MAT_DOZU_ID,
   TYT_COURSES,
   topicOptionsForCourse,
   type Course,
@@ -115,7 +116,9 @@ export function courseOptionsFor(examType: ExamType, isBranchExam: boolean): { i
       ...ROUTINE_COURSES.filter((c) => c.id !== "problem").map((c) => ({ id: c.id, label: c.name })),
     ];
   }
-  const atomic = ALL_COURSES.filter((c) => !isBranchExamMacroCourseId(c.id) && !isLgsCourseId(c.id));
+  const atomic = ALL_COURSES.filter(
+    (c) => !isBranchExamMacroCourseId(c.id) && !isLgsCourseId(c.id) && c.id !== YENI_NESIL_MAT_DOZU_ID,
+  );
   return (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomic] : atomic).map((c) => ({ id: c.id, label: courseLabel(c) }));
 }
 

@@ -12,6 +12,7 @@ import type { CourseResourceData } from "../kaynak-takibi-tab";
 import type { ExamType } from "@/lib/exam-type";
 import { TaskFormFields, defaultTaskFormValue, firstCourseIdFor, taskFormValueToPayload, valueFromTask, type TaskFormValue } from "./task-form-fields";
 import { TrialResultsSection } from "./trial-results-section";
+import { isCourseRoutine, routineOptionsFor, type RoutineType } from "./routine-options";
 
 export type TaskDrawerState =
   | { mode: "create"; date: string }
@@ -21,21 +22,6 @@ export type TaskDrawerState =
 const DAY_LABELS_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-type RoutineType = "paragraf" | "problem" | "kitap-okuma" | "diger";
-
-const ROUTINE_TYPE_OPTIONS: { value: RoutineType; label: string }[] = [
-  { value: "paragraf", label: "Paragraf" },
-  { value: "problem", label: "Problem" },
-  { value: "kitap-okuma", label: "Kitap Okuma" },
-  { value: "diger", label: "Diğer" },
-];
-
-// LGS has no Problem routine (it's a YKS-only practice) -- its Rutin Türü
-// row is Paragraf / Kitap Okuma / Diğer.
-function routineOptionsFor(examType: ExamType) {
-  return examType === "LGS" ? ROUTINE_TYPE_OPTIONS.filter((o) => o.value !== "problem") : ROUTINE_TYPE_OPTIONS;
-}
 
 function firstNonRoutineCourseId(examType: ExamType): string {
   return firstCourseIdFor(examType);
@@ -234,7 +220,7 @@ export function TaskDrawer({
     setRoutineType(next);
     if (next === "kitap-okuma") {
       setValue((v) => ({ ...v, courseId: next, topicId: "", resources: [], taskType: "reading" }));
-    } else if (next === "paragraf" || next === "problem") {
+    } else if (isCourseRoutine(next)) {
       setValue((v) => ({ ...v, courseId: next, topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     } else {
       setValue((v) => ({
@@ -311,7 +297,7 @@ export function TaskDrawer({
   }
 
   const showRoutineForm = state.mode === "create-multi" && tab === "routine";
-  const isRoutineCoursePicked = routineType === "paragraf" || routineType === "problem";
+  const isRoutineCoursePicked = isCourseRoutine(routineType);
 
   return (
     <div
