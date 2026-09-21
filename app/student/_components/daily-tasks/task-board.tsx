@@ -199,6 +199,10 @@ export function TaskBoard({
     // that's joined once, up front, in fetchHomeData (page.tsx) and never
     // changes via any of these save paths, so keeping whatever the task
     // already had is exactly correct, not stale.
+    const before = tasks.find((t) => t.id === updated.id);
+    if (updated.evidence_review_status === "pending" && before?.evidence_review_status !== "pending") {
+      toast.info("Fotoğraflı görev koçun onayına gönderildi.");
+    }
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
@@ -616,6 +620,7 @@ export function TaskBoard({
         onSaved={handleSaved}
         initialStep={modalStep}
         openKey={modalOpenKey}
+        examType={examType}
       />
     </div>
   );

@@ -55,6 +55,8 @@ export type DetailTask = {
   is_locked: boolean;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   analysis_pending: boolean;
+  // Kanıt Fotoğrafı: Storage paths of the photos the student attached (0087).
+  evidence_image_paths?: string[];
 };
 
 export type DetailSession = {

@@ -2,15 +2,22 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ChevronDown, ClipboardCheck, X } from "lucide-react";
+import { Camera, ChevronDown, ClipboardCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EvidenceLightbox } from "@/components/evidence-lightbox";
 import { findCourseById } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
-import { approveStudentTask, rejectStudentTask, type ApprovalActionResult, type PendingStudentTask } from "../../actions";
+import {
+  approveStudentTask,
+  getTaskEvidenceUrlsForCoach,
+  rejectStudentTask,
+  type ApprovalActionResult,
+  type PendingStudentTask,
+} from "../../actions";
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   question_bank: "Soru Çözümü",
@@ -57,11 +64,45 @@ function groupByStudent(tasks: PendingTask[]): StudentGroup[] {
   return order.map((id) => byStudent.get(id)!);
 }
 
+// "Fotoğrafları Gör (N)" on a row that carries Kanıt Fotoğrafı: the coach looks
+// at every uploaded photo (lightbox, signed URLs fetched on click) before
+// choosing Onayla or Reddet.
+function EvidencePhotos({ task }: { task: PendingTask }) {
+  const [open, setOpen] = useState(false);
+  const [urls, setUrls] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleOpen() {
+    setOpen(true);
+    setLoading(true);
+    setError(null);
+    const result = await getTaskEvidenceUrlsForCoach(task.studentId, task.id);
+    if (result.ok) setUrls(result.urls);
+    else setError(result.error);
+    setLoading(false);
+  }
+
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleOpen}>
+        <Camera className="size-3.5" />
+        Fotoğrafları Gör ({task.evidenceCount})
+      </Button>
+      <EvidenceLightbox open={open} onOpenChange={setOpen} title={task.title} urls={urls} loading={loading} error={error} />
+    </>
+  );
+}
+
 // Student self-created tasks (createRichCustomTask) start
 // is_approved_by_coach: false and stay out of Kaynak Takibi/Gelişim
 // Haritası/Karne until a coach reviews them here. A matching notification
 // entry (syncPendingApprovalNotifications) mirrors this same list into
 // Bildirimler and the sidebar's unread badge.
+//
+// The same list also carries photo-backed completions (Kanıt Fotoğrafı): a
+// task the student completed with photos is held as pending and waits here,
+// with a button to look at the photos before Onayla / Reddet.
 //
 // The dashboard card itself is a same-sized 7th tile in alert-panel.tsx's
 // grid (same Card/CardHeader chrome as the plain-link AlertCards there --
@@ -102,7 +143,7 @@ export function PendingApprovalsPanel({ tasks: initialTasks }: { tasks: PendingT
       >
         <CardHeader className="flex-row items-center gap-2 space-y-0">
           <ClipboardCheck className="text-muted-foreground size-4" />
-          <CardTitle className="text-sm">Onay Bekleyen Ekstra Çalışmalar ({tasks.length})</CardTitle>
+          <CardTitle className="text-sm">Onay Bekleyen Görevler ({tasks.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {groups.length === 0 ? (
@@ -212,7 +253,7 @@ function ApprovalsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Onay Bekleyen Ekstra Çalışmalar</DialogTitle>
+          <DialogTitle>Onay Bekleyen Görevler</DialogTitle>
         </DialogHeader>
 
         {groups.length === 0 ? (
@@ -253,7 +294,14 @@ function ApprovalsDialog({
                             className="border-border bg-muted/20 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
                           >
                             <div className="min-w-0 space-y-1">
-                              <p className="text-foreground text-sm font-medium">{task.title}</p>
+                              <p className="text-foreground flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                                {task.title}
+                                {task.kind === "evidence" && (
+                                  <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+                                    Fotoğraflı tamamlama
+                                  </span>
+                                )}
+                              </p>
                               <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
                                 <span>{TASK_TYPE_LABELS[task.task_type] ?? task.task_type}</span>
                                 <span>{course ? course.name : "—"}</span>
@@ -262,8 +310,14 @@ function ApprovalsDialog({
                               <p className="text-muted-foreground text-xs">
                                 {stats ?? <span className="italic">Sonuç henüz girilmedi</span>}
                               </p>
+                              {task.kind === "evidence" && task.claimedStatus && (
+                                <p className="text-muted-foreground text-xs">
+                                  Öğrencinin bildirdiği: {task.claimedStatus === "done" ? "Tamamlandı" : "Yarım yapıldı"}
+                                </p>
+                              )}
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {task.evidenceCount > 0 && <EvidencePhotos task={task} />}
                               <Button type="button" size="sm" disabled={isActing} onClick={() => handleApprove(task)}>
                                 {isActing && actingType === "approve" ? "Onaylanıyor..." : "Onayla"}
                               </Button>

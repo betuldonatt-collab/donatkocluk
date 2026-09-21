@@ -768,6 +768,7 @@ export function ScheduleBoard({
               return (
                 <DayColumn
                   key={day.date}
+                  studentId={studentId}
                   day={day}
                   isToday={day.date === today}
                   isDropTarget={day.date === overDay}
@@ -862,6 +863,7 @@ export function ScheduleBoard({
 }
 
 function DayColumn({
+  studentId,
   day,
   isToday,
   isDropTarget,
@@ -888,6 +890,7 @@ function DayColumn({
   onDeleteEvent,
   onToggleEventLock,
 }: {
+  studentId: string;
   day: { date: string; label: string };
   isToday: boolean;
   isDropTarget: boolean;
@@ -1005,6 +1008,7 @@ function DayColumn({
               <RoutineTaskCard
                 key={task.id}
                 task={task}
+                studentId={studentId}
                 resourceNameById={resourceNameById}
                 onEdit={onEdit}
                 onDuplicate={onDuplicate}
@@ -1074,6 +1078,7 @@ function DayColumn({
                     <KanbanTaskCard
                       key={item.data.id}
                       task={item.data}
+                      studentId={studentId}
                       resourceNameById={resourceNameById}
                       onEdit={onEdit}
                       onDuplicate={onDuplicate}

@@ -50,6 +50,11 @@ export type StudentTask = {
   video_links: VideoLink[];
   completed: boolean;
   analysis_pending: boolean;
+  // Kanıt Fotoğrafı: Storage paths of the photos attached to this task (0087).
+  evidence_image_paths?: string[];
+  // Coach review of those photos (0088): a completed photo-backed task is held
+  // as status "pending" until the coach approves it.
+  evidence_review_status?: "none" | "pending" | "approved" | "rejected";
   status: TaskStatus;
   reason: string | null;
   note: string | null;

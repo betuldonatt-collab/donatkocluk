@@ -227,6 +227,18 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
           Koç tarafından reddedildi
         </p>
       )}
+      {task.evidence_review_status === "pending" && (
+        <p className="flex items-center gap-1 text-xs font-medium text-amber-700">
+          <AlertCircle className="size-3.5 shrink-0" />
+          Koç onayı bekleniyor
+        </p>
+      )}
+      {task.evidence_review_status === "rejected" && (
+        <p className="flex items-center gap-1 text-xs font-medium text-rose-700">
+          <XCircle className="size-3.5 shrink-0" />
+          Kanıt onaylanmadı
+        </p>
+      )}
     </div>
   );
 }

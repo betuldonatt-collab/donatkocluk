@@ -14,6 +14,14 @@ import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
+import {
+  EVIDENCE_BUCKET,
+  EVIDENCE_MAX_BYTES,
+  evidencePath,
+  isEvidenceMimeType,
+  isEvidencePathFor,
+  shouldHoldForEvidenceReview,
+} from "@/lib/task-evidence";
 import { EXAMS_PAGE_SIZE } from "./constants";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -102,7 +110,9 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
 
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
-    .select("student_id, is_coach_assigned, task_type, title, total_count, correct_count, wrong_count, empty_count")
+    .select(
+      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, total_count, correct_count, wrong_count, empty_count",
+    )
     .eq("id", taskIdV)
     .maybeSingle();
   if (fetchError) throw dbError(fetchError);
@@ -194,9 +204,31 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
     }
   }
 
+  // Kanıt Fotoğrafı: a task that carries photos is not completed on the
+  // student's say-so. Marking it done / half done HOLDS it for the coach --
+  // status stays 'pending', the claimed outcome is remembered, and it lands on
+  // the coach's approval screen (getPendingStudentTasks) exactly like a
+  // self-created extra task. approveStudentTask then applies the claimed status.
+  // The DB trigger (0088) refuses the same write if it ever bypasses this.
+  let evidenceHold: { evidence_review_status: "pending"; evidence_pending_status: "done" | "half_done" } | null = null;
+  const claimedStatus = patchV.status;
+  if (
+    (claimedStatus === "done" || claimedStatus === "half_done") &&
+    shouldHoldForEvidenceReview({
+      inApprovalFlow: existing.is_coach_assigned || existing.is_approved_by_coach,
+      photoCount: ((existing.evidence_image_paths ?? []) as string[]).length,
+      status: claimedStatus,
+      reviewStatus: existing.evidence_review_status ?? "none",
+    })
+  ) {
+    evidenceHold = { evidence_review_status: "pending", evidence_pending_status: claimedStatus };
+    patchV.status = "pending";
+    patchV.completed = false;
+  }
+
   const { data, error } = await supabase
     .from("student_tasks")
-    .update({ ...patchV, updated_at: new Date().toISOString() })
+    .update({ ...patchV, ...(evidenceHold ?? {}), updated_at: new Date().toISOString() })
     .eq("id", taskIdV)
     .select("*")
     .single();
@@ -1373,5 +1405,179 @@ export async function reconcileStaleFocusSessions(): Promise<void> {
 
   for (const row of pausedRows ?? []) {
     await supabase.rpc("end_focus_session", { p_task_id: row.task_id, p_bank_through: row.last_heartbeat_at });
+  }
+}
+
+// --- Kanıt Fotoğrafı (photo evidence of finished work, migrations 0087/0088) --
+//
+// The browser compresses the photo (lib/image-compress.ts) and posts it here as
+// FormData; the server stores it in the private `task_evidence` bucket under
+// <student_id>/<task_id>/ (Storage RLS re-checks that folder) and records the
+// object path on the task. There is no limit on how many photos a task can have.
+// Every action returns a result object instead of throwing, so the Turkish
+// reason survives production error stripping.
+//
+// Completing a photo-backed task needs the coach's approval: see the hold in
+// updateTaskProgress above, and the same rule applied here when photos are added
+// to a task that is already marked done.
+
+export type EvidenceResult =
+  | { ok: true; paths: string[]; reviewStatus: string; status: string }
+  | { ok: false; error: string };
+
+async function loadOwnEvidence(supabase: SupabaseClient, userId: string, taskId: string) {
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .select(
+      "student_id, task_date, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, evidence_image_paths, evidence_review_status, evidence_pending_status",
+    )
+    .eq("id", taskId)
+    .eq("student_id", userId)
+    .maybeSingle();
+  if (error) throw dbError(error);
+  if (!data) throw new Error("Bu görev sana ait değil.");
+  return { ...data, paths: (data.evidence_image_paths ?? []) as string[] };
+}
+
+function evidenceError(label: string, e: unknown): { ok: false; error: string } {
+  console.error(`[${label}] failed:`, e);
+  Sentry.captureException(e);
+  return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+}
+
+export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceResult> {
+  try {
+    await assertNotImpersonating();
+    const taskId = parseInput(uuidSchema, formData.get("taskId"));
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Fotoğraf seçilmedi." };
+    if (!isEvidenceMimeType(file.type)) return { ok: false, error: "Sadece JPEG, PNG veya WebP fotoğraf yükleyebilirsin." };
+    if (file.size > EVIDENCE_MAX_BYTES) return { ok: false, error: "Fotoğraf çok büyük. Daha küçük bir fotoğraf dene." };
+
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    const task = await loadOwnEvidence(supabase, user.id, taskId);
+
+    const path = evidencePath(user.id, taskId, crypto.randomUUID(), file.type);
+    const { error: uploadError } = await supabase.storage
+      .from(EVIDENCE_BUCKET)
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (uploadError) throw uploadError;
+
+    const paths = [...task.paths, path];
+    // Photos added to a task already marked done / half done put it back in
+    // front of the coach.
+    const hold = shouldHoldForEvidenceReview({
+      inApprovalFlow: task.is_coach_assigned || task.is_approved_by_coach,
+      photoCount: paths.length,
+      status: task.status,
+      reviewStatus: task.evidence_review_status ?? "none",
+    });
+    const update = hold
+      ? {
+          evidence_image_paths: paths,
+          status: "pending",
+          completed: false,
+          evidence_review_status: "pending",
+          evidence_pending_status: task.status,
+          updated_at: new Date().toISOString(),
+        }
+      : { evidence_image_paths: paths, updated_at: new Date().toISOString() };
+
+    const { error: updateError } = await supabase.from("student_tasks").update(update).eq("id", taskId).eq("student_id", user.id);
+    if (updateError) {
+      // e.g. the coach locked this week meanwhile -- don't leave an orphan file.
+      await supabase.storage.from(EVIDENCE_BUCKET).remove([path]);
+      throw dbError(updateError);
+    }
+
+    if (hold) await resyncAfterStatusChange(supabase, task);
+
+    revalidatePath("/student");
+    return {
+      ok: true,
+      paths,
+      reviewStatus: hold ? "pending" : (task.evidence_review_status ?? "none"),
+      status: hold ? "pending" : task.status,
+    };
+  } catch (e) {
+    return evidenceError("uploadTaskEvidence", e);
+  }
+}
+
+// A held / released task changes what counts as "done" for its day and topic.
+async function resyncAfterStatusChange(
+  supabase: SupabaseClient,
+  task: { task_date: string; course_id: string | null; topic_id: string | null; student_id: string },
+) {
+  await recomputeDailyStats(supabase, task.student_id, task.task_date);
+  if (task.course_id) await recomputeTopicStats(supabase, task.student_id, task.course_id, task.topic_id);
+}
+
+export async function removeTaskEvidence(taskId: string, path: string): Promise<EvidenceResult> {
+  try {
+    await assertNotImpersonating();
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    if (!isEvidencePathFor(path, user.id, taskIdV)) return { ok: false, error: "Geçersiz fotoğraf." };
+
+    const task = await loadOwnEvidence(supabase, user.id, taskIdV);
+    if (!task.paths.includes(path)) {
+      return { ok: true, paths: task.paths, reviewStatus: task.evidence_review_status ?? "none", status: task.status };
+    }
+
+    const paths = task.paths.filter((p) => p !== path);
+    // Removing the last photo takes the task out of the review: a task waiting on
+    // the coach goes back to the outcome the student had claimed (no photos, no
+    // proof to review); a rejected one simply clears the rejection.
+    const release = paths.length === 0 && (task.evidence_review_status === "pending" || task.evidence_review_status === "rejected");
+    const restoredStatus = task.evidence_review_status === "pending" ? (task.evidence_pending_status ?? "done") : task.status;
+    const update = release
+      ? {
+          evidence_image_paths: paths,
+          evidence_review_status: "none",
+          evidence_pending_status: null,
+          status: restoredStatus,
+          completed: restoredStatus === "done",
+          updated_at: new Date().toISOString(),
+        }
+      : { evidence_image_paths: paths, updated_at: new Date().toISOString() };
+
+    const { error: updateError } = await supabase.from("student_tasks").update(update).eq("id", taskIdV).eq("student_id", user.id);
+    if (updateError) throw dbError(updateError);
+
+    const { error: removeError } = await supabase.storage.from(EVIDENCE_BUCKET).remove([path]);
+    if (removeError) console.error("[removeTaskEvidence] could not delete the file:", removeError);
+
+    if (release && restoredStatus !== task.status) await resyncAfterStatusChange(supabase, task);
+
+    revalidatePath("/student");
+    return {
+      ok: true,
+      paths,
+      reviewStatus: release ? "none" : (task.evidence_review_status ?? "none"),
+      status: release ? restoredStatus : task.status,
+    };
+  } catch (e) {
+    return evidenceError("removeTaskEvidence", e);
+  }
+}
+
+// Short-lived signed URLs (the bucket is private) for the student's own photos
+// of one task, in the same order as evidence_image_paths.
+export async function getTaskEvidenceUrls(taskId: string): Promise<{ ok: true; urls: string[] } | { ok: false; error: string }> {
+  try {
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    const task = await loadOwnEvidence(supabase, user.id, taskIdV);
+    const paths = task.paths.filter((p) => isEvidencePathFor(p, user.id, taskIdV));
+    if (paths.length === 0) return { ok: true, urls: [] };
+    const { data, error } = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrls(paths, 3600);
+    if (error) throw error;
+    return { ok: true, urls: (data ?? []).map((d) => d.signedUrl).filter((u): u is string => !!u) };
+  } catch (e) {
+    return evidenceError("getTaskEvidenceUrls", e);
   }
 }

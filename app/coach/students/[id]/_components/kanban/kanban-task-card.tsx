@@ -11,6 +11,7 @@ import { ResizeHandle } from "@/components/ui/resize-handle";
 import { cn } from "@/lib/utils";
 import type { AssignedTaskStatus } from "../../../../actions";
 import type { DetailTask } from "../../types";
+import { EvidencePhotoButton } from "./evidence-photo-button";
 import { cardBackgroundClass, statusClasses, TaskCardBody, TaskCardHoverDetail } from "./task-card-body";
 
 const PAINT_FLASH_CLASS: Partial<Record<AssignedTaskStatus, string>> = {
@@ -21,6 +22,7 @@ const PAINT_FLASH_CLASS: Partial<Record<AssignedTaskStatus, string>> = {
 
 export function KanbanTaskCard({
   task,
+  studentId,
   resourceNameById,
   onEdit,
   onDuplicate,
@@ -33,6 +35,8 @@ export function KanbanTaskCard({
   onResizeEnd,
 }: {
   task: DetailTask;
+  // For loading the task's Kanıt Fotoğrafı (the camera icon).
+  studentId: string;
   resourceNameById?: Map<string, string>;
   onEdit: (task: DetailTask) => void;
   onDuplicate: (task: DetailTask) => void;
@@ -110,6 +114,7 @@ export function KanbanTaskCard({
           </div>
 
           <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", paintMode && "pointer-events-none opacity-30")}>
+            <EvidencePhotoButton studentId={studentId} task={task} />
             <Button
               type="button"
               variant="ghost"

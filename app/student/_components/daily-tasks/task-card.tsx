@@ -203,6 +203,16 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
               Reddedildi
             </span>
           )}
+          {task.evidence_review_status === "pending" && (
+            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+              Koç onayı bekleniyor
+            </span>
+          )}
+          {task.evidence_review_status === "rejected" && (
+            <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+              Kanıt onaylanmadı
+            </span>
+          )}
         </div>
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full

@@ -38,6 +38,8 @@ import {
 } from "../../actions";
 import { TASK_TYPE_LABELS, type StudentTask, type SubjectScore, type TopicMistake } from "./types";
 import { TopicMistakeSelector } from "./topic-mistake-selector";
+import { EvidenceUploader } from "./evidence-uploader";
+import type { ExamType } from "@/lib/exam-type";
 
 type Step = "form" | "analysis";
 
@@ -48,6 +50,7 @@ export function TaskModal({
   onSaved,
   initialStep = "form",
   openKey,
+  examType,
 }: {
   task: StudentTask | null;
   open: boolean;
@@ -58,6 +61,8 @@ export function TaskModal({
   // *same* task (even mid-flow, e.g. after finishing the analysis step)
   // always starts from a clean slate instead of resuming stale local state.
   openKey?: number;
+  // Kanıt Fotoğrafı (photo of the finished work) is offered to LGS students.
+  examType?: ExamType;
 }) {
   // Any task type that renders the Toplam/Doğru/Yanlış/Boş (or per-subject)
   // count grids needs the wider container -- narrowing this to just
@@ -82,6 +87,7 @@ export function TaskModal({
             onOpenChange={onOpenChange}
             onSaved={onSaved}
             initialStep={initialStep}
+            examType={examType}
           />
         )}
       </DialogContent>
@@ -236,11 +242,13 @@ function TaskModalBody({
   onOpenChange,
   onSaved,
   initialStep,
+  examType,
 }: {
   task: StudentTask;
   onOpenChange: (open: boolean) => void;
   onSaved: (task: StudentTask) => void;
   initialStep: Step;
+  examType?: ExamType;
 }) {
   const [step, setStep] = useState<Step>(initialStep);
   const [saving, setSaving] = useState(false);
@@ -1088,6 +1096,23 @@ function TaskModalBody({
               </div>
             )}
           </div>
+        )}
+
+        {(examType === "LGS" || (task.evidence_image_paths?.length ?? 0) > 0) && (
+          <EvidenceUploader
+            taskId={task.id}
+            paths={task.evidence_image_paths ?? []}
+            reviewStatus={task.evidence_review_status ?? "none"}
+            onChange={(next) =>
+              onSaved({
+                ...task,
+                evidence_image_paths: next.paths,
+                evidence_review_status: next.reviewStatus,
+                status: next.status as StudentTask["status"],
+                completed: next.status === "done",
+              })
+            }
+          />
         )}
 
         {showAnalysisFlow && task.analysis_pending && (
