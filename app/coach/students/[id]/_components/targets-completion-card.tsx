@@ -90,6 +90,7 @@ export function TargetsCompletionCard({
 
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
+          <p className="text-muted-foreground -mt-2 text-xs">Bu haftanın başından bugüne kadar olan görevler; sonraki günler sayılmaz.</p>
           <CompletionBar label="Genel" pct={completion.overall} />
           {/* TYT/AYT split is a YKS notion; for LGS these would be two
               permanently empty bars. */}

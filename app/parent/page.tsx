@@ -5,6 +5,7 @@ import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
+import { completionCounts, completionPercent } from "@/lib/completion";
 import { CompletionBar } from "./_components/completion-bar";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
@@ -52,12 +53,12 @@ function getWeekRange(referenceIso: string) {
   return { start, end: sunday.toISOString().slice(0, 10) };
 }
 
-type WeekTask = { status: "pending" | "done" | "half_done" | "not_done" };
+type WeekTask = { task_date: string; status: "pending" | "done" | "half_done" | "not_done" };
 
-function computeWeeklyCompletionPct(tasks: WeekTask[]) {
-  if (tasks.length === 0) return null;
-  const done = tasks.filter((t) => t.status === "done").length;
-  return Math.round((done / tasks.length) * 100);
+// Counts only what is due so far this week (Monday..today): tomorrow's tasks are
+// in neither the numerator nor the denominator (lib/completion.ts).
+function computeWeeklyCompletionPct(tasks: WeekTask[], today: string) {
+  return completionPercent(completionCounts(tasks, today));
 }
 
 // Softened per product decision: sums only the total questions solved --
@@ -153,7 +154,7 @@ async function fetchDashboardData() {
     completedCount,
     remaining: Math.max(0, profile.total_session_quota - completedCount),
     sessions,
-    weeklyCompletionPct: computeWeeklyCompletionPct(weekTasks),
+    weeklyCompletionPct: computeWeeklyCompletionPct(weekTasks, today),
     weekStat,
     programTasks,
     tytNetChartData,

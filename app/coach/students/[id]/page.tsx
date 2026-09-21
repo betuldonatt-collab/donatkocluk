@@ -20,6 +20,7 @@ import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
+import { tasksDueSoFar } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import type { TopicPerformanceRow } from "./_components/topic-performance-map";
 import type { WeakTopicRow } from "./weak-topic-map";
@@ -65,7 +66,11 @@ function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
   return "other";
 }
 
-function computeCompletionStats(tasks: DetailTask[]): CompletionStats {
+// Program completion counts only what is due so far this week (Monday..today,
+// lib/completion.ts) -- tasks scheduled for tomorrow or later are in neither
+// the numerator nor the denominator.
+function computeCompletionStats(allTasks: DetailTask[], today: string): CompletionStats {
+  const tasks = tasksDueSoFar(allTasks, today);
   const buckets = {
     overall: { done: 0, total: 0 },
     tyt: { done: 0, total: 0 },
@@ -87,9 +92,9 @@ function computeCompletionStats(tasks: DetailTask[]): CompletionStats {
 // Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
 // (paragraf/problem) aren't real curriculum subjects, so they're excluded
 // here even though they're valid course_ids elsewhere in the app.
-function computeSubjectCompletion(tasks: DetailTask[]): SubjectCompletion[] {
+function computeSubjectCompletion(allTasks: DetailTask[], today: string): SubjectCompletion[] {
   const buckets = new Map<string, { done: number; total: number }>();
-  for (const t of tasks) {
+  for (const t of tasksDueSoFar(allTasks, today)) {
     if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
     const bucket = buckets.get(t.course_id) ?? { done: 0, total: 0 };
     bucket.total += 1;
@@ -481,8 +486,8 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
-    completion: computeCompletionStats(tasks),
-    subjectCompletion: computeSubjectCompletion(tasks),
+    completion: computeCompletionStats(tasks, today),
+    subjectCompletion: computeSubjectCompletion(tasks, today),
     topicPerformance: topicPerformanceWithQuestions,
     gelisimHaritasi,
     sessions,

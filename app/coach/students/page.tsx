@@ -4,6 +4,7 @@ import { BookOpen, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { completionCounts, completionPercent } from "@/lib/completion";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
@@ -34,24 +35,22 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
       .from("profiles")
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
-    supabase.from("student_tasks").select("student_id, status").in("student_id", studentIds),
+    supabase.from("student_tasks").select("student_id, status, task_date").in("student_id", studentIds),
   ]);
 
-  const totalsByStudent = new Map<string, { total: number; done: number }>();
+  // Only this week's tasks that are due by today count (lib/completion.ts).
+  const today = new Date().toISOString().slice(0, 10);
+  const tasksByStudent = new Map<string, { task_date: string; status: string }[]>();
   for (const t of taskRows ?? []) {
-    const bucket = totalsByStudent.get(t.student_id) ?? { total: 0, done: 0 };
-    bucket.total += 1;
-    if (t.status === "done") bucket.done += 1;
-    totalsByStudent.set(t.student_id, bucket);
+    const list = tasksByStudent.get(t.student_id) ?? [];
+    list.push({ task_date: t.task_date, status: t.status });
+    tasksByStudent.set(t.student_id, list);
   }
 
-  return (profiles ?? []).map((p) => {
-    const bucket = totalsByStudent.get(p.id);
-    return {
-      ...p,
-      completionPct: bucket && bucket.total > 0 ? Math.round((bucket.done / bucket.total) * 100) : null,
-    };
-  });
+  return (profiles ?? []).map((p) => ({
+    ...p,
+    completionPct: completionPercent(completionCounts(tasksByStudent.get(p.id) ?? [], today)),
+  }));
 }
 
 function formatTarget(row: StudentRow) {
@@ -117,7 +116,7 @@ export default async function CoachStudentsPage() {
                       {completionDotClass(row.completionPct) && (
                         <span
                           className={cn("size-2 shrink-0 rounded-full", completionDotClass(row.completionPct))}
-                          title={`Genel tamamlama: %${row.completionPct}`}
+                          title={`Bu hafta bugüne kadar tamamlama: %${row.completionPct}`}
                         />
                       )}
                       {row.full_name ?? "İsimsiz Öğrenci"}
