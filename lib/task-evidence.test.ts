@@ -6,6 +6,11 @@ import {
   isEvidenceMimeType,
   isEvidencePathFor,
   shouldHoldForEvidenceReview,
+  applyPhotoDecisions,
+  evidenceOutcome,
+  normalizePhotoStatus,
+  withoutPath,
+  withoutRejected,
 } from "./task-evidence";
 
 const STUDENT = "11111111-1111-4111-8111-111111111111";
@@ -72,5 +77,56 @@ describe("shouldHoldForEvidenceReview", () => {
 
   it("leaves a self-created task that is itself awaiting approval to the existing flow", () => {
     expect(shouldHoldForEvidenceReview({ ...base, inApprovalFlow: false })).toBe(false);
+  });
+});
+
+describe("evidenceOutcome", () => {
+  const paths = ["a", "b", "c"];
+
+  it("is approved only when every photo is approved", () => {
+    expect(evidenceOutcome(paths, { a: "approved", b: "approved", c: "approved" })).toBe("approved");
+  });
+
+  it("sends the task back as soon as ANY photo is rejected, even with others undecided", () => {
+    expect(evidenceOutcome(paths, { a: "approved", b: "rejected", c: "approved" })).toBe("rejected");
+    expect(evidenceOutcome(paths, { b: "rejected" })).toBe("rejected");
+  });
+
+  it("stays pending while a photo has no verdict and none is rejected", () => {
+    expect(evidenceOutcome(paths, { a: "approved", b: "approved" })).toBe("pending");
+    expect(evidenceOutcome(paths, {})).toBe("pending");
+  });
+
+  it("is pending for a task with no photos", () => {
+    expect(evidenceOutcome([], {})).toBe("pending");
+  });
+
+  it("ignores verdicts for photos the task no longer has", () => {
+    expect(evidenceOutcome(["a"], { a: "approved", gone: "rejected" })).toBe("approved");
+  });
+});
+
+describe("photo status helpers", () => {
+  it("normalizePhotoStatus keeps only known verdicts", () => {
+    expect(normalizePhotoStatus({ a: "approved", b: "rejected", c: "maybe", d: 1 })).toEqual({ a: "approved", b: "rejected" });
+    expect(normalizePhotoStatus(null)).toEqual({});
+    expect(normalizePhotoStatus(["a"])).toEqual({});
+  });
+
+  it("withoutRejected clears rejected verdicts and keeps approved ones", () => {
+    expect(withoutRejected({ a: "approved", b: "rejected" })).toEqual({ a: "approved" });
+  });
+
+  it("withoutPath drops one photo's verdict", () => {
+    expect(withoutPath({ a: "approved", b: "rejected" }, "b")).toEqual({ a: "approved" });
+  });
+
+  it("applyPhotoDecisions merges verdicts, drops stale paths and ignores unknown ones", () => {
+    expect(
+      applyPhotoDecisions(["a", "b"], { a: "approved", stale: "rejected" }, [
+        { path: "b", decision: "rejected" },
+        { path: "nope", decision: "approved" },
+      ]),
+    ).toEqual({ a: "approved", b: "rejected" });
   });
 });

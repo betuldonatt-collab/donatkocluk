@@ -8,12 +8,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { EvidenceLightbox } from "@/components/evidence-lightbox";
+import { EvidenceReviewDialog } from "../../_components/evidence-review-dialog";
 import { findCourseById } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
 import {
   approveStudentTask,
-  getTaskEvidenceUrlsForCoach,
   rejectStudentTask,
   type ApprovalActionResult,
   type PendingStudentTask,
@@ -64,32 +63,28 @@ function groupByStudent(tasks: PendingTask[]): StudentGroup[] {
   return order.map((id) => byStudent.get(id)!);
 }
 
-// "Fotoğrafları Gör (N)" on a row that carries Kanıt Fotoğrafı: the coach looks
-// at every uploaded photo (lightbox, signed URLs fetched on click) before
-// choosing Onayla or Reddet.
-function EvidencePhotos({ task }: { task: PendingTask }) {
+// "Fotoğrafları Gör (N)" on a row that carries Kanıt Fotoğrafı: opens the photo
+// review -- the coach looks at every photo and can approve or reject each one
+// (or all at once) before, or instead of, the row's own Onayla / Reddet. Saving a
+// verdict that settles the task (approved, or sent back) takes it off this list.
+function EvidencePhotos({ task, onResolved }: { task: PendingTask; onResolved: (taskId: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [urls, setUrls] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleOpen() {
-    setOpen(true);
-    setLoading(true);
-    setError(null);
-    const result = await getTaskEvidenceUrlsForCoach(task.studentId, task.id);
-    if (result.ok) setUrls(result.urls);
-    else setError(result.error);
-    setLoading(false);
-  }
 
   return (
     <>
-      <Button type="button" size="sm" variant="outline" className="gap-1" onClick={handleOpen}>
+      <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => setOpen(true)}>
         <Camera className="size-3.5" />
-        Fotoğrafları Gör ({task.evidenceCount})
+        Fotoğrafları İncele ({task.evidenceCount})
       </Button>
-      <EvidenceLightbox open={open} onOpenChange={setOpen} title={task.title} urls={urls} loading={loading} error={error} />
+      {open && (
+        <EvidenceReviewDialog
+          studentId={task.studentId}
+          taskId={task.id}
+          title={task.title}
+          onClose={() => setOpen(false)}
+          onReviewed={(outcome) => outcome !== "pending" && onResolved(task.id)}
+        />
+      )}
     </>
   );
 }
@@ -317,7 +312,7 @@ function ApprovalsDialog({
                               )}
                             </div>
                             <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              {task.evidenceCount > 0 && <EvidencePhotos task={task} />}
+                              {task.evidenceCount > 0 && <EvidencePhotos task={task} onResolved={onRemove} />}
                               <Button type="button" size="sm" disabled={isActing} onClick={() => handleApprove(task)}>
                                 {isActing && actingType === "approve" ? "Onaylanıyor..." : "Onayla"}
                               </Button>

@@ -57,6 +57,10 @@ export type DetailTask = {
   analysis_pending: boolean;
   // Kanıt Fotoğrafı: Storage paths of the photos the student attached (0087).
   evidence_image_paths?: string[];
+  // Where the coach's review of those photos stands (0088) and the per-photo
+  // verdicts (0089).
+  evidence_review_status?: "none" | "pending" | "approved" | "rejected";
+  evidence_photo_status?: Record<string, "approved" | "rejected">;
 };
 
 export type DetailSession = {

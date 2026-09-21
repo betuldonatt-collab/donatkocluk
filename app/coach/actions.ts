@@ -10,7 +10,14 @@ import { isValidISODateOnly } from "@/lib/chart-range";
 import { countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
 import { normalizeLgsScores } from "@/lib/lgs-exam";
-import { EVIDENCE_BUCKET, isEvidencePathFor } from "@/lib/task-evidence";
+import {
+  EVIDENCE_BUCKET,
+  applyPhotoDecisions,
+  evidenceOutcome,
+  isEvidencePathFor,
+  normalizePhotoStatus,
+  type PhotoDecision,
+} from "@/lib/task-evidence";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
 import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
@@ -1665,6 +1672,97 @@ async function resolvePendingApprovalNotification(supabase: SupabaseClient, coac
 // banner. Genuine errors still throw, same as every other action here.
 export type ApprovalActionResult<T> = { success: true; data: T } | { success: false; code: "ALREADY_PROCESSED" };
 
+// --- Kanıt Fotoğrafı: per-photo review (migration 0089) -----------------------
+//
+// The coach gives EACH photo a verdict (Onayla / Reddet); the task follows from
+// them: any rejected photo sends the whole task back to the student (not
+// completed), and only when every photo is approved does the student's claimed
+// status apply. A partial set of verdicts with none rejected leaves the task
+// waiting. "Approve all" / "reject all" and the task-level Onayla / Reddet buttons
+// are the same thing with a verdict for every photo.
+
+export type EvidenceReviewOutcome = "approved" | "rejected" | "pending";
+export type ReviewEvidenceResult =
+  | { success: true; outcome: EvidenceReviewOutcome }
+  | { success: false; code: "ALREADY_PROCESSED" };
+
+const evidenceDecisionsSchema = z
+  .array(z.object({ path: z.string().min(1).max(300), decision: z.enum(["approved", "rejected"]) }))
+  .min(1)
+  .max(500);
+
+async function applyEvidenceDecisions(
+  supabase: SupabaseClient,
+  coachId: string,
+  taskId: string,
+  decide: { all: PhotoDecision } | { list: { path: string; decision: PhotoDecision }[] },
+): Promise<ReviewEvidenceResult> {
+  const { data: task, error: fetchError } = await supabase
+    .from("student_tasks")
+    .select("student_id, task_date, evidence_image_paths, evidence_photo_status, evidence_review_status, evidence_pending_status")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (fetchError) throw dbError(fetchError);
+  if (!task) return { success: false, code: "ALREADY_PROCESSED" };
+  await requireCoachAccess(supabase, coachId, task.student_id);
+  if (task.evidence_review_status !== "pending") return { success: false, code: "ALREADY_PROCESSED" };
+
+  const paths = (task.evidence_image_paths ?? []) as string[];
+  const decisions = "all" in decide ? paths.map((path) => ({ path, decision: decide.all })) : decide.list;
+  const photoStatus = applyPhotoDecisions(paths, normalizePhotoStatus(task.evidence_photo_status), decisions);
+  const outcome = evidenceOutcome(paths, photoStatus);
+  const claimed = task.evidence_pending_status ?? "done";
+  const base = { evidence_photo_status: photoStatus, updated_at: new Date().toISOString() };
+  const update =
+    outcome === "approved"
+      ? { ...base, evidence_review_status: "approved", evidence_pending_status: null, status: claimed, completed: claimed === "done" }
+      : outcome === "rejected"
+        ? {
+            ...base,
+            evidence_review_status: "rejected",
+            evidence_pending_status: null,
+            status: "pending",
+            completed: false,
+            rejection_reason: "Koç kanıt fotoğrafını onaylamadı.",
+          }
+        : base;
+
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .update(update)
+    .eq("id", taskId)
+    .eq("evidence_review_status", "pending")
+    .select("*");
+  if (error) throw dbError(error);
+  if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
+
+  if (outcome === "approved") {
+    // The task now counts as done: resync its topic bucket and the student's day total.
+    if (data[0].course_id) await recomputeTopicStats(supabase, task.student_id, data[0].course_id, data[0].topic_id);
+    await recomputeDailyStatsForStudent(supabase, task.student_id, task.task_date);
+  }
+  if (outcome !== "pending") await resolvePendingApprovalNotification(supabase, coachId, taskId);
+
+  revalidatePath(`/coach/students/${task.student_id}`);
+  revalidatePath("/student");
+  revalidatePath("/coach/dashboard");
+  return { success: true, outcome };
+}
+
+// Verdicts for individual photos (the per-photo Onayla / Reddet in the review
+// lightbox, and its bulk buttons).
+export async function reviewEvidencePhotos(
+  taskId: string,
+  decisions: { path: string; decision: PhotoDecision }[],
+): Promise<ReviewEvidenceResult> {
+  await assertNotImpersonating();
+  const taskIdV = parseInput(uuidSchema, taskId);
+  const decisionsV = parseInput(evidenceDecisionsSchema, decisions);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  return applyEvidenceDecisions(supabase, user.id, taskIdV, { list: decisionsV });
+}
+
 export async function approveStudentTask(taskId: string): Promise<ApprovalActionResult<Record<string, unknown>>> {
   await assertNotImpersonating();
   const taskIdV = parseInput(uuidSchema, taskId);
@@ -1683,33 +1781,11 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
   await requireCoachAccess(supabase, user.id, existing.student_id);
 
   // Kanıt Fotoğrafı: the student completed this task with photos and it has been
-  // held as pending. Approving applies the outcome they reported.
+  // held as pending. Onayla approves every photo, which applies the outcome the
+  // student reported (individual photos: reviewEvidencePhotos).
   if (existing.evidence_review_status === "pending") {
-    const finalStatus = existing.evidence_pending_status ?? "done";
-    const { data, error } = await supabase
-      .from("student_tasks")
-      .update({
-        evidence_review_status: "approved",
-        evidence_pending_status: null,
-        status: finalStatus,
-        completed: finalStatus === "done",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", taskIdV)
-      .eq("evidence_review_status", "pending")
-      .select("*");
-    if (error) throw dbError(error);
-    if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
-
-    // The task now counts as done: resync its topic bucket and the student's day total.
-    if (data[0].course_id) await recomputeTopicStats(supabase, existing.student_id, data[0].course_id, data[0].topic_id);
-    await recomputeDailyStatsForStudent(supabase, existing.student_id, existing.task_date);
-    await resolvePendingApprovalNotification(supabase, user.id, taskIdV);
-
-    revalidatePath(`/coach/students/${existing.student_id}`);
-    revalidatePath("/student");
-    revalidatePath("/coach/dashboard");
-    return { success: true, data: data[0] };
+    const result = await applyEvidenceDecisions(supabase, user.id, taskIdV, { all: "approved" });
+    return result.success ? { success: true, data: { outcome: result.outcome } } : result;
   }
 
   // Already approved (a second tab, or two coaches on a shared roster)
@@ -1778,30 +1854,12 @@ export async function rejectStudentTask(taskId: string): Promise<ApprovalActionR
   await requireCoachAccess(supabase, user.id, existing.student_id);
 
   // Kanıt Fotoğrafı: the task itself stays (it is the coach's own assignment) --
-  // it is sent back as not completed, the photos stay, and the student can fix
-  // them and mark it done again, which puts it back in this queue.
+  // Reddet rejects every photo, which sends it back as not completed. The photos
+  // stay, and the student can fix them and mark it done again, which puts it
+  // back in this queue.
   if (existing.evidence_review_status === "pending") {
-    const { data, error } = await supabase
-      .from("student_tasks")
-      .update({
-        evidence_review_status: "rejected",
-        evidence_pending_status: null,
-        status: "pending",
-        completed: false,
-        rejection_reason: "Koç kanıt fotoğrafını onaylamadı.",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", taskIdV)
-      .eq("evidence_review_status", "pending")
-      .select("id");
-    if (error) throw dbError(error);
-    if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
-
-    await resolvePendingApprovalNotification(supabase, user.id, taskIdV);
-    revalidatePath(`/coach/students/${existing.student_id}`);
-    revalidatePath("/student");
-    revalidatePath("/coach/dashboard");
-    return { success: true, data: { id: taskIdV } };
+    const result = await applyEvidenceDecisions(supabase, user.id, taskIdV, { all: "rejected" });
+    return result.success ? { success: true, data: { id: taskIdV } } : result;
   }
 
   if (existing.is_coach_assigned || existing.is_approved_by_coach) {
@@ -3393,13 +3451,16 @@ export async function reviewFocusSession(reviewId: string, decision: FocusReview
   }
 }
 
-// Kanıt Fotoğrafı (migration 0087): signed URLs for the photos a student attached
-// to one of their tasks. The coach must have the student on their roster; the
-// storage policy checks the same thing again when the URL is signed.
-export async function getTaskEvidenceUrlsForCoach(
+// Kanıt Fotoğrafı (migration 0087): the photos a student attached to one of their
+// tasks, each with a signed (short-lived) URL and its current verdict (null = not
+// reviewed yet). The coach must have the student on their roster; the storage
+// policy checks the same thing again when the URL is signed.
+export type CoachEvidencePhoto = { path: string; url: string; status: PhotoDecision | null };
+
+export async function getTaskEvidenceForCoach(
   studentId: string,
   taskId: string,
-): Promise<{ ok: true; urls: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; photos: CoachEvidencePhoto[]; reviewStatus: string } | { ok: false; error: string }> {
   try {
     const studentIdV = parseInput(uuidSchema, studentId);
     const taskIdV = parseInput(uuidSchema, taskId);
@@ -3409,19 +3470,26 @@ export async function getTaskEvidenceUrlsForCoach(
 
     const { data: task, error: taskError } = await supabase
       .from("student_tasks")
-      .select("evidence_image_paths")
+      .select("evidence_image_paths, evidence_photo_status, evidence_review_status")
       .eq("id", taskIdV)
       .eq("student_id", studentIdV)
       .maybeSingle();
     if (taskError) throw dbError(taskError);
+    const reviewStatus = (task?.evidence_review_status ?? "none") as string;
     const paths = ((task?.evidence_image_paths ?? []) as string[]).filter((p) => isEvidencePathFor(p, studentIdV, taskIdV));
-    if (paths.length === 0) return { ok: true, urls: [] };
+    if (paths.length === 0) return { ok: true, photos: [], reviewStatus };
 
-    const { data, error } = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrls(paths, 3600);
+    const { data: signed, error } = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrls(paths, 3600);
     if (error) throw error;
-    return { ok: true, urls: (data ?? []).map((d) => d.signedUrl).filter((u): u is string => !!u) };
+    const urlByPath = new Map((signed ?? []).map((d) => [d.path, d.signedUrl]));
+    const statuses = normalizePhotoStatus(task?.evidence_photo_status);
+    const photos = paths.flatMap((path) => {
+      const url = urlByPath.get(path);
+      return url ? [{ path, url, status: statuses[path] ?? null }] : [];
+    });
+    return { ok: true, photos, reviewStatus };
   } catch (e) {
-    console.error("[getTaskEvidenceUrlsForCoach] failed:", e);
+    console.error("[getTaskEvidenceForCoach] failed:", e);
     return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }
 }

@@ -20,7 +20,11 @@ import {
   evidencePath,
   isEvidenceMimeType,
   isEvidencePathFor,
+  normalizePhotoStatus,
   shouldHoldForEvidenceReview,
+  withoutPath,
+  withoutRejected,
+  type PhotoStatusMap,
 } from "@/lib/task-evidence";
 import { EXAMS_PAGE_SIZE } from "./constants";
 
@@ -111,7 +115,7 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
     .select(
-      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, total_count, correct_count, wrong_count, empty_count",
+      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count",
     )
     .eq("id", taskIdV)
     .maybeSingle();
@@ -210,7 +214,11 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   // the coach's approval screen (getPendingStudentTasks) exactly like a
   // self-created extra task. approveStudentTask then applies the claimed status.
   // The DB trigger (0088) refuses the same write if it ever bypasses this.
-  let evidenceHold: { evidence_review_status: "pending"; evidence_pending_status: "done" | "half_done" } | null = null;
+  let evidenceHold: {
+    evidence_review_status: "pending";
+    evidence_pending_status: "done" | "half_done";
+    evidence_photo_status: PhotoStatusMap;
+  } | null = null;
   const claimedStatus = patchV.status;
   if (
     (claimedStatus === "done" || claimedStatus === "half_done") &&
@@ -221,7 +229,13 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
       reviewStatus: existing.evidence_review_status ?? "none",
     })
   ) {
-    evidenceHold = { evidence_review_status: "pending", evidence_pending_status: claimedStatus };
+    // Resubmitting puts every photo the coach rejected back up for review; the
+    // ones already approved stay approved.
+    evidenceHold = {
+      evidence_review_status: "pending",
+      evidence_pending_status: claimedStatus,
+      evidence_photo_status: withoutRejected(normalizePhotoStatus(existing.evidence_photo_status)),
+    };
     patchV.status = "pending";
     patchV.completed = false;
   }
@@ -1426,7 +1440,7 @@ export async function reconcileStaleFocusSessions(): Promise<void> {
 // the file) plus the underlying code/message, so a failure can be diagnosed from
 // the screen without digging through server logs.
 export type EvidenceResult =
-  | { ok: true; paths: string[]; reviewStatus: string; status: string }
+  | { ok: true; paths: string[]; reviewStatus: string; status: string; photoStatus: PhotoStatusMap }
   | { ok: false; error: string; detail?: string };
 
 // A failure at one named step of an evidence action.
@@ -1461,14 +1475,14 @@ async function loadOwnEvidence(supabase: SupabaseClient, userId: string, taskId:
   const { data, error } = await supabase
     .from("student_tasks")
     .select(
-      "student_id, task_date, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, evidence_image_paths, evidence_review_status, evidence_pending_status",
+      "student_id, task_date, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, evidence_image_paths, evidence_review_status, evidence_pending_status, evidence_photo_status",
     )
     .eq("id", taskId)
     .eq("student_id", userId)
     .maybeSingle();
   if (error) throw evidenceStepError("task", error);
   if (!data) throw new Error("Bu görev sana ait değil.");
-  return { ...data, paths: (data.evidence_image_paths ?? []) as string[] };
+  return { ...data, paths: (data.evidence_image_paths ?? []) as string[], photoStatus: normalizePhotoStatus(data.evidence_photo_status) };
 }
 
 function evidenceError(label: string, e: unknown): { ok: false; error: string; detail?: string } {
@@ -1510,6 +1524,7 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
       status: task.status,
       reviewStatus: task.evidence_review_status ?? "none",
     });
+    const photoStatus = hold ? withoutRejected(task.photoStatus) : task.photoStatus;
     const update = hold
       ? {
           evidence_image_paths: paths,
@@ -1517,6 +1532,7 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
           completed: false,
           evidence_review_status: "pending",
           evidence_pending_status: task.status,
+          evidence_photo_status: photoStatus,
           updated_at: new Date().toISOString(),
         }
       : { evidence_image_paths: paths, updated_at: new Date().toISOString() };
@@ -1536,6 +1552,7 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
       paths,
       reviewStatus: hold ? "pending" : (task.evidence_review_status ?? "none"),
       status: hold ? "pending" : task.status,
+      photoStatus,
     };
   } catch (e) {
     return evidenceError("uploadTaskEvidence", e);
@@ -1568,7 +1585,13 @@ export async function removeTaskEvidence(taskId: string, path: string): Promise<
 
     const task = await loadOwnEvidence(supabase, user.id, taskIdV);
     if (!task.paths.includes(path)) {
-      return { ok: true, paths: task.paths, reviewStatus: task.evidence_review_status ?? "none", status: task.status };
+      return {
+        ok: true,
+        paths: task.paths,
+        reviewStatus: task.evidence_review_status ?? "none",
+        status: task.status,
+        photoStatus: task.photoStatus,
+      };
     }
 
     const paths = task.paths.filter((p) => p !== path);
@@ -1577,16 +1600,19 @@ export async function removeTaskEvidence(taskId: string, path: string): Promise<
     // proof to review); a rejected one simply clears the rejection.
     const release = paths.length === 0 && (task.evidence_review_status === "pending" || task.evidence_review_status === "rejected");
     const restoredStatus = task.evidence_review_status === "pending" ? (task.evidence_pending_status ?? "done") : task.status;
+    // The photo's verdict goes with it.
+    const photoStatus = release ? {} : withoutPath(task.photoStatus, path);
     const update = release
       ? {
           evidence_image_paths: paths,
           evidence_review_status: "none",
           evidence_pending_status: null,
+          evidence_photo_status: photoStatus,
           status: restoredStatus,
           completed: restoredStatus === "done",
           updated_at: new Date().toISOString(),
         }
-      : { evidence_image_paths: paths, updated_at: new Date().toISOString() };
+      : { evidence_image_paths: paths, evidence_photo_status: photoStatus, updated_at: new Date().toISOString() };
 
     const { error: updateError } = await supabase.from("student_tasks").update(update).eq("id", taskIdV).eq("student_id", user.id);
     if (updateError) throw evidenceStepError("record", updateError);
@@ -1602,6 +1628,7 @@ export async function removeTaskEvidence(taskId: string, path: string): Promise<
       paths,
       reviewStatus: release ? "none" : (task.evidence_review_status ?? "none"),
       status: release ? restoredStatus : task.status,
+      photoStatus,
     };
   } catch (e) {
     return evidenceError("removeTaskEvidence", e);

@@ -55,6 +55,9 @@ export type StudentTask = {
   // Coach review of those photos (0088): a completed photo-backed task is held
   // as status "pending" until the coach approves it.
   evidence_review_status?: "none" | "pending" | "approved" | "rejected";
+  // The coach's verdict per photo (0089): storage path -> approved / rejected.
+  // A photo that is not in the map has not been reviewed yet.
+  evidence_photo_status?: Record<string, "approved" | "rejected">;
   status: TaskStatus;
   reason: string | null;
   note: string | null;

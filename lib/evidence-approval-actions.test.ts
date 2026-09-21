@@ -34,6 +34,7 @@ function baseTask(overrides: Row = {}): Row {
     evidence_image_paths: [`${USER}/${TASK}/a.jpg`, `${USER}/${TASK}/b.jpg`],
     evidence_review_status: "none",
     evidence_pending_status: null,
+    evidence_photo_status: {},
     total_count: 20,
     correct_count: null,
     wrong_count: null,
@@ -91,8 +92,8 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/impersonation", () => ({ assertNotImpersonating: async () => {}, getViewContext: async () => null }));
 vi.mock("@sentry/nextjs", () => ({ captureException: () => {} }));
 
-import { updateTaskProgress, uploadTaskEvidence } from "../app/student/actions";
-import { approveStudentTask, rejectStudentTask } from "../app/coach/actions";
+import { removeTaskEvidence, updateTaskProgress, uploadTaskEvidence } from "../app/student/actions";
+import { approveStudentTask, rejectStudentTask, reviewEvidencePhotos } from "../app/coach/actions";
 
 function taskUpdate(): Row {
   return state.updates.find((u) => u.table === "student_tasks")!.payload;
@@ -256,5 +257,104 @@ describe("coach approves / rejects a held task", () => {
     expect(await approveStudentTask(TASK)).toEqual({ success: false, code: "ALREADY_PROCESSED" });
     expect(await rejectStudentTask(TASK)).toEqual({ success: false, code: "ALREADY_PROCESSED" });
     expect(state.updates).toHaveLength(0);
+  });
+});
+
+const A = `${USER}/${TASK}/a.jpg`;
+const B = `${USER}/${TASK}/b.jpg`;
+
+describe("per-photo review by the coach", () => {
+  beforeEach(() => {
+    state.task = baseTask({ evidence_review_status: "pending", evidence_pending_status: "done" });
+  });
+
+  it("rejecting ONE photo sends the whole task back, keeping the other verdict", async () => {
+    const result = await reviewEvidencePhotos(TASK, [
+      { path: A, decision: "approved" },
+      { path: B, decision: "rejected" },
+    ]);
+    expect(result).toEqual({ success: true, outcome: "rejected" });
+    expect(taskUpdate()).toMatchObject({
+      evidence_review_status: "rejected",
+      status: "pending",
+      completed: false,
+      evidence_photo_status: { [A]: "approved", [B]: "rejected" },
+    });
+  });
+
+  it("approving every photo completes the task with the status the student claimed", async () => {
+    const result = await reviewEvidencePhotos(TASK, [
+      { path: A, decision: "approved" },
+      { path: B, decision: "approved" },
+    ]);
+    expect(result).toEqual({ success: true, outcome: "approved" });
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "approved", status: "done", completed: true });
+  });
+
+  it("rejects a task on a single rejection even when the other photo is still undecided", async () => {
+    const result = await reviewEvidencePhotos(TASK, [{ path: B, decision: "rejected" }]);
+    expect(result).toEqual({ success: true, outcome: "rejected" });
+  });
+
+  it("keeps the task waiting when only some photos are approved", async () => {
+    const result = await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }]);
+    expect(result).toEqual({ success: true, outcome: "pending" });
+    const update = taskUpdate();
+    expect(update).toMatchObject({ evidence_photo_status: { [A]: "approved" } });
+    expect(update).not.toHaveProperty("evidence_review_status");
+    expect(update).not.toHaveProperty("status");
+  });
+
+  it("ignores a verdict for a photo the task does not have", async () => {
+    await reviewEvidencePhotos(TASK, [
+      { path: A, decision: "approved" },
+      { path: "someone-else/x.jpg", decision: "rejected" },
+    ]);
+    expect(taskUpdate().evidence_photo_status).toEqual({ [A]: "approved" });
+  });
+
+  it("does nothing for a task that is not waiting for review", async () => {
+    state.task = baseTask({ evidence_review_status: "none" });
+    expect(await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }])).toEqual({
+      success: false,
+      code: "ALREADY_PROCESSED",
+    });
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("the bulk Onayla / Reddet buttons give every photo the same verdict", async () => {
+    await approveStudentTask(TASK);
+    expect(taskUpdate().evidence_photo_status).toEqual({ [A]: "approved", [B]: "approved" });
+    state.updates = [];
+    await rejectStudentTask(TASK);
+    expect(taskUpdate().evidence_photo_status).toEqual({ [A]: "rejected", [B]: "rejected" });
+  });
+});
+
+describe("student side of per-photo review", () => {
+  it("resubmitting clears the rejected verdicts (up for review again) and keeps the approved ones", async () => {
+    state.task = baseTask({
+      evidence_review_status: "rejected",
+      evidence_photo_status: { [A]: "rejected", [B]: "approved" },
+    });
+    await updateTaskProgress(TASK, { status: "done", completed: true });
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "pending", evidence_photo_status: { [B]: "approved" } });
+  });
+
+  it("deleting a photo drops its verdict but leaves the task's review state alone", async () => {
+    state.task = baseTask({
+      evidence_review_status: "rejected",
+      evidence_photo_status: { [A]: "rejected", [B]: "approved" },
+    });
+    const result = await removeTaskEvidence(TASK, A);
+    expect(result).toMatchObject({ ok: true, paths: [B], reviewStatus: "rejected", photoStatus: { [B]: "approved" } });
+    expect(taskUpdate()).toMatchObject({ evidence_image_paths: [B], evidence_photo_status: { [B]: "approved" } });
+    expect(taskUpdate()).not.toHaveProperty("evidence_review_status");
+  });
+
+  it("a new upload after a resubmission starts unreviewed", async () => {
+    state.task = baseTask({ evidence_image_paths: [B], evidence_photo_status: { [B]: "approved" }, status: "pending" });
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result.ok && result.photoStatus).toEqual({ [B]: "approved" });
   });
 });

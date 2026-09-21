@@ -1,34 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { EvidenceLightbox } from "@/components/evidence-lightbox";
-import { getTaskEvidenceUrlsForCoach } from "../../../../actions";
+import { EvidenceReviewDialog } from "../../../../_components/evidence-review-dialog";
 import type { DetailTask } from "../../types";
 
 // Small camera icon on a task card when the student attached Kanıt Fotoğrafı to
-// it; click opens the lightbox. Renders nothing for a task without photos. The
-// (signed, short-lived) URLs are fetched on click, not when the board loads.
+// it; click opens the photo review (per-photo Onayla / Reddet when the task is
+// waiting for review, read-only with the verdicts otherwise). Renders nothing for
+// a task without photos. The photos are fetched when the dialog opens, not when
+// the board loads.
 export function EvidencePhotoButton({ studentId, task }: { studentId: string; task: DetailTask }) {
+  const router = useRouter();
   const count = task.evidence_image_paths?.length ?? 0;
   const [open, setOpen] = useState(false);
-  const [urls, setUrls] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (count === 0) return null;
 
-  async function handleOpen() {
-    setOpen(true);
-    setLoading(true);
-    setError(null);
-    const result = await getTaskEvidenceUrlsForCoach(studentId, task.id);
-    if (result.ok) setUrls(result.urls);
-    else setError(result.error);
-    setLoading(false);
-  }
+  const waiting = task.evidence_review_status === "pending";
 
   return (
     <>
@@ -36,14 +28,22 @@ export function EvidencePhotoButton({ studentId, task }: { studentId: string; ta
         type="button"
         variant="ghost"
         size="icon"
-        className="size-5 text-sky-600 hover:text-sky-700"
-        onClick={handleOpen}
-        aria-label={`Kanıt fotoğrafını gör (${count})`}
-        title={`Kanıt fotoğrafı (${count})`}
+        className={waiting ? "size-5 text-amber-600 hover:text-amber-700" : "size-5 text-sky-600 hover:text-sky-700"}
+        onClick={() => setOpen(true)}
+        aria-label={`Kanıt fotoğraflarını gör (${count})`}
+        title={waiting ? `Kanıt fotoğrafı (${count}) — onayını bekliyor` : `Kanıt fotoğrafı (${count})`}
       >
         <Camera className="size-3" />
       </Button>
-      <EvidenceLightbox open={open} onOpenChange={setOpen} title={task.title} urls={urls} loading={loading} error={error} />
+      {open && (
+        <EvidenceReviewDialog
+          studentId={studentId}
+          taskId={task.id}
+          title={task.title}
+          onClose={() => setOpen(false)}
+          onReviewed={() => router.refresh()}
+        />
+      )}
     </>
   );
 }

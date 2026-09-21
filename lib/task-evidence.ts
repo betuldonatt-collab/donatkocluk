@@ -68,3 +68,55 @@ export function shouldHoldForEvidenceReview(input: {
     input.reviewStatus !== "approved"
   );
 }
+
+// --- Per-photo review (student_tasks.evidence_photo_status, 0089) ------------
+//
+// A map storage-path -> verdict. A path that is not in it is still waiting for
+// the coach. The task-level review status is the summary of these verdicts.
+
+export type PhotoDecision = "approved" | "rejected";
+export type PhotoStatusMap = Record<string, PhotoDecision>;
+
+// The jsonb column as it comes back from the database, sanitised to a plain map
+// of known verdicts (anything else is dropped).
+export function normalizePhotoStatus(raw: unknown): PhotoStatusMap {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: PhotoStatusMap = {};
+  for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value === "approved" || value === "rejected") out[path] = value;
+  }
+  return out;
+}
+
+// What the verdicts add up to for the task: any rejected photo sends the whole
+// task back; only when EVERY photo is approved is the task approved; otherwise
+// it is still waiting.
+export function evidenceOutcome(paths: string[], statuses: PhotoStatusMap): "approved" | "rejected" | "pending" {
+  if (paths.some((p) => statuses[p] === "rejected")) return "rejected";
+  if (paths.length > 0 && paths.every((p) => statuses[p] === "approved")) return "approved";
+  return "pending";
+}
+
+// Resubmitting clears the rejected verdicts (those photos are up for review
+// again); approved ones stay.
+export function withoutRejected(statuses: PhotoStatusMap): PhotoStatusMap {
+  return Object.fromEntries(Object.entries(statuses).filter(([, v]) => v !== "rejected"));
+}
+
+// Deleting a photo drops its verdict too.
+export function withoutPath(statuses: PhotoStatusMap, path: string): PhotoStatusMap {
+  return Object.fromEntries(Object.entries(statuses).filter(([p]) => p !== path));
+}
+
+// Applies the coach's verdicts to the current map, ignoring any path the task
+// does not actually have.
+export function applyPhotoDecisions(
+  paths: string[],
+  current: PhotoStatusMap,
+  decisions: { path: string; decision: PhotoDecision }[],
+): PhotoStatusMap {
+  const next: PhotoStatusMap = {};
+  for (const p of paths) if (current[p]) next[p] = current[p];
+  for (const d of decisions) if (paths.includes(d.path)) next[d.path] = d.decision;
+  return next;
+}

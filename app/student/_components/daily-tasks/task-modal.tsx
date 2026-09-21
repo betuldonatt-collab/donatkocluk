@@ -1103,10 +1103,12 @@ function TaskModalBody({
             taskId={task.id}
             paths={task.evidence_image_paths ?? []}
             reviewStatus={task.evidence_review_status ?? "none"}
+            photoStatus={task.evidence_photo_status ?? {}}
             onChange={(next) =>
               onSaved({
                 ...task,
                 evidence_image_paths: next.paths,
+                evidence_photo_status: next.photoStatus,
                 evidence_review_status: next.reviewStatus,
                 status: next.status as StudentTask["status"],
                 completed: next.status === "done",

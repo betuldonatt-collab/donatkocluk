@@ -5,7 +5,8 @@ import { AlertTriangle, Camera, Hourglass, ImagePlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { EvidenceLightbox } from "@/components/evidence-lightbox";
+import { EvidenceLightbox, REJECTED_PHOTO_TEXT } from "@/components/evidence-lightbox";
+import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
 import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../../actions";
 
@@ -20,19 +21,24 @@ import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../
 // shows where the review stands.
 
 type ReviewStatus = "none" | "pending" | "approved" | "rejected";
+type PhotoStatus = Record<string, "approved" | "rejected">;
 
 export function EvidenceUploader({
   taskId,
   paths,
   reviewStatus,
+  photoStatus,
   onChange,
 }: {
   taskId: string;
   paths: string[];
   reviewStatus: ReviewStatus;
-  // Called with the task's new photo paths, review status and task status after
-  // an upload/removal (adding photos to a done task sends it to the coach).
-  onChange: (next: { paths: string[]; reviewStatus: ReviewStatus; status: string }) => void;
+  // The coach's verdict per photo (a path that is not here has not been reviewed).
+  photoStatus: PhotoStatus;
+  // Called with the task's new photo paths, review state, per-photo verdicts and
+  // task status after an upload/removal (adding photos to a done task sends it to
+  // the coach).
+  onChange: (next: { paths: string[]; reviewStatus: ReviewStatus; status: string; photoStatus: PhotoStatus }) => void;
 }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -85,7 +91,12 @@ export function EvidenceUploader({
           break;
         }
         uploaded += 1;
-        onChange({ paths: result.paths, reviewStatus: result.reviewStatus as ReviewStatus, status: result.status });
+        onChange({
+          paths: result.paths,
+          reviewStatus: result.reviewStatus as ReviewStatus,
+          status: result.status,
+          photoStatus: result.photoStatus,
+        });
       } catch (e) {
         // Thrown here (not returned by the action): the browser could not decode or
         // shrink the photo, or the request itself failed (too large, offline).
@@ -109,7 +120,12 @@ export function EvidenceUploader({
       setError({ message: result.error, detail: result.detail });
       return;
     }
-    onChange({ paths: result.paths, reviewStatus: result.reviewStatus as ReviewStatus, status: result.status });
+    onChange({
+      paths: result.paths,
+      reviewStatus: result.reviewStatus as ReviewStatus,
+      status: result.status,
+      photoStatus: result.photoStatus,
+    });
   }
 
   return (
@@ -125,7 +141,7 @@ export function EvidenceUploader({
       {reviewStatus === "rejected" && (
         <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-3 py-2 text-xs">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          Koç fotoğrafları onaylamadı. Fotoğrafları düzeltip görevi tekrar tamamlandı olarak işaretle.
+          Koç bu görevi geri gönderdi. Kırmızı çerçeveli fotoğrafları silip yenisini ekle, sonra görevi tekrar tamamlandı olarak işaretle.
         </div>
       )}
       {reviewStatus === "approved" && paths.length > 0 && (
@@ -133,28 +149,48 @@ export function EvidenceUploader({
       )}
 
       {paths.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {paths.map((path, i) => (
-            <div key={path} className="relative">
-              {urls[i] ? (
-                <button type="button" onClick={() => setViewing(true)} aria-label="Fotoğrafı büyüt">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={urls[i]} alt={`Kanıt fotoğrafı ${i + 1}`} className="bg-muted size-16 rounded-md border object-cover" />
-                </button>
-              ) : (
-                <div className="bg-muted size-16 animate-pulse rounded-md border" />
-              )}
-              <button
-                type="button"
-                onClick={() => handleRemove(path)}
-                disabled={busy !== null}
-                className="bg-background text-muted-foreground hover:text-destructive absolute -top-1.5 -right-1.5 rounded-full border p-0.5 shadow-sm"
-                aria-label="Fotoğrafı kaldır"
-              >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
+        <div className="grid grid-cols-3 gap-3">
+          {paths.map((path, i) => {
+            const verdict = photoStatus[path] ?? null;
+            return (
+              <div key={path} className="space-y-1">
+                <div className="relative">
+                  {urls[i] ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewing(true)}
+                      aria-label="Fotoğrafı büyüt"
+                      className={cn(
+                        "block aspect-square w-full overflow-hidden rounded-md",
+                        verdict === "rejected" ? "border-2 border-red-500" : verdict === "approved" ? "border-2 border-emerald-500" : "border",
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={urls[i]} alt={`Kanıt fotoğrafı ${i + 1}`} className="bg-muted size-full object-cover" />
+                    </button>
+                  ) : (
+                    <div
+                      className={cn(
+                        "bg-muted aspect-square w-full animate-pulse rounded-md",
+                        verdict === "rejected" ? "border-2 border-red-500" : "border",
+                      )}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(path)}
+                    disabled={busy !== null}
+                    className="bg-background text-muted-foreground hover:text-destructive absolute -top-1.5 -right-1.5 rounded-full border p-0.5 shadow-sm"
+                    aria-label="Fotoğrafı kaldır"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+                {verdict === "rejected" && <p className="text-xs leading-snug font-semibold text-red-600">{REJECTED_PHOTO_TEXT}</p>}
+                {verdict === "approved" && <p className="text-[11px] leading-snug text-emerald-700">Koç onayladı</p>}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -213,7 +249,7 @@ export function EvidenceUploader({
         open={viewing}
         onOpenChange={setViewing}
         title="Yüklediğin fotoğraflar"
-        urls={urls}
+        photos={urls.map((url, i) => ({ url, status: photoStatus[paths[i]] ?? null }))}
         loading={false}
         error={null}
       />
