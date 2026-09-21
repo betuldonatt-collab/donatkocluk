@@ -226,7 +226,11 @@ function ApprovalsDialog({
       try {
         const result = await action(task.id);
         if (!result.success) {
-          if (result.code === "ALREADY_PROCESSED") {
+          if (result.code === "ERROR") {
+            // Not processed: put the row back and say what went wrong.
+            onRestore(task);
+            toast.error(result.message);
+          } else {
             toast.error("Bu görev öğrenci tarafından zaten silinmiş veya güncellenmiş.");
           }
           return;

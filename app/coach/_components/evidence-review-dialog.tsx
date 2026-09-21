@@ -64,6 +64,11 @@ export function EvidenceReviewDialog({
     try {
       const result = await reviewEvidencePhotos(taskId, list);
       if (!result.success) {
+        if (result.code === "ERROR") {
+          // Stay open so the coach can retry; say exactly what failed.
+          toast.error(result.message);
+          return;
+        }
         toast.error("Bu görev zaten işlenmiş veya öğrenci tarafından güncellenmiş.");
         onClose();
         return;
@@ -78,7 +83,10 @@ export function EvidenceReviewDialog({
       onReviewed?.(result.outcome);
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      // The request itself failed (network, or the server could not build its
+      // response) -- the verdicts may or may not have been saved.
+      console.error("[evidence review] request failed:", e);
+      toast.error("Karar gönderilemedi. Sayfayı yenileyip fotoğrafların durumunu kontrol et, gerekirse tekrar dene.");
     } finally {
       setBusy(false);
     }

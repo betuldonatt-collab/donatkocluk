@@ -363,6 +363,44 @@ describe("per-photo review by the coach", () => {
   });
 });
 
+describe("a photo review that fails", () => {
+  beforeEach(() => {
+    state.task = baseTask({ evidence_review_status: "pending", evidence_pending_status: "done" });
+  });
+
+  it("reports a database failure as a result naming the step, instead of throwing", async () => {
+    state.updateError = { code: "42501", message: "new row violates row-level security policy" };
+    const result = await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }]);
+    expect(result.success).toBe(false);
+    if (result.success || result.code !== "ERROR") throw new Error("expected an ERROR result");
+    expect(result.message).toContain("save");
+    expect(result.message).toContain("42501");
+  });
+
+  it("the task-level Onayla reports a failure the same way", async () => {
+    state.updateError = { code: "XX000", message: "boom" };
+    const result = await approveStudentTask(TASK);
+    expect(result).toMatchObject({ success: false, code: "ERROR" });
+  });
+
+  it("reports invalid input as a result too", async () => {
+    const result = await reviewEvidencePhotos(TASK, []);
+    expect(result).toMatchObject({ success: false, code: "ERROR" });
+  });
+
+  it("claims a task that has no coach yet, so the coach's write is not refused by RLS", async () => {
+    state.task = baseTask({ evidence_review_status: "pending", evidence_pending_status: "done", coach_id: null });
+    await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }]);
+    expect(taskUpdate()).toMatchObject({ coach_id: USER });
+  });
+
+  it("leaves the coach of an already-assigned task alone", async () => {
+    state.task = baseTask({ evidence_review_status: "pending", evidence_pending_status: "done", coach_id: "some-coach" });
+    await reviewEvidencePhotos(TASK, [{ path: A, decision: "approved" }]);
+    expect(taskUpdate()).not.toHaveProperty("coach_id");
+  });
+});
+
 describe("student side of per-photo review", () => {
   it("resubmitting clears the rejected verdicts (up for review again) and keeps the approved ones", async () => {
     state.task = baseTask({

@@ -73,6 +73,8 @@ export function EvidenceUploader({
   const [busy, setBusy] = useState<{ phase: "compress" | "upload"; index: number; total: number } | null>(null);
   const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
   const [viewing, setViewing] = useState(false);
+  // The path being deleted right now (its X shows a spinner-ish state).
+  const [removing, setRemoving] = useState<string | null>(null);
   // Signatures of the photos added since this modal opened (path -> signature) --
   // covers a browser where localStorage is unavailable.
   const sessionSignatures = useRef<Record<string, string>>({});
@@ -156,21 +158,35 @@ export function EvidenceUploader({
   }
 
   async function handleRemove(path: string) {
+    if (removing) return;
     setError(null);
-    const result = await removeTaskEvidence(taskId, path);
-    if (!result.ok) {
-      console.error("[evidence remove] failed:", result);
-      setError({ message: result.error, detail: result.detail });
-      return;
+    setRemoving(path);
+    try {
+      const result = await removeTaskEvidence(taskId, path);
+      if (!result.ok) {
+        console.error("[evidence remove] failed:", result);
+        setError({ message: result.error, detail: result.detail });
+        return;
+      }
+      delete sessionSignatures.current[path];
+      saveSignatures(taskId, loadSignatures(taskId, result.paths));
+      onChange({
+        paths: result.paths,
+        reviewStatus: result.reviewStatus as ReviewStatus,
+        status: result.status,
+        photoStatus: result.photoStatus,
+      });
+    } catch (e) {
+      // The request itself failed (before, the rejection was swallowed and the
+      // button seemed to do nothing).
+      console.error("[evidence remove] request failed:", e);
+      setError({
+        message: "Fotoğraf silinemedi. Tekrar dene.",
+        detail: `client · ${e instanceof Error ? e.message : String(e)}`.slice(0, 220),
+      });
+    } finally {
+      setRemoving(null);
     }
-    delete sessionSignatures.current[path];
-    saveSignatures(taskId, loadSignatures(taskId, result.paths));
-    onChange({
-      paths: result.paths,
-      reviewStatus: result.reviewStatus as ReviewStatus,
-      status: result.status,
-      photoStatus: result.photoStatus,
-    });
   }
 
   return (
@@ -223,12 +239,19 @@ export function EvidenceUploader({
                   )}
                   <button
                     type="button"
-                    onClick={() => handleRemove(path)}
-                    disabled={busy !== null}
-                    className="bg-background text-muted-foreground hover:text-destructive absolute -top-1.5 -right-1.5 rounded-full border p-0.5 shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleRemove(path);
+                    }}
+                    disabled={removing !== null}
+                    className={cn(
+                      "bg-background text-foreground hover:bg-destructive hover:text-destructive-foreground absolute top-1 right-1 z-10 flex size-6 items-center justify-center rounded-full border shadow-sm transition-colors",
+                      removing === path && "animate-pulse opacity-60",
+                    )}
                     aria-label="Fotoğrafı kaldır"
+                    title="Fotoğrafı kaldır"
                   >
-                    <X className="size-3" />
+                    <X className="size-3.5" />
                   </button>
                 </div>
                 {verdict === "rejected" && <p className="text-xs leading-snug font-semibold text-red-600">{REJECTED_PHOTO_TEXT}</p>}

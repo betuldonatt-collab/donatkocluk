@@ -1670,7 +1670,13 @@ async function resolvePendingApprovalNotification(supabase: SupabaseClient, coac
 // a genuine failure (network, RLS, validation) and react accordingly
 // (resync its local list + a calm toast) instead of a generic error
 // banner. Genuine errors still throw, same as every other action here.
-export type ApprovalActionResult<T> = { success: true; data: T } | { success: false; code: "ALREADY_PROCESSED" };
+export type ApprovalActionResult<T> =
+  | { success: true; data: T }
+  | { success: false; code: "ALREADY_PROCESSED" }
+  // Photo-evidence reviews report a failure as a result (with what went wrong)
+  // instead of throwing: a thrown error reaches the browser as the opaque
+  // "Server Components render" message (React error #441) in production.
+  | { success: false; code: "ERROR"; message: string };
 
 // --- Kanıt Fotoğrafı: per-photo review (migration 0089) -----------------------
 //
@@ -1684,7 +1690,19 @@ export type ApprovalActionResult<T> = { success: true; data: T } | { success: fa
 export type EvidenceReviewOutcome = "approved" | "rejected" | "pending";
 export type ReviewEvidenceResult =
   | { success: true; outcome: EvidenceReviewOutcome }
-  | { success: false; code: "ALREADY_PROCESSED" };
+  | { success: false; code: "ALREADY_PROCESSED" }
+  | { success: false; code: "ERROR"; message: string };
+
+// A failure at one named step of a photo review: logged (server log + Sentry) and
+// turned into an Error whose message says which step failed, with the database
+// code and message -- shown to the coach in a toast so it can be diagnosed.
+function reviewStepError(step: string, error: unknown): Error {
+  console.error(`[evidence review:${step}]`, error);
+  Sentry.captureException(error, { tags: { evidence_review_step: step } });
+  const e = (error ?? {}) as { message?: unknown; code?: unknown };
+  const detail = [e.code, typeof e.message === "string" ? e.message.slice(0, 160) : null].filter(Boolean).join(" · ");
+  return new Error(`Karar kaydedilemedi (${step}${detail ? ` · ${detail}` : ""}).`);
+}
 
 const evidenceDecisionsSchema = z
   .array(z.object({ path: z.string().min(1).max(300), decision: z.enum(["approved", "rejected"]) }))
@@ -1699,10 +1717,10 @@ async function applyEvidenceDecisions(
 ): Promise<ReviewEvidenceResult> {
   const { data: task, error: fetchError } = await supabase
     .from("student_tasks")
-    .select("student_id, task_date, status, evidence_image_paths, evidence_photo_status, evidence_review_status, evidence_pending_status")
+    .select("student_id, coach_id, task_date, status, evidence_image_paths, evidence_photo_status, evidence_review_status, evidence_pending_status")
     .eq("id", taskId)
     .maybeSingle();
-  if (fetchError) throw dbError(fetchError);
+  if (fetchError) throw reviewStepError("read", fetchError);
   if (!task) return { success: false, code: "ALREADY_PROCESSED" };
   await requireCoachAccess(supabase, coachId, task.student_id);
 
@@ -1723,7 +1741,14 @@ async function applyEvidenceDecisions(
   const wasPending = task.evidence_review_status === "pending";
   const wasCompleted = task.status === "done" || task.status === "half_done";
   const claimed = task.evidence_pending_status ?? "done";
-  const base = { evidence_photo_status: photoStatus, updated_at: new Date().toISOString() };
+  // student_tasks_coach_all only lets a coach write rows whose coach_id is theirs. A
+  // task the student created themselves has none, so the review claims it (as
+  // approving one always has) -- without this the update is refused by RLS.
+  const base = {
+    evidence_photo_status: photoStatus,
+    updated_at: new Date().toISOString(),
+    ...(task.coach_id ? {} : { coach_id: coachId }),
+  };
   let update: Record<string, unknown> = base;
   let statusChanged = false;
   if (outcome === "approved") {
@@ -1751,12 +1776,18 @@ async function applyEvidenceDecisions(
     .eq("id", taskId)
     .eq("evidence_review_status", task.evidence_review_status)
     .select("*");
-  if (error) throw dbError(error);
+  if (error) throw reviewStepError("save", error);
   if (!data || data.length === 0) return { success: false, code: "ALREADY_PROCESSED" };
 
   if (statusChanged) {
-    // Whether the task counts as done changed: resync its topic bucket and the student's day total.
-    if (data[0].course_id) await recomputeTopicStats(supabase, task.student_id, data[0].course_id, data[0].topic_id);
+    // Whether the task counts as done changed: resync its topic bucket and the
+    // student's day total. Best-effort -- the verdicts are already saved, and the
+    // next save on that day/topic re-syncs them.
+    try {
+      if (data[0].course_id) await recomputeTopicStats(supabase, task.student_id, data[0].course_id, data[0].topic_id);
+    } catch (e) {
+      console.error("[evidence review:topic stats] rollup failed (verdicts saved):", e);
+    }
     await recomputeDailyStatsForStudent(supabase, task.student_id, task.task_date);
   }
   if (outcome !== "pending") await resolvePendingApprovalNotification(supabase, coachId, taskId);
@@ -1767,18 +1798,33 @@ async function applyEvidenceDecisions(
   return { success: true, outcome };
 }
 
+// Runs a review and reports ANY failure (view mode, roster check, validation, a
+// database step) as an ERROR result carrying its message, so the browser shows
+// what happened instead of the production-stripped "Server Components render" error.
+async function runEvidenceReview(
+  taskId: string,
+  decide: { all: PhotoDecision } | { list: { path: string; decision: PhotoDecision }[] },
+): Promise<ReviewEvidenceResult> {
+  try {
+    await assertNotImpersonating();
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const decideV = "list" in decide ? { list: parseInput(evidenceDecisionsSchema, decide.list) } : decide;
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    return await applyEvidenceDecisions(supabase, user.id, taskIdV, decideV);
+  } catch (e) {
+    console.error("[evidence review] failed:", e);
+    return { success: false, code: "ERROR", message: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
+}
+
 // Verdicts for individual photos (the per-photo Onayla / Reddet in the review
 // lightbox, and its bulk buttons).
 export async function reviewEvidencePhotos(
   taskId: string,
   decisions: { path: string; decision: PhotoDecision }[],
 ): Promise<ReviewEvidenceResult> {
-  await assertNotImpersonating();
-  const taskIdV = parseInput(uuidSchema, taskId);
-  const decisionsV = parseInput(evidenceDecisionsSchema, decisions);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  return applyEvidenceDecisions(supabase, user.id, taskIdV, { list: decisionsV });
+  return runEvidenceReview(taskId, { list: decisions });
 }
 
 export async function approveStudentTask(taskId: string): Promise<ApprovalActionResult<Record<string, unknown>>> {
@@ -1802,7 +1848,7 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
   // held as pending. Onayla approves every photo, which applies the outcome the
   // student reported (individual photos: reviewEvidencePhotos).
   if (existing.evidence_review_status === "pending") {
-    const result = await applyEvidenceDecisions(supabase, user.id, taskIdV, { all: "approved" });
+    const result = await runEvidenceReview(taskIdV, { all: "approved" });
     return result.success ? { success: true, data: { outcome: result.outcome } } : result;
   }
 
@@ -1876,7 +1922,7 @@ export async function rejectStudentTask(taskId: string): Promise<ApprovalActionR
   // stay, and the student can fix them and mark it done again, which puts it
   // back in this queue.
   if (existing.evidence_review_status === "pending") {
-    const result = await applyEvidenceDecisions(supabase, user.id, taskIdV, { all: "rejected" });
+    const result = await runEvidenceReview(taskIdV, { all: "rejected" });
     return result.success ? { success: true, data: { id: taskIdV } } : result;
   }
 
