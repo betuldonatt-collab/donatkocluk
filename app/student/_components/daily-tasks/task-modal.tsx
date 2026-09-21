@@ -74,7 +74,7 @@ export function TaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(needsWideModal && "sm:max-w-lg")}>
+      <DialogContent className={cn("max-h-[90dvh] overflow-y-auto", needsWideModal && "sm:max-w-lg")}>
         {task && (
           <TaskModalBody
             key={`${task.id}:${initialStep}:${openKey ?? 0}`}
@@ -1108,7 +1108,7 @@ function TaskModalBody({
           right edge. Two explicit flex-wrap rows below keep each button
           group contained to the dialog's actual width, wrapping onto a
           second line if it ever gets tight instead of overflowing. */}
-      <DialogFooter className="flex-col gap-2">
+      <DialogFooter className="bg-card sticky bottom-0 z-10 -mx-6 -mb-6 flex-col gap-2 border-t px-6 pt-3 pb-6">
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
             İptal
