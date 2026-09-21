@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Coffee, History, Minimize2, PartyPopper, Pause, PictureInPicture2, Play } from "lucide-react";
+import { CheckCircle2, Coffee, Minimize2, Pause, PictureInPicture2, Play, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
 import { closePip, isPipSupported, openPip, pipStore } from "@/lib/focus-pip";
 import { formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
-import { needsCoachApproval } from "@/lib/focus-approval";
 import { focusModalStore } from "@/lib/focus-modal-store";
 import { FocusTimerBackground, randomFocusTimerAnimationIndex } from "./focus-timer-animations";
 import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-prompt";
@@ -20,7 +19,6 @@ import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-pr
 export type FocusTimerMode = "stopwatch" | "countdown";
 
 const COUNTDOWN_PRESETS_MIN = [15, 25, 45, 60];
-const SUCCESS_DISPLAY_MS = 1400;
 const HEARTBEAT_INTERVAL_MS = 20_000;
 
 function formatSeconds(totalSeconds: number) {
@@ -30,124 +28,90 @@ function formatSeconds(totalSeconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-// Tiered praise for the success screen -- picked once when the session
-// finishes (see resolvePraiseMessage below), not re-picked while the
-// success screen is showing.
-const GOAL_HIT_MESSAGES = [
-  "Hedefi 12'den vurdun! Planladığın süreyi kusursuz tamamladın.",
-  "Tam vaktinde! Hedefine birebir ulaştın.",
-];
-const SHORT_SESSION_MESSAGES = ["Güzel bir ısınma turu!", "Küçük adımlar büyük işler başarır!"];
-const STANDARD_SESSION_MESSAGES = ["Harika bir odak bloğu!", "Zihni kilitledin, süper gidiyorsun!"];
-const LONG_SESSION_MESSAGES = ["Gerçek bir maraton disiplini!", "Bugün rakiplerine fark attın!"];
-
-function pickRandom(pool: string[]) {
-  return pool[Math.floor(Math.random() * pool.length)];
+// "47 dk", "2 sa 5 dk", "40 sn".
+function formatLogged(totalSeconds: number) {
+  if (totalSeconds < 60) return `${Math.round(totalSeconds)} sn`;
+  const minutes = Math.round(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} dk`;
+  return rest === 0 ? `${hours} sa` : `${hours} sa ${rest} dk`;
 }
 
-// A completed countdown goal always gets its own celebration, regardless
-// of how long the planned duration was -- hitting a 15-minute target is
-// just as much "nailed it" as hitting a 60-minute one. Everything else
-// (stopwatch sessions, and a countdown ended early via Bitir before time
-// was up) falls back to the duration-based tiers.
-function resolvePraiseMessage(finishing: { seconds: number; goalHit: boolean }): string {
-  if (finishing.goalHit) return pickRandom(GOAL_HIT_MESSAGES);
-  const minutes = finishing.seconds / 60;
-  if (minutes < 20) return pickRandom(SHORT_SESSION_MESSAGES);
-  if (minutes < 50) return pickRandom(STANDARD_SESSION_MESSAGES);
-  return pickRandom(LONG_SESSION_MESSAGES);
-}
-
-// Full-viewport, backdrop-blurred overlay -- deliberately not dismissible
-// by clicking outside or Escape, since the point of Focus Mode is to
-// prevent the student from wandering off without at least pausing or
-// finishing. "Vazgeç" is the one explicit escape hatch, kept small and
-// separate from Mola Ver / Bitir so it's never an accidental click.
-export type ActiveFocusSession = {
+// A session that is ALREADY running when the timer opens (alive in another tab
+// / the floating widget / another device): the timer just shows it, running.
+export type AttachedFocusSession = {
   mode: FocusTimerMode;
   countdownTargetSeconds: number | null;
-  status: "running" | "paused";
   elapsedSeconds: number;
 };
 
+// A leftover session that was closed out automatically when the timer opened.
+export type BankedNotice = { seconds: number; pendingApproval: boolean };
+
+// What state the timer was in when it was closed with the X / Escape.
+export type CloseState = "running" | "paused" | "idle";
+
+// Full-viewport, backdrop-blurred overlay. Closing it (X, Escape, the green
+// "Arka planda çalışsın" button) never discards anything: a running session
+// simply carries on in the background and shows up in the floating widget.
 export function FocusTimerModal({
   taskId,
   taskTitle,
-  initialSession,
+  attachSession,
+  bankedNotice,
   onStart,
   onPause,
   onResumeSession,
-  onCancel,
-  onMinimize,
+  onClose,
   onFinish,
   onHeartbeat,
 }: {
   taskId: string;
   taskTitle: string;
-  // Resolved by the trigger (getActiveFocusSession) BEFORE this modal ever
-  // mounts -- a resumable session (this device, a crashed tab, or a
-  // different device entirely) shows the "Devam eden bir seansın var..."
-  // prompt first instead of the normal mode picker. null means there's
-  // genuinely nothing to resume (including a stale one already
-  // auto-flushed server-side).
-  initialSession: ActiveFocusSession | null;
+  attachSession: AttachedFocusSession | null;
+  bankedNotice: BankedNotice | null;
   // Fired once, right when Başlat is clicked (fire-and-forget from this
-  // modal's perspective -- the visual timer never waits on it, matching
-  // every other persistence call here).
+  // modal's perspective -- the visual timer never waits on it).
   onStart: (mode: FocusTimerMode, countdownTargetSeconds: number | null) => void;
   // Mola Ver -- banks the live segment server-side and flips to paused.
   onPause: () => void;
-  // Shared by the resume prompt's "Süre tutmaya devam et" AND Mola Ver's
-  // own "Devam Et" -- returns the server's reconciled elapsed seconds
-  // (null if there was nothing to resume), which the resume prompt needs
-  // to seed its local display from (this modal has no memory of a session
-  // it didn't start itself).
+  // Mola Ver's own "Devam Et".
   onResumeSession: () => Promise<{ elapsedSeconds: number } | null>;
-  // Called on an explicit "Vazgeç" click -- with however many seconds had
-  // accumulated at that point (0 if the session never started). Persistence
-  // itself is server-authoritative (endFocusSession re-derives the true
-  // elapsed from the session row), so `seconds` here is only ever used for
-  // this modal's own display text. Simply leaving the page does NOT call
-  // this: the session keeps running server-side.
-  onCancel: (seconds: number) => void;
-  // Closes this fullscreen timer WITHOUT ending or pausing the session: it
-  // keeps running on the server and the floating widget takes over on every
-  // page. Without this the only ways out were Bitir / Vazgeç / Mola Ver, all of
-  // which end or pause it.
-  onMinimize?: () => void;
-  // `creditedSeconds` is set only when the student ended the session from
-  // the "Hâlâ çalışmaya devam ediyor musun?" check-in and chose to shorten
-  // the figure; otherwise the full elapsed time is credited.
-  onFinish: (result: { mode: FocusTimerMode; seconds: number; creditedSeconds?: number }) => void;
+  // The X / Escape / "Arka planda çalışsın". Closes this screen WITHOUT
+  // ending or discarding anything -- the parent only decides what to tell the
+  // student, according to `state`.
+  onClose: (state: CloseState) => void;
+  // Bitir (and "Hayır, bitir" on the check-in). The parent closes this screen
+  // and saves in the background -- nothing here waits for the server, so it
+  // feels instant. `creditedSeconds` is set only when the student shortened the
+  // figure from the check-in; otherwise the full elapsed time is credited.
+  onFinish: (result: { mode: FocusTimerMode; seconds: number; goalHit: boolean; creditedSeconds?: number }) => void;
   // Fired immediately whenever the timer starts/resumes, then every
-  // HEARTBEAT_INTERVAL_MS while it keeps running -- see the effect
-  // below. Optional so this modal doesn't hard-depend on the server
-  // action living in the trigger.
+  // HEARTBEAT_INTERVAL_MS while it keeps running.
   onHeartbeat?: () => void;
 }) {
-  const [mode, setMode] = useState<FocusTimerMode>("stopwatch");
-  const [started, setStarted] = useState(false);
-  const [countdownMinutes, setCountdownMinutes] = useState(25);
+  const [mode, setMode] = useState<FocusTimerMode>(attachSession?.mode ?? "stopwatch");
+  const [started, setStarted] = useState(attachSession !== null);
+  const [countdownMinutes, setCountdownMinutes] = useState(() =>
+    attachSession?.mode === "countdown" && attachSession.countdownTargetSeconds
+      ? Math.round(attachSession.countdownTargetSeconds / 60)
+      : 25,
+  );
   const [customMinutes, setCustomMinutes] = useState("");
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(attachSession !== null);
   const [onBreak, setOnBreak] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [finishing, setFinishing] = useState<{
-    mode: FocusTimerMode;
-    seconds: number;
-    goalHit: boolean;
-    creditedSeconds?: number;
-  } | null>(null);
-  // Shown instead of the mode picker while there's a resumable session to
-  // decide on -- cleared either by "Süre tutmaya devam et" (jumps straight
-  // to the running screen) or "Yeni Başlat" (falls through to the picker;
-  // the old session isn't lost, startFocusSession banks it transparently).
-  const [resumePromptPending, setResumePromptPending] = useState(initialSession !== null);
-  const [resumeActionPending, setResumeActionPending] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(() => (attachSession ? attachSession.elapsedSeconds * 1000 : 0));
   const startedAtRef = useRef<number | null>(null);
 
-  // Picked once per mount -- since the parent only mounts this modal while
-  // it's open, every fresh "open" gets its own random pick.
+  // Attaching to an already-running session: anchor the local clock to the
+  // server's elapsed time.
+  useEffect(() => {
+    if (attachSession) startedAtRef.current = Date.now() - attachSession.elapsedSeconds * 1000;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Picked once per mount -- every fresh "open" gets its own random pick.
   const backgroundIndex = useMemo(() => randomFocusTimerAnimationIndex(), []);
 
   // While this fullscreen timer is open the floating widget hides (same
@@ -169,13 +133,7 @@ export function FocusTimerModal({
   }, [running]);
 
   // "Anlık Çalışma Durumu" -- a coach-visible live indicator. Fires once
-  // right away whenever `running` flips true (start or resume from a
-  // break) so the coach sees the student go live within ~1s rather than
-  // waiting a full interval, then every HEARTBEAT_INTERVAL_MS after
-  // that. Pausing (Mola Ver) or finishing simply stops this effect --
-  // no explicit "clear" call, since the coach side treats a heartbeat
-  // older than LIVE_STATUS_STALE_MS as idle regardless (see
-  // lib/focus-live-status.ts).
+  // right away whenever `running` flips true, then every HEARTBEAT_INTERVAL_MS.
   useEffect(() => {
     if (!running) return;
     onHeartbeat?.();
@@ -184,30 +142,16 @@ export function FocusTimerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
 
-  // Bitir's celebration screen hands off to the parent after a beat.
-  useEffect(() => {
-    if (!finishing) return;
-    const id = setTimeout(() => {
-      onFinish({ mode: finishing.mode, seconds: finishing.seconds, creditedSeconds: finishing.creditedSeconds });
-    }, SUCCESS_DISPLAY_MS);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finishing]);
+  // NOTE -- deliberately NOT here: any cleanup that ends the session when this
+  // modal unmounts, and any beforeunload/sendBeacon that pauses it. A running
+  // session lives on the server (wall-clock timestamps), so it keeps counting
+  // through tab switches, other sites, other pages of the platform and even a
+  // closed tab; on return the time is worked out from the start timestamp.
+  // Only the student's own Bitir / Mola Ver ends or pauses it.
 
-  // NOTE -- what is deliberately NOT here any more:
-  //  * no cleanup that ends the session when this modal unmounts (leaving
-  //    the dashboard used to end it);
-  //  * no beforeunload / sendBeacon that paused it on tab close, refresh or
-  //    navigating to another site (YouTube, ...).
-  // A running session lives on the server (wall-clock timestamps), so it keeps
-  // counting through tab switches, other sites, other pages of the platform
-  // and closed tabs alike. The only things that end or pause it are the
-  // student's own Bitir / Vazgeç / Mola Ver clicks.
-
-  // Hidden tabs throttle setInterval (to about once a minute), so the
-  // display can lag while the student is elsewhere. Elapsed is computed from
-  // the wall clock, not counted in ticks -- so nothing is lost, and this just
-  // refreshes the readout the instant they come back.
+  // Hidden tabs throttle timers, so the display can lag while the student is
+  // elsewhere. Elapsed is computed from the wall clock, so nothing is lost;
+  // this refreshes the readout the instant they come back.
   useEffect(() => {
     function handleVisible() {
       if (document.visibilityState === "visible" && startedAtRef.current !== null) {
@@ -218,10 +162,6 @@ export function FocusTimerModal({
     return () => document.removeEventListener("visibilitychange", handleVisible);
   }, []);
 
-  // Picked once when the session actually finishes, not re-rolled while
-  // the success screen is showing.
-  const praiseMessage = useMemo(() => (finishing ? resolvePraiseMessage(finishing) : ""), [finishing]);
-
   const totalSeconds = mode === "countdown" ? countdownMinutes * 60 : 0;
   const elapsedSeconds = elapsedMs / 1000;
   const displaySeconds = mode === "countdown" ? Math.max(0, totalSeconds - elapsedSeconds) : elapsedSeconds;
@@ -229,15 +169,14 @@ export function FocusTimerModal({
 
   // "Hâlâ çalışmaya devam ediyor musun?" every 3 hours of a running session.
   // The timer is never stopped or trimmed by it (see lib/focus-confirmation).
-  const stillStudying = useStillStudyingPrompt(taskId, elapsedSeconds, running && !finishing);
+  const stillStudying = useStillStudyingPrompt(taskId, elapsedSeconds, running);
 
   // The browser-tab title carries the live clock ("⏳ 01:25:30") so it stays
   // visible from the tab bar while the student is on another site.
   const shownWhole = Math.floor(displaySeconds);
-  const titleActive = running && !finishing;
   useEffect(() => {
-    setTimerTitle(titleActive ? formatTimerTitle(shownWhole, stillStudying.due) : null);
-  }, [titleActive, shownWhole, stillStudying.due]);
+    setTimerTitle(running ? formatTimerTitle(shownWhole, stillStudying.due) : null);
+  }, [running, shownWhole, stillStudying.due]);
   useEffect(() => () => setTimerTitle(null), []);
 
   // Optional always-on-top Picture-in-Picture window (Chrome/Edge/Safari on
@@ -277,54 +216,20 @@ export function FocusTimerModal({
     onResumeSession().catch(() => {});
   }
 
-  // The resume prompt's "Süre tutmaya devam et" -- unlike handleResume
-  // above, this modal has no local memory of a session it didn't start
-  // itself, so it seeds elapsedMs from the server's reconciled value
-  // (falling back to the prompt's own already-displayed estimate if the
-  // network call itself fails, rather than stranding the student on the
-  // prompt screen).
-  async function handleResumeFromPrompt() {
-    if (!initialSession) return;
-    setResumeActionPending(true);
-    let seconds = initialSession.elapsedSeconds;
-    try {
-      const result = await onResumeSession();
-      if (result) seconds = result.elapsedSeconds;
-    } catch {
-      // Fall through with the prompt's own last-known elapsed.
-    }
-    setMode(initialSession.mode);
-    if (initialSession.mode === "countdown" && initialSession.countdownTargetSeconds) {
-      setCountdownMinutes(Math.round(initialSession.countdownTargetSeconds / 60));
-    }
-    startedAtRef.current = Date.now() - seconds * 1000;
-    setElapsedMs(seconds * 1000);
-    setStarted(true);
-    setRunning(true);
-    setResumeActionPending(false);
-    setResumePromptPending(false);
-  }
-
-  // "Yeni Başlat" -- falls through to the normal mode picker. The old
-  // session isn't discarded: startFocusSession (fired from the next
-  // handleStart, via onStart) transparently banks it first.
-  function handleDiscardResume() {
-    setResumePromptPending(false);
-  }
-
+  // Bitir: hand off IMMEDIATELY. The parent closes this screen on the spot and
+  // saves in the background, so the click always feels instant.
   function handleFinish() {
     setRunning(false);
     // A countdown ended early via Bitir (before its target was reached)
     // doesn't count as "hitting the goal" -- only countdownDone does.
-    setFinishing({ mode, seconds: Math.round(elapsedSeconds), goalHit: countdownDone });
+    onFinish({ mode, seconds: Math.round(elapsedSeconds), goalHit: countdownDone });
   }
 
-  // "Hayır, bitir" on the check-in: ends the session, crediting either the
-  // full elapsed time (creditedSeconds undefined) or the shorter figure the
-  // student typed.
+  // "Hayır, bitir" on the check-in: credits either the full elapsed time
+  // (creditedSeconds undefined) or the shorter figure the student typed.
   function handleEndFromPrompt(creditedSeconds?: number) {
     setRunning(false);
-    setFinishing({
+    onFinish({
       mode,
       seconds: creditedSeconds ?? Math.round(elapsedSeconds),
       goalHit: false,
@@ -332,20 +237,28 @@ export function FocusTimerModal({
     });
   }
 
-  // The explicit "Vazgeç" click -- reports whatever's accumulated so far
-  // before closing. Bailing straight from the resume prompt (never actually
-  // pressing Devam Et or Yeni Başlat) still banks that pre-existing
-  // session's real elapsed -- same "close and bank whatever's active"
-  // meaning Vazgeç already has everywhere else, it just happens to apply to
-  // a session this modal instance didn't start itself.
-  function handleCancelClick() {
-    const seconds = started
-      ? Math.round(elapsedMs / 1000)
-      : resumePromptPending && initialSession
-        ? Math.round(initialSession.elapsedSeconds)
-        : 0;
-    onCancel(seconds);
+  // The X, Escape and the green button all mean the same thing: leave this
+  // screen, lose nothing.
+  function handleClose() {
+    onClose(running ? "running" : started ? "paused" : "idle");
   }
+
+  // Escape closes it too -- but never while the check-in question is up.
+  const closeRef = useRef(handleClose);
+  useEffect(() => {
+    closeRef.current = handleClose;
+  });
+  const promptDueRef = useRef(false);
+  useEffect(() => {
+    promptDueRef.current = stillStudying.due;
+  });
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !promptDueRef.current) closeRef.current();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   function handleCustomMinutesChange(value: string) {
     setCustomMinutes(value);
@@ -362,11 +275,9 @@ export function FocusTimerModal({
   // completion modal open behind/underneath this one.
   //
   // preventDefault only goes on the click guard -- every button in this
-  // modal is type="button" with no default browser action worth blocking,
-  // so it's a safe no-op there. It must NOT go on the keydown guard: the
-  // "özel süre" number input relies on default keydown behavior for
-  // digits/backspace/arrow-spinners, and preventDefault-ing every keydown
-  // that bubbles through this div would silently break typing into it.
+  // modal is type="button" with no default browser action worth blocking.
+  // It must NOT go on the keydown guard: the "özel süre" number input relies
+  // on default keydown behavior for digits/backspace/arrow-spinners.
   function stopClickBubbling(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
@@ -383,63 +294,35 @@ export function FocusTimerModal({
     >
       <FocusTimerBackground index={backgroundIndex} />
 
-      {/* Hidden once the celebration screen is showing -- Bitir's own
-          save is already underway at that point, and there's nothing
-          left to meaningfully "cancel". */}
-      {!finishing && (
-        <button
-          type="button"
-          onClick={handleCancelClick}
-          className="text-muted-foreground hover:text-foreground absolute top-6 right-6 z-10 text-xs font-medium underline-offset-2 hover:underline"
-        >
-          Vazgeç
-        </button>
-      )}
+      {/* The close button. Never discards: a running timer keeps running in the
+          floating widget, a paused one is saved the next time Süre Tut is
+          pressed on this task. */}
+      <button
+        type="button"
+        onClick={handleClose}
+        aria-label={running ? "Kapat (sayaç arka planda çalışmaya devam eder)" : "Kapat"}
+        title={running ? "Kapat — sayaç arka planda çalışmaya devam eder" : "Kapat"}
+        className="text-muted-foreground hover:bg-secondary hover:text-foreground absolute top-5 right-5 z-10 rounded-full p-2 transition-colors"
+      >
+        <X className="size-5" />
+      </button>
 
       <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-6 text-center">
-        {finishing ? (
+        {!started ? (
           <>
-            <div className="bg-emerald-500/15 flex size-20 items-center justify-center rounded-full">
-              <PartyPopper className="size-10 text-emerald-500" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-foreground text-xl font-semibold">{praiseMessage}</h2>
-              <p className="text-muted-foreground text-sm">
-                {needsCoachApproval(finishing.seconds)
-                  ? `${formatSeconds(finishing.seconds)} kaydedildi ama 6 saati aştığı için koçunun onayını bekliyor. Onaylanınca sıralamana ve istatistiklerine eklenecek.`
-                  : `${formatSeconds(finishing.seconds)} boyunca odaklandın. Bu süre göreve kaydedildi.`}
-              </p>
-            </div>
-          </>
-        ) : resumePromptPending && initialSession ? (
-          <>
-            <div className="bg-primary/10 flex size-16 items-center justify-center rounded-full">
-              <History className="text-primary size-8" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-foreground text-lg font-semibold">Devam eden bir seansın var</h2>
-              <p className="text-muted-foreground max-w-[260px] truncate text-sm" title={taskTitle}>
-                {taskTitle}
-              </p>
-            </div>
-            <p className="text-foreground text-5xl font-bold tabular-nums">
-              {formatSeconds(initialSession.elapsedSeconds)}
-            </p>
-            <p className="text-muted-foreground text-sm">
-              {initialSession.status === "running" ? "Süre arka planda işlemeye devam etti" : "Duraklatılmış"}
-            </p>
-            <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" size="lg" onClick={handleDiscardResume} disabled={resumeActionPending}>
-                Yeni Başlat
-              </Button>
-              <Button type="button" size="lg" onClick={handleResumeFromPrompt} disabled={resumeActionPending}>
-                <Play className="size-4" />
-                Süre tutmaya devam et
-              </Button>
-            </div>
-          </>
-        ) : !started ? (
-          <>
+            {bankedNotice && (
+              <div className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-left">
+                <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-4 shrink-0" />
+                  Önceki çalışman kaydedildi
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {bankedNotice.pendingApproval
+                    ? `${formatLogged(bankedNotice.seconds)} 6 saati aştığı için koçunun onayını bekliyor. Onaylanınca sıralamana ve istatistiklerine eklenecek.`
+                    : `${formatLogged(bankedNotice.seconds)} bu göreve eklendi.`}
+                </p>
+              </div>
+            )}
             <div className="space-y-1">
               <h2 className="text-foreground text-xl font-semibold">Odak Modu</h2>
               <p className="text-muted-foreground max-w-[260px] truncate text-sm" title={taskTitle}>
@@ -548,29 +431,27 @@ export function FocusTimerModal({
                 Bitir
               </Button>
             </div>
-            {onMinimize && (
-              <div className="flex w-full flex-col items-center gap-2 pt-2">
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={onMinimize}
-                  className="h-14 w-full max-w-xs gap-2 bg-emerald-600 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700"
-                >
-                  <Minimize2 className="size-5" />
-                  Arka planda çalışsın
+            <div className="flex w-full flex-col items-center gap-2 pt-2">
+              <Button
+                type="button"
+                size="lg"
+                onClick={handleClose}
+                className="h-14 w-full max-w-xs gap-2 bg-emerald-600 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700"
+              >
+                <Minimize2 className="size-5" />
+                Arka planda çalışsın
+              </Button>
+              <p className="text-muted-foreground max-w-[280px] text-xs">
+                Bu ekrandan çık, sayaç çalışmaya devam etsin. Sağ alttaki küçük kartta görürsün; sekme başlığında da
+                süre akar. Kapatmak (X) süreni silmez.
+              </p>
+              {pipSupported && (
+                <Button type="button" variant="outline" onClick={handlePip} className="w-full max-w-xs gap-2">
+                  <PictureInPicture2 className="size-4" />
+                  {pipOpen ? "Ayrı pencereyi kapat" : "Ayrı pencerede aç (YouTube'un üstünde kalır)"}
                 </Button>
-                <p className="text-muted-foreground max-w-[280px] text-xs">
-                  Bu ekrandan çık, sayaç çalışmaya devam etsin. Sağ alttaki küçük kartta görürsün; sekme başlığında da
-                  süre akar.
-                </p>
-                {pipSupported && (
-                  <Button type="button" variant="outline" onClick={handlePip} className="w-full max-w-xs gap-2">
-                    <PictureInPicture2 className="size-4" />
-                    {pipOpen ? "Ayrı pencereyi kapat" : "Ayrı pencerede aç (YouTube'un üstünde kalır)"}
-                  </Button>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>

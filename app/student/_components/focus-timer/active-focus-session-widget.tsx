@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
-import { focusModalStore } from "@/lib/focus-modal-store";
+import { focusEndingStore, focusModalStore } from "@/lib/focus-modal-store";
+import { resolvePraiseMessage } from "@/lib/focus-praise";
 import { closePip, isPipSupported, openPip, pipStore, updatePip } from "@/lib/focus-pip";
 import { formatTimerClock, formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
 import {
@@ -64,6 +65,15 @@ export function ActiveFocusSessionWidget() {
   const modalOpen = useSyncExternalStore(focusModalStore.subscribe, focusModalStore.getSnapshot, focusModalStore.getServerSnapshot) > 0;
   const pipOpen = useSyncExternalStore(pipStore.subscribe, pipStore.getSnapshot, pipStore.getServerSnapshot);
   const [sessions, setSessions] = useState<LiveSession[]>([]);
+  // Sessions whose Bitir was just clicked and whose save is still in flight:
+  // hidden immediately (Bitir is optimistic), and the read below re-runs when
+  // the set changes so a failed save brings the session back.
+  const endingKey = useSyncExternalStore(
+    focusEndingStore.subscribe,
+    focusEndingStore.getSnapshot,
+    focusEndingStore.getServerSnapshot,
+  );
+  const visibleSessions = endingKey ? sessions.filter((s) => !endingKey.split(",").includes(s.taskId)) : sessions;
 
   const refresh = useCallback(async () => {
     const running = await getRunningFocusSessions();
@@ -95,7 +105,7 @@ export function ActiveFocusSessionWidget() {
       cancelled = true;
       clearTimeout(retry);
     };
-  }, [modalOpen, pipOpen, pathname]);
+  }, [modalOpen, pipOpen, pathname, endingKey]);
 
   useEffect(() => {
     function handleReturn() {
@@ -111,10 +121,10 @@ export function ActiveFocusSessionWidget() {
 
   return (
     <>
-      <PipDriver sessions={sessions} active={pipOpen} onResync={refresh} />
-      {!modalOpen && sessions.length > 0 && (
+      <PipDriver sessions={visibleSessions} active={pipOpen} onResync={refresh} />
+      {!modalOpen && visibleSessions.length > 0 && (
         <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
-          {sessions.map((session, index) => (
+          {visibleSessions.map((session, index) => (
             <RunningSessionCard
               key={session.taskId}
               session={session}
@@ -233,28 +243,41 @@ function RunningSessionCard({
     }
   }
 
-  async function handleEnd(creditedSeconds?: number) {
-    setBusy(true);
-    try {
-      const ended = await endFocusSession(session.taskId, creditedSeconds);
-      if (!ended.ok) {
-        toast.error(ended.error);
-        return;
-      }
-      clearConfirmedMultiple(session.taskId);
-      const savedSeconds = creditedSeconds ?? Math.round(elapsedSeconds);
-      if (ended.pendingApproval) {
-        toast.warning(`${formatTimerClock(savedSeconds)} çok uzun olduğu için koç onayına gönderildi.`);
-      } else if (savedSeconds > 0) {
-        toast.success(`${formatTimerClock(savedSeconds)} odaklandın, göreve kaydedildi.`);
-      }
-      await onChanged();
-      router.refresh();
-    } catch {
-      toast.error("Odak süresi kaydedilemedi, tekrar dene.");
-    } finally {
-      setBusy(false);
-    }
+  // Bitir is OPTIMISTIC: the card disappears the instant it's clicked (the
+  // session is added to the "ending" set, which the widget hides) and the save
+  // finishes in the background behind a "Süren kaydediliyor…" toast. If the save
+  // fails, the session is still running on the server, so it comes back here.
+  function handleEnd(creditedSeconds?: number) {
+    const taskId = session.taskId;
+    const savedSeconds = creditedSeconds ?? Math.round(elapsedSeconds);
+    const goalHit =
+      session.mode === "countdown" &&
+      session.countdownTargetSeconds !== null &&
+      elapsedSeconds >= session.countdownTargetSeconds;
+    focusEndingStore.begin(taskId);
+    const toastId = toast.loading("Süren kaydediliyor…");
+
+    endFocusSession(taskId, creditedSeconds)
+      .then((ended) => {
+        if (!ended.ok) {
+          toast.error(ended.error, { id: toastId });
+          return;
+        }
+        clearConfirmedMultiple(taskId);
+        const clock = formatTimerClock(savedSeconds);
+        if (ended.pendingApproval) {
+          toast.warning(`${clock} çok uzun olduğu için koç onayına gönderildi.`, { id: toastId });
+        } else if (savedSeconds > 0) {
+          toast.success(`${resolvePraiseMessage(savedSeconds, goalHit)} ${clock} boyunca odaklandın, göreve kaydedildi.`, {
+            id: toastId,
+          });
+        } else {
+          toast.dismiss(toastId);
+        }
+        router.refresh();
+      })
+      .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
+      .finally(() => focusEndingStore.end(taskId));
   }
 
   async function handlePip() {

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { needsCoachApproval } from "@/lib/focus-approval";
+import { decideOpenAction } from "@/lib/focus-open-decision";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
@@ -950,7 +951,7 @@ export async function getMyResourcesForCourse(courseId: string, kind: "study" | 
 // in-progress session for one (student, task) pair -- created on Başlat,
 // updated on every pause/resume, and resolved (banked into
 // tracked_duration_seconds, then deleted) only when the student ends it
-// (Bitir/Vazgeç -> endFocusSession) or starts a new one on the same task.
+// (Bitir -> endFocusSession, or "Süre Tut" pressed again -> openFocusSessionForTask) or starts a new one on the same task.
 //
 // run_started_at is a timestamp, not a counter -- elapsed is always
 // accumulated_seconds + (now - run_started_at) while running, so ANY device
@@ -1010,31 +1011,6 @@ function liveElapsedSeconds(session: FocusSessionRow): number {
   if (session.status !== "running" || !session.run_started_at) return session.accumulated_seconds;
   const ranMs = Date.now() - new Date(session.run_started_at).getTime();
   return session.accumulated_seconds + Math.max(0, Math.round(ranMs / 1000));
-}
-
-// Called right when the Focus Timer opens for a task -- returns the
-// resumable state for the "Devam eden bir seansın var..." prompt, or null
-// when there's genuinely nothing to resume. A running session is reported
-// with its true wall-clock elapsed time, however long ago it started.
-export async function getActiveFocusSession(taskId: string): Promise<{
-  mode: "stopwatch" | "countdown";
-  countdownTargetSeconds: number | null;
-  status: "running" | "paused";
-  elapsedSeconds: number;
-} | null> {
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  const taskIdV = parseInput(uuidSchema, taskId);
-
-  const session = await getOwnFocusSession(supabase, user.id, taskIdV);
-  if (!session) return null;
-
-  return {
-    mode: session.mode,
-    countdownTargetSeconds: session.countdown_target_seconds,
-    status: session.status,
-    elapsedSeconds: liveElapsedSeconds(session),
-  };
 }
 
 // The student's currently RUNNING sessions, across every task -- what the
@@ -1214,30 +1190,87 @@ export async function heartbeatFocusSession(taskId: string): Promise<void> {
     .eq("status", "running");
 }
 
-// Bitir and Vazgeç both end here -- the only difference between them is
-// client-side UX (a celebration screen vs. not), not what gets persisted.
-// Banks through "now" (the session's full wall-clock elapsed) and deletes the
-// session row via end_focus_session (migration 0078/0086).
+// --- ending / banking a session -------------------------------------------
 //
-// A session longer than 6 hours is NOT credited to the task: the database
-// parks it in focus_session_reviews until the coach approves, reduces or
-// rejects it (lib/focus-approval.ts, migration 0086). `pendingApproval` tells
-// the caller which of the two happened so it can say so ("Koç onayı bekliyor")
-// instead of claiming the time was saved. `totalSeconds` is the task's
-// cumulative tracked total (null if there was no session to end).
+// A session is closed out (its time credited to the task, its row deleted) by
+// end_focus_session (migration 0078/0086). It always banks through "now" -- the
+// full wall-clock elapsed -- so nothing is ever dropped; a session longer than
+// 6 hours is NOT credited but parked for the coach's approval (lib/
+// focus-approval.ts). `creditedSeconds` is the one way a session is credited
+// with LESS than it ran: the student answering "Hayır, bitir" on the "Hâlâ
+// çalışmaya devam ediyor musun?" check-in may correct the figure downwards. It
+// can never exceed the real elapsed time, and only that explicit student choice
+// ever passes it -- nothing on the system side trims a session.
 //
-// creditedSeconds is the one way a session is ever credited with LESS than it
-// ran: the student answering "Hayır, bitir" on the "Hâlâ çalışmaya devam
-// ediyor musun?" check-in can correct the figure downwards (e.g. they left
-// their desk hours ago). It can never exceed the real elapsed time, so it
-// can't be used to inflate anything, and it is only ever passed by that
-// explicit student choice -- nothing on the system side trims a session.
+// Throws raw errors (PostgREST error objects keep their SQLSTATE `code`); the
+// two public actions below turn them into a result.
+
+async function bankFocusSession(
+  supabase: SupabaseClient,
+  userId: string,
+  taskId: string,
+  session: FocusSessionRow | null,
+  creditedSeconds?: number,
+): Promise<{ totalSeconds: number | null; bankedSeconds: number; pendingApproval: boolean }> {
+  // What this session will bank: its full wall-clock elapsed, or the shorter
+  // figure the student chose. Mirrors the > 6h rule in end_focus_session (the
+  // database is what actually enforces it).
+  const bankedSeconds = session
+    ? creditedSeconds !== undefined
+      ? Math.min(creditedSeconds, liveElapsedSeconds(session))
+      : liveElapsedSeconds(session)
+    : 0;
+
+  if (session && creditedSeconds !== undefined) {
+    // Freeze the row at the chosen amount; end_focus_session below then banks
+    // exactly that (a paused row contributes its accumulated_seconds).
+    const { error: trimError } = await supabase
+      .from("focus_sessions")
+      .update({ status: "paused", run_started_at: null, accumulated_seconds: bankedSeconds })
+      .eq("id", session.id);
+    if (trimError) throw trimError;
+  }
+
+  const { data, error } = await supabase.rpc("end_focus_session", {
+    p_task_id: taskId,
+    p_bank_through: new Date().toISOString(),
+  });
+  if (error) throw error;
+
+  if (session) revalidatePath("/student");
+
+  // Only claim "sent to the coach" if the database really parked it: confirm a
+  // fresh pending review exists rather than trusting the prediction above (it
+  // wouldn't, e.g., if migration 0086 hasn't been applied).
+  let pendingApproval = false;
+  if (session && needsCoachApproval(bankedSeconds)) {
+    const { data: review } = await supabase
+      .from("focus_session_reviews")
+      .select("id")
+      .eq("student_id", userId)
+      .eq("task_id", taskId)
+      .eq("status", "pending")
+      .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+      .limit(1);
+    pendingApproval = (review?.length ?? 0) > 0;
+  }
+
+  return { totalSeconds: data as number | null, bankedSeconds, pendingApproval };
+}
+
 // Returns a result instead of throwing: a thrown Error's message is replaced by
-// a generic one in production builds, which left the student with a bare "could
-// not be saved" and us with no idea why. A failure is logged with its Postgres
+// a generic one in production builds. A failure is logged with its Postgres
 // code and returned with a short reference (the SQLSTATE, e.g. 42501 = missing
-// permission) so it can actually be diagnosed; the session itself is untouched
-// on failure, so nothing is lost and ending it can simply be retried.
+// permission) so it can be diagnosed; the session itself is untouched on
+// failure, so nothing is lost and ending it can simply be retried.
+function focusActionError(label: string, e: unknown): string {
+  console.error(`[${label}] failed:`, e);
+  Sentry.captureException(e);
+  const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : null;
+  if (code) return `Odak süresi kaydedilemedi (hata kodu: ${code}).`;
+  return e instanceof Error ? e.message : GENERIC_DB_ERROR;
+}
+
 export type EndFocusSessionResult =
   | { ok: true; totalSeconds: number | null; pendingApproval: boolean }
   | { ok: false; error: string };
@@ -1246,6 +1279,7 @@ export type EndFocusSessionResult =
 // omitted argument can arrive as null across the Server Action boundary.
 const creditedSecondsSchema = z.number().int().min(0).max(86_400).nullish();
 
+// Bitir (and "Hayır, bitir" on the check-in) end here.
 export async function endFocusSession(taskId: string, creditedSeconds?: number | null): Promise<EndFocusSessionResult> {
   try {
     await assertNotImpersonating();
@@ -1255,59 +1289,60 @@ export async function endFocusSession(taskId: string, creditedSeconds?: number |
     const creditedV = parseInput(creditedSecondsSchema, creditedSeconds) ?? undefined;
 
     const session = await getOwnFocusSession(supabase, user.id, taskIdV);
-    // What this session will bank: its full wall-clock elapsed, or the shorter
-    // figure the student chose. Mirrors the > 6h rule in end_focus_session (the
-    // database is what actually enforces it).
-    const bankedSeconds = session
-      ? creditedV !== undefined
-        ? Math.min(creditedV, liveElapsedSeconds(session))
-        : liveElapsedSeconds(session)
-      : 0;
-
-    if (session && creditedV !== undefined) {
-      // Freeze the row at the chosen amount; end_focus_session below then banks
-      // exactly that (a paused row contributes its accumulated_seconds).
-      const { error: trimError } = await supabase
-        .from("focus_sessions")
-        .update({ status: "paused", run_started_at: null, accumulated_seconds: bankedSeconds })
-        .eq("id", session.id);
-      if (trimError) throw trimError;
-    }
-
-    const { data, error } = await supabase.rpc("end_focus_session", {
-      p_task_id: taskIdV,
-      p_bank_through: new Date().toISOString(),
-    });
-    if (error) throw error;
-
-    if (session) revalidatePath("/student");
-
-    // Only claim "sent to the coach" if the database really parked it: confirm a
-    // fresh pending review exists rather than trusting the prediction above (it
-    // wouldn't, e.g., if migration 0086 hasn't been applied).
-    let pendingApproval = false;
-    if (session && needsCoachApproval(bankedSeconds)) {
-      const { data: review } = await supabase
-        .from("focus_session_reviews")
-        .select("id")
-        .eq("student_id", user.id)
-        .eq("task_id", taskIdV)
-        .eq("status", "pending")
-        .gte("created_at", new Date(Date.now() - 60_000).toISOString())
-        .limit(1);
-      pendingApproval = (review?.length ?? 0) > 0;
-    }
-
-    return { ok: true, totalSeconds: data as number | null, pendingApproval };
+    const banked = await bankFocusSession(supabase, user.id, taskIdV, session, creditedV);
+    return { ok: true, totalSeconds: banked.totalSeconds, pendingApproval: banked.pendingApproval };
   } catch (e) {
-    console.error("[endFocusSession] failed:", e);
-    Sentry.captureException(e);
-    // PostgREST / Postgres errors carry a short SQLSTATE-style code; other
-    // errors here are already user-facing Turkish messages (impersonation,
-    // validation).
-    const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : null;
-    if (code) return { ok: false, error: `Odak süresi kaydedilemedi (hata kodu: ${code}).` };
-    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+    return { ok: false, error: focusActionError("endFocusSession", e) };
+  }
+}
+
+// Called when "Süre Tut" is pressed on a task. There is no "resume?" question:
+//   * nothing on the server           -> "none": open a fresh timer.
+//   * a leftover (paused, or running but its page has gone quiet) session
+//                                     -> "banked": its time is credited on the
+//                                        spot and the student is told how much.
+//   * a session that is alive right now (running elsewhere / the floating
+//     widget / another device, or past the 3-hour check-in)
+//                                     -> "attach": show it, already running --
+//                                        banking it would end a timer the
+//                                        student is actively using.
+// See lib/focus-open-decision.ts for the rule.
+export type OpenFocusSessionResult =
+  | { kind: "none" }
+  | { kind: "attach"; mode: "stopwatch" | "countdown"; countdownTargetSeconds: number | null; elapsedSeconds: number }
+  | { kind: "banked"; seconds: number; pendingApproval: boolean }
+  | { kind: "error"; error: string };
+
+export async function openFocusSessionForTask(taskId: string): Promise<OpenFocusSessionResult> {
+  try {
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    const taskIdV = parseInput(uuidSchema, taskId);
+
+    const session = await getOwnFocusSession(supabase, user.id, taskIdV);
+    if (!session) return { kind: "none" };
+
+    const elapsedSeconds = liveElapsedSeconds(session);
+    const decision = decideOpenAction({
+      status: session.status,
+      lastHeartbeatAt: session.last_heartbeat_at,
+      elapsedSeconds,
+    });
+
+    if (decision === "attach") {
+      return {
+        kind: "attach",
+        mode: session.mode,
+        countdownTargetSeconds: session.countdown_target_seconds,
+        elapsedSeconds,
+      };
+    }
+
+    await assertNotImpersonating();
+    const banked = await bankFocusSession(supabase, user.id, taskIdV, session);
+    return { kind: "banked", seconds: banked.bankedSeconds, pendingApproval: banked.pendingApproval };
+  } catch (e) {
+    return { kind: "error", error: focusActionError("openFocusSessionForTask", e) };
   }
 }
 

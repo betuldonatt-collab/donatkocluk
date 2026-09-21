@@ -31,3 +31,37 @@ export const focusModalStore = {
     emit();
   },
 };
+
+// Sessions whose "Bitir" has been clicked and whose save is still in flight.
+// Bitir is optimistic: the timer disappears the instant it is clicked and the
+// server call finishes in the background -- so the floating widget must not
+// keep showing (or briefly re-show) a session that is being ended. The widget
+// hides these ids, and re-reads the server when the set changes (which brings
+// the session back if the save failed, so it can be ended again).
+const ending = new Set<string>();
+const endingListeners = new Set<() => void>();
+
+function emitEnding() {
+  for (const listener of endingListeners) listener();
+}
+
+export const focusEndingStore = {
+  subscribe(listener: () => void) {
+    endingListeners.add(listener);
+    return () => {
+      endingListeners.delete(listener);
+    };
+  },
+  // A primitive snapshot (comma-joined ids) so useSyncExternalStore compares it
+  // by value.
+  getSnapshot: () => [...ending].sort().join(","),
+  getServerSnapshot: () => "",
+  begin(taskId: string) {
+    ending.add(taskId);
+    emitEnding();
+  },
+  end(taskId: string) {
+    ending.delete(taskId);
+    emitEnding();
+  },
+};

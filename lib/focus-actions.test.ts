@@ -138,3 +138,68 @@ describe("getRunningFocusSessions", () => {
     expect(console.error).toHaveBeenCalled();
   });
 });
+
+// --- openFocusSessionForTask: no "resume?" question -------------------------
+
+function sessionWith(overrides: Partial<Row>): Row {
+  return { ...runningSince(600), ...overrides };
+}
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
+describe("openFocusSessionForTask", () => {
+  it("opens a fresh timer when there is nothing on the server", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = null;
+    expect(await openFocusSessionForTask(TASK)).toEqual({ kind: "none" });
+    expect(state.rpcCalls).toHaveLength(0);
+  });
+
+  it("automatically banks a leftover PAUSED session and reports how much was logged", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ status: "paused", run_started_at: null, accumulated_seconds: 1500 });
+    const result = await openFocusSessionForTask(TASK);
+    expect(result).toEqual({ kind: "banked", seconds: 1500, pendingApproval: false });
+    expect(state.rpcCalls.map((c) => c.fn)).toEqual(["end_focus_session"]);
+  });
+
+  it("does NOT end a session that is alive right now (fresh heartbeat) -- it attaches to it", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ last_heartbeat_at: minutesAgo(1), run_started_at: minutesAgo(20) });
+    const result = await openFocusSessionForTask(TASK);
+    expect(result).toMatchObject({ kind: "attach", mode: "stopwatch" });
+    if (result.kind === "attach") expect(result.elapsedSeconds).toBeGreaterThanOrEqual(20 * 60);
+    expect(state.rpcCalls).toHaveLength(0); // nothing was ended
+  });
+
+  it("banks a running session whose page went quiet (tab closed), through NOW -- the time away is not dropped", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ last_heartbeat_at: minutesAgo(40), run_started_at: minutesAgo(45) });
+    const result = await openFocusSessionForTask(TASK);
+    expect(result.kind).toBe("banked");
+    if (result.kind === "banked") expect(result.seconds).toBeGreaterThanOrEqual(45 * 60);
+  });
+
+  it("shows a quiet session past 3 hours (so the check-in can ask) instead of crediting it unseen", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ last_heartbeat_at: minutesAgo(200), run_started_at: minutesAgo(240) });
+    expect((await openFocusSessionForTask(TASK)).kind).toBe("attach");
+    expect(state.rpcCalls).toHaveLength(0);
+  });
+
+  it("reports pending approval when the banked leftover was over 6 hours and the database parked it", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ status: "paused", run_started_at: null, accumulated_seconds: 7 * 3600 });
+    state.reviews = [{ id: "r1" }];
+    expect(await openFocusSessionForTask(TASK)).toEqual({ kind: "banked", seconds: 7 * 3600, pendingApproval: true });
+  });
+
+  it("returns a diagnosable error (never throws) when banking fails", async () => {
+    const { openFocusSessionForTask } = await import("../app/student/actions");
+    state.session = sessionWith({ status: "paused", run_started_at: null, accumulated_seconds: 900 });
+    state.rpcResult = { data: null, error: { code: "42501", message: "permission denied" } };
+    expect(await openFocusSessionForTask(TASK)).toEqual({
+      kind: "error",
+      error: "Odak süresi kaydedilemedi (hata kodu: 42501).",
+    });
+  });
+});
