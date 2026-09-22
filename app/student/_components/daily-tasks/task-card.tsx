@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { TaskDescription } from "@/components/task-description";
 import { cn } from "@/lib/utils";
 import { FocusTimerTrigger } from "../focus-timer/focus-timer-trigger";
 import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
@@ -131,7 +132,7 @@ function taskSubtitle(task: StudentTask): string {
       return `${manual}${durationSuffix(task)}`;
     }
     default:
-      return `${task.description ?? TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
   }
 }
 
@@ -219,6 +220,8 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
             </span>
           )}
         </div>
+        {/* The coach's note, right under the title (line breaks kept). */}
+        <TaskDescription text={task.description} lines={3} className="mt-0.5" />
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full
             task modal (traced to the fetch itself never joining

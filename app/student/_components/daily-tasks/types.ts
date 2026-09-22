@@ -89,6 +89,8 @@ export type StudentFixedTask = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  // Coach's note shown under the title (line breaks kept); null = none.
+  description: string | null;
 };
 
 export type TopicMistakeStatus = "wrong" | "blank";

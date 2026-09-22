@@ -10,6 +10,7 @@ import { findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { weekDates } from "@/lib/date";
 import { getStudentTasksForWeek, type StudentFixedTask } from "../../../actions";
+import { TaskDescription } from "@/components/task-description";
 import { FixedTaskDialog, type FixedTaskDialogState } from "./fixed-task-dialog";
 import type { DetailTask } from "../types";
 
@@ -159,6 +160,7 @@ export function ProgramTab({
                             <Clock className="size-2.5 shrink-0" />
                             {t.start_time.slice(0, 5)}–{t.end_time.slice(0, 5)}
                           </p>
+                          <TaskDescription text={t.description} lines={3} className="mt-0.5 text-[11px]" />
                           <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                             <Button
                               type="button"

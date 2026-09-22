@@ -113,7 +113,7 @@ async function fetchHomeData(userId: string) {
       // "Sabit Görevler" -- week-independent (no date range), read-only
       // here (RLS: student_fixed_tasks_student_read). Same student-side
       // injection ScheduleBoard does for the coach, see task-board.tsx.
-      supabase.from("student_fixed_tasks").select("id, title, day_of_week, start_time, end_time").eq("student_id", userId),
+      supabase.from("student_fixed_tasks").select("*").eq("student_id", userId),
       // "Tüm Zamanlar" total for the dashboard's own Toplam Süre card --
       // every task ever, one column only (cheap). tracked_duration_seconds
       // only ever grows from a real completed Focus Timer session (never a

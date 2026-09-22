@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { TaskDescription } from "@/components/task-description";
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -136,7 +137,7 @@ function cellSubtitle(task: StudentTask): string {
       return `${manual}${durationSuffix(task)}`;
     }
     default:
-      return `${task.description ?? TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
+      return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
   }
 }
 
@@ -185,6 +186,7 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
   return (
     <div className="space-y-1.5">
       <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
+      <TaskDescription text={task.description} lines="all" />
       {topic && (
         <p className={cn("text-xs leading-snug break-words", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>
           {topic.name}
@@ -337,6 +339,8 @@ export function WeekTaskCell({
                   )
                 )}
               </div>
+
+              <TaskDescription text={task.description} lines={2} className="text-[10px]" />
 
               {topic && (
                 <p

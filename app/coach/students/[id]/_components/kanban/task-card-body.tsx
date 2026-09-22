@@ -3,6 +3,7 @@ import { PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
+import { TaskDescription } from "@/components/task-description";
 import type { DetailTask } from "../../types";
 
 export const TASK_TYPE_LABELS: Record<string, string> = {
@@ -127,6 +128,8 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
     <div className="min-w-0 flex-1 space-y-1 overflow-hidden">
       <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
 
+      <TaskDescription text={task.description} lines={3} />
+
       {topic && (
         <p
           className={cn(
@@ -155,6 +158,8 @@ export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTa
   return (
     <div className="space-y-1.5">
       <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
+
+      <TaskDescription text={task.description} lines="all" />
 
       {topic && (
         <p className={cn("text-xs leading-snug break-words", topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground")}>

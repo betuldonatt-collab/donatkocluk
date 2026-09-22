@@ -34,6 +34,7 @@ import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
 import { WeekProgressBar } from "./week-progress-bar";
+import { TaskDescription } from "@/components/task-description";
 import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
 
@@ -81,12 +82,15 @@ function getWeekDays(referenceIso: string) {
 // so it reads as the same feature on both panels.
 function FixedTaskChip({ task }: { task: StudentFixedTask }) {
   return (
-    <div className="border-border/70 bg-muted/50 text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs">
-      <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
-      <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
-      <span className="shrink-0 tabular-nums">
-        {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
-      </span>
+    <div className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
+      <div className="flex items-center gap-1.5">
+        <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
+        <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
+        <span className="shrink-0 tabular-nums">
+          {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
+        </span>
+      </div>
+      <TaskDescription text={task.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
     </div>
   );
 }

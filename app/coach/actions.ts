@@ -1027,6 +1027,8 @@ export type StudentFixedTask = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  // Free text (line breaks kept) shown under the title; null/absent = none.
+  description?: string | null;
 };
 
 const fixedTaskInputSchema = z
@@ -1035,12 +1037,13 @@ const fixedTaskInputSchema = z
     dayOfWeek: z.number().int().min(0).max(6),
     startTime: timeOnlySchema,
     endTime: timeOnlySchema,
+    description: z.string().trim().max(2000, "Açıklama en fazla 2000 karakter olabilir.").nullable().optional(),
   })
   .refine((v) => v.endTime > v.startTime, { message: "Bitiş saati başlangıçtan sonra olmalı.", path: ["endTime"] });
 
 export async function createFixedTask(
   studentId: string,
-  input: { title: string; dayOfWeek: number; startTime: string; endTime: string },
+  input: { title: string; dayOfWeek: number; startTime: string; endTime: string; description?: string | null },
 ): Promise<StudentFixedTask> {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
@@ -1058,6 +1061,9 @@ export async function createFixedTask(
       day_of_week: inputV.dayOfWeek,
       start_time: inputV.startTime,
       end_time: inputV.endTime,
+      // Only sent when there is one, so a fixed task without a description never
+      // touches the column.
+      ...(inputV.description ? { description: inputV.description } : {}),
     })
     .select("*")
     .single();
@@ -1071,7 +1077,7 @@ export async function createFixedTask(
 export async function updateFixedTask(
   studentId: string,
   fixedTaskId: string,
-  input: { title: string; dayOfWeek: number; startTime: string; endTime: string },
+  input: { title: string; dayOfWeek: number; startTime: string; endTime: string; description?: string | null },
 ): Promise<StudentFixedTask> {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
@@ -1088,6 +1094,8 @@ export async function updateFixedTask(
       day_of_week: inputV.dayOfWeek,
       start_time: inputV.startTime,
       end_time: inputV.endTime,
+      // undefined = leave as is; null/"" = clear it.
+      ...(inputV.description !== undefined ? { description: inputV.description || null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", fixedTaskIdV)
@@ -1177,6 +1185,8 @@ type AssignTaskInput = {
   // column (no course/topic exists for this type), same "no new column"
   // convention as generalExamPublisher/branchExamPublisher above.
   bookTitle?: string | null;
+  // The coach's note shown under the task's title on both panels (line breaks kept).
+  description?: string | null;
 };
 
 const videoLinkSchema = z.object({ url: z.string().trim().max(2000), title: z.string().trim().max(300).nullable() });
@@ -1193,6 +1203,8 @@ const assignTaskInputSchema = z.object({
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
+  // The coach's note under the task's title (line breaks kept).
+  description: z.string().trim().max(2000).nullable().optional(),
 });
 
 // A day's Görevler section is one combined [task|event] order_index
@@ -1256,6 +1268,7 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
     duration_minutes: number | null;
     video_links: VideoLink[];
     order_index: number;
+    description: string | null;
     is_coach_assigned: true;
     is_approved_by_coach: true;
   }[] = [];
@@ -1280,6 +1293,7 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
         duration_minutes: input.durationMinutes ?? null,
         video_links: videoLinks,
         order_index: nextOrder++,
+        description: input.description?.trim() || null,
         is_coach_assigned: true,
         // A coach-originated task needs no separate review -- see
         // "Soft Coach Approval" in app/student/actions.ts's
@@ -1394,6 +1408,7 @@ const updateAssignedTaskSchema = z.object({
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
 });
 
 // Edits always operate on the ONE existing row -- a "video" task's links
@@ -1415,6 +1430,7 @@ export async function updateAssignedTask(
     generalExamPublisher?: string | null;
     branchExamPublisher?: string | null;
     bookTitle?: string | null;
+    description?: string | null;
   },
 ) {
   await assertNotImpersonating();
@@ -1443,6 +1459,7 @@ export async function updateAssignedTask(
   if (input_.totalCount !== undefined) patch.total_count = input_.totalCount;
   if (input_.durationMinutes !== undefined) patch.duration_minutes = input_.durationMinutes;
   if (input_.videoLinks !== undefined) patch.video_links = input_.videoLinks;
+  if (input_.description !== undefined) patch.description = input_.description?.trim() || null;
   if (input_.taskType === "general_exam") {
     patch.title = buildGeneralExamTitle(input_.generalExamTrack, input_.generalExamPublisher);
   } else if (

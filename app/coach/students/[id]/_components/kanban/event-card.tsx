@@ -60,8 +60,12 @@ export function EventCardBody({ event }: { event: StudentEvent }) {
       </div>
       <span className="block truncate text-[10px] opacity-80">
         {event.start_time.slice(0, 5)}–{event.end_time.slice(0, 5)}
-        {event.description ? ` · ${event.description}` : ""}
       </span>
+      {event.description?.trim() && (
+        <span className="mt-0.5 line-clamp-3 block text-[10px] leading-snug break-words whitespace-pre-wrap opacity-80">
+          {event.description.trim()}
+        </span>
+      )}
     </div>
   );
 }

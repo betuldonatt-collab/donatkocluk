@@ -50,6 +50,7 @@ import type { DetailTask } from "../types";
 import type { CourseResourceData } from "../_components/kaynak-takibi-tab";
 import { EventCard, EventCardBody, EVENT_TYPE_CLASSES, eventDragId, isEventDragId, eventIdFromDragId } from "../_components/kanban/event-card";
 import { EventDialog, type EventDialogState } from "../_components/kanban/event-dialog";
+import { TaskDescription } from "@/components/task-description";
 import { KanbanTaskCard } from "../_components/kanban/kanban-task-card";
 import { RoutineTaskCard } from "../_components/kanban/routine-task-card";
 import {
@@ -976,15 +977,15 @@ function DayColumn({
           <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
           <div className="space-y-1.5">
             {fixedTasks.map((ft) => (
-              <div
-                key={ft.id}
-                className="border-border/70 bg-muted/50 text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1.5 text-xs"
-              >
-                <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
-                <span className="min-w-0 flex-1 truncate font-medium">{ft.title}</span>
-                <span className="shrink-0 tabular-nums">
-                  {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
-                </span>
+              <div key={ft.id} className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{ft.title}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
+                  </span>
+                </div>
+                <TaskDescription text={ft.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
               </div>
             ))}
           </div>

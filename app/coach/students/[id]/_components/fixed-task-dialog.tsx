@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { createFixedTask, deleteFixedTask, updateFixedTask, type StudentFixedTask } from "../../../actions";
 
@@ -43,6 +44,7 @@ export function FixedTaskDialog({
   const [dayOfWeek, setDayOfWeek] = useState(initial?.day_of_week ?? (state.mode === "create" ? state.dayOfWeek : 0));
   const [startTime, setStartTime] = useState(initial?.start_time.slice(0, 5) ?? "08:00");
   const [endTime, setEndTime] = useState(initial?.end_time.slice(0, 5) ?? "09:00");
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,15 @@ export function FixedTaskDialog({
     setSaving(true);
     setError(null);
     try {
-      const payload = { title: title.trim(), dayOfWeek, startTime, endTime };
+      // The description is only sent when there is one to save or one to clear,
+      // so a fixed task that never had any is written exactly as before.
+      const payload = {
+        title: title.trim(),
+        dayOfWeek,
+        startTime,
+        endTime,
+        ...(description.trim() || initial?.description ? { description: description.trim() || null } : {}),
+      };
       if (isEdit) {
         const saved = await updateFixedTask(studentId, state.task.id, payload);
         onSaved(saved);
@@ -127,6 +137,18 @@ export function FixedTaskDialog({
             <Label htmlFor="fixed-task-end">Bitiş</Label>
             <Input id="fixed-task-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="fixed-task-description">Açıklama (opsiyonel)</Label>
+          <Textarea
+            id="fixed-task-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Başlığın altında görünür; yazdığın satır boşlukları korunur"
+          />
         </div>
 
         {error && <p className="text-destructive text-sm">{error}</p>}
