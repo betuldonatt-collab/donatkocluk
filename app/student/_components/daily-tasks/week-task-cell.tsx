@@ -286,13 +286,19 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
 
 // Compact task box for a single day cell in the weekly matrix -- same
 // click/keyboard behavior as TaskCard (opens the same TaskModal), but a
-// much smaller footprint so several fit inside one grid column. Title,
-// topic, subtitle, and the video indicator all wrap freely (no
-// truncation) -- the cell's dragged/stored height is a FLOOR, not a hard
-// cap, so content taller than that floor (a description especially) grows
-// the cell past it instead of being silently clipped; drag the row's own
-// handle taller to raise that floor for every cell at this row index. The
-// same detail is also one hover away via WeekCellHoverDetail.
+// much smaller footprint so several fit inside one grid column. The cell's
+// dragged/stored height is a strict, shared value for every cell at this
+// row index across all 7 days (an "Excel-like grid", see useRowHeights) --
+// it used to be applied as a FLOOR only (minHeight, no clip), so a cell
+// with more text than its neighbors grew taller than the rest of its own
+// row, breaking the grid's alignment. It's now a real height with
+// overflow-hidden: collapsed (a short dragged row), extra content is
+// cleanly cut at the box edge instead of pushing the cell out of line;
+// expanded (drag the row's own handle taller), every cell in that row
+// grows together and reveals more, still perfectly aligned. line-clamp on
+// the title keeps that clip at a line boundary rather than mid-glyph; the
+// full, untruncated detail is always one hover away via
+// WeekCellHoverDetail.
 export function WeekTaskCell({
   task,
   onClick,
@@ -332,9 +338,9 @@ export function WeekTaskCell({
               onClick();
             }
           }}
-          style={{ minHeight: height }}
+          style={{ height }}
           className={cn(
-            "border-border hover:bg-accent/40 relative flex w-full cursor-pointer flex-col rounded-md border p-2 text-left transition-colors",
+            "border-border hover:bg-accent/40 relative flex w-full cursor-pointer flex-col overflow-hidden rounded-md border p-2 text-left transition-colors",
             task.rejected_at ? "bg-rose-500/5" : subjectTintClass(task),
             statusBorderClass(task),
             task.rejected_at && "border-l-2 border-l-rose-400",
@@ -357,7 +363,9 @@ export function WeekTaskCell({
 
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-start gap-1">
-                <p className="text-foreground min-w-0 flex-1 text-xs font-semibold leading-snug break-words">{cLabel ?? task.title}</p>
+                <p className="text-foreground line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-snug break-words">
+                  {cLabel ?? task.title}
+                </p>
                 {/* Icon-only indicators (never a text badge row) -- keeps
                     every state, including the rarer analysis-pending /
                     rejected ones, compact next to a title that can now
@@ -379,7 +387,7 @@ export function WeekTaskCell({
               {topic && (
                 <p
                   className={cn(
-                    "text-[11px] leading-snug break-words",
+                    "line-clamp-1 text-[11px] leading-snug break-words",
                     topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
                   )}
                 >
@@ -388,14 +396,17 @@ export function WeekTaskCell({
               )}
 
               {/* Which book/kaynak the coach linked, if any -- see the
-                  matching comment on StudentTask.resource_names. Wraps
-                  freely now -- the cell's own resize handle is how extra
-                  height gets reclaimed, not clipping this text. */}
+                  matching comment on StudentTask.resource_names. Clamped to
+                  one line, same as topic above -- the cell's own resize
+                  handle is how extra height gets reclaimed now, not
+                  unbounded wrapping. */}
               {task.resource_names.length > 0 && (
-                <p className="text-muted-foreground text-[10px] leading-snug break-words">{task.resource_names.join(" + ")}</p>
+                <p className="text-muted-foreground line-clamp-1 text-[10px] leading-snug break-words">
+                  {task.resource_names.join(" + ")}
+                </p>
               )}
 
-              <p className="text-muted-foreground text-[10px] leading-snug break-words">
+              <p className="text-muted-foreground line-clamp-1 text-[10px] leading-snug break-words">
                 {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
               </p>
 
