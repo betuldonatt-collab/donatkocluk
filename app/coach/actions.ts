@@ -1324,6 +1324,16 @@ async function recomputeTopicStats(supabase: SupabaseClient, studentId: string, 
   if (error) throw dbError(error);
 }
 
+// Paragraf ve Problem Çizelgesi (migration 0091): a "paragraf"/"problem"
+// routine task's own counts ARE that day's chart entry now -- no separate
+// manual re-entry, on either panel. Re-derives (or removes) the one row tied
+// to this task from its current state; best-effort, since the chart is a
+// convenience on top of the write that just succeeded, not a reason to fail it.
+async function syncParagrafProblemEntry(supabase: SupabaseClient, taskId: string) {
+  const { error } = await supabase.rpc("sync_paragraf_problem_entry", { p_task_id: taskId });
+  if (error) console.error("[syncParagrafProblemEntry] failed:", error);
+}
+
 // Links the same ordered resource list to every given task id (one
 // created task per date/video-link pair shares the coach's one resource
 // pick). No-ops when there's nothing to link.
@@ -1478,6 +1488,11 @@ export async function updateAssignedTask(
 
   if (taskBefore?.course_id) await recomputeTopicStats(supabase, studentIdV, taskBefore.course_id, taskBefore.topic_id);
   if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
+  // Same rule: a duration edit, or moving the task on/off Paragraf/Problem,
+  // can change (or end) its Paragraf ve Problem Çizelgesi entry.
+  if (taskBefore?.course_id === "paragraf" || taskBefore?.course_id === "problem" || data.course_id === "paragraf" || data.course_id === "problem") {
+    await syncParagrafProblemEntry(supabase, taskIdV);
+  }
 
   let resourceIds = input_.resourceIds;
   if (resourceIds !== undefined) {
@@ -1905,6 +1920,9 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
   // app/coach/students/[id]/page.tsx) -- the bucket it belongs to must be
   // resynced now, not just on the next unrelated write to that topic.
   if (data[0].course_id) await recomputeTopicStats(supabase, existing.student_id, data[0].course_id, data[0].topic_id);
+  // Same rule: an approved self-created Paragraf/Problem entry now counts
+  // toward the Paragraf ve Problem Çizelgesi too, same as a coach-assigned one.
+  if (data[0].course_id === "paragraf" || data[0].course_id === "problem") await syncParagrafProblemEntry(supabase, taskIdV);
 
   await resolvePendingApprovalNotification(supabase, user.id, taskIdV);
 
@@ -2094,6 +2112,7 @@ export async function updateAssignedTaskStatus(studentId: string, taskId: string
     .single();
   if (error) throw dbError(error);
   if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
+  if (data.course_id === "paragraf" || data.course_id === "problem") await syncParagrafProblemEntry(supabase, taskIdV);
   revalidatePath(`/coach/students/${studentIdV}`);
   return data;
 }

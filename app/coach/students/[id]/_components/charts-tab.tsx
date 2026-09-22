@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
+import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
@@ -117,18 +118,30 @@ export function ChartsTab({
   // filtering by range is plain client-side work, no extra fetch needed.
   const [chartRange, setChartRange] = useState<ChartRange>(LAST_30_DAYS_RANGE);
 
-  const sortedEntries = paragrafEntries
-    .filter((e) => isDateInChartRange(e.entry_date, chartRange))
-    .sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+  // One point per DAY, not per row: a day can hold several entries for the
+  // same date now -- the student's own manual entries plus a Paragraf/Problem
+  // routine task auto-synced the moment they mark it done (migration 0091) --
+  // so this sums same-date rows together first instead of plotting more than
+  // one point on the same date (aggregateParagrafProblemByDate, shared with
+  // the student's own equivalent chart).
+  const sortedEntries = aggregateParagrafProblemByDate(
+    paragrafEntries
+      .filter((e) => isDateInChartRange(e.entry_date, chartRange))
+      .map((e) => ({
+        date: e.entry_date,
+        paragraf: { dogru: e.paragraf_dogru, yanlis: e.paragraf_yanlis, bos: 0, sure: e.paragraf_sure },
+        problem: { dogru: e.problem_dogru, yanlis: e.problem_yanlis, bos: 0, sure: e.problem_sure },
+      })),
+  );
   const paragrafSeries = sortedEntries.map((e) => ({
-    date: e.entry_date,
-    a: computeNet(e.paragraf_dogru, e.paragraf_yanlis),
-    b: e.paragraf_sure,
+    date: e.date,
+    a: computeNet(e.paragraf.dogru, e.paragraf.yanlis),
+    b: e.paragraf.sure,
   }));
   const problemSeries = sortedEntries.map((e) => ({
-    date: e.entry_date,
-    a: computeNet(e.problem_dogru, e.problem_yanlis),
-    b: e.problem_sure,
+    date: e.date,
+    a: computeNet(e.problem.dogru, e.problem.yanlis),
+    b: e.problem.sure,
   }));
 
   // LGS: Paragraf (3:1 net + duration) and Kitap Okuma (pages/day) from the

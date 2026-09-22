@@ -71,6 +71,16 @@ async function recomputeTopicStats(supabase: SupabaseClient, studentId: string, 
   if (error) throw dbError(error);
 }
 
+// Paragraf ve Problem Çizelgesi (migration 0091): a "paragraf"/"problem"
+// routine task's own counts ARE that day's chart entry now -- no separate
+// manual re-entry. Re-derives (or removes) the one row tied to this task from
+// its current state; best-effort, since the chart is a convenience on top of
+// the task the student just successfully saved, not a reason to fail that save.
+async function syncParagrafProblemEntry(supabase: SupabaseClient, taskId: string) {
+  const { error } = await supabase.rpc("sync_paragraf_problem_entry", { p_task_id: taskId });
+  if (error) console.error("[syncParagrafProblemEntry] failed:", error);
+}
+
 const countField = z.number().int().min(0).max(10000).nullable().optional();
 const subjectScoreSchema = z.object({
   correct: z.number().int().min(0).max(10000).nullable(),
@@ -262,8 +272,15 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   if (data.course_id && (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV)) {
     await recomputeTopicStats(supabase, data.student_id, data.course_id, data.topic_id);
   }
+  // Same trigger as the topic-stats resync just above: a Paragraf/Problem
+  // routine task's counts or status changed, so the day's chart entry might
+  // need to change (or stop existing) with it.
+  if ((data.course_id === "paragraf" || data.course_id === "problem") && (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV)) {
+    await syncParagrafProblemEntry(supabase, data.id);
+  }
 
   revalidatePath("/student");
+  revalidatePath("/student/paragraf-problem");
   return data;
 }
 

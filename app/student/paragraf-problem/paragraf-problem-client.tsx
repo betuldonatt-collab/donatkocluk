@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
+import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
 import { computeNet } from "@/lib/scoring";
 import { ChartRangePicker } from "../_components/charts/chart-range-picker";
 import { DualMetricChart } from "../_components/charts/dual-metric-chart";
@@ -139,20 +140,34 @@ export function ParagrafProblemClient({
     }
   }
 
+  // One point per DAY, not per row: a day can now hold several rows for the
+  // same date -- a manual entry plus a Paragraf/Problem routine task the
+  // student marked done, or more than one of either -- so the chart sums them
+  // together first (aggregateParagrafProblemByDate) instead of plotting (or
+  // drawing a line through) more than one point on the same date. The
+  // "Geçmiş Veriler" table below stays one row per entry, exactly as logged.
   const chartSortedAsc = useMemo(() => {
     const source =
       chartRange.type === "last30"
         ? history.filter((e) => isDateInChartRange(e.date, chartRange))
         : (rangeCache[rangeCacheKey!] ?? []);
-    return [...source].sort((a, b) => a.date.localeCompare(b.date));
+    return aggregateParagrafProblemByDate(source.map((e) => ({ date: e.date, paragraf: e.paragraf, problem: e.problem })));
   }, [chartRange, history, rangeCache, rangeCacheKey]);
   const sortedDesc = useMemo(
     () => [...history].sort((a, b) => b.date.localeCompare(a.date)),
     [history],
   );
 
-  const paragrafSeries = chartSortedAsc.map((e) => ({ date: e.date, a: e.paragraf.net, b: e.paragraf.sure }));
-  const problemSeries = chartSortedAsc.map((e) => ({ date: e.date, a: e.problem.net, b: e.problem.sure }));
+  const paragrafSeries = chartSortedAsc.map((e) => ({
+    date: e.date,
+    a: computeNet(e.paragraf.dogru, e.paragraf.yanlis),
+    b: e.paragraf.sure,
+  }));
+  const problemSeries = chartSortedAsc.map((e) => ({
+    date: e.date,
+    a: computeNet(e.problem.dogru, e.problem.yanlis),
+    b: e.problem.sure,
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -164,6 +179,16 @@ export function ParagrafProblemClient({
           Günlük paragraf ve problem çalışmalarını gir, gelişimini grafikte izle.
         </p>
       </header>
+
+      {/* Görev panosundan bir Paragraf/Problem rutinini "Tamamlandı" ya da
+          "Yarım" işaretlemek burayı otomatik günceller -- aynı çalışmayı iki
+          kez girmeye gerek yok. Aşağıdaki form yalnızca görev panosunda
+          karşılığı olmayan (ör. bağımsız, kendi başına yapılan) çalışmalar
+          için. */}
+      <div className="border-primary/20 bg-primary/5 text-foreground mb-6 rounded-lg border px-4 py-3 text-sm">
+        Görev panondan bir Paragraf veya Problem rutinini tamamlandı olarak işaretlediğinde bu sayfa otomatik güncellenir. Aşağıdaki
+        formu yalnızca görev panonda karşılığı olmayan ekstra çalışmalar için kullan.
+      </div>
 
       <section aria-labelledby="section-charts">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
