@@ -81,6 +81,16 @@ async function syncParagrafProblemEntry(supabase: SupabaseClient, taskId: string
   if (error) console.error("[syncParagrafProblemEntry] failed:", error);
 }
 
+// LGS counterpart (migration 0092): a "paragraf" or "kitap-okuma" routine task
+// feeds the LGS Paragraf/Kitap Okuma tracker instead (lgs_daily_routines) --
+// the RPC itself only actually writes for an LGS student, so calling both this
+// and syncParagrafProblemEntry for a shared course_id like "paragraf" is safe
+// regardless of the task owner's cohort.
+async function syncLgsDailyRoutineEntry(supabase: SupabaseClient, taskId: string) {
+  const { error } = await supabase.rpc("sync_lgs_daily_routine_entry", { p_task_id: taskId });
+  if (error) console.error("[syncLgsDailyRoutineEntry] failed:", error);
+}
+
 const countField = z.number().int().min(0).max(10000).nullable().optional();
 const subjectScoreSchema = z.object({
   correct: z.number().int().min(0).max(10000).nullable(),
@@ -272,11 +282,13 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   if (data.course_id && (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV)) {
     await recomputeTopicStats(supabase, data.student_id, data.course_id, data.topic_id);
   }
-  // Same trigger as the topic-stats resync just above: a Paragraf/Problem
-  // routine task's counts or status changed, so the day's chart entry might
-  // need to change (or stop existing) with it.
-  if ((data.course_id === "paragraf" || data.course_id === "problem") && (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV)) {
-    await syncParagrafProblemEntry(supabase, data.id);
+  // Same trigger as the topic-stats resync just above: a Paragraf/Problem/
+  // Kitap Okuma routine task's counts or status changed, so its chart entry
+  // (YKS: paragraf_problem_entries, LGS: lgs_daily_routines) might need to
+  // change, or stop existing, with it.
+  if (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV) {
+    if (data.course_id === "paragraf" || data.course_id === "problem") await syncParagrafProblemEntry(supabase, data.id);
+    if (data.course_id === "paragraf" || data.course_id === "kitap-okuma") await syncLgsDailyRoutineEntry(supabase, data.id);
   }
 
   revalidatePath("/student");

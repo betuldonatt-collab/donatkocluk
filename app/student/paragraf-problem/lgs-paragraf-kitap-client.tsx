@@ -187,6 +187,14 @@ export function LgsParagrafKitapClient({
         </p>
       </header>
 
+      {/* Görev panosundan bir Paragraf/Kitap Okuma rutinini tamamlandı/yarım
+          işaretlemek burayı otomatik günceller (migration 0092) -- aynı
+          çalışmayı iki kez girmeye gerek yok. */}
+      <div className="border-primary/20 bg-primary/5 text-foreground mb-6 rounded-lg border px-4 py-3 text-sm">
+        Görev panondan bir Paragraf veya Kitap Okuma rutinini tamamlandı olarak işaretlediğinde bu sayfa otomatik güncellenir. Aşağıdaki
+        formu yalnızca görev panonda karşılığı olmayan ekstra çalışmalar için kullan.
+      </div>
+
       <section aria-labelledby="section-charts">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 id="section-charts" className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">

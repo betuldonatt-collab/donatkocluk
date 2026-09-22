@@ -1334,6 +1334,13 @@ async function syncParagrafProblemEntry(supabase: SupabaseClient, taskId: string
   if (error) console.error("[syncParagrafProblemEntry] failed:", error);
 }
 
+// LGS counterpart (migration 0092) -- see the matching comment in
+// app/student/actions.ts.
+async function syncLgsDailyRoutineEntry(supabase: SupabaseClient, taskId: string) {
+  const { error } = await supabase.rpc("sync_lgs_daily_routine_entry", { p_task_id: taskId });
+  if (error) console.error("[syncLgsDailyRoutineEntry] failed:", error);
+}
+
 // Links the same ordered resource list to every given task id (one
 // created task per date/video-link pair shares the coach's one resource
 // pick). No-ops when there's nothing to link.
@@ -1488,10 +1495,14 @@ export async function updateAssignedTask(
 
   if (taskBefore?.course_id) await recomputeTopicStats(supabase, studentIdV, taskBefore.course_id, taskBefore.topic_id);
   if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
-  // Same rule: a duration edit, or moving the task on/off Paragraf/Problem,
-  // can change (or end) its Paragraf ve Problem Çizelgesi entry.
-  if (taskBefore?.course_id === "paragraf" || taskBefore?.course_id === "problem" || data.course_id === "paragraf" || data.course_id === "problem") {
+  // Same rule: a duration edit, or moving the task on/off Paragraf/Problem/
+  // Kitap Okuma, can change (or end) its chart entry.
+  const beforeCourse = taskBefore?.course_id;
+  if (beforeCourse === "paragraf" || beforeCourse === "problem" || data.course_id === "paragraf" || data.course_id === "problem") {
     await syncParagrafProblemEntry(supabase, taskIdV);
+  }
+  if (beforeCourse === "paragraf" || beforeCourse === "kitap-okuma" || data.course_id === "paragraf" || data.course_id === "kitap-okuma") {
+    await syncLgsDailyRoutineEntry(supabase, taskIdV);
   }
 
   let resourceIds = input_.resourceIds;
@@ -1920,9 +1931,10 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
   // app/coach/students/[id]/page.tsx) -- the bucket it belongs to must be
   // resynced now, not just on the next unrelated write to that topic.
   if (data[0].course_id) await recomputeTopicStats(supabase, existing.student_id, data[0].course_id, data[0].topic_id);
-  // Same rule: an approved self-created Paragraf/Problem entry now counts
-  // toward the Paragraf ve Problem Çizelgesi too, same as a coach-assigned one.
+  // Same rule: an approved self-created Paragraf/Problem/Kitap Okuma entry now
+  // counts toward its chart too, same as a coach-assigned one.
   if (data[0].course_id === "paragraf" || data[0].course_id === "problem") await syncParagrafProblemEntry(supabase, taskIdV);
+  if (data[0].course_id === "paragraf" || data[0].course_id === "kitap-okuma") await syncLgsDailyRoutineEntry(supabase, taskIdV);
 
   await resolvePendingApprovalNotification(supabase, user.id, taskIdV);
 
@@ -2113,6 +2125,7 @@ export async function updateAssignedTaskStatus(studentId: string, taskId: string
   if (error) throw dbError(error);
   if (data.course_id) await recomputeTopicStats(supabase, studentIdV, data.course_id, data.topic_id);
   if (data.course_id === "paragraf" || data.course_id === "problem") await syncParagrafProblemEntry(supabase, taskIdV);
+  if (data.course_id === "paragraf" || data.course_id === "kitap-okuma") await syncLgsDailyRoutineEntry(supabase, taskIdV);
   revalidatePath(`/coach/students/${studentIdV}`);
   return data;
 }

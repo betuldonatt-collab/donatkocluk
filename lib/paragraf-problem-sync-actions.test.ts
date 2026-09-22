@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Paragraf ve Problem Çizelgesi auto-sync (migration 0091) against a mocked
-// Supabase client: completing (or editing, or approving) a "paragraf"/"problem"
-// routine task calls sync_paragraf_problem_entry for that task; anything else
-// never does. The RPC's own recompute logic is covered by the migration's own
-// verification query and by lib/paragraf-problem-chart.test.ts (the chart-side
-// aggregation it feeds).
+// Paragraf ve Problem Çizelgesi auto-sync (migration 0091, +0092 for LGS's
+// Paragraf/Kitap Okuma) against a mocked Supabase client: completing (or
+// editing, or approving) a "paragraf"/"problem"/"kitap-okuma" routine task
+// calls the matching sync RPC for that task; anything else never does. Both
+// RPCs' own recompute logic (including the exam_type gate that keeps a YKS
+// "paragraf" task out of the LGS tracker and vice versa) is covered by each
+// migration's own verification query and by lib/paragraf-problem-chart.test.ts
+// (the chart-side aggregation sync_paragraf_problem_entry feeds).
 
 type Row = Record<string, unknown>;
 
@@ -83,6 +85,9 @@ import { approveStudentTask, updateAssignedTaskStatus } from "../app/coach/actio
 function syncCalls() {
   return state.rpcCalls.filter((c) => c.fn === "sync_paragraf_problem_entry");
 }
+function lgsSyncCalls() {
+  return state.rpcCalls.filter((c) => c.fn === "sync_lgs_daily_routine_entry");
+}
 
 beforeEach(() => {
   state.task = baseTask();
@@ -112,6 +117,25 @@ describe("student marks a Paragraf/Problem routine task's counts (updateTaskProg
     await updateTaskProgress(TASK, { status: "not_done" });
     expect(syncCalls()).toHaveLength(1);
   });
+
+  it("a 'paragraf' task (shared by both cohorts) syncs BOTH trackers -- each RPC's own exam_type gate decides which one actually writes", async () => {
+    await updateTaskProgress(TASK, { correct_count: 15, wrong_count: 3, empty_count: 2 });
+    expect(syncCalls()).toHaveLength(1);
+    expect(lgsSyncCalls()).toEqual([{ fn: "sync_lgs_daily_routine_entry", args: { p_task_id: TASK } }]);
+  });
+
+  it("a Kitap Okuma (reading) task syncs only the LGS tracker, never the YKS one", async () => {
+    state.task = baseTask({ course_id: "kitap-okuma", task_type: "reading", title: "Sefiller", correct_count: 15, wrong_count: null, empty_count: null });
+    await updateTaskProgress(TASK, { correct_count: 20 });
+    expect(syncCalls()).toHaveLength(0);
+    expect(lgsSyncCalls()).toEqual([{ fn: "sync_lgs_daily_routine_entry", args: { p_task_id: TASK } }]);
+  });
+
+  it("does not sync either tracker for a plain course", async () => {
+    state.task = baseTask({ course_id: "tyt-matematik" });
+    await updateTaskProgress(TASK, { correct_count: 15, wrong_count: 3, empty_count: 2 });
+    expect(lgsSyncCalls()).toHaveLength(0);
+  });
 });
 
 describe("coach actions on a Paragraf/Problem routine task", () => {
@@ -131,5 +155,12 @@ describe("coach actions on a Paragraf/Problem routine task", () => {
     const result = await approveStudentTask(TASK);
     expect(result.success).toBe(true);
     expect(syncCalls()).toEqual([{ fn: "sync_paragraf_problem_entry", args: { p_task_id: TASK } }]);
+  });
+
+  it("updateAssignedTaskStatus on a Kitap Okuma task syncs only the LGS tracker", async () => {
+    state.task = baseTask({ course_id: "kitap-okuma", task_type: "reading" });
+    await updateAssignedTaskStatus(STUDENT, TASK, "done");
+    expect(syncCalls()).toHaveLength(0);
+    expect(lgsSyncCalls()).toEqual([{ fn: "sync_lgs_daily_routine_entry", args: { p_task_id: TASK } }]);
   });
 });
