@@ -35,16 +35,21 @@ export function SessionRatingModal({
     if (rating === 0) return;
     setSaving(true);
     try {
-      await submitSessionRating(session.id, rating, feedback.trim() || null);
+      // submitSessionRating never throws -- it always resolves to
+      // {ok, data|error} (same contract as updateTaskProgress/
+      // saveTaskAnalysis). An uncaught rejection out of a Server Action is
+      // exactly what surfaced to the student as a raw React error #441
+      // instead of a real message; this outer try/catch is only a backstop
+      // for something even earlier failing (e.g. the request itself).
+      const result = await submitSessionRating(session.id, rating, feedback.trim() || null);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Değerlendirmen kaydedildi, teşekkürler!");
       onSubmitted();
       onOpenChange(false);
     } catch (e) {
-      // Without this catch, a thrown error (an RLS denial, a stale session
-      // id) left the promise rejected with nothing awaiting it -- the modal
-      // never got to onSubmitted/onOpenChange, so it just sat there with no
-      // explanation, looking "stuck" to the student even though nothing had
-      // actually saved.
       toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
     } finally {
       setSaving(false);

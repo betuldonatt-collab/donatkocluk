@@ -478,7 +478,32 @@ const ratingSchema = z.object({
   feedback: z.string().trim().max(2000).nullable(),
 });
 
-export async function submitSessionRating(sessionId: string, rating: number, feedback: string | null) {
+// Never throws -- an uncaught rejection out of a Server Action is what
+// surfaced to the student as a raw, unreadable React error #441 instead of
+// a real message (see updateTaskProgress's own version of this fix, above).
+// `data` is the raw coaching_sessions row; the modal doesn't currently use
+// it beyond confirming success.
+export type SubmitSessionRatingResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
+
+export async function submitSessionRating(
+  sessionId: string,
+  rating: number,
+  feedback: string | null,
+): Promise<SubmitSessionRatingResult> {
+  try {
+    const data = await submitSessionRatingInternal(sessionId, rating, feedback);
+    return { ok: true, data };
+  } catch (e) {
+    if (!(e instanceof Error)) {
+      console.error("[submitSessionRating] non-Error thrown:", e);
+      Sentry.captureException(e);
+      return { ok: false, error: GENERIC_DB_ERROR };
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
+async function submitSessionRatingInternal(sessionId: string, rating: number, feedback: string | null) {
   await assertNotImpersonating();
   const inputV = parseInput(ratingSchema, { sessionId, rating, feedback });
   const supabase = await createClient();
