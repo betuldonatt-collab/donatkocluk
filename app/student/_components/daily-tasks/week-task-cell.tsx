@@ -255,10 +255,11 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
 // click/keyboard behavior as TaskCard (opens the same TaskModal), but a
 // much smaller footprint so several fit inside one grid column. Title,
 // topic, subtitle, and the video indicator all wrap freely (no
-// truncation) -- the cell's fixed-but-draggable height + overflow-hidden
-// still clips whichever rows don't fit when dragged short; drag the
-// row's own handle taller to reveal more. The same detail is also one
-// hover away via WeekCellHoverDetail.
+// truncation) -- the cell's dragged/stored height is a FLOOR, not a hard
+// cap, so content taller than that floor (a description especially) grows
+// the cell past it instead of being silently clipped; drag the row's own
+// handle taller to raise that floor for every cell at this row index. The
+// same detail is also one hover away via WeekCellHoverDetail.
 export function WeekTaskCell({
   task,
   onClick,
@@ -298,16 +299,16 @@ export function WeekTaskCell({
               onClick();
             }
           }}
-          style={{ height }}
+          style={{ minHeight: height }}
           className={cn(
-            "border-border hover:bg-accent/40 relative flex w-full cursor-pointer flex-col overflow-hidden rounded-md border p-2 text-left transition-colors",
+            "border-border hover:bg-accent/40 relative flex w-full cursor-pointer flex-col rounded-md border p-2 text-left transition-colors",
             task.rejected_at ? "bg-rose-500/5" : subjectTintClass(task),
             statusBorderClass(task),
             task.rejected_at && "border-l-2 border-l-rose-400",
             (task.week_locked || task.rejected_at) && "opacity-70",
           )}
         >
-          <div className="flex min-h-0 flex-1 items-start gap-1.5 overflow-hidden">
+          <div className="flex min-h-0 flex-1 items-start gap-1.5">
             <div
               className={cn(
                 "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
@@ -321,7 +322,7 @@ export function WeekTaskCell({
               {isDone ? <CheckCircle2 className="size-3" /> : isHalfDone ? <MinusCircle className="size-3" /> : <Icon className="size-3" />}
             </div>
 
-            <div className="min-w-0 flex-1 space-y-0.5 overflow-hidden">
+            <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-start gap-1">
                 <p className="text-foreground min-w-0 flex-1 text-xs font-semibold leading-snug break-words">{cLabel ?? task.title}</p>
                 {/* Icon-only indicators (never a text badge row) -- keeps

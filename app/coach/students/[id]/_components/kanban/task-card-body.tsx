@@ -112,11 +112,12 @@ function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] 
 
 // Default card content -- course name, topic, subtitle, and a video
 // indicator, each wrapping freely (no truncation) rather than being cut
-// off. The card's own fixed-but-draggable height + overflow-hidden (see
-// kanban-task-card.tsx/routine-task-card.tsx) still clips whichever rows
-// don't fit when dragged short -- drag the row's own handle taller to
-// reveal more, rather than the text being cut mid-line. Shared by
-// KanbanTaskCard (draggable, in a day column) and RoutineTaskCard
+// off. The card's own dragged/stored height (see kanban-task-card.tsx/
+// routine-task-card.tsx) is a FLOOR, not a hard cap -- content taller than
+// that floor (a description especially, clamped to 3 lines here) grows the
+// card past it instead of being silently clipped; dragging the row's own
+// handle taller just raises that floor for every card at this row index.
+// Shared by KanbanTaskCard (draggable, in a day column) and RoutineTaskCard
 // (static, in the Rutinler lane) so the two stay visually identical. The
 // same detail is also one hover away via TaskCardHoverDetail below, shown
 // in a HoverCard by the card components themselves.
@@ -125,7 +126,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
   const topic = findTopicById(task.course_id, task.topic_id);
 
   return (
-    <div className="min-w-0 flex-1 space-y-1 overflow-hidden">
+    <div className="min-w-0 flex-1 space-y-1">
       <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
 
       <TaskDescription text={task.description} lines={3} />

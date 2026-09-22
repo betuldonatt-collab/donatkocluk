@@ -44,13 +44,13 @@ export function eventIdFromDragId(id: string): string {
 // double-registering a second useSortable for the same id. The heading is
 // the event_type label itself -- there is no separate title field to show
 // (see event-dialog.tsx); the description, if any, carries whatever custom
-// text the coach wrote. Both lines truncate to one line each -- events now
-// share the same per-row grid as tasks (see EventCard below), so their
-// content needs to fit whatever height that row was dragged to just like
-// a task card's does.
+// text the coach wrote, clamped to 3 lines with line breaks kept. The
+// type/time line stays a single truncated line (it's a short fixed string);
+// the description clamp can grow the card past its row's floor height (see
+// EventCard below) instead of being clipped.
 export function EventCardBody({ event }: { event: StudentEvent }) {
   return (
-    <div className="min-w-0 flex-1 overflow-hidden">
+    <div className="min-w-0 flex-1">
       <div className="flex items-center justify-between gap-1">
         <span className="truncate font-semibold">{STUDENT_EVENT_TYPE_LABELS[event.event_type]}</span>
         <span className="flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums opacity-90">
@@ -105,18 +105,21 @@ export function EventCard({
     id: eventDragId(event.id),
     disabled: event.is_locked,
   });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height };
+  // minHeight, not height -- same reasoning as KanbanTaskCard: the row's
+  // dragged/stored height is a floor, not a hard cap, so a description taller
+  // than that floor grows the card instead of being silently clipped.
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, minHeight: height };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative flex flex-col gap-1 overflow-hidden rounded-md border px-2 py-1.5 text-xs",
+        "relative flex flex-col gap-1 rounded-md border px-2 py-1.5 text-xs",
         EVENT_TYPE_CLASSES[event.event_type],
       )}
     >
-      <div className="flex min-h-0 flex-1 items-start gap-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 items-start gap-1">
         <button
           type="button"
           className={cn(

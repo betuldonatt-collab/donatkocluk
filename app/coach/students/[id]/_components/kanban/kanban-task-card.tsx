@@ -70,7 +70,13 @@ export function KanbanTaskCard({
     id: task.id,
     disabled: task.is_locked || !!paintMode,
   });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height: cardHeight };
+  // minHeight, not height: the row's dragged/stored height is a FLOOR, not a hard
+  // cap -- a card whose real content (a description especially, see
+  // TaskCardBody) is taller than that floor grows past it instead of having that
+  // content silently clipped. Every other card at this row index still starts
+  // from the same floor, so short cards keep lining up; only one that actually
+  // needs more room pushes its own column's later rows down.
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, minHeight: cardHeight };
 
   function handlePaintClick() {
     if (!paintMode) return;
@@ -87,14 +93,14 @@ export function KanbanTaskCard({
           style={style}
           onClick={paintMode ? handlePaintClick : undefined}
           className={cn(
-            "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",
+            "border-border relative flex flex-col rounded-md border p-2.5 transition-colors",
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",
             flash && PAINT_FLASH_CLASS[flash],
           )}
         >
-          <div className="flex min-h-0 flex-1 items-start gap-1.5 overflow-hidden">
+          <div className="flex min-h-0 flex-1 items-start gap-1.5">
             <button
               type="button"
               className={cn(
