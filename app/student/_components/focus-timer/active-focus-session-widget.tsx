@@ -277,7 +277,19 @@ function RunningSessionCard({
         router.refresh();
       })
       .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
-      .finally(() => focusEndingStore.end(taskId));
+      .finally(() => {
+        focusEndingStore.end(taskId);
+        // Without this, the card's return to "visible" (ending set clearing)
+        // relied entirely on the endingKey change already being in this
+        // effect's own dependency array to indirectly trigger a re-fetch --
+        // correct in theory, but this makes it explicit and immediate: pull
+        // the real server state (which no longer includes this session on
+        // success) the instant the optimistic hide would otherwise lift,
+        // instead of leaving the card's fate to a separate effect re-run.
+        // router.refresh() above only reaches server-rendered parts of the
+        // page, never this client widget's own `sessions` state.
+        onChanged().catch(() => {});
+      });
   }
 
   async function handlePip() {
