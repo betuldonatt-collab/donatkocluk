@@ -4,10 +4,20 @@ import { useCallback, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "stopwatch-widget-collapsed";
 const CHANGE_EVENT = "stopwatch-widget-collapsed-changed";
+// Tailwind's own `sm` breakpoint -- below it counts as "mobile" for this
+// widget's default-collapsed rule.
+const MOBILE_QUERY = "(max-width: 639px)";
 
 function readStored(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    const stored = localStorage.getItem(STORAGE_KEY);
+    // No explicit choice yet: default collapsed on a mobile viewport (the
+    // full details panel is too intrusive to auto-expand over a small
+    // screen), expanded everywhere else -- same as before this change. The
+    // moment the student taps it once, `toggle` below persists that literal
+    // choice, and it's read back as-is on every viewport from then on.
+    if (stored === null) return window.matchMedia(MOBILE_QUERY).matches;
+    return stored === "1";
   } catch {
     return false;
   }
