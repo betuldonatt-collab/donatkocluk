@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +36,16 @@ export function SessionRatingModal({
     setSaving(true);
     try {
       await submitSessionRating(session.id, rating, feedback.trim() || null);
+      toast.success("Değerlendirmen kaydedildi, teşekkürler!");
       onSubmitted();
       onOpenChange(false);
+    } catch (e) {
+      // Without this catch, a thrown error (an RLS denial, a stale session
+      // id) left the promise rejected with nothing awaiting it -- the modal
+      // never got to onSubmitted/onOpenChange, so it just sat there with no
+      // explanation, looking "stuck" to the student even though nothing had
+      // actually saved.
+      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
     } finally {
       setSaving(false);
     }
