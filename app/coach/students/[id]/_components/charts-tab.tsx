@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
+import { isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
@@ -15,7 +15,6 @@ import {
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
-import { ChartRangePicker } from "./charts/chart-range-picker";
 import { DualMetricChart } from "./charts/dual-metric-chart";
 import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
@@ -77,6 +76,7 @@ export function ChartsTab({
   branchExams,
   examType = "YKS",
   lgsRoutines = [],
+  chartRange,
 }: {
   paragrafEntries: ParagrafProblemEntry[];
   generalExams: DetailTask[];
@@ -85,6 +85,9 @@ export function ChartsTab({
   // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines instead of
   // paragraf_problem_entries.
   lgsRoutines?: LgsDailyRoutine[];
+  // Owned by DetailTabs now (shared with Analiz/Gelişim Haritası, and
+  // survives switching tabs) -- this tab used to own this state itself.
+  chartRange: ChartRange;
 }) {
   const isLgs = examType === "LGS";
   // The net rule for everything on this tab: LGS 3 wrong : 1 right, YKS 4 : 1.
@@ -112,11 +115,6 @@ export function ChartsTab({
   }
 
   const branchCourses = isLgs ? LGS_COURSES : mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack];
-
-  // Paragraf/Problem chart date range -- paragrafEntries is already this
-  // student's full, unpaginated history (fetched once server-side), so
-  // filtering by range is plain client-side work, no extra fetch needed.
-  const [chartRange, setChartRange] = useState<ChartRange>(LAST_30_DAYS_RANGE);
 
   // One point per DAY, not per row: a day can hold several entries for the
   // same date now -- the student's own manual entries plus a Paragraf/Problem
@@ -174,6 +172,7 @@ export function ChartsTab({
   const genelBreakdownData = generalExams
     .filter(
       (e) =>
+        isDateInChartRange(e.task_date, chartRange) &&
         e.subject_scores &&
         (isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"
@@ -193,7 +192,12 @@ export function ChartsTab({
     }));
 
   const bransChartData = branchExams
-    .filter((e) => e.course_id === branchCourseId && (e.correct_count !== null || e.wrong_count !== null))
+    .filter(
+      (e) =>
+        isDateInChartRange(e.task_date, chartRange) &&
+        e.course_id === branchCourseId &&
+        (e.correct_count !== null || e.wrong_count !== null),
+    )
     .slice()
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
     .map((e) => ({
@@ -206,10 +210,6 @@ export function ChartsTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <ChartRangePicker value={chartRange} onChange={setChartRange} />
-      </div>
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>

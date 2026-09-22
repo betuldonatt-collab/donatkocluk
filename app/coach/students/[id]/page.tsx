@@ -6,7 +6,6 @@ import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
-import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
 import type { ExamType } from "@/lib/exam-type";
@@ -432,8 +431,12 @@ async function fetchStudentDetail(studentId: string) {
     }
   }
 
-  // Windowed sibling of the all-time map below -- see lib/gelisim-haritasi.ts.
-  const gelisimHaritasi: GelisimHaritasiRow[] = computeGelisimHaritasi(curriculumCourseIds, allExams, mistakeRows ?? []);
+  // Gelişim Haritası (the windowed sibling of the all-time map below) is
+  // no longer computed here -- it now reruns client-side in
+  // gelisim-haritasi-tab.tsx against the coach's live date-range filter
+  // (DetailTabs), using the same allExams/mistakeRows this file already
+  // sends down for other tabs (via generalExams/branchExams/examMistakes,
+  // built further below) plus curriculumCourseIds, returned as-is.
 
   // Full-spectrum performance map: every topic in every curriculum course
   // (not just ones the student has actually been examined on yet), so the
@@ -525,7 +528,7 @@ async function fetchStudentDetail(studentId: string) {
     progressFrom: completionStart(today, progressLockedAt),
     progressFromLock: progressLockedAt !== null,
     topicPerformance: topicPerformanceWithQuestions,
-    gelisimHaritasi,
+    curriculumCourseIds,
     sessions,
     notes,
     notesHasMore: notes.length === STUDENT_NOTES_PAGE_SIZE,
@@ -611,7 +614,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
               <DetailTabs
                 studentId={id}
                 topicPerformance={detail.topicPerformance}
-                gelisimHaritasi={detail.gelisimHaritasi}
+                curriculumCourseIds={detail.curriculumCourseIds}
                 paragrafEntries={detail.paragrafEntries}
                 generalExams={detail.generalExams}
                 branchExams={detail.branchExams}
