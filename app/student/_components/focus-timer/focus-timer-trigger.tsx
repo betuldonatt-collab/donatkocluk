@@ -48,6 +48,16 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   const [checking, setChecking] = useState(false);
   const [attachSession, setAttachSession] = useState<AttachedFocusSession | null>(null);
   const [bankedNotice, setBankedNotice] = useState<BankedNotice | null>(null);
+  // What the fullscreen timer's stopwatch display should count UP FROM --
+  // seconds already banked on this task from earlier, already-ended
+  // sessions, so a student who took a Mola and comes back sees the clock
+  // continue instead of restarting at 0. Seeded from the task's own
+  // (already-fresh, nothing pending) cumulative total; openFocusSessionForTask
+  // overrides it below with its own, just-updated figure whenever this
+  // specific call changed it (banking a leftover session). Never itself
+  // credited again -- only the NEW session's own elapsed is banked when it
+  // ends, so there's no double count.
+  const [priorTrackedSeconds, setPriorTrackedSeconds] = useState(() => (task.tracked_duration_minutes ?? 0) * 60);
 
   // Pressing Süre Tut asks the server what to do with any leftover session --
   // there is no "resume?" question (see openFocusSessionForTask):
@@ -60,6 +70,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     setChecking(true);
     setAttachSession(null);
     setBankedNotice(null);
+    setPriorTrackedSeconds((task.tracked_duration_minutes ?? 0) * 60);
     try {
       const result = await openFocusSessionForTask(task.id);
       if (result.kind === "attach") {
@@ -68,9 +79,11 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           countdownTargetSeconds: result.countdownTargetSeconds,
           elapsedSeconds: result.elapsedSeconds,
         });
+        setPriorTrackedSeconds(result.priorTrackedSeconds);
       } else if (result.kind === "banked") {
         clearConfirmedMultiple(task.id);
         if (result.seconds > 0) setBankedNotice({ seconds: result.seconds, pendingApproval: result.pendingApproval });
+        setPriorTrackedSeconds(result.priorTrackedSeconds);
       } else if (result.kind === "error") {
         toast.error(result.error);
       }
@@ -189,6 +202,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           taskTitle={task.title}
           attachSession={attachSession}
           bankedNotice={bankedNotice}
+          priorTrackedSeconds={priorTrackedSeconds}
           onStart={handleStart}
           onPause={handlePause}
           onResumeSession={handleResumeSession}

@@ -1208,6 +1208,13 @@ export type RunningFocusSession = {
   mode: "stopwatch" | "countdown";
   countdownTargetSeconds: number | null;
   elapsedSeconds: number;
+  // Seconds already banked onto this task from EARLIER, already-ended
+  // sessions -- separate from `elapsedSeconds` (this live, unbanked
+  // stretch), so a student who took a Mola and came back sees the clock
+  // continue from where they left off instead of restarting at 0. Never
+  // credited again itself; only this session's own elapsedSeconds is
+  // banked when it ends (endFocusSession), so there's no double count.
+  priorTrackedSeconds: number;
 };
 
 export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> {
@@ -1221,7 +1228,7 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
     const { data, error } = await supabase
       .from("focus_sessions")
       .select(
-        "task_id, mode, countdown_target_seconds, status, run_started_at, accumulated_seconds, last_heartbeat_at, student_tasks(title)",
+        "task_id, mode, countdown_target_seconds, status, run_started_at, accumulated_seconds, last_heartbeat_at, student_tasks(title, tracked_duration_seconds)",
       )
       .eq("student_id", user.id)
       .eq("status", "running");
@@ -1240,6 +1247,7 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
         mode: row.mode as "stopwatch" | "countdown",
         countdownTargetSeconds: row.countdown_target_seconds as number | null,
         elapsedSeconds: liveElapsedSeconds(row as unknown as FocusSessionRow),
+        priorTrackedSeconds: (task?.tracked_duration_seconds as number | undefined) ?? 0,
       };
     });
   } catch (e) {
@@ -1493,8 +1501,16 @@ export async function endFocusSession(taskId: string, creditedSeconds?: number |
 // See lib/focus-open-decision.ts for the rule.
 export type OpenFocusSessionResult =
   | { kind: "none" }
-  | { kind: "attach"; mode: "stopwatch" | "countdown"; countdownTargetSeconds: number | null; elapsedSeconds: number }
-  | { kind: "banked"; seconds: number; pendingApproval: boolean }
+  | {
+      kind: "attach";
+      mode: "stopwatch" | "countdown";
+      countdownTargetSeconds: number | null;
+      elapsedSeconds: number;
+      // Seconds already banked from earlier, already-ended sessions on this
+      // same task -- see RunningFocusSession's own field for why.
+      priorTrackedSeconds: number;
+    }
+  | { kind: "banked"; seconds: number; pendingApproval: boolean; priorTrackedSeconds: number }
   | { kind: "error"; error: string };
 
 export async function openFocusSessionForTask(taskId: string): Promise<OpenFocusSessionResult> {
@@ -1514,17 +1530,28 @@ export async function openFocusSessionForTask(taskId: string): Promise<OpenFocus
     });
 
     if (decision === "attach") {
+      const { data: task } = await supabase
+        .from("student_tasks")
+        .select("tracked_duration_seconds")
+        .eq("id", taskIdV)
+        .maybeSingle();
       return {
         kind: "attach",
         mode: session.mode,
         countdownTargetSeconds: session.countdown_target_seconds,
         elapsedSeconds,
+        priorTrackedSeconds: (task?.tracked_duration_seconds as number | undefined) ?? 0,
       };
     }
 
     await assertNotImpersonating();
     const banked = await bankFocusSession(supabase, user.id, taskIdV, session);
-    return { kind: "banked", seconds: banked.bankedSeconds, pendingApproval: banked.pendingApproval };
+    return {
+      kind: "banked",
+      seconds: banked.bankedSeconds,
+      pendingApproval: banked.pendingApproval,
+      priorTrackedSeconds: banked.totalSeconds ?? 0,
+    };
   } catch (e) {
     return { kind: "error", error: focusActionError("openFocusSessionForTask", e) };
   }

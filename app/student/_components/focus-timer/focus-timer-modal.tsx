@@ -60,6 +60,7 @@ export function FocusTimerModal({
   taskTitle,
   attachSession,
   bankedNotice,
+  priorTrackedSeconds,
   onStart,
   onPause,
   onResumeSession,
@@ -71,6 +72,13 @@ export function FocusTimerModal({
   taskTitle: string;
   attachSession: AttachedFocusSession | null;
   bankedNotice: BankedNotice | null;
+  // Seconds already banked on this task from earlier, already-ended
+  // sessions -- added ONLY to the stopwatch's displayed clock (never to
+  // what actually gets credited on Bitir, see onFinish below) so a student
+  // who took a Mola and comes back sees the count continue from where they
+  // left off instead of restarting at 0. Countdown mode ignores it: each
+  // sitting's goal duration is its own fresh target, not a continuation.
+  priorTrackedSeconds: number;
   // Fired once, right when Başlat is clicked (fire-and-forget from this
   // modal's perspective -- the visual timer never waits on it).
   onStart: (mode: FocusTimerMode, countdownTargetSeconds: number | null) => void;
@@ -164,7 +172,11 @@ export function FocusTimerModal({
 
   const totalSeconds = mode === "countdown" ? countdownMinutes * 60 : 0;
   const elapsedSeconds = elapsedMs / 1000;
-  const displaySeconds = mode === "countdown" ? Math.max(0, totalSeconds - elapsedSeconds) : elapsedSeconds;
+  // Stopwatch only: what's shown counts up from the task's own prior total,
+  // not from 0 -- what actually gets credited on Bitir stays `elapsedSeconds`
+  // alone (see onFinish's own callers), so this offset is display-only.
+  const displaySeconds =
+    mode === "countdown" ? Math.max(0, totalSeconds - elapsedSeconds) : elapsedSeconds + priorTrackedSeconds;
   const countdownDone = mode === "countdown" && elapsedSeconds >= totalSeconds;
 
   // "Hâlâ çalışmaya devam ediyor musun?" every 3 hours of a running session.
@@ -250,6 +262,7 @@ export function FocusTimerModal({
         mode,
         countdownTargetSeconds: mode === "countdown" ? countdownMinutes * 60 : null,
         elapsedSeconds,
+        priorTrackedSeconds,
         fetchedAt: Date.now(),
       });
     }

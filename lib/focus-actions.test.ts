@@ -13,7 +13,16 @@ const state: {
   runningRows: Row[] | null;
   runningError: unknown;
   rpcCalls: { fn: string; args: unknown }[];
-} = { session: null, reviews: [], rpcResult: { data: 90, error: null }, runningRows: [], runningError: null, rpcCalls: [] };
+  taskRow: Row | null;
+} = {
+  session: null,
+  reviews: [],
+  rpcResult: { data: 90, error: null },
+  runningRows: [],
+  runningError: null,
+  rpcCalls: [],
+  taskRow: { tracked_duration_seconds: 300 },
+};
 
 function builder(table: string) {
   const filters: Record<string, unknown> = {};
@@ -23,6 +32,7 @@ function builder(table: string) {
       return { data: state.session, error: null };
     }
     if (table === "focus_session_reviews") return { data: state.reviews, error: null };
+    if (table === "student_tasks") return { data: state.taskRow, error: null };
     return { data: null, error: null };
   };
   const b: Record<string, unknown> = {};
@@ -71,6 +81,7 @@ beforeEach(() => {
   state.runningRows = [];
   state.runningError = null;
   state.rpcCalls = [];
+  state.taskRow = { tracked_duration_seconds: 300 };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -121,12 +132,14 @@ describe("endFocusSession", () => {
 });
 
 describe("getRunningFocusSessions", () => {
-  it("returns running sessions with the embedded task title", async () => {
+  it("returns running sessions with the embedded task title and prior tracked total", async () => {
     const { getRunningFocusSessions } = await import("../app/student/actions");
-    state.runningRows = [{ ...runningSince(120), task_id: TASK, student_tasks: { title: "TYT Türkçe" } }];
+    state.runningRows = [
+      { ...runningSince(120), task_id: TASK, student_tasks: { title: "TYT Türkçe", tracked_duration_seconds: 600 } },
+    ];
     const rows = await getRunningFocusSessions();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ taskId: TASK, taskTitle: "TYT Türkçe", mode: "stopwatch" });
+    expect(rows[0]).toMatchObject({ taskId: TASK, taskTitle: "TYT Türkçe", mode: "stopwatch", priorTrackedSeconds: 600 });
     expect(rows[0].elapsedSeconds).toBeGreaterThanOrEqual(120);
   });
 
@@ -158,7 +171,10 @@ describe("openFocusSessionForTask", () => {
     const { openFocusSessionForTask } = await import("../app/student/actions");
     state.session = sessionWith({ status: "paused", run_started_at: null, accumulated_seconds: 1500 });
     const result = await openFocusSessionForTask(TASK);
-    expect(result).toEqual({ kind: "banked", seconds: 1500, pendingApproval: false });
+    // priorTrackedSeconds is the RPC's own returned total (the task's fresh
+    // cumulative tracked_duration_seconds after this bank) -- 90 here is
+    // just beforeEach's default rpcResult.data, not a real duration.
+    expect(result).toEqual({ kind: "banked", seconds: 1500, pendingApproval: false, priorTrackedSeconds: 90 });
     expect(state.rpcCalls.map((c) => c.fn)).toEqual(["end_focus_session"]);
   });
 
@@ -166,7 +182,7 @@ describe("openFocusSessionForTask", () => {
     const { openFocusSessionForTask } = await import("../app/student/actions");
     state.session = sessionWith({ last_heartbeat_at: minutesAgo(1), run_started_at: minutesAgo(20) });
     const result = await openFocusSessionForTask(TASK);
-    expect(result).toMatchObject({ kind: "attach", mode: "stopwatch" });
+    expect(result).toMatchObject({ kind: "attach", mode: "stopwatch", priorTrackedSeconds: 300 });
     if (result.kind === "attach") expect(result.elapsedSeconds).toBeGreaterThanOrEqual(20 * 60);
     expect(state.rpcCalls).toHaveLength(0); // nothing was ended
   });
@@ -190,7 +206,12 @@ describe("openFocusSessionForTask", () => {
     const { openFocusSessionForTask } = await import("../app/student/actions");
     state.session = sessionWith({ status: "paused", run_started_at: null, accumulated_seconds: 7 * 3600 });
     state.reviews = [{ id: "r1" }];
-    expect(await openFocusSessionForTask(TASK)).toEqual({ kind: "banked", seconds: 7 * 3600, pendingApproval: true });
+    expect(await openFocusSessionForTask(TASK)).toEqual({
+      kind: "banked",
+      seconds: 7 * 3600,
+      pendingApproval: true,
+      priorTrackedSeconds: 90,
+    });
   });
 
   it("returns a diagnosable error (never throws) when banking fails", async () => {

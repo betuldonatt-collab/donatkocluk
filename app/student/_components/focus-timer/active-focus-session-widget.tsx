@@ -33,13 +33,17 @@ function elapsedNow(session: LiveSession, now: number) {
   return session.elapsedSeconds + Math.max(0, (now - session.fetchedAt) / 1000);
 }
 
-// What to show as the big number: the countdown's remaining time, else elapsed.
+// What to show as the big number: the countdown's remaining time, else
+// elapsed PLUS whatever was already banked on this task earlier (so a
+// student back from a Mola sees the count continue, not restart at 0) --
+// display-only, never what actually gets credited on Bitir (see
+// RunningSessionCard.handleEnd, which uses elapsedNow directly).
 function displaySeconds(session: LiveSession, now: number) {
   const elapsed = elapsedNow(session, now);
   if (session.mode === "countdown" && session.countdownTargetSeconds !== null) {
     return Math.max(0, session.countdownTargetSeconds - elapsed);
   }
-  return elapsed;
+  return elapsed + session.priorTrackedSeconds;
 }
 
 function modeLabel(session: LiveSession, now: number) {
@@ -65,9 +69,9 @@ export function ActiveFocusSessionWidget() {
   const modalOpen = useSyncExternalStore(focusModalStore.subscribe, focusModalStore.getSnapshot, focusModalStore.getServerSnapshot) > 0;
   const pipOpen = useSyncExternalStore(pipStore.subscribe, pipStore.getSnapshot, pipStore.getServerSnapshot);
   const [sessions, setSessions] = useState<LiveSession[]>([]);
-  // Sessions whose Bitir was just clicked and whose save is still in flight:
-  // hidden immediately (Bitir is optimistic), and the read below re-runs when
-  // the set changes so a failed save brings the session back.
+  // Sessions whose Bitir or Mola was just clicked and whose save is still in
+  // flight: hidden immediately (both are optimistic), settled by the effect
+  // further down once a fresh read confirms the outcome.
   const endingKey = useSyncExternalStore(
     focusEndingStore.subscribe,
     focusEndingStore.getSnapshot,
@@ -176,13 +180,7 @@ export function ActiveFocusSessionWidget() {
       {!modalOpen && visibleSessions.length > 0 && (
         <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
           {visibleSessions.map((session, index) => (
-            <RunningSessionCard
-              key={session.taskId}
-              session={session}
-              onChanged={refresh}
-              ownsTitle={index === 0}
-              pipOpen={pipOpen}
-            />
+            <RunningSessionCard key={session.taskId} session={session} ownsTitle={index === 0} pipOpen={pipOpen} />
           ))}
         </div>
       )}
@@ -229,12 +227,10 @@ function PipDriver({
 
 function RunningSessionCard({
   session,
-  onChanged,
   ownsTitle,
   pipOpen,
 }: {
   session: LiveSession;
-  onChanged: () => Promise<void>;
   // Only one card drives the browser-tab title (with several sessions the
   // title would otherwise flip between them).
   ownsTitle: boolean;
@@ -242,7 +238,6 @@ function RunningSessionCard({
 }) {
   const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
-  const [busy, setBusy] = useState(false);
   // Cards only mount client-side (after the sessions are fetched), so reading
   // browser capabilities here can't cause a hydration mismatch.
   const pipSupported = isPipSupported();
@@ -281,17 +276,22 @@ function RunningSessionCard({
     return () => setTimerTitle(null);
   }, [ownsTitle]);
 
-  async function handlePause() {
-    setBusy(true);
-    try {
-      await pauseFocusSession(session.taskId);
-      toast.success("Mola verildi. Devam etmek için görevdeki Süre Tut'a bas.");
-      await onChanged();
-    } catch {
-      toast.error("Mola verilemedi, tekrar dene.");
-    } finally {
-      setBusy(false);
-    }
+  // Mola is OPTIMISTIC, same as Bitir below: the card disappears (and its
+  // ticker stops, since it leaves the DOM) the instant it's clicked, not
+  // after the server round trip -- focusEndingStore hides it right away,
+  // and the widget's own "settling" logic keeps it hidden until a fresh
+  // read confirms the pause (or reveals it again, still running, if the
+  // save failed).
+  function handlePause() {
+    const taskId = session.taskId;
+    focusEndingStore.begin(taskId);
+    pauseFocusSession(taskId)
+      .then(() => toast.success("Mola verildi. Devam etmek için görevdeki Süre Tut'a bas."))
+      .catch(() => toast.error("Mola verilemedi, tekrar dene."))
+      .finally(() => {
+        focusOptimisticSessionStore.clear(taskId);
+        focusEndingStore.end(taskId);
+      });
   }
 
   // Bitir is OPTIMISTIC: the card disappears the instant it's clicked (the
@@ -380,11 +380,11 @@ function RunningSessionCard({
                 <PictureInPicture2 className="size-4" />
               </Button>
             )}
-            <Button type="button" variant="outline" size="sm" onClick={handlePause} disabled={busy}>
+            <Button type="button" variant="outline" size="sm" onClick={handlePause}>
               <Pause className="size-3.5" />
               Mola
             </Button>
-            <Button type="button" size="sm" onClick={() => handleEnd()} disabled={busy}>
+            <Button type="button" size="sm" onClick={() => handleEnd()}>
               Bitir
             </Button>
           </div>
@@ -394,7 +394,6 @@ function RunningSessionCard({
       {due && (
         <StillStudyingPrompt
           elapsedSeconds={elapsedSeconds}
-          busy={busy}
           onConfirm={confirm}
           onEnd={(credited) => handleEnd(credited)}
         />

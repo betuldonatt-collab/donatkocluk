@@ -32,12 +32,16 @@ export const focusModalStore = {
   },
 };
 
-// Sessions whose "Bitir" has been clicked and whose save is still in flight.
-// Bitir is optimistic: the timer disappears the instant it is clicked and the
-// server call finishes in the background -- so the floating widget must not
-// keep showing (or briefly re-show) a session that is being ended. The widget
-// hides these ids, and re-reads the server when the set changes (which brings
-// the session back if the save failed, so it can be ended again).
+// Sessions whose "Bitir" OR "Mola" has just been clicked and whose save is
+// still in flight. Both are optimistic: the card disappears the instant
+// either button is clicked and the server call finishes in the background --
+// so the floating widget must not keep showing (or briefly re-show) a
+// session that is being ended or paused (either way it's about to stop being
+// "running", which is all this widget ever shows). The widget hides these
+// ids immediately, and only reveals a taskId again once a FRESH read has
+// actually confirmed the outcome (see ActiveFocusSessionWidget's own
+// "settling" logic) -- which is also what brings a session back if its save
+// failed, so it can be ended/paused again.
 const ending = new Set<string>();
 const endingListeners = new Set<() => void>();
 
@@ -72,6 +76,11 @@ export type OptimisticFocusSession = {
   mode: "stopwatch" | "countdown";
   countdownTargetSeconds: number | null;
   elapsedSeconds: number;
+  // Seconds already banked on this task from earlier, already-ended
+  // sessions -- same field/purpose as RunningFocusSession's own, kept in
+  // sync here so the widget's displayed clock doesn't jump the moment the
+  // real server read supersedes this optimistic entry.
+  priorTrackedSeconds: number;
   fetchedAt: number;
 };
 
