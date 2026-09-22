@@ -125,7 +125,35 @@ const taskProgressPatchSchema = z.object({
 // .select().single() throws on "no rows returned"), not a clear rejection.
 // Fetching the task's real owner first and comparing explicitly turns
 // that into an intentional, immediate "not yours" error instead.
-export async function updateTaskProgress(taskId: string, patch: TaskProgressPatch) {
+// Returns a result instead of throwing: a rejected Server Action promise that
+// reaches the client uncaught (a bug in this function, or in anything it awaits
+// -- a recompute call, a trigger, ...) surfaces in production as the opaque
+// "Server Components render" message (React error #441) instead of a readable
+// one, exactly the crash this app's evidence-review flow hit before it was
+// changed to the same result pattern (see reviewEvidencePhotos in
+// app/coach/actions.ts). A genuine validation problem (missing exam scores, a
+// locked task, ...) is reported through `error` here, not thrown; anything
+// truly unexpected is logged in full server-side (console + Sentry) and
+// reported as a generic message rather than left to escape uncaught.
+// `data` is the raw student_tasks row (same shape updateTaskProgress always
+// returned) -- callers cast it to their own StudentTask type, same as before.
+export type UpdateTaskProgressResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
+
+export async function updateTaskProgress(taskId: string, patch: TaskProgressPatch): Promise<UpdateTaskProgressResult> {
+  try {
+    const data = await updateTaskProgressInternal(taskId, patch);
+    return { ok: true, data };
+  } catch (e) {
+    if (!(e instanceof Error)) {
+      console.error("[updateTaskProgress] non-Error thrown:", e);
+      Sentry.captureException(e);
+      return { ok: false, error: GENERIC_DB_ERROR };
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
+async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPatch) {
   await assertNotImpersonating();
   const taskIdV = parseInput(uuidSchema, taskId);
   const patchV = parseInput(taskProgressPatchSchema, patch);
@@ -286,13 +314,23 @@ export async function updateTaskProgress(taskId: string, patch: TaskProgressPatc
   // Kitap Okuma routine task's counts or status changed, so its chart entry
   // (YKS: paragraf_problem_entries, LGS: lgs_daily_routines) might need to
   // change, or stop existing, with it.
+  let touchedParagrafProblemChart = false;
   if (SCORE_FIELDS.some((f) => f in patchV) || "status" in patchV) {
-    if (data.course_id === "paragraf" || data.course_id === "problem") await syncParagrafProblemEntry(supabase, data.id);
-    if (data.course_id === "paragraf" || data.course_id === "kitap-okuma") await syncLgsDailyRoutineEntry(supabase, data.id);
+    if (data.course_id === "paragraf" || data.course_id === "problem") {
+      await syncParagrafProblemEntry(supabase, data.id);
+      touchedParagrafProblemChart = true;
+    }
+    if (data.course_id === "paragraf" || data.course_id === "kitap-okuma") {
+      await syncLgsDailyRoutineEntry(supabase, data.id);
+      touchedParagrafProblemChart = true;
+    }
   }
 
   revalidatePath("/student");
-  revalidatePath("/student/paragraf-problem");
+  // Only for a task that could actually have changed that page's data --
+  // revalidating it on every unrelated save (any Genel/Branş Deneme, any
+  // ordinary task) was pure waste.
+  if (touchedParagrafProblemChart) revalidatePath("/student/paragraf-problem");
   return data;
 }
 
@@ -502,10 +540,33 @@ const mistakeSchema = z.object({
   status: z.enum(["wrong", "blank"]),
 });
 
+// Returns a result instead of throwing -- same reason as updateTaskProgress
+// just above (an uncaught Server Action rejection shows the browser the
+// opaque "Server Components render" message instead of the real one).
+export type SaveTaskAnalysisResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
+
+export async function saveTaskAnalysis(
+  taskId: string,
+  mistakes: { course_id: string; topic_id: string; status: "wrong" | "blank" }[],
+  deferred: boolean,
+): Promise<SaveTaskAnalysisResult> {
+  try {
+    const data = await saveTaskAnalysisInternal(taskId, mistakes, deferred);
+    return { ok: true, data };
+  } catch (e) {
+    if (!(e instanceof Error)) {
+      console.error("[saveTaskAnalysis] non-Error thrown:", e);
+      Sentry.captureException(e);
+      return { ok: false, error: GENERIC_DB_ERROR };
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
 // Replaces the full mistake-topic set for a task and resolves its
 // analysis: `deferred` persists the counts only ("Analizi Sonra Yap"),
 // leaving analysis_pending true and skipping the topic list entirely.
-export async function saveTaskAnalysis(
+async function saveTaskAnalysisInternal(
   taskId: string,
   mistakes: { course_id: string; topic_id: string; status: "wrong" | "blank" }[],
   deferred: boolean,

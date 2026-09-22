@@ -588,8 +588,12 @@ function TaskModalBody({
     try {
       const patch = buildCountsPatch();
       if (showAnalysisFlow) patch.analysis_pending = false;
-      const updated = await updateTaskProgress(task.id, patch);
-      onSaved(updated as StudentTask);
+      const result = await updateTaskProgress(task.id, patch);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
@@ -610,8 +614,12 @@ function TaskModalBody({
     setSaving(true);
     setError(null);
     try {
-      const updated = await updateTaskProgress(task.id, { status, completed: status === "done" });
-      onSaved(updated as StudentTask);
+      const result = await updateTaskProgress(task.id, { status, completed: status === "done" });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
@@ -628,8 +636,12 @@ function TaskModalBody({
     try {
       const patch = buildCountsPatch();
       patch.analysis_pending = true;
-      const updated = await updateTaskProgress(task.id, patch);
-      onSaved(updated as StudentTask);
+      const result = await updateTaskProgress(task.id, patch);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       setStep("analysis");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
@@ -645,8 +657,12 @@ function TaskModalBody({
     try {
       const patch = buildCountsPatch();
       patch.analysis_pending = true;
-      const updated = await updateTaskProgress(task.id, patch);
-      onSaved(updated as StudentTask);
+      const result = await updateTaskProgress(task.id, patch);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
@@ -659,8 +675,12 @@ function TaskModalBody({
     setSaving(true);
     setError(null);
     try {
-      const updated = await saveTaskAnalysis(task.id, mistakes, false);
-      onSaved(updated as StudentTask);
+      const result = await saveTaskAnalysis(task.id, mistakes, false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
@@ -673,8 +693,12 @@ function TaskModalBody({
     setSaving(true);
     setError(null);
     try {
-      const updated = await saveTaskAnalysis(task.id, mistakes, true);
-      onSaved(updated as StudentTask);
+      const result = await saveTaskAnalysis(task.id, mistakes, true);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
