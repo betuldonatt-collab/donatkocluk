@@ -27,6 +27,7 @@ import { isRoutineCourseId } from "@/lib/curriculum";
 import { sumTaskCounts, sumTaskDuration } from "@/lib/scoring";
 import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
 import { useRowHeights } from "@/lib/use-row-heights";
+import { useAutoRowHeights } from "@/lib/use-auto-row-heights";
 import { deleteCustomTask, getPastWeeksForStudent, getTasksForWeek, updateTaskOrder } from "../../actions";
 import type { ExamType } from "@/lib/exam-type";
 import { AddCustomTaskDialog } from "./add-custom-task-dialog";
@@ -80,9 +81,24 @@ function getWeekDays(referenceIso: string) {
 // 0081's own comment for why this is never editable here). Same dashed/
 // locked visual treatment as the coach's own schedule-board.tsx injects,
 // so it reads as the same feature on both panels.
-function FixedTaskChip({ task }: { task: StudentFixedTask }) {
+function FixedTaskChip({
+  task,
+  innerRef,
+  minHeight,
+}: {
+  task: StudentFixedTask;
+  // Only set from the "Bu Hafta" grid (see maxFixedSlots/fixedRows in
+  // TaskBoard) -- the "Bugün" list below has just one day to show, so
+  // nothing there needs to line up with a neighbor.
+  innerRef?: (el: HTMLDivElement | null) => void;
+  minHeight?: number;
+}) {
   return (
-    <div className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
+    <div
+      ref={innerRef}
+      style={minHeight !== undefined ? { minHeight } : undefined}
+      className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs"
+    >
       {/* Time on its own top-right line -- sharing a row with the title (the old
           layout) squeezed the title/description into a narrow column and forced
           awkward line breaks. On its own line, the title below gets the card's
@@ -197,6 +213,25 @@ export function TaskBoard({
     DEFAULT_CELL_HEIGHT_PX,
     updateScheduleTaskRowHeights,
     (message) => toast.error(message),
+  );
+  // Widest "Sabit Görevler" lane across the currently-loaded 7-day window
+  // (same "pad every day to the busiest one" convention as maxRoutineSlots/
+  // maxGorevSlots below) -- rendered for every day, real chip or empty
+  // placeholder, so a day with no fixed tasks doesn't let Rutinler start
+  // higher than a neighbor's. Fixed tasks aren't draggable, so unlike
+  // routineRows/taskRows each row's height here is auto-measured from its
+  // real content rather than dragged (see useAutoRowHeights). A hook call,
+  // so it has to live at this top level, not inside the per-day render below.
+  const maxFixedSlots = Math.max(0, ...weekDays.map((day) => fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(day.date)).length));
+  const fixedRows = useAutoRowHeights(
+    maxFixedSlots,
+    weekDays.map(
+      (day) =>
+        `${day.date}:${fixedTasks
+          .filter((t) => t.day_of_week === dayOfWeekOf(day.date))
+          .map((t) => `${t.id}:${t.title}:${t.description ?? ""}`)
+          .join(",")}`,
+    ),
   );
 
   const isCurrentWeek = weekDays.some((d) => d.date === today);
@@ -539,17 +574,38 @@ export function TaskBoard({
                     {isToday && <span className="text-primary/70 shrink-0 text-[10px] font-normal">Bugün</span>}
                   </div>
 
-                  {/* Section 0: Sabit Görevler -- injected read-only, only
-                      when this day actually has any (see FixedTaskChip's
-                      own comment). Mirrors the coach's own schedule-board.tsx
+                  {/* Section 0: Sabit Görevler -- injected read-only, rendered
+                      for every day once ANY day in the week has at least one
+                      (maxFixedSlots), each day padded to that count with an
+                      invisible same-height placeholder and every row sized to
+                      the tallest real chip found at that row across all 7
+                      days (fixedRows, auto-measured) -- see FixedTaskChip's
+                      own comment. Mirrors the coach's own schedule-board.tsx
                       injection exactly. */}
-                  {dayFixedTasks.length > 0 && (
+                  {maxFixedSlots > 0 && (
                     <div className="border-border/60 mx-2 mt-2 space-y-1.5 border-b pb-2">
                       <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
                       <div className="space-y-1.5">
-                        {dayFixedTasks.map((t) => (
-                          <FixedTaskChip key={t.id} task={t} />
-                        ))}
+                        {Array.from({ length: maxFixedSlots }).map((_, rowIndex) => {
+                          const t = dayFixedTasks[rowIndex];
+                          if (!t) {
+                            return (
+                              <div
+                                key={`fixed-placeholder-${rowIndex}`}
+                                aria-hidden
+                                style={{ minHeight: fixedRows.heights[rowIndex] ?? 0 }}
+                              />
+                            );
+                          }
+                          return (
+                            <FixedTaskChip
+                              key={t.id}
+                              task={t}
+                              innerRef={fixedRows.registerRef(rowIndex, day.date)}
+                              minHeight={fixedRows.heights[rowIndex] ?? 0}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   )}

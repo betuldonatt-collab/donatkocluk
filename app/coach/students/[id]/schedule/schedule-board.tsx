@@ -24,6 +24,7 @@ import { isRoutineCourseId } from "@/lib/curriculum";
 import { sumTaskCounts } from "@/lib/scoring";
 import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
 import { useRowHeights, type RowHeights } from "@/lib/use-row-heights";
+import { useAutoRowHeights } from "@/lib/use-auto-row-heights";
 import {
   createStudentEvent,
   deleteAssignedTask,
@@ -181,6 +182,20 @@ export function ScheduleBoard({
     }
     return map;
   }, [weekDays, fixedTasks]);
+  // Widest "Sabit Görevler" lane across the current 7-day window (same
+  // "pad every day to the busiest one" convention as maxRoutineSlots/
+  // maxGorevSlots below) -- rendered for every day, real chip or empty
+  // placeholder, so a day with no fixed tasks doesn't let Rutinler start
+  // higher than a neighbor's and throw off the whole column's alignment.
+  const maxFixedSlots = Math.max(0, ...weekDays.map((day) => (fixedTasksByDate.get(day.date) ?? []).length));
+  // Fixed tasks aren't draggable (they're managed on the Program tab, never
+  // here), so unlike routineRows/taskRows below, each row's height here is
+  // auto-measured from its real content rather than dragged by the coach --
+  // see useAutoRowHeights.
+  const fixedRows = useAutoRowHeights(
+    maxFixedSlots,
+    weekDays.map((d) => `${d.date}:${(fixedTasksByDate.get(d.date) ?? []).map((t) => `${t.id}:${t.title}:${t.description ?? ""}`).join(",")}`),
+  );
   const [eventDialogState, setEventDialogState] = useState<EventDialogState | null>(null);
   // Stateful (not just the initial prop) so a resource created inline
   // from the drawer's "type new" flow (see handleResourceCreated) is
@@ -775,6 +790,9 @@ export function ScheduleBoard({
                   isDropTarget={day.date === overDay}
                   events={eventsByDay(day.date)}
                   fixedTasks={fixedTasksByDate.get(day.date) ?? []}
+                  maxFixedSlots={maxFixedSlots}
+                  fixedRowHeights={fixedRows.heights}
+                  registerFixedRef={fixedRows.registerRef}
                   routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
                   regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
                   maxRoutineSlots={maxRoutineSlots}
@@ -870,6 +888,9 @@ function DayColumn({
   isDropTarget,
   events,
   fixedTasks,
+  maxFixedSlots,
+  fixedRowHeights,
+  registerFixedRef,
   routineTasks,
   regularTasks,
   maxRoutineSlots,
@@ -899,6 +920,12 @@ function DayColumn({
   // Read-only -- see the "Section 0" render below and migration 0081's
   // own comment for why these are never draggable/editable here.
   fixedTasks: StudentFixedTask[];
+  // The week's widest "Sabit Görevler" lane and its auto-measured per-row
+  // heights (see useAutoRowHeights in ScheduleBoard) -- every day pads its
+  // own lane out to maxFixedSlots so Rutinler always starts at the same Y.
+  maxFixedSlots: number;
+  fixedRowHeights: number[];
+  registerFixedRef: (rowIndex: number, columnKey: string) => (el: HTMLDivElement | null) => void;
   routineTasks: DetailTask[];
   regularTasks: DetailTask[];
   maxRoutineSlots: number;
@@ -970,33 +997,53 @@ function DayColumn({
           student's fixed weekly skeleton (managed on the Program tab,
           never here -- see migration 0081's own comment for why this is
           deliberately not draggable/editable/deletable on the board
-          itself). Rendered only when this day actually has any, unlike
-          Rutinler below, since there's no "add" action to offer here. */}
-      {fixedTasks.length > 0 && (
+          itself). Rendered for every day once ANY day in the visible week
+          has at least one (maxFixedSlots, computed in ScheduleBoard) --
+          each day pads its own lane out to that count with an invisible,
+          same-height placeholder, and every row's height is the tallest
+          real chip found at that row across all 7 days (fixedRowHeights,
+          auto-measured -- see useAutoRowHeights), so a day with none, or
+          fewer/shorter ones than a busy neighbor, never lets Rutinler
+          below start higher than that neighbor's and throw the whole
+          column grid out of alignment. */}
+      {maxFixedSlots > 0 && (
         <div className="border-border/60 mx-2 mt-2 space-y-1.5 border-b pb-2">
           <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
           <div className="space-y-1.5">
-            {fixedTasks.map((ft) => (
-              <div key={ft.id} className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
-                {/* Time on its own top-right line -- sharing a row with the title
-                    (the old layout) squeezed the title/description into a narrow
-                    column and forced awkward line breaks. On its own line, the
-                    title below gets the card's full width. */}
-                <div className="flex justify-end">
-                  <span className="shrink-0 tabular-nums">
-                    {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
-                  </span>
+            {Array.from({ length: maxFixedSlots }).map((_, rowIndex) => {
+              const ft = fixedTasks[rowIndex];
+              if (!ft) {
+                return (
+                  <div key={`fixed-placeholder-${rowIndex}`} aria-hidden style={{ minHeight: fixedRowHeights[rowIndex] ?? 0 }} />
+                );
+              }
+              return (
+                <div
+                  key={ft.id}
+                  ref={registerFixedRef(rowIndex, day.date)}
+                  style={{ minHeight: fixedRowHeights[rowIndex] ?? 0 }}
+                  className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs"
+                >
+                  {/* Time on its own top-right line -- sharing a row with the title
+                      (the old layout) squeezed the title/description into a narrow
+                      column and forced awkward line breaks. On its own line, the
+                      title below gets the card's full width. */}
+                  <div className="flex justify-end">
+                    <span className="shrink-0 tabular-nums">
+                      {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <Lock className="mt-0.5 size-3 shrink-0" aria-label="Sabit, salt okunur" />
+                    {/* break-words, not truncate: a long title (many coaches type the
+                        whole period's plan straight into it) wraps across lines
+                        instead of being clipped to one with an ellipsis. */}
+                    <span className="min-w-0 flex-1 font-medium break-words">{ft.title}</span>
+                  </div>
+                  <TaskDescription text={ft.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
                 </div>
-                <div className="flex items-start gap-1.5">
-                  <Lock className="mt-0.5 size-3 shrink-0" aria-label="Sabit, salt okunur" />
-                  {/* break-words, not truncate: a long title (many coaches type the
-                      whole period's plan straight into it) wraps across lines
-                      instead of being clipped to one with an ellipsis. */}
-                  <span className="min-w-0 flex-1 font-medium break-words">{ft.title}</span>
-                </div>
-                <TaskDescription text={ft.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
