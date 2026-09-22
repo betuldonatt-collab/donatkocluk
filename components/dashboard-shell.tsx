@@ -34,7 +34,13 @@ export function DashboardShell({ sidebar, children }: { sidebar: React.ReactNode
         onClick={toggleMobileNav}
         aria-label={mobileOpen ? "Menüyü kapat" : "Menüyü aç"}
         aria-expanded={mobileOpen}
-        className="bg-card text-foreground border-border fixed top-3 left-3 z-50 flex size-10 items-center justify-center rounded-lg border shadow-sm md:hidden print:hidden"
+        // text-primary (not text-foreground): the brand's own navy/blue
+        // (oklch hue 265, same as --primary everywhere else) rather than
+        // the plain neutral foreground color, so this icon reads as a
+        // deliberate, on-brand control -- and stays a real, opaque color
+        // in both themes (dark navy on the light card, light blue on the
+        // dark one) instead of ever risking blending into bg-card.
+        className="bg-card text-primary border-primary/30 fixed top-3 left-3 z-50 flex size-10 items-center justify-center rounded-lg border shadow-sm md:hidden print:hidden"
       >
         {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
