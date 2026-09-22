@@ -81,7 +81,17 @@ export function TaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-h-[90dvh] overflow-y-auto", needsWideModal && "sm:max-w-lg")}>
+      {/* flex-col + overflow-hidden here, NOT overflow-y-auto on the whole
+          dialog: a single shared scroll container made the footer's own
+          `sticky bottom-0` overlap whatever body content hadn't scrolled
+          past it yet (sticky floats over in-flow siblings, it doesn't
+          reserve space for them) -- the amber "konu analizi tamamlanmadı"
+          banner sitting right above the footer got visually squashed
+          behind the buttons. Each step's own scrollable wrapper below
+          (flex-1 min-h-0 overflow-y-auto) now owns the ONLY scrollbar, and
+          the header/footer are plain flex items outside it that can never
+          be drawn over. */}
+      <DialogContent className={cn("flex max-h-[90dvh] flex-col overflow-hidden", needsWideModal && "sm:max-w-lg")}>
         {task && (
           <TaskModalBody
             key={`${task.id}:${initialStep}:${openKey ?? 0}`}
@@ -730,7 +740,7 @@ function TaskModalBody({
   if (task.week_locked) {
     return (
       <>
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>{task.title}</DialogTitle>
           <DialogDescription>
             {TASK_TYPE_LABELS[task.task_type]}
@@ -738,7 +748,7 @@ function TaskModalBody({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           <div className="flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
             <Lock className="size-3.5 shrink-0" />
             Bu haftanın görevleri koçun tarafından kilitlendi. Sadece görüntüleyebilirsin.
@@ -828,7 +838,7 @@ function TaskModalBody({
           </p>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t pt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Kapat
           </Button>
@@ -840,24 +850,26 @@ function TaskModalBody({
   if (step === "analysis") {
     return (
       <>
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>{task.title} — Konu Analizi</DialogTitle>
           <DialogDescription>Hata yaptığın veya boş bıraktığın soruların konularını işaretle.</DialogDescription>
         </DialogHeader>
 
-        {!mistakesLoaded ? (
-          <p className="text-muted-foreground py-6 text-center text-sm">Yükleniyor...</p>
-        ) : analysisGroups.length === 0 ? (
-          <p className="text-muted-foreground py-6 text-center text-sm">
-            Bu görev için konu listesi bulunamadı.
-          </p>
-        ) : (
-          <TopicMistakeSelector groups={analysisGroups} selected={mistakes} onChange={setMistakes} />
-        )}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          {!mistakesLoaded ? (
+            <p className="text-muted-foreground py-6 text-center text-sm">Yükleniyor...</p>
+          ) : analysisGroups.length === 0 ? (
+            <p className="text-muted-foreground py-6 text-center text-sm">
+              Bu görev için konu listesi bulunamadı.
+            </p>
+          ) : (
+            <TopicMistakeSelector groups={analysisGroups} selected={mistakes} onChange={setMistakes} />
+          )}
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
+        </div>
 
-        <DialogFooter className="items-center sm:justify-between">
+        <DialogFooter className="shrink-0 items-center border-t pt-4 sm:justify-between">
           <Button
             type="button"
             variant="ghost"
@@ -883,7 +895,7 @@ function TaskModalBody({
 
   return (
     <>
-      <DialogHeader>
+      <DialogHeader className="shrink-0">
         <DialogTitle>{task.title}</DialogTitle>
         <DialogDescription>
           {TASK_TYPE_LABELS[task.task_type]}
@@ -891,7 +903,7 @@ function TaskModalBody({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         {/* Kaynak (which book/resource the coach linked, if any) and the
             target/recorded süre -- previously invisible everywhere in the
             student panel, not just the compact card, not even here in the
@@ -1161,12 +1173,13 @@ function TaskModalBody({
           5 buttons into one un-wrapped row that burst past the dialog's
           right edge. Two explicit flex-wrap rows below keep each button
           group contained to the dialog's actual width, wrapping onto a
-          second line if it ever gets tight instead of overflowing. */}
-      <DialogFooter className="bg-card sticky bottom-0 z-10 -mx-6 -mb-6 flex-col gap-2 border-t px-6 pt-3 pb-6">
-        {/* Lives in the sticky footer itself (not the scrollable body above
-            it) so a long message is never covered by the footer that sits
-            on top of the last few pixels of scrolled content -- it can only
-            ever sit above its own buttons now, never behind them. */}
+          second line if it ever gets tight instead of overflowing.
+
+          shrink-0 (not sticky) -- the body above is its own independent
+          scroll container now (min-h-0 flex-1 overflow-y-auto), so this
+          footer sits in normal flex flow below it and can never be drawn
+          over by it, at any scroll position. */}
+      <DialogFooter className="shrink-0 flex-col gap-2 border-t pt-4">
         {error && <p className="text-destructive text-sm break-words whitespace-pre-wrap">{error}</p>}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
