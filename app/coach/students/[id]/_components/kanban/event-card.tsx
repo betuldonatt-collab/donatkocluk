@@ -46,8 +46,8 @@ export function eventIdFromDragId(id: string): string {
 // (see event-dialog.tsx); the description, if any, carries whatever custom
 // text the coach wrote, clamped to 3 lines with line breaks kept. The
 // type/time line stays a single truncated line (it's a short fixed string);
-// the description clamp can grow the card past its row's floor height (see
-// EventCard below) instead of being clipped.
+// content past what the card's row height (see EventCard below) actually
+// fits is cut at the box edge, same as every other card in this grid.
 export function EventCardBody({ event }: { event: StudentEvent }) {
   return (
     <div className="min-w-0 flex-1">
@@ -105,17 +105,20 @@ export function EventCard({
     id: eventDragId(event.id),
     disabled: event.is_locked,
   });
-  // minHeight, not height -- same reasoning as KanbanTaskCard: the row's
-  // dragged/stored height is a floor, not a hard cap, so a description taller
-  // than that floor grows the card instead of being silently clipped.
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, minHeight: height };
+  // A real height, not a floor -- same reasoning as KanbanTaskCard: this
+  // card shares the Görevler lane's row-height grid with task cards (see
+  // this component's own comment above), so minHeight let a long
+  // description grow an event card taller than the task cards sharing its
+  // row, breaking that row's alignment. overflow-hidden below (plus the
+  // description's own line-clamp-3 in EventCardBody) clips it instead.
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative flex flex-col gap-1 rounded-md border px-2 py-1.5 text-xs",
+        "relative flex flex-col gap-1 overflow-hidden rounded-md border px-2 py-1.5 text-xs",
         EVENT_TYPE_CLASSES[event.event_type],
       )}
     >

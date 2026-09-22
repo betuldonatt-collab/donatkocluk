@@ -67,13 +67,14 @@ export function RoutineTaskCard({
       <HoverCardTrigger asChild>
         <div
           onClick={paintMode ? handlePaintClick : undefined}
-          // minHeight, not height -- see KanbanTaskCard's matching comment: the
-          // row's dragged/stored height is a floor, not a hard cap, so a
-          // description (or anything else) taller than that floor grows the
-          // card instead of being silently clipped.
-          style={{ minHeight: cardHeight }}
+          // A real height, not a floor -- see KanbanTaskCard's matching
+          // comment: minHeight let one card with more text than its row
+          // neighbors grow taller than the rest, breaking the row's
+          // alignment. overflow-hidden below (plus TaskCardBody's own
+          // line-clamps) now clips extra content at the box edge instead.
+          style={{ height: cardHeight }}
           className={cn(
-            "border-border relative flex flex-col rounded-md border p-2.5 transition-colors",
+            "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",

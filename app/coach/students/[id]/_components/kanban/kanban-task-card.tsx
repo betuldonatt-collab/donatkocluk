@@ -70,13 +70,16 @@ export function KanbanTaskCard({
     id: task.id,
     disabled: task.is_locked || !!paintMode,
   });
-  // minHeight, not height: the row's dragged/stored height is a FLOOR, not a hard
-  // cap -- a card whose real content (a description especially, see
-  // TaskCardBody) is taller than that floor grows past it instead of having that
-  // content silently clipped. Every other card at this row index still starts
-  // from the same floor, so short cards keep lining up; only one that actually
-  // needs more room pushes its own column's later rows down.
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, minHeight: cardHeight };
+  // A real height, not a floor: every card at this row index across all 7
+  // days shares cardHeight (see the prop's own comment), and applying it as
+  // minHeight let one card with more text than its neighbors (a long video
+  // title especially, see TaskCardBody's VideoPill) grow taller than the
+  // rest of its own row -- collapsed, that meant content spilling past the
+  // card edge; either way it broke the row's alignment, since only that one
+  // card grew. overflow-hidden below (plus TaskCardBody's own line-clamps)
+  // now clips extra content at the box edge instead. Dragging the row's
+  // handle taller still grows every card in that row together.
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height: cardHeight };
 
   function handlePaintClick() {
     if (!paintMode) return;
@@ -93,7 +96,7 @@ export function KanbanTaskCard({
           style={style}
           onClick={paintMode ? handlePaintClick : undefined}
           className={cn(
-            "border-border relative flex flex-col rounded-md border p-2.5 transition-colors",
+            "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",
