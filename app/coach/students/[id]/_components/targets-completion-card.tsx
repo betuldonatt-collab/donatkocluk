@@ -7,23 +7,35 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
-import type { CompletionStats, StudentProfile, SubjectCompletion } from "../types";
+import type { DualCompletionStats, StudentProfile, SubjectCompletion } from "../types";
 
-function CompletionBar({ label, pct }: { label: string; pct: number | null }) {
+function barColorClass(pct: number | null): string {
+  if (pct === null) return "bg-muted-foreground/20";
+  return pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-rose-500";
+}
+
+// Shows the current week's figure and the all-time one side by side (the
+// coach's own requested "Haftalık: %80 | Genel: %65" format), each with its
+// own thin bar underneath -- one label, two numbers, two bars, so a coach
+// can tell at a glance whether a student caught up this week or has been
+// steady all along without those two stories blending into one average.
+function DualCompletionBar({ label, weekly, allTime }: { label: string; weekly: number | null; allTime: number | null }) {
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="text-foreground font-semibold tabular-nums">{pct === null ? "—" : `%${pct}`}</span>
+      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground min-w-0 flex-1 truncate">{label}</span>
+        <span className="text-foreground shrink-0 font-semibold tabular-nums">
+          Haftalık {weekly === null ? "—" : `%${weekly}`} <span className="text-muted-foreground font-normal">·</span> Genel{" "}
+          {allTime === null ? "—" : `%${allTime}`}
+        </span>
       </div>
-      <div className="bg-muted h-2 overflow-hidden rounded-full">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all",
-            pct === null ? "w-0" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-rose-500",
-          )}
-          style={{ width: `${pct ?? 0}%` }}
-        />
+      <div className="flex items-center gap-1.5">
+        <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full" title="Haftalık">
+          <div className={cn("h-full rounded-full transition-all", barColorClass(weekly))} style={{ width: `${weekly ?? 0}%` }} />
+        </div>
+        <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full" title="Genel">
+          <div className={cn("h-full rounded-full transition-all", barColorClass(allTime))} style={{ width: `${allTime ?? 0}%` }} />
+        </div>
       </div>
     </div>
   );
@@ -39,7 +51,7 @@ export function TargetsCompletionCard({
 }: {
   studentId: string;
   profile: StudentProfile;
-  completion: CompletionStats;
+  completion: DualCompletionStats;
   subjectCompletion: SubjectCompletion[];
   // The first day the percentages count, and whether that is the day the week was
   // locked (otherwise the week's Monday).
@@ -97,16 +109,22 @@ export function TargetsCompletionCard({
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
           <p className="text-muted-foreground -mt-2 text-xs">
+            Haftalık:{" "}
             {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
-            {progressFromLock ? " (programın kilitlendiği gün)" : " (haftanın başı)"} ile bugün arasındaki görevler; sonraki günler sayılmaz.
+            {progressFromLock ? " (programın kilitlendiği gün)" : " (haftanın başı)"} ile bugün arası. Genel: bugüne kadar atanmış tüm
+            görevler. İkisinde de sonraki günler sayılmaz.
           </p>
-          <CompletionBar label="Genel" pct={completion.overall} />
+          {/* Row label "Toplam" (not "Genel") -- this row is TYT+AYT combined,
+              and "Genel" is already what each row's own all-time COLUMN is
+              called (vs. that same row's "Haftalık" column) -- reusing it
+              here too would read as "Genel: Haftalık %80 · Genel %65". */}
+          <DualCompletionBar label="Toplam" weekly={completion.weekly.overall} allTime={completion.allTime.overall} />
           {/* TYT/AYT split is a YKS notion; for LGS these would be two
               permanently empty bars. */}
           {profile.exam_type !== "LGS" && (
             <>
-              <CompletionBar label="TYT" pct={completion.tyt} />
-              <CompletionBar label="AYT" pct={completion.ayt} />
+              <DualCompletionBar label="TYT" weekly={completion.weekly.tyt} allTime={completion.allTime.tyt} />
+              <DualCompletionBar label="AYT" weekly={completion.weekly.ayt} allTime={completion.allTime.ayt} />
             </>
           )}
         </section>
@@ -115,7 +133,7 @@ export function TargetsCompletionCard({
           <section className="space-y-3">
             <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Ders Bazında Tamamlama</p>
             {subjectCompletion.map((s) => (
-              <CompletionBar key={s.courseId} label={s.courseName} pct={s.pct} />
+              <DualCompletionBar key={s.courseId} label={s.courseName} weekly={s.weekly.pct} allTime={s.allTime.pct} />
             ))}
           </section>
         )}

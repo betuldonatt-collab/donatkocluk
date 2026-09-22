@@ -29,6 +29,7 @@ import type {
   DetailCoachNote,
   DetailSession,
   DetailTask,
+  DualCompletionStats,
   LgsDailyRoutine,
   ParagrafProblemEntry,
   StudentProfile,
@@ -66,11 +67,13 @@ function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
   return "other";
 }
 
-// Program completion counts only what is due so far this week (Monday..today,
-// lib/completion.ts) -- tasks scheduled for tomorrow or later are in neither
-// the numerator nor the denominator.
-function computeCompletionStats(allTasks: DetailTask[], today: string, lockedAt: string | null): CompletionStats {
-  const tasks = tasksDueSoFar(allTasks, today, lockedAt);
+// Program completion ("Haftalık") counts only what is due so far this week
+// (Monday..today, lib/completion.ts) -- tasks scheduled for tomorrow or
+// later are in neither the numerator nor the denominator. The "Genel"
+// (all-time) figure is the exact same bucketing, just over every task ever
+// assigned through today instead of only this week's -- see
+// computeDualCompletionStats below, which runs this over both slices.
+function bucketCompletionStats(tasks: DetailTask[]): CompletionStats {
   const buckets = {
     overall: { done: 0, total: 0 },
     tyt: { done: 0, total: 0 },
@@ -89,30 +92,52 @@ function computeCompletionStats(allTasks: DetailTask[], today: string, lockedAt:
   return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
+function computeDualCompletionStats(allTasks: DetailTask[], today: string, lockedAt: string | null): DualCompletionStats {
+  return {
+    weekly: bucketCompletionStats(tasksDueSoFar(allTasks, today, lockedAt)),
+    allTime: bucketCompletionStats(allTasks.filter((t) => t.task_date <= today)),
+  };
+}
+
 // Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
 // (paragraf/problem) aren't real curriculum subjects, so they're excluded
 // here even though they're valid course_ids elsewhere in the app.
-function computeSubjectCompletion(allTasks: DetailTask[], today: string, lockedAt: string | null): SubjectCompletion[] {
-  const buckets = new Map<string, { done: number; total: number }>();
-  for (const t of tasksDueSoFar(allTasks, today, lockedAt)) {
+function bucketSubjectCompletion(tasks: DetailTask[]): Map<string, { courseName: string; done: number; total: number }> {
+  const buckets = new Map<string, { courseName: string; done: number; total: number }>();
+  for (const t of tasks) {
     if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
-    const bucket = buckets.get(t.course_id) ?? { done: 0, total: 0 };
+    const bucket = buckets.get(t.course_id) ?? { courseName: courseLabelFor(t.course_id), done: 0, total: 0 };
     bucket.total += 1;
     if (t.status === "done") bucket.done += 1;
     buckets.set(t.course_id, bucket);
   }
-  return [...buckets.entries()]
-    .map(([courseId, b]) => {
-      const course = findCourseById(courseId);
-      const prefix = courseId.startsWith("tyt-") ? "TYT " : courseId.startsWith("ayt-") ? "AYT " : "";
-      return {
-        courseId,
-        courseName: `${prefix}${course?.name ?? courseId}`,
-        pct: Math.round((b.done / b.total) * 100),
-        done: b.done,
-        total: b.total,
-      };
-    })
+  return buckets;
+}
+
+function courseLabelFor(courseId: string): string {
+  const course = findCourseById(courseId);
+  const prefix = courseId.startsWith("tyt-") ? "TYT " : courseId.startsWith("ayt-") ? "AYT " : "";
+  return `${prefix}${course?.name ?? courseId}`;
+}
+
+// Merges the weekly and all-time per-course buckets into one row per
+// course touched in EITHER scope -- a course only worked on in a prior
+// week still shows its all-time figure with "—" for this week's, and vice
+// versa for a course picked up for the first time this week.
+function computeSubjectCompletion(allTasks: DetailTask[], today: string, lockedAt: string | null): SubjectCompletion[] {
+  const weekly = bucketSubjectCompletion(tasksDueSoFar(allTasks, today, lockedAt));
+  const allTime = bucketSubjectCompletion(allTasks.filter((t) => t.task_date <= today));
+  const courseIds = new Set([...weekly.keys(), ...allTime.keys()]);
+  const toBucket = (b: { done: number; total: number } | undefined) =>
+    b ? { pct: Math.round((b.done / b.total) * 100), done: b.done, total: b.total } : { pct: null, done: 0, total: 0 };
+
+  return [...courseIds]
+    .map((courseId) => ({
+      courseId,
+      courseName: (weekly.get(courseId) ?? allTime.get(courseId))!.courseName,
+      weekly: toBucket(weekly.get(courseId)),
+      allTime: toBucket(allTime.get(courseId)),
+    }))
     .sort((a, b) => a.courseName.localeCompare(b.courseName, "tr"));
 }
 
@@ -495,7 +520,7 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
-    completion: computeCompletionStats(tasks, today, progressLockedAt),
+    completion: computeDualCompletionStats(tasks, today, progressLockedAt),
     subjectCompletion: computeSubjectCompletion(tasks, today, progressLockedAt),
     progressFrom: completionStart(today, progressLockedAt),
     progressFromLock: progressLockedAt !== null,

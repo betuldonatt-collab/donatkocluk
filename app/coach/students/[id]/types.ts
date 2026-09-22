@@ -104,12 +104,21 @@ export type CompletionStats = {
   ayt: number | null;
 };
 
+// The same shape, twice: "weekly" counts only what's due since the current
+// week's lock day (or Monday), same as before this field split; "allTime"
+// counts everything ever assigned through today, no lower bound.
+export type DualCompletionStats = {
+  weekly: CompletionStats;
+  allTime: CompletionStats;
+};
+
+export type CompletionBucket = { pct: number | null; done: number; total: number };
+
 export type SubjectCompletion = {
   courseId: string;
   courseName: string;
-  pct: number;
-  done: number;
-  total: number;
+  weekly: CompletionBucket;
+  allTime: CompletionBucket;
 };
 
 export type CoachNoteType = "main_session" | "check_in" | "parent_meeting";
