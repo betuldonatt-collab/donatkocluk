@@ -83,14 +83,20 @@ function getWeekDays(referenceIso: string) {
 function FixedTaskChip({ task }: { task: StudentFixedTask }) {
   return (
     <div className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
+      {/* Time on its own top-right line -- sharing a row with the title (the old
+          layout) squeezed the title/description into a narrow column and forced
+          awkward line breaks. On its own line, the title below gets the card's
+          full width. */}
+      <div className="flex justify-end">
+        <span className="shrink-0 tabular-nums">
+          {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
+        </span>
+      </div>
       <div className="flex items-start gap-1.5">
         <Lock className="mt-0.5 size-3 shrink-0" aria-label="Sabit, salt okunur" />
         {/* break-words, not truncate: a long title wraps across lines instead of
             being clipped to one with an ellipsis. */}
         <span className="min-w-0 flex-1 font-medium break-words">{task.title}</span>
-        <span className="shrink-0 tabular-nums">
-          {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
-        </span>
       </div>
       <TaskDescription text={task.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
     </div>
