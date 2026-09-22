@@ -26,7 +26,9 @@ import {
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsExamSubject,
+  emptyForGroup,
   inferAytTrackFromScores,
+  overCapGroup,
 } from "@/lib/curriculum/subject-groups";
 import { cn } from "@/lib/utils";
 import {
@@ -223,7 +225,7 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
 function subjectGroupsFor(
   examTrack: "tyt" | "ayt" | "lgs",
   aytTrack: Track | null,
-): { key: string; label: string; courseIds: string[]; section?: string; questions?: number }[] {
+): { key: string; label: string; courseIds: string[]; section?: string; questions: number }[] {
   if (examTrack === "lgs") return LGS_EXAM_SUBJECTS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
   if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
@@ -296,19 +298,37 @@ function TaskModalBody({
       examTrack === "lgs"
         ? emptyLgsInputs(task.subject_scores)
         : Object.fromEntries(
-        activeGroups.map((g) => {
-          const existing = task.subject_scores?.[g.key] ?? EMPTY_SUBJECT_SCORE;
-          return [
-            g.key,
-            {
-              correct: existing.correct?.toString() ?? "",
-              wrong: existing.wrong?.toString() ?? "",
-              empty: existing.empty?.toString() ?? "",
-            },
-          ];
-        }),
-      ),
+            activeGroups.map((g) => {
+              const existing = task.subject_scores?.[g.key] ?? EMPTY_SUBJECT_SCORE;
+              const correct = existing.correct ?? null;
+              const wrong = existing.wrong ?? null;
+              return [
+                g.key,
+                {
+                  correct: correct?.toString() ?? "",
+                  wrong: wrong?.toString() ?? "",
+                  empty: emptyForGroup(g.questions, correct, wrong)?.toString() ?? "",
+                },
+              ];
+            }),
+          ),
   );
+
+  // TYT/AYT's own Boş auto-derivation (LGS's version of the same idea lives
+  // in LgsExamScoreGrid/emptyLgsInputs) -- Doğru or Yanlış changing recomputes
+  // Boş from the section's fixed question count instead of asking for it, so
+  // Doğru+Yanlış+Boş can never disagree with that count through this form.
+  function handleSubjectFieldChange(key: string, field: "correct" | "wrong", value: string) {
+    setSubjectInputs((prev) => {
+      const current = prev[key] ?? { correct: "", wrong: "", empty: "" };
+      const nextRow = { ...current, [field]: value };
+      const group = activeGroups.find((g) => g.key === key);
+      const correct = nextRow.correct.trim() === "" ? null : Number(nextRow.correct);
+      const wrong = nextRow.wrong.trim() === "" ? null : Number(nextRow.wrong);
+      const empty = group ? emptyForGroup(group.questions, correct, wrong) : null;
+      return { ...prev, [key]: { ...nextRow, empty: empty?.toString() ?? "" } };
+    });
+  }
 
   function handleAytTrackChange(next: Track) {
     setAytTrack(next);
@@ -405,20 +425,14 @@ function TaskModalBody({
       }, 0)
     : (Number(wrongCount) || 0) + (Number(emptyCount) || 0);
 
-  // An LGS exam's per-subject Doğru+Yanlış+Boş can never exceed that
-  // subject's real question count (Türkçe 20, İnkılap/Din/İngilizce 10,
-  // Matematik/Fen 20) -- the same caps lgs_general_exams enforces at the DB
-  // level. Folded into trackNotChosen so every save path that already
-  // refuses to run while it's true also refuses on an over-cap subject.
-  const lgsOverCap =
-    showSubjectScores && examTrack === "lgs"
-      ? activeGroups.find((g) => {
-          const s = subjectInputs[g.key];
-          if (!s || g.questions === undefined) return false;
-          return (Number(s.correct) || 0) + (Number(s.wrong) || 0) + (Number(s.empty) || 0) > g.questions;
-        })
-      : undefined;
-  const trackNotChosen = (showSubjectScores && examTrack === "ayt" && !aytTrack) || !!lgsOverCap;
+  // A general exam's per-subject Doğru+Yanlış can never exceed that
+  // section's real, fixed question count (TYT/AYT: see subject-groups.ts;
+  // LGS: the same caps lgs_general_exams enforces at the DB level, shown via
+  // its own LgsExamScoreGrid instead of the message below). Folded into
+  // trackNotChosen so every save path that already refuses to run while
+  // it's true also refuses on an over-cap subject.
+  const overCapSubject = showSubjectScores ? overCapGroup(activeGroups, subjectInputs) : undefined;
+  const trackNotChosen = (showSubjectScores && examTrack === "ayt" && !aytTrack) || !!overCapSubject;
 
   // Doğru+Yanlış+Boş no longer has to add up to Toplam -- that's exactly
   // what "partially completed" means now (see computeAutoTaskStatus,
@@ -1068,9 +1082,9 @@ function TaskModalBody({
               </div>
             )}
 
-            {lgsOverCap && examTrack !== "lgs" && (
+            {overCapSubject && examTrack !== "lgs" && (
               <p className="text-destructive mb-2 text-xs">
-                {lgsOverCap.label} için Doğru + Yanlış + Boş en fazla {lgsOverCap.questions} olabilir.
+                {overCapSubject.label} için Doğru + Yanlış en fazla {overCapSubject.questions} olabilir.
               </p>
             )}
             {examTrack === "lgs" && (
@@ -1085,34 +1099,24 @@ function TaskModalBody({
                     )}
                     <p className="text-foreground text-sm font-medium">
                       {g.label}
-                      {g.questions !== undefined && (
-                        <span className="text-muted-foreground ml-1.5 text-xs font-normal">({g.questions} soru)</span>
-                      )}
+                      <span className="text-muted-foreground ml-1.5 text-xs font-normal">({g.questions} soru)</span>
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       <Field
                         label="Doğru"
                         value={subjectInputs[g.key].correct}
-                        onChange={(v) =>
-                          setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], correct: v } }))
-                        }
+                        onChange={(v) => handleSubjectFieldChange(g.key, "correct", v)}
                         invalid={showMissingScores && isBlankScore(subjectInputs[g.key].correct)}
                       />
                       <Field
                         label="Yanlış"
                         value={subjectInputs[g.key].wrong}
-                        onChange={(v) =>
-                          setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], wrong: v } }))
-                        }
+                        onChange={(v) => handleSubjectFieldChange(g.key, "wrong", v)}
                         invalid={showMissingScores && isBlankScore(subjectInputs[g.key].wrong)}
                       />
-                      <Field
+                      <ReadOnlyField
                         label="Boş"
-                        value={subjectInputs[g.key].empty}
-                        onChange={(v) =>
-                          setSubjectInputs((prev) => ({ ...prev, [g.key]: { ...prev[g.key], empty: v } }))
-                        }
-                        invalid={showMissingScores && isBlankScore(subjectInputs[g.key].empty)}
+                        value={subjectInputs[g.key].empty === "" ? null : Number(subjectInputs[g.key].empty)}
                       />
                     </div>
                   </div>
@@ -1148,7 +1152,6 @@ function TaskModalBody({
           </div>
         )}
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
 
       {/* Forced flex-col at every breakpoint (overriding the shared
@@ -1160,6 +1163,11 @@ function TaskModalBody({
           group contained to the dialog's actual width, wrapping onto a
           second line if it ever gets tight instead of overflowing. */}
       <DialogFooter className="bg-card sticky bottom-0 z-10 -mx-6 -mb-6 flex-col gap-2 border-t px-6 pt-3 pb-6">
+        {/* Lives in the sticky footer itself (not the scrollable body above
+            it) so a long message is never covered by the footer that sits
+            on top of the last few pixels of scrolled content -- it can only
+            ever sit above its own buttons now, never behind them. */}
+        {error && <p className="text-destructive text-sm break-words whitespace-pre-wrap">{error}</p>}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:mr-auto">
             İptal

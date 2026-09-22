@@ -72,3 +72,56 @@ export function isGeneralExamScoresIncomplete(
     return !s || anyBlankScore([s.correct, s.wrong, s.empty]);
   });
 }
+
+// The real, fixed question count for one Genel Deneme section -- null when
+// the track/section can't be resolved (an AYT exam before its alan is
+// known), same resolution rule expectedGeneralExamKeys uses.
+function questionsForGeneralExamKey(
+  title: string,
+  key: string,
+  scores: Record<string, unknown> | null | undefined,
+): number | null {
+  const track = examTrackFromTitle(title);
+  if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
+  if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
+  const aytTrack = inferAytTrackFromScores(scores);
+  if (!aytTrack) return null;
+  return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].find((g) => g.key === key)?.questions ?? null;
+}
+
+// The client auto-derives Boş from Doğru/Yanlış (see task-modal.tsx /
+// LgsExamScoreGrid) so this should never actually fire in normal use -- it
+// is the server's own backstop against a stale or forged submission whose
+// Doğru+Yanlış+Boş doesn't add up to its section's real, fixed question
+// count. Returns the first mismatched section (for a message naming it
+// specifically, e.g. "Türkçe bölümü toplam 40 soru olmalıdır"), or null
+// when every present, complete section matches (or its count can't be
+// resolved yet, e.g. an AYT exam with no alan chosen).
+export function findGeneralExamTotalMismatch(
+  title: string,
+  scores: Record<string, SubjectScore> | null | undefined,
+): { label: string; questions: number } | null {
+  if (!scores) return null;
+  for (const key of Object.keys(scores)) {
+    const s = scores[key];
+    if (!s || anyBlankScore([s.correct, s.wrong, s.empty])) continue;
+    const questions = questionsForGeneralExamKey(title, key, scores);
+    if (questions === null) continue;
+    const sum = Number(s.correct) + Number(s.wrong) + Number(s.empty);
+    if (sum !== questions) {
+      const track = examTrackFromTitle(title);
+      const label =
+        track === "lgs"
+          ? LGS_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
+          : track === "tyt"
+            ? TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.label
+            : AYT_SUBJECT_GROUPS_BY_TRACK[inferAytTrackFromScores(scores)!].find((g) => g.key === key)?.label;
+      return { label: label ?? key, questions };
+    }
+  }
+  return null;
+}
+
+export function generalExamTotalMismatchMessage(label: string, questions: number): string {
+  return `${label} bölümü toplam ${questions} soru olmalıdır.`;
+}

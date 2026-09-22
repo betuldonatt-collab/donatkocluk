@@ -9,7 +9,13 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { needsCoachApproval } from "@/lib/focus-approval";
 import { decideOpenAction } from "@/lib/focus-open-decision";
-import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
+import {
+  EXAM_SCORES_REQUIRED,
+  GENERAL_EXAM_SCORES_REQUIRED,
+  findGeneralExamTotalMismatch,
+  generalExamTotalMismatchMessage,
+  isGeneralExamScoresIncomplete,
+} from "@/lib/exam-results-validation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
@@ -183,6 +189,10 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
     if (isGeneralExamScoresIncomplete(existing.title, patchV.subject_scores)) {
       throw new Error(GENERAL_EXAM_SCORES_REQUIRED);
     }
+    const mismatch = findGeneralExamTotalMismatch(existing.title, patchV.subject_scores);
+    if (mismatch) {
+      throw new Error(generalExamTotalMismatchMessage(mismatch.label, mismatch.questions));
+    }
   }
   if (
     existing.task_type === "branch_exam" &&
@@ -202,7 +212,20 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   // authoritative check (mirrored at the DB level by
   // prevent_student_task_core_tampering, migration 0077) -- a direct or
   // forged call gets the same clear rejection.
-  if (existing.is_coach_assigned && "total_count" in patchV && patchV.total_count !== existing.total_count) {
+  //
+  // general_exam is excluded: unlike question_bank/branch_exam, its
+  // total_count is NEVER a coach-set target (always null at assignment --
+  // see taskFormValueToPayload's general_exam branch) -- it's a rollup the
+  // student's own per-subject scores recompute on every save
+  // (buildCountsPatch's showSubjectScores branch, task-modal.tsx). Treating
+  // it as an immutable coach target here rejected every legitimate Genel
+  // Deneme save after the first one, with this same misleading message.
+  if (
+    existing.task_type !== "general_exam" &&
+    existing.is_coach_assigned &&
+    "total_count" in patchV &&
+    patchV.total_count !== existing.total_count
+  ) {
     throw new Error("Koç tarafından atanan toplam soru sayısı değiştirilemez.");
   }
 

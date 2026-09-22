@@ -118,6 +118,35 @@ describe("updateTaskProgress never throws -- always a result", () => {
     if (result.ok) return;
     expect(result.error).not.toContain("connection reset");
   });
+
+  it("a Genel Deneme re-save no longer trips the coach-assigned total_count lock", async () => {
+    // A prior save already gave this row a real total_count -- editing the
+    // subject scores again recomputes and changes it, which used to be
+    // rejected by the guard meant for question_bank/branch_exam's coach-set
+    // Toplam (that guard never applies to general_exam, see actions.ts).
+    state.task = baseTask({ total_count: 84, correct_count: 60, wrong_count: 10, empty_count: 14 });
+    const result = await updateTaskProgress(TASK, {
+      subject_scores: {
+        turkce: { correct: 30, wrong: 5, empty: 5 },
+        sosyal: { correct: 15, wrong: 2, empty: 3 },
+        matematik: { correct: 35, wrong: 3, empty: 2 },
+        fen: { correct: 18, wrong: 1, empty: 1 },
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("a TYT subject whose Doğru+Yanlış+Boş doesn't match its fixed question count resolves ok:false with a subject-specific message", async () => {
+    const result = await updateTaskProgress(TASK, {
+      subject_scores: {
+        turkce: { correct: 32, wrong: 2, empty: 8 }, // sums to 42, not the fixed 40
+        sosyal: { correct: 12, wrong: 2, empty: 6 },
+        matematik: { correct: 20, wrong: 2, empty: 18 },
+        fen: { correct: 13, wrong: 7, empty: 0 },
+      },
+    });
+    expect(result).toEqual({ ok: false, error: "Türkçe bölümü toplam 40 soru olmalıdır." });
+  });
 });
 
 describe("saveTaskAnalysis never throws -- always a result", () => {

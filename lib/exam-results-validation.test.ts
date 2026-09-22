@@ -4,6 +4,8 @@ import {
   GENERAL_EXAM_SCORES_REQUIRED,
   anyBlankScore,
   expectedGeneralExamKeys,
+  findGeneralExamTotalMismatch,
+  generalExamTotalMismatchMessage,
   isBlankScore,
   isGeneralExamScoresIncomplete,
 } from "./exam-results-validation";
@@ -69,6 +71,38 @@ describe("isGeneralExamScoresIncomplete", () => {
     const five = { lgs_turkce: row, lgs_inkilap: row, lgs_din: row, lgs_ingilizce: row, lgs_matematik: row };
     expect(isGeneralExamScoresIncomplete("LGS Genel Deneme", five)).toBe(true);
     expect(isGeneralExamScoresIncomplete("LGS Genel Deneme", { ...five, lgs_fen: row })).toBe(false);
+  });
+});
+
+describe("findGeneralExamTotalMismatch", () => {
+  it("catches the exact reported bug: Türkçe summing to 42 instead of its fixed 40", () => {
+    const scores = {
+      turkce: { correct: 32, wrong: 2, empty: 8 },
+      sosyal: { correct: 12, wrong: 2, empty: 6 },
+      matematik: { correct: 20, wrong: 2, empty: 18 },
+      fen: { correct: 13, wrong: 7, empty: 0 },
+    };
+    expect(findGeneralExamTotalMismatch("TYT Genel Deneme", scores)).toEqual({ label: "Türkçe", questions: 40 });
+  });
+
+  it("passes when every section's Doğru+Yanlış+Boş matches its fixed count", () => {
+    const tyt = {
+      turkce: { correct: 30, wrong: 5, empty: 5 },
+      sosyal: { correct: 15, wrong: 2, empty: 3 },
+      matematik: { correct: 35, wrong: 3, empty: 2 },
+      fen: { correct: 18, wrong: 1, empty: 1 },
+    };
+    expect(findGeneralExamTotalMismatch("TYT Genel Deneme", tyt)).toBeNull();
+  });
+
+  it("skips a still-blank section rather than reporting a false mismatch", () => {
+    expect(
+      findGeneralExamTotalMismatch("TYT Genel Deneme", { turkce: { correct: 30, wrong: null, empty: null } }),
+    ).toBeNull();
+  });
+
+  it("builds the subject-specific Turkish message", () => {
+    expect(generalExamTotalMismatchMessage("Türkçe", 40)).toBe("Türkçe bölümü toplam 40 soru olmalıdır.");
   });
 });
 

@@ -66,12 +66,38 @@ export function coursesForLgsGroup(key: string): Course[] {
 
 export type SubjectGroupKey = "turkce" | "sosyal" | "matematik" | "fen";
 
-export const TYT_SUBJECT_GROUPS: { key: SubjectGroupKey; label: string; courseIds: string[] }[] = [
-  { key: "turkce", label: "Türkçe", courseIds: ["tyt-turkce"] },
-  { key: "sosyal", label: "Sosyal Bilimler", courseIds: ["tyt-tarih", "tyt-cografya", "tyt-felsefe", "tyt-din"] },
-  { key: "matematik", label: "Matematik", courseIds: ["tyt-matematik", "tyt-geometri"] },
-  { key: "fen", label: "Fen Bilimleri", courseIds: ["tyt-fizik", "tyt-kimya", "tyt-biyoloji"] },
+// `questions` is each section's real, fixed TYT question count (ÖSYM's own
+// format: 120 total) -- kept here, next to the group it belongs to, so the
+// shared task UI can derive Boş from Doğru/Yanlış instead of asking for it,
+// and refuse a section whose total doesn't match its own fixed count. Mirrors
+// LGS_EXAM_SUBJECTS' own `questions` above exactly.
+export const TYT_SUBJECT_GROUPS: { key: SubjectGroupKey; label: string; courseIds: string[]; questions: number }[] = [
+  { key: "turkce", label: "Türkçe", courseIds: ["tyt-turkce"], questions: 40 },
+  { key: "sosyal", label: "Sosyal Bilimler", courseIds: ["tyt-tarih", "tyt-cografya", "tyt-felsefe", "tyt-din"], questions: 20 },
+  { key: "matematik", label: "Matematik", courseIds: ["tyt-matematik", "tyt-geometri"], questions: 40 },
+  { key: "fen", label: "Fen Bilimleri", courseIds: ["tyt-fizik", "tyt-kimya", "tyt-biyoloji"], questions: 20 },
 ];
+
+// Shared by TYT/AYT's own Genel Deneme entry (LGS has its own richer
+// net/puan version of this same idea in lib/lgs-exam.ts): Boş is never
+// typed, it is what's left of a section's fixed question count once Doğru
+// and Yanlış are known.
+export function emptyForGroup(questions: number, correct: number | null, wrong: number | null): number | null {
+  if (correct === null || wrong === null) return null;
+  return Math.max(0, questions - correct - wrong);
+}
+
+// Doğru + Yanlış above a section's fixed question count -- the form refuses
+// to save (mirrors lgsOverCapSubject in components/lgs-exam-score-grid.tsx).
+export function overCapGroup<T extends { key: string; questions: number }>(
+  groups: T[],
+  inputs: Record<string, { correct: string; wrong: string }>,
+): T | undefined {
+  return groups.find((g) => {
+    const v = inputs[g.key];
+    return v ? (Number(v.correct) || 0) + (Number(v.wrong) || 0) > g.questions : false;
+  });
+}
 
 export function coursesForGroup(key: SubjectGroupKey) {
   const group = TYT_SUBJECT_GROUPS.find((g) => g.key === key);
@@ -91,29 +117,33 @@ export type AytSubjectGroupKey =
   | "ayt_sozel_sozel1"
   | "ayt_sozel_sosyal2";
 
+// `questions` is each section's real, fixed AYT question count (80 per
+// track), same purpose as TYT_SUBJECT_GROUPS' own field above.
 export const AYT_SUBJECT_GROUPS_BY_TRACK: Record<
   Track,
-  { key: AytSubjectGroupKey; label: string; courseIds: string[] }[]
+  { key: AytSubjectGroupKey; label: string; courseIds: string[]; questions: number }[]
 > = {
   sayisal: [
-    { key: "ayt_matematik", label: "Matematik", courseIds: ["ayt-matematik-sayisal", "ayt-geometri-sayisal"] },
-    { key: "ayt_fizik", label: "Fizik", courseIds: ["ayt-fizik"] },
-    { key: "ayt_kimya", label: "Kimya", courseIds: ["ayt-kimya"] },
-    { key: "ayt_biyoloji", label: "Biyoloji", courseIds: ["ayt-biyoloji"] },
+    { key: "ayt_matematik", label: "Matematik", courseIds: ["ayt-matematik-sayisal", "ayt-geometri-sayisal"], questions: 40 },
+    { key: "ayt_fizik", label: "Fizik", courseIds: ["ayt-fizik"], questions: 14 },
+    { key: "ayt_kimya", label: "Kimya", courseIds: ["ayt-kimya"], questions: 13 },
+    { key: "ayt_biyoloji", label: "Biyoloji", courseIds: ["ayt-biyoloji"], questions: 13 },
   ],
   ea: [
     {
       key: "ayt_ea_sozel1",
       label: "Türk Dili ve Edebiyatı - Sosyal Bilimler 1",
       courseIds: ["ayt-edebiyat-ea", "ayt-tarih-1-ea", "ayt-cografya-1-ea"],
+      questions: 40,
     },
-    { key: "ayt_ea_matematik", label: "Matematik", courseIds: ["ayt-matematik-ea", "ayt-geometri-ea"] },
+    { key: "ayt_ea_matematik", label: "Matematik", courseIds: ["ayt-matematik-ea", "ayt-geometri-ea"], questions: 40 },
   ],
   sozel: [
     {
       key: "ayt_sozel_sozel1",
       label: "Türk Dili ve Edebiyatı - Sosyal Bilimler 1",
       courseIds: ["ayt-edebiyat-sozel", "ayt-tarih-1-sozel", "ayt-cografya-1-sozel"],
+      questions: 40,
     },
     {
       key: "ayt_sozel_sosyal2",
@@ -127,6 +157,7 @@ export const AYT_SUBJECT_GROUPS_BY_TRACK: Record<
         "ayt-mantik",
         "ayt-din-kulturu-ve-ahlak-bilgisi",
       ],
+      questions: 40,
     },
   ],
 };
