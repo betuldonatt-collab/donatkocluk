@@ -487,7 +487,16 @@ async function fetchStudentDetail(studentId: string) {
     if (!t.course_id || !t.topic_id || t.topic_id === "karma") continue;
     if (t.total_count === null && t.correct_count === null && t.wrong_count === null) continue;
     if (!isCompletedTask(t)) continue;
-    bumpQuestionTotals(t.course_id, t.topic_id, t.total_count ?? 0, t.correct_count ?? 0, t.wrong_count ?? 0);
+    // The denominator here must be what the student actually worked
+    // through (Doğru+Yanlış+Boş), not t.total_count -- that's the coach's
+    // ASSIGNED target, which a half_done task (computeAutoTaskStatus,
+    // lib/count-fields.ts) is by definition short of. Using the target
+    // made "Konu Performans Haritası" show e.g. "29/40 doğru" for a task
+    // the student only actually attempted 35 of, silently mixing an
+    // assigned goal into a map that's supposed to be pure solved-question
+    // history.
+    const solved = (t.correct_count ?? 0) + (t.wrong_count ?? 0) + (t.empty_count ?? 0);
+    bumpQuestionTotals(t.course_id, t.topic_id, solved, t.correct_count ?? 0, t.wrong_count ?? 0);
   }
 
   // Karma tasks contribute their per-topic breakdown rows (below) instead
