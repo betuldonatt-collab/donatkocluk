@@ -6,7 +6,6 @@ import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   AYT_COURSES_BY_TRACK,
@@ -99,8 +98,6 @@ export type TaskFormValue = {
   // (no course/topic exists for this type, unlike branchExamPublisher
   // which suffixes onto a real course+topic title).
   bookTitle: string;
-  // Optional note shown under the task's title on both panels (line breaks kept).
-  description: string;
 };
 
 function emptyResourceRow(): TaskFormResource {
@@ -142,7 +139,6 @@ export function defaultTaskFormValue(examType: ExamType = "YKS"): TaskFormValue 
     generalExamPublisher: "",
     branchExamPublisher: "",
     bookTitle: "",
-    description: "",
   };
 }
 
@@ -224,7 +220,6 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     // The book name IS the title, no suffix-parsing needed (unlike
     // branchExamPublisher above).
     bookTitle: taskType === "reading" ? task.title : "",
-    description: task.description ?? "",
   };
 }
 
@@ -246,7 +241,6 @@ export function taskFormValueToPayload(value: TaskFormValue) {
       videoLinks: [],
       generalExamTrack: value.generalExamTrack,
       generalExamPublisher: value.generalExamPublisher.trim() || null,
-      description: value.description.trim() || null,
     };
   }
 
@@ -284,7 +278,6 @@ export function taskFormValueToPayload(value: TaskFormValue) {
             .join(" + ") || value.branchExamPublisher.trim() || null
         : null,
     bookTitle: value.taskType === "reading" ? value.bookTitle.trim() || null : null,
-    description: value.description.trim() || null,
   };
 }
 
@@ -643,20 +636,6 @@ export function TaskFormFields({
           </Button>
         </div>
       )}
-
-      <div className="space-y-1.5">
-        <Label htmlFor="task-form-description" className="text-muted-foreground text-xs font-normal">
-          Açıklama (opsiyonel)
-        </Label>
-        <Textarea
-          id="task-form-description"
-          value={value.description}
-          onChange={(e) => set({ description: e.target.value })}
-          rows={3}
-          maxLength={2000}
-          placeholder="Öğrencinin kartta başlığın altında göreceği not (satır boşlukları korunur)"
-        />
-      </div>
     </div>
   );
 }
