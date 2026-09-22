@@ -7,7 +7,7 @@ import { Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
-import { focusEndingStore } from "@/lib/focus-modal-store";
+import { focusEndingStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
 import { resolvePraiseMessage } from "@/lib/focus-praise";
 import { formatTimerClock } from "@/lib/focus-title";
 import {
@@ -112,7 +112,10 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
         }
       })
       .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
-      .finally(() => focusEndingStore.end(task.id));
+      .finally(() => {
+        focusOptimisticSessionStore.clear(task.id);
+        focusEndingStore.end(task.id);
+      });
   }
 
   // The X / Escape / the green button. Closing NEVER discards time: a running

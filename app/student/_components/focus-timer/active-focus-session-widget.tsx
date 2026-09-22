@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
-import { focusEndingStore, focusModalStore } from "@/lib/focus-modal-store";
+import { focusEndingStore, focusModalStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
 import { resolvePraiseMessage } from "@/lib/focus-praise";
 import { closePip, isPipSupported, openPip, pipStore, updatePip } from "@/lib/focus-pip";
 import { formatTimerClock, formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
@@ -73,13 +73,64 @@ export function ActiveFocusSessionWidget() {
     focusEndingStore.getSnapshot,
     focusEndingStore.getServerSnapshot,
   );
-  const visibleSessions = endingKey ? sessions.filter((s) => !endingKey.split(",").includes(s.taskId)) : sessions;
+  // Set by the fullscreen timer the instant it closes while still running --
+  // shown immediately, before this widget's own server read (below) has had
+  // a chance to land, since that read fires off the same transition and can
+  // race the write that created the session (see its own 2s retry comment).
+  // Dropped the moment `sessions` confirms it (the effect further down) so
+  // the real, server-driven reading takes over from then on.
+  const optimisticSession = useSyncExternalStore(
+    focusOptimisticSessionStore.subscribe,
+    focusOptimisticSessionStore.getSnapshot,
+    focusOptimisticSessionStore.getServerSnapshot,
+  );
+  const mergedSessions =
+    optimisticSession && !sessions.some((s) => s.taskId === optimisticSession.taskId)
+      ? [optimisticSession, ...sessions]
+      : sessions;
+
+  useEffect(() => {
+    if (optimisticSession && sessions.some((s) => s.taskId === optimisticSession.taskId)) {
+      focusOptimisticSessionStore.clear(optimisticSession.taskId);
+    }
+  }, [sessions, optimisticSession]);
 
   const refresh = useCallback(async () => {
     const running = await getRunningFocusSessions();
     const fetchedAt = Date.now();
     setSessions(running.map((s) => ({ ...s, fetchedAt })));
   }, []);
+
+  // A taskId lands here the instant its "ending" flag lifts (Bitir's save
+  // attempt settled, success or fail -- see focusEndingStore), and leaves the
+  // moment a fresh read has actually confirmed the outcome either way. Without
+  // this, lifting "ending" alone could let this widget's OWN still-stale
+  // `sessions` (from before the save) flash the card back, ticking off old
+  // data, for however long the confirming read takes -- shared by both Bitir
+  // entry points (this card's own button, and the fullscreen timer's), since
+  // both only ever go through the same focusEndingStore.
+  const [settling, setSettling] = useState<Set<string>>(() => new Set());
+  const previousEndingIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const currentIds = endingKey ? endingKey.split(",") : [];
+    const justSettled = previousEndingIdsRef.current.filter((id) => !currentIds.includes(id));
+    previousEndingIdsRef.current = currentIds;
+    if (justSettled.length === 0) return;
+    setSettling((prev) => new Set([...prev, ...justSettled]));
+    refresh().finally(() => {
+      setSettling((prev) => {
+        const next = new Set(prev);
+        for (const id of justSettled) next.delete(id);
+        return next;
+      });
+    });
+  }, [endingKey, refresh]);
+
+  const visibleSessions = mergedSessions.filter((s) => {
+    if (endingKey && endingKey.split(",").includes(s.taskId)) return false;
+    if (settling.has(s.taskId)) return false;
+    return true;
+  });
 
   // Re-read the server whenever something that could have changed it
   // happens: mount / route change, the fullscreen timer closing (a session may
@@ -278,17 +329,12 @@ function RunningSessionCard({
       })
       .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
       .finally(() => {
+        focusOptimisticSessionStore.clear(taskId);
+        // Lifting this doesn't by itself risk a flash of stale data: the
+        // "settling" effect below (shared with FocusTimerTrigger's own
+        // Bitir) keeps this taskId hidden until a fresh read has actually
+        // confirmed it either way.
         focusEndingStore.end(taskId);
-        // Without this, the card's return to "visible" (ending set clearing)
-        // relied entirely on the endingKey change already being in this
-        // effect's own dependency array to indirectly trigger a re-fetch --
-        // correct in theory, but this makes it explicit and immediate: pull
-        // the real server state (which no longer includes this session on
-        // success) the instant the optimistic hide would otherwise lift,
-        // instead of leaving the card's fate to a separate effect re-run.
-        // router.refresh() above only reaches server-rendered parts of the
-        // page, never this client widget's own `sessions` state.
-        onChanged().catch(() => {});
       });
   }
 

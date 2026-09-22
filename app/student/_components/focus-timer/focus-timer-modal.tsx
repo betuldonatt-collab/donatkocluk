@@ -12,7 +12,7 @@ import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
 import { closePip, isPipSupported, openPip, pipStore } from "@/lib/focus-pip";
 import { formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
-import { focusModalStore } from "@/lib/focus-modal-store";
+import { focusModalStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
 import { FocusTimerBackground, randomFocusTimerAnimationIndex } from "./focus-timer-animations";
 import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-prompt";
 
@@ -240,6 +240,19 @@ export function FocusTimerModal({
   // The X, Escape and the green button all mean the same thing: leave this
   // screen, lose nothing.
   function handleClose() {
+    if (running) {
+      // Hands the floating widget this exact reading right as it takes
+      // over, so it shows up instantly instead of waiting on its own
+      // server round trip (see focusOptimisticSessionStore's own comment).
+      focusOptimisticSessionStore.set({
+        taskId,
+        taskTitle,
+        mode,
+        countdownTargetSeconds: mode === "countdown" ? countdownMinutes * 60 : null,
+        elapsedSeconds,
+        fetchedAt: Date.now(),
+      });
+    }
     onClose(running ? "running" : started ? "paused" : "idle");
   }
 

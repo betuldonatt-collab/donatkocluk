@@ -65,3 +65,67 @@ export const focusEndingStore = {
     emitEnding();
   },
 };
+
+export type OptimisticFocusSession = {
+  taskId: string;
+  taskTitle: string;
+  mode: "stopwatch" | "countdown";
+  countdownTargetSeconds: number | null;
+  elapsedSeconds: number;
+  fetchedAt: number;
+};
+
+// A just-started-or-just-backgrounded session, pushed here by the fullscreen
+// timer the instant it closes while still running ("Arka planda çalışsın",
+// X, Escape). The floating widget (active-focus-session-widget.tsx) shows it
+// immediately from this, instead of waiting on its own server round trip
+// (getRunningFocusSessions) -- that fetch fires off the SAME modalOpen
+// transition and can race the write that created the session (see its own
+// 2s blind-retry comment), which is what left the widget empty for a few
+// seconds after backgrounding a freshly-started timer. Superseded the
+// moment that fetch actually confirms the session (the widget clears it
+// then), and auto-clears itself after a generous timeout as a safety net if
+// that confirmation never arrives (e.g. the write genuinely failed).
+const OPTIMISTIC_SESSION_TIMEOUT_MS = 15_000;
+let optimisticSession: OptimisticFocusSession | null = null;
+let optimisticClearTimer: ReturnType<typeof setTimeout> | null = null;
+const optimisticListeners = new Set<() => void>();
+
+function emitOptimistic() {
+  for (const listener of optimisticListeners) listener();
+}
+
+function clearOptimisticTimer() {
+  if (optimisticClearTimer) {
+    clearTimeout(optimisticClearTimer);
+    optimisticClearTimer = null;
+  }
+}
+
+export const focusOptimisticSessionStore = {
+  subscribe(listener: () => void) {
+    optimisticListeners.add(listener);
+    return () => {
+      optimisticListeners.delete(listener);
+    };
+  },
+  getSnapshot: () => optimisticSession,
+  getServerSnapshot: () => null,
+  set(session: OptimisticFocusSession) {
+    optimisticSession = session;
+    clearOptimisticTimer();
+    optimisticClearTimer = setTimeout(() => {
+      optimisticSession = null;
+      emitOptimistic();
+    }, OPTIMISTIC_SESSION_TIMEOUT_MS);
+    emitOptimistic();
+  },
+  // taskId omitted clears whatever is currently held, no matter which task.
+  clear(taskId?: string) {
+    if (optimisticSession && (!taskId || optimisticSession.taskId === taskId)) {
+      optimisticSession = null;
+      clearOptimisticTimer();
+      emitOptimistic();
+    }
+  },
+};
