@@ -114,7 +114,11 @@ function FixedTaskChip({
             being clipped to one with an ellipsis. */}
         <span className="min-w-0 flex-1 font-medium break-words">{task.title}</span>
       </div>
-      <TaskDescription text={task.description} lines={3} className="mt-1 pl-[18px] text-[11px]" />
+      {/* lines="all" -- this chip's own row height auto-measures to fit
+          whatever renders (fixedRows in TaskBoard), so there's nothing to
+          clip; a line-clamp here would only ever be an artificial cap
+          adding a "…" to a description this box already has room for. */}
+      <TaskDescription text={task.description} lines="all" className="mt-1 pl-[18px] text-[11px]" />
     </div>
   );
 }

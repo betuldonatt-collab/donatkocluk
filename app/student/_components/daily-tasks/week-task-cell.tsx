@@ -295,10 +295,11 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
 // overflow-hidden: collapsed (a short dragged row), extra content is
 // cleanly cut at the box edge instead of pushing the cell out of line;
 // expanded (drag the row's own handle taller), every cell in that row
-// grows together and reveals more, still perfectly aligned. line-clamp on
-// the title keeps that clip at a line boundary rather than mid-glyph; the
-// full, untruncated detail is always one hover away via
-// WeekCellHoverDetail.
+// grows together and reveals more, still perfectly aligned. Deliberately
+// no line-clamp/ellipsis anywhere in here -- text wraps at its natural
+// size and whatever doesn't fit is hidden by the box's own
+// overflow-hidden, never cut to a "…". The full, untruncated detail is
+// always one hover away via WeekCellHoverDetail.
 export function WeekTaskCell({
   task,
   onClick,
@@ -363,7 +364,7 @@ export function WeekTaskCell({
 
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-start gap-1">
-                <p className="text-foreground line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-snug break-words">
+                <p className="text-foreground min-w-0 flex-1 text-xs font-semibold leading-snug break-words">
                   {cLabel ?? task.title}
                 </p>
                 {/* Icon-only indicators (never a text badge row) -- keeps
@@ -382,12 +383,12 @@ export function WeekTaskCell({
                 )}
               </div>
 
-              <TaskDescription text={task.description} lines={2} className="text-[10px]" />
+              <TaskDescription text={task.description} lines="all" className="text-[10px]" />
 
               {topic && (
                 <p
                   className={cn(
-                    "line-clamp-1 text-[11px] leading-snug break-words",
+                    "text-[11px] leading-snug break-words",
                     topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
                   )}
                 >
@@ -396,17 +397,16 @@ export function WeekTaskCell({
               )}
 
               {/* Which book/kaynak the coach linked, if any -- see the
-                  matching comment on StudentTask.resource_names. Clamped to
-                  one line, same as topic above -- the cell's own resize
-                  handle is how extra height gets reclaimed now, not
-                  unbounded wrapping. */}
+                  matching comment on StudentTask.resource_names. No clamp:
+                  text wraps at its natural size and the cell's own
+                  overflow-hidden (see the outer box above) is what hides
+                  anything past the row's current height -- no "…", just a
+                  clean cut at the box edge. */}
               {task.resource_names.length > 0 && (
-                <p className="text-muted-foreground line-clamp-1 text-[10px] leading-snug break-words">
-                  {task.resource_names.join(" + ")}
-                </p>
+                <p className="text-muted-foreground text-[10px] leading-snug break-words">{task.resource_names.join(" + ")}</p>
               )}
 
-              <p className="text-muted-foreground line-clamp-1 text-[10px] leading-snug break-words">
+              <p className="text-muted-foreground text-[10px] leading-snug break-words">
                 {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
               </p>
 

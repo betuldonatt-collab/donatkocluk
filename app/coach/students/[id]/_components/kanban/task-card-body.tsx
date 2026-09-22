@@ -86,7 +86,7 @@ function VideoPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="bg-rose-500/10 text-rose-600 inline-flex max-w-full items-start gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-snug">
       <PlayCircle className="mt-0.5 size-3 shrink-0" />
-      <span className="line-clamp-2 break-words">{children}</span>
+      <span className="break-words">{children}</span>
     </span>
   );
 }
@@ -94,9 +94,10 @@ function VideoPill({ children }: { children: React.ReactNode }) {
 // Default-state video indicator: 1 video shows its own title (as a real
 // link); 2+ collapse into a single "N video" summary pill instead of
 // stacking individual titles -- no appetite for an unbounded stack of
-// video rows regardless of the card's own dragged height. Its title is
-// clamped to 2 lines (VideoPill above); the full list is still one hover
-// away (TaskCardHoverDetail).
+// video rows regardless of the card's own dragged height. No clamp on its
+// title -- wraps at its natural size, hidden past the card's own
+// overflow-hidden with no "…"; the full list is still one hover away
+// (TaskCardHoverDetail).
 function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] }) {
   if (videoLinks.length === 0) return null;
   if (videoLinks.length === 1) {
@@ -111,31 +112,32 @@ function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] 
 
 // Default card content -- course name, topic, subtitle, and a video
 // indicator. The card's own dragged/stored height (see
-// kanban-task-card.tsx/routine-task-card.tsx) is now a real height with
-// overflow-hidden, not a floor -- title/topic/subtitle are line-clamped so
-// a clip lands at a line boundary instead of mid-glyph, and the
-// description (3 lines) and video pill (2 lines) are clamped too. A card
-// with genuinely more content than fits at its row's current height just
-// has the rest cut at the box edge; dragging the row's own handle taller
-// (every card at that row index together) reveals more. Shared by
-// KanbanTaskCard (draggable, in a day column) and RoutineTaskCard (static,
-// in the Rutinler lane) so the two stay visually identical. The full,
-// untruncated detail is always one hover away via TaskCardHoverDetail
-// below, shown in a HoverCard by the card components themselves.
+// kanban-task-card.tsx/routine-task-card.tsx) is a real height with
+// overflow-hidden, not a floor -- deliberately no line-clamp/ellipsis
+// anywhere here: every line wraps at its natural size, and whatever
+// doesn't fit the card's current height is hidden by that overflow-hidden,
+// never cut to a "…". A card with genuinely more content than fits at its
+// row's current height just has the rest cut at the box edge; dragging
+// the row's own handle taller (every card at that row index together)
+// reveals more. Shared by KanbanTaskCard (draggable, in a day column) and
+// RoutineTaskCard (static, in the Rutinler lane) so the two stay visually
+// identical. The full, untruncated detail is always one hover away via
+// TaskCardHoverDetail below, shown in a HoverCard by the card components
+// themselves.
 export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
 
   return (
     <div className="min-w-0 flex-1 space-y-1">
-      <p className="text-foreground line-clamp-2 text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
+      <p className="text-foreground text-sm leading-snug font-semibold break-words">{cLabel ?? task.title}</p>
 
-      <TaskDescription text={task.description} lines={3} />
+      <TaskDescription text={task.description} lines="all" />
 
       {topic && (
         <p
           className={cn(
-            "line-clamp-1 text-xs leading-snug break-words",
+            "text-xs leading-snug break-words",
             topic.id === "karma" ? "text-amber-600 font-medium" : "text-muted-foreground",
           )}
         >
@@ -143,9 +145,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
         </p>
       )}
 
-      <p className="text-muted-foreground line-clamp-1 text-[11px] leading-snug break-words">
-        {subtitleText(task, resourceNameById)}
-      </p>
+      <p className="text-muted-foreground text-[11px] leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
 
       <CardVideoLinks videoLinks={task.video_links} />
     </div>

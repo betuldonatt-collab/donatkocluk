@@ -70,8 +70,9 @@ export function RoutineTaskCard({
           // A real height, not a floor -- see KanbanTaskCard's matching
           // comment: minHeight let one card with more text than its row
           // neighbors grow taller than the rest, breaking the row's
-          // alignment. overflow-hidden below (plus TaskCardBody's own
-          // line-clamps) now clips extra content at the box edge instead.
+          // alignment. overflow-hidden below now clips extra content at
+          // the box edge instead -- no line-clamp anywhere in
+          // TaskCardBody, so that clip is a plain cut, never a "…".
           style={{ height: cardHeight }}
           className={cn(
             "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",

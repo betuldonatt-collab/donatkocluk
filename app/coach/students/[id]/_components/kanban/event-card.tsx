@@ -44,25 +44,26 @@ export function eventIdFromDragId(id: string): string {
 // double-registering a second useSortable for the same id. The heading is
 // the event_type label itself -- there is no separate title field to show
 // (see event-dialog.tsx); the description, if any, carries whatever custom
-// text the coach wrote, clamped to 3 lines with line breaks kept. The
-// type/time line stays a single truncated line (it's a short fixed string);
-// content past what the card's row height (see EventCard below) actually
-// fits is cut at the box edge, same as every other card in this grid.
+// text the coach wrote, with its line breaks kept. Deliberately no
+// line-clamp/truncate/ellipsis anywhere here: everything wraps at its
+// natural size, and content past what the card's row height (see
+// EventCard below) actually fits is cut at the box edge, same as every
+// other card in this grid -- never cut to a "…".
 export function EventCardBody({ event }: { event: StudentEvent }) {
   return (
     <div className="min-w-0 flex-1">
-      <div className="flex items-center justify-between gap-1">
-        <span className="truncate font-semibold">{STUDENT_EVENT_TYPE_LABELS[event.event_type]}</span>
+      <div className="flex items-start justify-between gap-1">
+        <span className="font-semibold break-words">{STUDENT_EVENT_TYPE_LABELS[event.event_type]}</span>
         <span className="flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums opacity-90">
           <Clock className="size-2.5" />
           {event.start_time.slice(0, 5)}
         </span>
       </div>
-      <span className="block truncate text-[10px] opacity-80">
+      <span className="block text-[10px] break-words opacity-80">
         {event.start_time.slice(0, 5)}–{event.end_time.slice(0, 5)}
       </span>
       {event.description?.trim() && (
-        <span className="mt-0.5 line-clamp-3 block text-[10px] leading-snug break-words whitespace-pre-wrap opacity-80">
+        <span className="mt-0.5 block text-[10px] leading-snug break-words whitespace-pre-wrap opacity-80">
           {event.description.trim()}
         </span>
       )}
@@ -109,8 +110,9 @@ export function EventCard({
   // card shares the Görevler lane's row-height grid with task cards (see
   // this component's own comment above), so minHeight let a long
   // description grow an event card taller than the task cards sharing its
-  // row, breaking that row's alignment. overflow-hidden below (plus the
-  // description's own line-clamp-3 in EventCardBody) clips it instead.
+  // row, breaking that row's alignment. overflow-hidden below clips it
+  // instead -- no line-clamp anywhere in EventCardBody, so that clip is a
+  // plain cut, never a "…".
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height };
 
   return (

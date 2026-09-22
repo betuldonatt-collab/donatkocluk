@@ -76,9 +76,10 @@ export function KanbanTaskCard({
   // title especially, see TaskCardBody's VideoPill) grow taller than the
   // rest of its own row -- collapsed, that meant content spilling past the
   // card edge; either way it broke the row's alignment, since only that one
-  // card grew. overflow-hidden below (plus TaskCardBody's own line-clamps)
-  // now clips extra content at the box edge instead. Dragging the row's
-  // handle taller still grows every card in that row together.
+  // card grew. overflow-hidden below now clips extra content at the box
+  // edge instead -- no line-clamp anywhere in TaskCardBody, so that clip is
+  // a plain cut, never a "…". Dragging the row's handle taller still grows
+  // every card in that row together.
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height: cardHeight };
 
   function handlePaintClick() {
