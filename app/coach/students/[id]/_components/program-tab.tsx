@@ -155,7 +155,10 @@ export function ProgramTab({
                     ) : (
                       dayFixedTasks.map((t) => (
                         <div key={t.id} className="border-border bg-muted/30 group relative rounded-md border p-1.5 text-[11px]">
-                          <p className="text-foreground truncate pr-9 font-medium break-words">{t.title}</p>
+                          {/* break-words, not truncate: a long title wraps across
+                              lines instead of being clipped to one with an
+                              ellipsis (pr-9 keeps it clear of the edit button). */}
+                          <p className="text-foreground pr-9 font-medium break-words">{t.title}</p>
                           <p className="text-muted-foreground flex items-center gap-1">
                             <Clock className="size-2.5 shrink-0" />
                             {t.start_time.slice(0, 5)}–{t.end_time.slice(0, 5)}

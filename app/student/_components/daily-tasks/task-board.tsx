@@ -83,9 +83,11 @@ function getWeekDays(referenceIso: string) {
 function FixedTaskChip({ task }: { task: StudentFixedTask }) {
   return (
     <div className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
-      <div className="flex items-center gap-1.5">
-        <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
-        <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
+      <div className="flex items-start gap-1.5">
+        <Lock className="mt-0.5 size-3 shrink-0" aria-label="Sabit, salt okunur" />
+        {/* break-words, not truncate: a long title wraps across lines instead of
+            being clipped to one with an ellipsis. */}
+        <span className="min-w-0 flex-1 font-medium break-words">{task.title}</span>
         <span className="shrink-0 tabular-nums">
           {task.start_time.slice(0, 5)}–{task.end_time.slice(0, 5)}
         </span>

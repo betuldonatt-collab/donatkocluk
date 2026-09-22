@@ -978,9 +978,12 @@ function DayColumn({
           <div className="space-y-1.5">
             {fixedTasks.map((ft) => (
               <div key={ft.id} className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <Lock className="size-3 shrink-0" aria-label="Sabit, salt okunur" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{ft.title}</span>
+                <div className="flex items-start gap-1.5">
+                  <Lock className="mt-0.5 size-3 shrink-0" aria-label="Sabit, salt okunur" />
+                  {/* break-words, not truncate: a long title (many coaches type the
+                      whole period's plan straight into it) wraps across lines
+                      instead of being clipped to one with an ellipsis. */}
+                  <span className="min-w-0 flex-1 font-medium break-words">{ft.title}</span>
                   <span className="shrink-0 tabular-nums">
                     {ft.start_time.slice(0, 5)}–{ft.end_time.slice(0, 5)}
                   </span>
