@@ -19,6 +19,24 @@ function formatMinutesLabel(totalMinutes: number): string {
   return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
+// Same wording/thresholds as the admin student directory's own
+// formatRelativeTime (app/admin/students/page.tsx) -- duplicated per this
+// repo's per-panel convention, kept in sync deliberately so "Son görülme"
+// reads identically everywhere it appears. Takes `now` (this widget's own
+// ticking clock state) rather than reading Date.now() directly, so the
+// label stays live without its own separate timer.
+function formatLastSeen(iso: string | null, now: number): string {
+  if (!iso) return "Hiç görülmedi";
+  const diffMs = now - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "az önce";
+  if (minutes < 60) return `${minutes} dakika önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+  const days = Math.floor(hours / 24);
+  return `${days} gün önce`;
+}
+
 // Fixed-right collapsible widget, same "book spine" shape as the
 // announcements widget but at a distinct offset (top-[68%] vs. that
 // one's top-1/2) and its own blue theme, so the two can coexist on
@@ -150,8 +168,11 @@ export function StopwatchSideWidget({
               />
               <div className="min-w-0 flex-1">
                 <p className="text-foreground truncate text-sm font-medium">{row.fullName ?? "—"}</p>
-                <p className={cn("text-xs", live ? "text-emerald-600" : "text-muted-foreground")}>
-                  {live ? "Çalışıyor" : "Boşta"}
+                {/* "Çalışıyor" while live already says everything "last
+                    seen" would; the two only ever show one at a time so
+                    this stays a single line, same row height either way. */}
+                <p className={cn("truncate text-xs", live ? "text-emerald-600" : "text-muted-foreground")}>
+                  {live ? "Çalışıyor" : `Son görülme: ${formatLastSeen(row.lastActiveAt, now)}`}
                 </p>
               </div>
               <p className="text-foreground shrink-0 text-sm font-semibold tabular-nums">

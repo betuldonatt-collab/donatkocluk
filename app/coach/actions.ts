@@ -3072,6 +3072,13 @@ export type StopwatchRosterRow = {
   // those refetches -- see getCoachLiveFocusStatuses below for the cheap
   // poll that keeps it current in between.
   activeFocusHeartbeatAt: string | null;
+  // "Son görülme" -- the same profiles.last_active_at the admin panel's
+  // own student directory already shows (app/admin/students/page.tsx),
+  // reused here rather than re-derived from something Focus-Timer-
+  // specific: this is general app presence (any authenticated request
+  // touches it), not "was actively studying", which is exactly what
+  // activeFocusHeartbeatAt above already covers.
+  lastActiveAt: string | null;
   // Coach-only grouping + active/passive exclusion (0068_stopwatch_
   // competition_groups.sql) -- a passive student's minutes are still real
   // and shown here (the coach must always be able to see them), only
@@ -3152,7 +3159,7 @@ export async function fetchStopwatchCompetitionRoster(
     supabase
       .from("profiles")
       .select(
-        "id, full_name, sinif_sube, active_focus_heartbeat_at, competition_group_id, competition_status, student_groups!profiles_competition_group_id_fkey(name)",
+        "id, full_name, sinif_sube, active_focus_heartbeat_at, last_active_at, competition_group_id, competition_status, student_groups!profiles_competition_group_id_fkey(name)",
       )
       .in("id", studentIds),
     supabase
@@ -3195,6 +3202,7 @@ export async function fetchStopwatchCompetitionRoster(
         weeklyMinutes: totals.weekly,
         monthlyMinutes: totals.monthly,
         activeFocusHeartbeatAt: profile?.active_focus_heartbeat_at ?? null,
+        lastActiveAt: profile?.last_active_at ?? null,
         competitionGroupId: profile?.competition_group_id ?? null,
         competitionGroupName: profile?.student_groups?.name ?? null,
         competitionStatus: profile?.competition_status ?? "active",
