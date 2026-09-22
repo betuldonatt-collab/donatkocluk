@@ -10,6 +10,7 @@ import {
   MinusCircle,
   PlayCircle,
   Sparkles,
+  Timer,
   Video,
   XCircle,
 } from "lucide-react";
@@ -67,6 +68,17 @@ export const DEFAULT_CELL_HEIGHT_PX = 132;
 // on a TYT branch exam) the actual time taken.
 function durationSuffix(task: StudentTask): string {
   return task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
+}
+
+// Actual time SPENT via Süre Tut (task.tracked_duration_minutes) -- distinct
+// from duration_minutes above, the coach's assigned target/estimate. Same
+// convention as task-card.tsx's own formatTrackedTime, duplicated per this
+// repo's per-view convention (see durationSuffix's own comment above).
+function formatTrackedTime(totalMinutes: number): string {
+  if (totalMinutes < 60) return `${totalMinutes} dk`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
 // Same subtitle rules as TaskCard's taskSubtitle, kept in sync deliberately
@@ -155,6 +167,21 @@ function VideoPill({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Same shape as VideoPill, neutral (not attention-colored -- this is purely
+// informational, not something needing action). Only rendered once time has
+// actually been logged via Süre Tut (WeekTaskCell's own check).
+function TrackedTimePill({ minutes }: { minutes: number }) {
+  return (
+    <span
+      className="bg-secondary text-muted-foreground mt-0.5 inline-flex max-w-full items-center gap-0.5 rounded px-1 py-0.5 text-[9px] leading-snug tabular-nums"
+      title="Bu görevde Süre Tut ile geçirilen toplam süre"
+    >
+      <Timer className="size-2.5 shrink-0" />
+      {formatTrackedTime(minutes)}
+    </span>
+  );
+}
+
 // Default-state video indicator: 1 video shows its own title (as a real
 // link); 2+ collapse into a single "N video" summary pill rather than
 // stacking individual titles -- the cell's height is a free drag, not a
@@ -198,6 +225,12 @@ function WeekCellHoverDetail({ task }: { task: StudentTask }) {
       <p className="text-muted-foreground text-xs leading-snug break-words">
         {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
       </p>
+      {task.tracked_duration_minutes > 0 && (
+        <p className="text-muted-foreground flex items-center gap-1 text-xs leading-snug">
+          <Timer className="size-3.5 shrink-0" />
+          Süre Tut ile {formatTrackedTime(task.tracked_duration_minutes)} çalışıldı
+        </p>
+      )}
       {task.video_links.length > 0 && (
         <div className="flex flex-col items-start gap-1 pt-0.5">
           {task.video_links.map((link, i) => (
@@ -366,6 +399,7 @@ export function WeekTaskCell({
                 {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : cellSubtitle(task)}
               </p>
 
+              {task.tracked_duration_minutes > 0 && <TrackedTimePill minutes={task.tracked_duration_minutes} />}
               <WeekCellVideoLinks videoLinks={task.video_links} />
             </div>
           </div>

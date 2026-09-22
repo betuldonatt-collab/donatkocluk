@@ -28,13 +28,6 @@ import {
   type FocusTimerMode,
 } from "./focus-timer-modal";
 
-function formatMinutesLabel(totalMinutes: number): string {
-  if (totalMinutes < 60) return `${totalMinutes} dk`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
-}
-
 // Per-task Focus Mode entry point -- opens the same fullscreen timer for
 // whichever task this button is rendered next to. Persistence is entirely
 // server-authoritative (migration 0078/0086, app/student/actions.ts): a
@@ -169,15 +162,13 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   return (
     <>
       {/* `className` (hidden/flex responsive visibility, shrink-0) moves
-          here from the Button below so the duration badge and the button
-          hide/show together as one unit -- the caller in task-card.tsx
-          doesn't need to change at all. */}
+          here from the Button below so the caller in task-card.tsx doesn't
+          need to change at all. The tracked-time readout that used to sit
+          here moved onto the card itself (task-card.tsx's own title-row
+          badge) -- that one stays visible once the task is done, when this
+          whole component unmounts, so showing it here too was redundant
+          for exactly the tasks where seeing it matters least. */}
       <div className={cn("items-center gap-1.5", className)}>
-        {!!task.tracked_duration_minutes && (
-          <span className="text-muted-foreground shrink-0 text-xs font-medium tabular-nums">
-            {formatMinutesLabel(task.tracked_duration_minutes)}
-          </span>
-        )}
         <Button
           type="button"
           variant="outline"

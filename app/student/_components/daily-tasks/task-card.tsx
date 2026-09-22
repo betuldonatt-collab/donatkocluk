@@ -9,6 +9,7 @@ import {
   MinusCircle,
   PlayCircle,
   Sparkles,
+  Timer,
   Video,
   XCircle,
 } from "lucide-react";
@@ -35,6 +36,20 @@ const TASK_TYPE_ICONS = {
 // on the student side at all.
 function durationSuffix(task: StudentTask): string {
   return task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
+}
+
+// Actual time SPENT on this task via Süre Tut (task.tracked_duration_minutes)
+// -- distinct from duration_minutes above, which is the coach's assigned
+// target/estimate, not what was really tracked. Same "45 dk" / "1 sa 15 dk"
+// convention as focus-timer-trigger.tsx's own formatMinutesLabel (kept as a
+// separate copy here rather than imported -- this repo's own convention for
+// small per-view formatters, see that file's and week-task-cell.tsx's
+// matching comments elsewhere).
+function formatTrackedTime(totalMinutes: number): string {
+  if (totalMinutes < 60) return `${totalMinutes} dk`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
 function taskSubtitle(task: StudentTask): string {
@@ -180,6 +195,20 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
             title would float them awkwardly mid-block. */}
         <div className="flex items-start gap-1.5">
           <p className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
+          {/* Only when time has actually been logged via Süre Tut -- unlike
+              FocusTimerTrigger's own inline duration (which this replaces,
+              see that file), this stays visible even once the task is
+              done, so a student can still see at a glance what they spent
+              on it. */}
+          {task.tracked_duration_minutes > 0 && (
+            <span
+              className="bg-secondary text-muted-foreground inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
+              title="Bu görevde Süre Tut ile geçirilen toplam süre"
+            >
+              <Timer className="size-2.5" />
+              {formatTrackedTime(task.tracked_duration_minutes)}
+            </span>
+          )}
           {task.week_locked ? (
             <span
               className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
