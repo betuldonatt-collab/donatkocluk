@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, GraduationCap, Home, Link2, Settings, UserCog, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, GraduationCap, Home, Link2, Network, Settings, UserCog, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Ana Sayfa", icon: Home },
   { href: "/admin/students", label: "Öğrenci Rehberi", icon: Users },
   { href: "/admin/coaches", label: "Koçlar", icon: GraduationCap },
+  { href: "/admin/coach-connections", label: "Koç Öğrenci Eşleştirmeleri", icon: Network },
   { href: "/admin/parent-connections", label: "Öğrenci Veli Eşleştirmeleri", icon: Link2 },
   { href: "/admin/profile", label: "Profil", icon: UserCog },
   { href: "/admin/settings", label: "Ayarlar", icon: Settings },

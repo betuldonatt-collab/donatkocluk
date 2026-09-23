@@ -61,7 +61,12 @@ export async function assignCoach(studentId: string, coachId: string | null) {
     if (cycleError) throw dbError(cycleError);
   }
 
+  // Coach assignments feed both this page's own table AND the main
+  // dashboard's Koç Performans Uyarıları/Yenileme Radarı sections (both
+  // read coach_students) -- genuinely visible on both, so both need to
+  // stop serving a stale cached render.
   revalidatePath("/admin");
+  revalidatePath("/admin/coach-connections");
 }
 
 const exitCategorySchema = z.string().trim().max(60).nullable();
@@ -93,7 +98,10 @@ export async function setStudentStatus(
     .eq("id", studentIdV);
   if (error) throw dbError(error);
 
+  // Also editable from the coach-connections table -- same reasoning as
+  // assignCoach above.
   revalidatePath("/admin");
+  revalidatePath("/admin/coach-connections");
 }
 
 // --- Coach note parent-sharing approval queue ---------------------------
@@ -192,7 +200,10 @@ export async function updateSessionQuota(studentId: string, quota: number) {
     .eq("id", studentIdV);
   if (error) throw dbError(error);
 
+  // Also editable from the coach-connections table -- same reasoning as
+  // assignCoach above.
   revalidatePath("/admin");
+  revalidatePath("/admin/coach-connections");
 }
 
 // Private, admin-only CRM note on a student (e.g. "left for another

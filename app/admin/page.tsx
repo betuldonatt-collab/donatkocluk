@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { AnnouncementsAdmin } from "./announcements-admin";
 import { CoachAlerts } from "./_components/coach-alerts";
 import { RenewalRadar } from "./_components/renewal-radar";
-import { CoachAssignmentTable } from "./coach-assignment-table";
 import { PendingNotesQueue } from "./pending-notes-queue";
 import { PendingPasswordResets } from "./pending-password-resets";
 import { PendingSignupRequests } from "./pending-signup-requests";
@@ -117,10 +116,6 @@ export default async function AdminPage() {
       .limit(200),
   ]);
 
-  const assignedCoachByStudent = Object.fromEntries(
-    (assignments ?? []).map((a) => [a.student_id, a.coach_id]),
-  );
-
   const peopleById = new Map(
     [...(students ?? []), ...(coaches ?? [])].map((p) => [p.id, { id: p.id, full_name: p.full_name }]),
   );
@@ -146,18 +141,6 @@ export default async function AdminPage() {
   const nearingCompletionStudents = (students ?? [])
     .filter((s) => assignedStudentIds.has(s.id) && (completedCountByStudent.get(s.id) ?? 0) >= 4)
     .map((s) => ({ id: s.id, full_name: s.full_name, completedCount: completedCountByStudent.get(s.id) ?? 0 }));
-
-  // --- Coach capacity (Group 3b: "Ahmet Yılmaz - Aktif: 12 Öğrenci") -----
-  const activeCountByCoach = new Map<string, number>();
-  for (const a of assignments ?? []) {
-    activeCountByCoach.set(a.coach_id, (activeCountByCoach.get(a.coach_id) ?? 0) + 1);
-  }
-  const maxStudentsByCoach = new Map((coachProfiles ?? []).map((cp) => [cp.coach_id, cp.max_students]));
-  const coachesWithCapacity = (coaches ?? []).map((c) => ({
-    ...c,
-    activeCount: activeCountByCoach.get(c.id) ?? 0,
-    maxStudents: maxStudentsByCoach.get(c.id) ?? 20,
-  }));
 
   // --- Coach crisis panel ------------------------------------------------
   const coachAlerts = computeCoachAlerts(
@@ -213,19 +196,6 @@ export default async function AdminPage() {
       <h2 className="text-foreground mt-12 mb-4 text-xl font-semibold">Yönetim</h2>
 
       <section>
-        <h3 className="text-foreground text-lg font-semibold">Koç Atamaları</h3>
-        <p className="text-muted-foreground mb-4 text-sm">
-          Her öğrenciye bir koç ata. Bir öğrencinin tek bir koçu olabilir.
-        </p>
-        <CoachAssignmentTable
-          students={students ?? []}
-          coaches={coachesWithCapacity}
-          assignedCoachByStudent={assignedCoachByStudent}
-          completedCountByStudent={Object.fromEntries(completedCountByStudent)}
-        />
-      </section>
-
-      <section className="mt-10">
         <h3 className="text-foreground text-lg font-semibold">Duyurular</h3>
         <p className="text-muted-foreground mb-4 text-sm">
           Öğrenci ve veli panellerine gösterilecek duyuruları yönet. Bir etkinlik tarihi girilirse duyuru,

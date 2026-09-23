@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EXIT_CATEGORY_LABELS, type ExitCategory } from "@/lib/exit-category";
-import { assignCoach, setStudentStatus, updateSessionQuota } from "./actions";
+import { assignCoach, setStudentStatus, updateSessionQuota } from "../actions";
 
 type Person = { id: string; full_name: string | null };
 type CoachRow = Person & { activeCount: number; maxStudents: number };

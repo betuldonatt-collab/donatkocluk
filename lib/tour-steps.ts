@@ -144,7 +144,12 @@ export const ADMIN_NAV_ITEMS: TourNavItem[] = [
   {
     href: "/admin/coaches",
     label: "Koçlar",
-    blurb: "Koç hesaplarını ve öğrenci atamalarını buradan yönetirsin.",
+    blurb: "Koç hesaplarını buradan yönetirsin.",
+  },
+  {
+    href: "/admin/coach-connections",
+    label: "Koç Öğrenci Eşleştirmeleri",
+    blurb: "Her öğrenciye bir koç atarsın.",
     deepDive: [
       {
         title: "Koç Ataması",
