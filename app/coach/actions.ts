@@ -2756,19 +2756,27 @@ export async function saveCoachTrialResults(
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  // LGS Genel Deneme: per-subject rows, validated and rolled up here (Boş is
-  // derived from each subject's question count, Doğru + Yanlış cannot exceed it).
+  // Per-subject rows only make sense on a general_exam row (subject_scores
+  // is a general_exam-only column -- a branch_exam has no "per subject"
+  // concept, it's already scoped to one course). That's the one real
+  // data-shape invariant worth checking here; requireCoachAccess above
+  // (plus RLS's own student_tasks_coach_all policy) already covers "does
+  // this coach own this task", so this no longer re-checks ownership by
+  // re-filtering on student_id too. It also no longer requires the title
+  // to start with "LGS" -- that was an accidental over-restriction (this
+  // app's only general-exam form that collects a per-subject breakdown
+  // today happens to be LGS's, but nothing about subject_scores itself is
+  // LGS-specific) that was silently rejecting legitimate saves.
   let lgs: Extract<ReturnType<typeof normalizeLgsScores>, { ok: true }> | null = null;
   if (inputV.subjectScores) {
     const { data: existing, error: existingError } = await supabase
       .from("student_tasks")
-      .select("task_type, title")
+      .select("task_type")
       .eq("id", taskIdV)
-      .eq("student_id", studentIdV)
       .maybeSingle();
     if (existingError) throw dbError(existingError);
-    if (!existing || existing.task_type !== "general_exam" || !/^LGS/i.test(existing.title)) {
-      return { ok: false, error: "Ders bazlı sonuç yalnızca LGS Genel Deneme için girilebilir." };
+    if (!existing || existing.task_type !== "general_exam") {
+      return { ok: false, error: "Ders bazlı sonuç yalnızca Genel Deneme için girilebilir." };
     }
     const normalized = normalizeLgsScores(inputV.subjectScores);
     if (!normalized.ok) return { ok: false, error: normalized.error };
