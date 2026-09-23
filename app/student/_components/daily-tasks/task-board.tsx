@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -242,8 +243,21 @@ export function TaskBoard({
 
   const isCurrentWeek = weekDays.some((d) => d.date === today);
 
+  // MouseSensor + TouchSensor, not the unified PointerSensor -- the two
+  // input types need genuinely different activation rules, and Pointer
+  // Events fire for touch too, so keeping PointerSensor around alongside
+  // a TouchSensor would double-handle every touch. Mouse keeps the
+  // original distance-based constraint (drag starts once the pointer
+  // has moved 8px, same as before). Touch needs a HOLD, not a distance,
+  // since a vertical scroll swipe crosses 8px almost instantly too --
+  // without a delay, that swipe got hijacked into a drag instead of a
+  // page scroll ("finger gets caught" on mobile). A 250ms hold with 5px
+  // of jitter tolerance gives a real scroll gesture (which starts moving
+  // immediately) no chance to ever cross that threshold, while a
+  // deliberate press-and-hold still starts a drag normally.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

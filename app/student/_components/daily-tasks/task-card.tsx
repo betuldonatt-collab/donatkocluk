@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BookOpen,
   BookOpenCheck,
@@ -167,6 +168,17 @@ export function TaskCard({
   const Icon = TASK_TYPE_ICONS[task.task_type];
   const isDone = task.status === "done" || task.completed;
   const isHalfDone = !isDone && task.status === "half_done";
+  // Below md, a scrolling finger landing on a card used to get "caught" --
+  // dnd-kit's own touch-drag collision is fixed separately (TaskBoard's
+  // sensors), but a long title/description could ALSO make cards grow to
+  // very different heights, which is its own source of a janky mobile
+  // scroll. Below md, title/description are clamped to a fixed size by
+  // default; holding a finger down on the card (onTouchStart/onTouchEnd,
+  // never mouse -- see the className below) reveals the full text for as
+  // long as the touch lasts, then snaps back the instant it's released.
+  // md and up are untouched: no clamp there at all, regardless of this
+  // state, so desktop/tablet behavior is exactly what it was before.
+  const [isPressed, setIsPressed] = useState(false);
 
   return (
     <div
@@ -179,6 +191,9 @@ export function TaskCard({
           onClick();
         }
       }}
+      onTouchStart={() => setIsPressed(true)}
+      onTouchEnd={() => setIsPressed(false)}
+      onTouchCancel={() => setIsPressed(false)}
       className={cn(
         "border-border hover:bg-accent/40 flex w-full cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
         task.rejected_at ? "bg-rose-500/5" : subjectTintClass(task),
@@ -201,12 +216,19 @@ export function TaskCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        {/* items-start (not -center): the title wraps freely now (no
-            line-clamp cap) so a long course+topic combination is never
-            cut off -- centering these badges against a now-possibly-taller
-            title would float them awkwardly mid-block. */}
+        {/* items-start (not -center): on md+ the title wraps freely (no
+            line-clamp cap there) so a long course+topic combination is
+            never cut off -- centering these badges against a
+            possibly-taller title would float them awkwardly mid-block. */}
         <div className="flex items-start gap-1.5">
-          <p className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
+          <p
+            className={cn(
+              "text-foreground min-w-0 flex-1 text-sm font-medium break-words md:line-clamp-none",
+              isPressed ? "line-clamp-none" : "line-clamp-2",
+            )}
+          >
+            {task.title}
+          </p>
           {/* Only when time has actually been logged via Süre Tut -- unlike
               FocusTimerTrigger's own inline duration (which this replaces,
               see that file), this stays visible even once the task is
@@ -262,7 +284,10 @@ export function TaskCard({
           )}
         </div>
         {/* The coach's note, right under the title (line breaks kept). */}
-        <TaskDescription text={task.description} lines={3} className="mt-0.5" />
+        {/* isPressed only ever becomes true via a real touchstart (see
+            above) -- a mouse-only desktop session never sets it, so this
+            stays exactly lines={3} there, unchanged. */}
+        <TaskDescription text={task.description} lines={isPressed ? "all" : 3} className="mt-0.5" />
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full
             task modal (traced to the fetch itself never joining
