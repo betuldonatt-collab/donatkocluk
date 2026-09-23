@@ -15,10 +15,16 @@ export function SortableTaskCard({
   task,
   onClick,
   trailing,
+  showTimer = true,
 }: {
   task: StudentTask;
   onClick: () => void;
   trailing?: React.ReactNode;
+  // Süre Tut only makes sense looking at the real, current day -- see
+  // TaskBoard's own canUseTimer. Defaults true so every OTHER caller
+  // (week-task-cell.tsx's own card, if any) keeps its existing behavior
+  // without having to pass this explicitly.
+  showTimer?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -44,7 +50,7 @@ export function SortableTaskCard({
         <GripVertical className="size-4" />
       </button>
       <div className="min-w-0 flex-1">
-        <TaskCard task={task} onClick={onClick} />
+        <TaskCard task={task} onClick={onClick} showTimer={showTimer} />
       </div>
       {trailing}
     </div>

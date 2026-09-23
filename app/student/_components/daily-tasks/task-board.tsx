@@ -39,8 +39,10 @@ import { TaskDescription } from "@/components/task-description";
 import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
 
-type ViewMode = "today" | "week";
+type ViewMode = "yesterday" | "today" | "tomorrow" | "week";
 type ModalStep = "form" | "analysis";
+
+const DAY_VIEW_LABELS: Record<Exclude<ViewMode, "week">, string> = { yesterday: "Dün", today: "Bugün", tomorrow: "Yarın" };
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 const MONTH_LABELS = [
@@ -278,19 +280,20 @@ export function TaskBoard({
     await deleteCustomTask(taskId);
   }
 
-  // Fetches a different week's tasks for the grid, without ever losing
-  // today's own tasks (the "Bugün" tab stays pinned to the real today
-  // regardless of which week the grid is browsing) or any pending-analysis
-  // task from elsewhere (PendingAnalysisAlert, below, is meant to persist
-  // across navigation too). Everything else belonging to whichever week
-  // was previously loaded gets replaced by the new one.
+  // Fetches a different week's tasks for the grid, without ever losing the
+  // Dün/Bugün/Yarın tabs' own tasks (those three stay pinned to the real
+  // yesterday/today/tomorrow regardless of which week the grid is
+  // browsing) or any pending-analysis task from elsewhere (PendingAnalysisAlert,
+  // below, is meant to persist across navigation too). Everything else
+  // belonging to whichever week was previously loaded gets replaced by the new one.
   async function loadWeek(newWeekDays: { date: string; label: string }[]) {
     setWeekLoading(true);
     try {
       const { tasks: rows, weekLocked: locked } = await getTasksForWeek(newWeekDays[0].date, newWeekDays[6].date);
       const rowIds = new Set(rows.map((r) => r.id));
+      const pinnedDates = new Set([yesterday, today, tomorrow]);
       setTasks((prev) => [
-        ...prev.filter((t) => (t.task_date === today || t.analysis_pending) && !rowIds.has(t.id)),
+        ...prev.filter((t) => (pinnedDates.has(t.task_date) || t.analysis_pending) && !rowIds.has(t.id)),
         ...(rows as StudentTask[]),
       ]);
       setWeekDays(newWeekDays);
@@ -316,10 +319,22 @@ export function TaskBoard({
     };
   }
 
-  const todayTasks = tasks.filter((t) => t.task_date === today);
-  const coachTasks = todayTasks.filter((t) => t.is_coach_assigned).sort(byOrder);
-  const customTasks = todayTasks.filter((t) => !t.is_coach_assigned).sort(byOrder);
-  const todayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(today));
+  const yesterday = addDaysISO(today, -1);
+  const tomorrow = addDaysISO(today, 1);
+  // The date behind whichever of the three single-day tabs is active --
+  // "week" never reads this (that branch renders the 7-day grid instead),
+  // so the "today" fallback there is arbitrary and unused.
+  const selectedDate = view === "yesterday" ? yesterday : view === "tomorrow" ? tomorrow : today;
+  const selectedDayLabel = view === "yesterday" ? "Dünün" : view === "tomorrow" ? "Yarının" : "Bugünün";
+  // Süre Tut only exists looking at the real, current day -- a student
+  // can't retroactively time something they already did yesterday, or
+  // pre-log time against a task that hasn't happened yet.
+  const canUseTimer = view === "today";
+
+  const selectedDayTasks = tasks.filter((t) => t.task_date === selectedDate);
+  const coachTasks = selectedDayTasks.filter((t) => t.is_coach_assigned).sort(byOrder);
+  const customTasks = selectedDayTasks.filter((t) => !t.is_coach_assigned).sort(byOrder);
+  const selectedDayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(selectedDate));
   // Same split as the coach's own schedule board (Rutinler vs Görevler,
   // routed purely by course_id -- see isRoutineCourseId) so a student
   // sees their day grouped exactly the way the coach assigned it.
@@ -332,9 +347,16 @@ export function TaskBoard({
 
       {/* Same bar/calculation either way (progressTasks/progressLockedAt,
           always about the current week regardless of which week the grid
-          below is browsing) -- only the heading framing switches with the
-          view, see WeekProgressBar's own comment. */}
-      <WeekProgressBar tasks={progressTasks} today={today} lockedAt={progressLockedAt} variant={view} />
+          below is browsing) -- only the heading framing switches, see
+          WeekProgressBar's own comment. This bar is always about the real
+          today specifically, not whichever of Dün/Bugün/Yarın is selected
+          -- it's a persistent status readout, not scoped to the tab. */}
+      <WeekProgressBar
+        tasks={progressTasks}
+        today={today}
+        lockedAt={progressLockedAt}
+        variant={view === "week" ? "week" : "today"}
+      />
 
       {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/
           Haftalık Toplam below, this doesn't reset when switching views or
@@ -346,23 +368,37 @@ export function TaskBoard({
         <span className="text-foreground font-semibold tabular-nums">{formatMinutesLabel(allTimeTrackedMinutes)}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="bg-secondary inline-flex w-fit rounded-lg p-1">
-          {(["today", "week"] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setView(mode)}
-              className={cn(
-                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-                view === mode
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {mode === "today" ? "Bugün" : "Bu Hafta"}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-start gap-2">
+        {/* Two-tier control: Bu Hafta on its own row up top, the three
+            single-day tabs as a second row below -- one bg-secondary/p-1
+            block so it still reads as one cohesive control, not two
+            unrelated ones. */}
+        <div className="bg-secondary inline-flex w-fit flex-col gap-1 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => setView("week")}
+            className={cn(
+              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+              view === "week" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Bu Hafta
+          </button>
+          <div className="grid grid-cols-3 gap-1">
+            {(["yesterday", "today", "tomorrow"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  view === mode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {DAY_VIEW_LABELS[mode]}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Day-by-day navigation -- only meaningful once "Bu Hafta" is
@@ -423,13 +459,13 @@ export function TaskBoard({
         </div>
       )}
 
-      {view === "today" ? (
+      {view !== "week" ? (
         <>
-          {todayFixedTasks.length > 0 && (
+          {selectedDayFixedTasks.length > 0 && (
             <div>
               <span className="text-muted-foreground mb-1.5 block text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</span>
               <div className="space-y-1.5">
-                {todayFixedTasks.map((t) => (
+                {selectedDayFixedTasks.map((t) => (
                   <FixedTaskChip key={t.id} task={t} />
                 ))}
               </div>
@@ -437,11 +473,11 @@ export function TaskBoard({
           )}
 
           <div>
-            <h2 className="text-foreground mb-3 text-base font-semibold">Bugünün Programı</h2>
+            <h2 className="text-foreground mb-3 text-base font-semibold">{selectedDayLabel} Programı</h2>
             {coachTasks.length === 0 ? (
               <EmptyState
                 icon={ClipboardList}
-                title="Bugün için koçun tarafından atanmış bir görev yok."
+                title={`${selectedDayLabel} için koçun tarafından atanmış bir görev yok.`}
                 description="Koçun yeni bir program hazırladığında burada görünecek. Bu arada aşağıdan kendi ekstra çalışmanı ekleyebilirsin."
               />
             ) : (
@@ -453,7 +489,7 @@ export function TaskBoard({
                       <SortableContext items={routineTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {routineTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} />
                           ))}
                         </div>
                       </SortableContext>
@@ -470,7 +506,7 @@ export function TaskBoard({
                       <SortableContext items={regularTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {regularTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} />
                           ))}
                         </div>
                       </SortableContext>
@@ -484,7 +520,7 @@ export function TaskBoard({
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-foreground text-base font-semibold">Diğer / Ekstra Çalışmalarım</h2>
-              <AddCustomTaskDialog taskDate={today} onCreated={handleCreated} disabled={todayLocked} examType={examType} />
+              <AddCustomTaskDialog taskDate={selectedDate} onCreated={handleCreated} disabled={todayLocked} examType={examType} />
             </div>
             {customTasks.length === 0 ? (
               <p className="text-muted-foreground text-sm">Henüz ekstra bir çalışma eklemedin.</p>
@@ -501,6 +537,7 @@ export function TaskBoard({
                         key={task.id}
                         task={task}
                         onClick={() => openTask(task)}
+                        showTimer={canUseTimer}
                         trailing={
                           // Branch exams are coach/admin-delete-only, same
                           // as resource tracking -- RLS already rejects
@@ -529,7 +566,7 @@ export function TaskBoard({
             )}
           </div>
 
-          <TodayDybTotal tasks={todayTasks} />
+          <TodayDybTotal tasks={selectedDayTasks} />
         </>
       ) : (
         <>

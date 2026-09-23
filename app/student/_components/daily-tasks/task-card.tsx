@@ -151,7 +151,19 @@ function taskSubtitle(task: StudentTask): string {
   }
 }
 
-export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => void }) {
+export function TaskCard({
+  task,
+  onClick,
+  showTimer = true,
+}: {
+  task: StudentTask;
+  onClick: () => void;
+  // Süre Tut is restricted to the real, current day (see TaskBoard's
+  // canUseTimer) -- a student can't retroactively time something they
+  // already did yesterday, or pre-log time on a task that hasn't happened
+  // yet. Defaults true so this card's other callers (if any) are unaffected.
+  showTimer?: boolean;
+}) {
   const Icon = TASK_TYPE_ICONS[task.task_type];
   const isDone = task.status === "done" || task.completed;
   const isHalfDone = !isDone && task.status === "half_done";
@@ -288,7 +300,7 @@ export function TaskCard({ task, onClick }: { task: StudentTask; onClick: () => 
           portrait but cross it in landscape), making the button appear
           to only work in landscape. The row copes with the narrower
           space via the title's own free wrapping. */}
-      {!isDone && <FocusTimerTrigger task={task} className="flex shrink-0" />}
+      {showTimer && !isDone && <FocusTimerTrigger task={task} className="flex shrink-0" />}
     </div>
   );
 }
