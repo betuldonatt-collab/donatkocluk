@@ -1,5 +1,3 @@
-import { BookOpen } from "lucide-react";
-
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +7,7 @@ import { completionCounts, completionPercent } from "@/lib/completion";
 import { CompletionBar } from "./_components/completion-bar";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
+import { SessionQuotaStats } from "./_components/session-quota-stats";
 import { WeeklyStatsSummary, type WeekStat } from "./_components/weekly-stats-summary";
 import { WeeklyProgramSheet, type ProgramTask } from "./_components/weekly-program-sheet";
 
@@ -92,7 +91,7 @@ async function fetchDashboardData() {
   ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, is_active, total_session_quota, exam_type")
+        .select("id, full_name, is_active, total_session_quota, quota_cycle_start_at, exam_type")
         .eq("id", studentId)
         .maybeSingle(),
       supabase
@@ -145,7 +144,14 @@ async function fetchDashboardData() {
   const sessions = (sessionRows ?? []) as ParentSession[];
   const weekTasks = (weekTaskRows ?? []) as WeekTask[];
   const programTasks = (weekTaskRows ?? []) as ProgramTask[];
-  const completedCount = sessions.filter((s) => s.outcome === "completed").length;
+  // Scoped to the current quota cycle, same reset point + condition
+  // (outcome = 'completed' and scheduled_at >= quota_cycle_start_at) as
+  // auto_unassign_on_quota_completion (0035_audit_fixes.sql) -- otherwise
+  // this reads as an all-time historical total instead of "how many of
+  // THIS assigned quota are done", diverging from what actually drives
+  // the auto-unassign behavior.
+  const cycleStart = profile.quota_cycle_start_at as string;
+  const completedCount = sessions.filter((s) => s.outcome === "completed" && s.scheduled_at >= cycleStart).length;
 
   const weekStat = sumWeekStats((dailyStatsRows ?? []).map((r) => ({ total: r.total_count })));
 
@@ -207,15 +213,7 @@ export default async function ParentPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 text-sm">
-            <span>
-              Toplam Görüşme: {totalQuota} | Tamamlanan: {completedCount} |
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <BookOpen className="size-3.5" />
-              Kalan: {remaining}
-            </span>
-          </p>
+          <SessionQuotaStats completed={completedCount} total={totalQuota} remaining={remaining} />
         </div>
         <div className="flex items-center gap-3">
           <span
