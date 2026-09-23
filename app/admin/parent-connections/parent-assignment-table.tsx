@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
-import { linkParent, unlinkParent } from "./actions";
-import { ResetPasswordButton } from "./_components/reset-password-button";
+import { linkParent, unlinkParent } from "../actions";
+import { ResetPasswordButton } from "../_components/reset-password-button";
 
 type Person = { id: string; full_name: string | null };
 

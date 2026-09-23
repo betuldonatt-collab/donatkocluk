@@ -161,7 +161,7 @@ export async function linkParent(parentId: string, studentId: string) {
   const { error } = await supabase.from("parent_students").insert({ parent_id: parentIdV, student_id: studentIdV });
   if (error) throw dbError(error);
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/parent-connections");
 }
 
 export async function unlinkParent(parentId: string, studentId: string) {
@@ -176,7 +176,7 @@ export async function unlinkParent(parentId: string, studentId: string) {
     .eq("student_id", studentIdV);
   if (error) throw dbError(error);
 
-  revalidatePath("/admin");
+  revalidatePath("/admin/parent-connections");
 }
 
 const quotaSchema = z.number().int().min(0).max(1000);

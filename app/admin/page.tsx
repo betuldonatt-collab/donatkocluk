@@ -3,7 +3,6 @@ import { AnnouncementsAdmin } from "./announcements-admin";
 import { CoachAlerts } from "./_components/coach-alerts";
 import { RenewalRadar } from "./_components/renewal-radar";
 import { CoachAssignmentTable } from "./coach-assignment-table";
-import { ParentAssignmentTable } from "./parent-assignment-table";
 import { PendingNotesQueue } from "./pending-notes-queue";
 import { PendingPasswordResets } from "./pending-password-resets";
 import { PendingSignupRequests } from "./pending-signup-requests";
@@ -74,8 +73,6 @@ export default async function AdminPage() {
     { data: coaches },
     { data: assignments },
     { data: pendingNoteRows },
-    { data: parents },
-    { data: parentLinks },
     { data: announcements },
     { data: completedSessionCounts },
     { data: coachProfiles },
@@ -97,8 +94,6 @@ export default async function AdminPage() {
       .eq("parent_share_status", "pending")
       .order("created_at", { ascending: true })
       .limit(200),
-    supabase.from("profiles").select("id, full_name").eq("role", "parent").order("full_name"),
-    supabase.from("parent_students").select("parent_id, student_id"),
     supabase
       .from("announcements")
       .select("id, title, content, expiry_date, event_date, event_time, requires_rsvp, is_active")
@@ -136,11 +131,6 @@ export default async function AdminPage() {
     student: peopleById.get(n.student_id) ?? { id: n.student_id, full_name: null },
     coach: peopleById.get(n.coach_id) ?? { id: n.coach_id, full_name: null },
   }));
-
-  const linksByParent: Record<string, string[]> = {};
-  for (const link of parentLinks ?? []) {
-    (linksByParent[link.parent_id] ??= []).push(link.student_id);
-  }
 
   // --- Yenileme Radarı -------------------------------------------------
   // completed_count now comes pre-aggregated from student_completed_
@@ -233,14 +223,6 @@ export default async function AdminPage() {
           assignedCoachByStudent={assignedCoachByStudent}
           completedCountByStudent={Object.fromEntries(completedCountByStudent)}
         />
-      </section>
-
-      <section className="mt-10">
-        <h3 className="text-foreground text-lg font-semibold">Veli Bağlantıları</h3>
-        <p className="text-muted-foreground mb-4 text-sm">
-          Bir veli hesabını bir veya daha fazla öğrenciyle eşleştir.
-        </p>
-        <ParentAssignmentTable parents={parents ?? []} students={students ?? []} linksByParent={linksByParent} />
       </section>
 
       <section className="mt-10">

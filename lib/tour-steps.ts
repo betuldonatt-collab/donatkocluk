@@ -152,6 +152,11 @@ export const ADMIN_NAV_ITEMS: TourNavItem[] = [
       },
     ],
   },
+  {
+    href: "/admin/parent-connections",
+    label: "Öğrenci Veli Eşleştirmeleri",
+    blurb: "Veli hesaplarını öğrencileriyle buradan eşleştirirsin.",
+  },
   { href: "/admin/profile", label: "Profil", blurb: "Kendi profil bilgilerini buradan güncelleyebilirsin." },
   { href: "/admin/settings", label: "Ayarlar", blurb: "Görünüm ve hesap ayarlarını buradan yönetirsin." },
 ];
