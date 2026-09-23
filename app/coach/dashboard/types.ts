@@ -55,6 +55,16 @@ export type MissingExamAlert = {
   title: string;
   taskDate: string;
   taskType: "general_exam" | "branch_exam";
+  // course_id/counts/subject_scores -- needed to both group this into its
+  // Ders bucket and to reconstruct a DetailTask-shaped object for
+  // TrialResultsSection when the coach fills the analysis in from here
+  // (see missing-exam-analysis-panel.tsx).
+  courseId: string | null;
+  totalCount: number | null;
+  correctCount: number | null;
+  wrongCount: number | null;
+  emptyCount: number | null;
+  subjectScores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
 };
 export type EmptyProgramAlert = { student: RosterStudent };
 export type PendingReportCardAlert = {

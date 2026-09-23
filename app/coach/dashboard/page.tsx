@@ -10,7 +10,16 @@ import {
 } from "../actions";
 import { DashboardClient } from "./dashboard-client";
 import { WeekNavigator } from "./_components/week-navigator";
-import type { CoachAlerts, CoachingSession, CalendarBlock, CoachTask, PendingReportCardAlert, RosterStudent, RsvpDeclineAlert } from "./types";
+import type {
+  CoachAlerts,
+  CoachingSession,
+  CalendarBlock,
+  CoachTask,
+  MissingExamAlert,
+  PendingReportCardAlert,
+  RosterStudent,
+  RsvpDeclineAlert,
+} from "./types";
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 const MONTH_LABELS = [
@@ -61,8 +70,12 @@ function buildCoachAlerts(
     task_type: string;
     task_date: string;
     title: string;
-    subject_scores: unknown;
+    course_id: string | null;
+    total_count: number | null;
     correct_count: number | null;
+    wrong_count: number | null;
+    empty_count: number | null;
+    subject_scores: MissingExamAlert["subjectScores"];
   }[],
   currentWeekTaskRows: { student_id: string }[],
   pendingReportCardRows: { id: string; student_id: string; cycle_number: number; generated_at: string }[],
@@ -94,16 +107,25 @@ function buildCoachAlerts(
     return completionPct < 50 ? [{ student, completionPct, doneCount: b.done, totalCount: b.total }] : [];
   });
 
+  // The query already scopes this to analysis_pending = true (the same
+  // flag the student's own "Analiz Bekliyor" reminder and TaskModal's
+  // analysis flow set/clear) -- so every row here genuinely is "declared
+  // solved, analysis not done yet", not a heuristic guess off null counts.
   const missingExams = missingExamRows
-    .filter((r) => (r.task_type === "general_exam" ? r.subject_scores === null : r.correct_count === null))
     .map((r) => ({
       student: rosterById.get(r.student_id),
       taskId: r.id,
       title: r.title,
       taskDate: r.task_date,
       taskType: r.task_type as "general_exam" | "branch_exam",
+      courseId: r.course_id,
+      totalCount: r.total_count,
+      correctCount: r.correct_count,
+      wrongCount: r.wrong_count,
+      emptyCount: r.empty_count,
+      subjectScores: r.subject_scores,
     }))
-    .filter((a): a is { student: RosterStudent; taskId: string; title: string; taskDate: string; taskType: "general_exam" | "branch_exam" } => !!a.student);
+    .filter((a): a is MissingExamAlert => !!a.student);
 
   const weekActiveIds = new Set(currentWeekTaskRows.map((r) => r.student_id));
   const emptyPrograms = roster.filter((s) => !weekActiveIds.has(s.id)).map((student) => ({ student }));
@@ -199,8 +221,6 @@ async function fetchDashboardData(
   const todayWeek = getWeekDays(today);
   const prevWeekMonday = addDaysISO(todayWeek[0].date, -7);
   const prevWeekSunday = addDaysISO(todayWeek[0].date, -1);
-  const todayMinus2 = addDaysISO(today, -2);
-  const todayMinus30 = addDaysISO(today, -30);
 
   const [
     { data: profiles },
@@ -224,13 +244,20 @@ async function fetchDashboardData(
             .in("student_id", studentIds)
             .gte("task_date", prevWeekMonday)
             .lte("task_date", prevWeekSunday),
+          // analysis_pending is the exact same flag the student side sets
+          // (task-modal.tsx) and clears (only once the topic-mistake
+          // analysis step is actually completed, by the student OR now by
+          // the coach via saveCoachTrialResults) -- no date window here,
+          // matching the student's own unbounded "Analiz Bekliyor" list
+          // (app/student/page.tsx): a still-pending analysis stays
+          // reportable regardless of how long ago the exam was solved.
           supabase
             .from("student_tasks")
-            .select("id, student_id, task_type, task_date, title, subject_scores, correct_count")
+            .select("id, student_id, task_type, task_date, title, course_id, total_count, correct_count, wrong_count, empty_count, subject_scores")
             .in("student_id", studentIds)
             .in("task_type", ["general_exam", "branch_exam"])
-            .gte("task_date", todayMinus30)
-            .lte("task_date", todayMinus2),
+            .eq("analysis_pending", true)
+            .order("task_date", { ascending: true }),
           supabase
             .from("student_tasks")
             .select("student_id")

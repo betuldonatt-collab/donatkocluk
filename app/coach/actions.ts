@@ -2757,6 +2757,12 @@ export async function saveCoachTrialResults(
       empty_count: lgs ? lgs.totals.empty : inputV.emptyCount,
       ...(lgs ? { subject_scores: lgs.scores } : {}),
       status: "done",
+      // This IS the coach's "do the analysis for the student" action --
+      // without clearing this, a task the coach just filled results (and
+      // optionally topic mistakes) for stays stuck showing "Analiz
+      // Bekliyor" forever, since nothing else ever clears it once a coach
+      // (rather than the student) is the one entering results.
+      analysis_pending: false,
       updated_at: new Date().toISOString(),
     })
     .eq("id", taskIdV)

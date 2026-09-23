@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarX, ClipboardCheck, ClipboardX, MessageSquareX, TrendingDown } from "lucide-react";
+import { AlertTriangle, CalendarX, ClipboardCheck, MessageSquareX, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
 import type { CoachAlerts } from "../types";
+import { MissingExamAnalysisPanel } from "./missing-exam-analysis-panel";
 import { PendingApprovalsPanel } from "./pending-approvals-panel";
 import { PendingFocusReviewsPanel } from "./pending-focus-reviews-panel";
 
@@ -97,19 +98,7 @@ export function AlertPanel({
           label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — %${a.completionPct}`,
         }))}
       />
-      <AlertCard
-        icon={ClipboardX}
-        title="Eksik Deneme Sonucu"
-        items={alerts.missingExams.map((a) => ({
-          key: a.taskId,
-          studentId: a.student.id,
-          label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.title}`,
-          // Jumps straight to that exam's own week on the schedule board and
-          // opens its edit drawer -- not just the student's general profile,
-          // which left the coach hunting for which task was actually missing.
-          href: `/coach/students/${a.student.id}/schedule?highlight=${a.taskId}`,
-        }))}
-      />
+      <MissingExamAnalysisPanel alerts={alerts.missingExams} />
       <AlertCard
         icon={CalendarX}
         title="Boş Program"
