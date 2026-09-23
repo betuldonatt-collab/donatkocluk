@@ -50,7 +50,15 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   // specific call changed it (banking a leftover session). Never itself
   // credited again -- only the NEW session's own elapsed is banked when it
   // ends, so there's no double count.
-  const [priorTrackedSeconds, setPriorTrackedSeconds] = useState(() => (task.tracked_duration_minutes ?? 0) * 60);
+  //
+  // Reads tracked_duration_seconds directly, NOT tracked_duration_minutes * 60
+  // -- the minutes column is a generated (floor-division) column, so a task
+  // sitting at 34:31 would seed this at 34:00, losing up to 59 real seconds
+  // every time the server round-trip below doesn't end up overriding it
+  // (e.g. openFocusSessionForTask returning "none" -- no leftover session
+  // row at all, the ordinary case right after a Bitir -- which this
+  // component doesn't otherwise touch this state for).
+  const [priorTrackedSeconds, setPriorTrackedSeconds] = useState(() => task.tracked_duration_seconds ?? 0);
 
   // Pressing Süre Tut asks the server what to do with any leftover session --
   // there is no "resume?" question (see openFocusSessionForTask):
@@ -63,7 +71,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     setChecking(true);
     setAttachSession(null);
     setBankedNotice(null);
-    setPriorTrackedSeconds((task.tracked_duration_minutes ?? 0) * 60);
+    setPriorTrackedSeconds(task.tracked_duration_seconds ?? 0);
     try {
       const result = await openFocusSessionForTask(task.id);
       if (result.kind === "attach") {

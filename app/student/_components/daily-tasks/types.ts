@@ -46,6 +46,12 @@ export type StudentTask = {
   empty_count: number | null;
   duration_minutes: number | null;
   tracked_duration_minutes: number;
+  // The real, second-precise column (tracked_duration_minutes above is a
+  // generated tracked_duration_seconds / 60 -- floor division, so it drops
+  // up to 59 seconds). Already returned by select("*"), just wasn't
+  // declared here before -- see FocusTimerTrigger's own use of it to seed
+  // the resumed stopwatch exactly instead of rounded down to the minute.
+  tracked_duration_seconds: number;
   subject_scores: Record<string, SubjectScore> | null;
   video_links: VideoLink[];
   completed: boolean;
