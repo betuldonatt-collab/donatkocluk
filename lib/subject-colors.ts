@@ -1,16 +1,17 @@
 // Subject-hierarchical pastel color-coding. YKS families (turkce through
-// din below) were revised 2026-09-23: custom hex pastels, hand-spaced
-// evenly around the hue wheel (Tailwind's own named hues cluster unevenly
-// in the blue/violet/purple range, which is what made Kimya/Biyoloji and
-// Fizik/Felsefe hard to tell apart under the original bg-{hue}-500/N
-// system) and reviewed swatch-by-swatch before approval. Each family's
-// [TYT, AYT, Branş Denemesi] triple lives as CSS custom properties in
-// app/globals.css (--subject-{family}-{tier}, with a separate :root/.dark
-// pair per token -- this replaces the old opacity trick as this system's
-// theme-safety mechanism, since these are solid fills now, not a
-// transparent wash over the surface). Branş Denemesi is the most
-// saturated of the three but still a light pastel -- dark text stays
-// readable on all three tiers, never a solid/bold fill.
+// din below) were revised 2026-09-23: a custom "pure hue" per subject,
+// hand-spaced evenly around the hue wheel (Tailwind's own named hues
+// cluster unevenly in the blue/violet/purple range, which is what made
+// Kimya/Biyoloji and Fizik/Felsefe hard to tell apart under the original
+// bg-{hue}-500/N system). Each pure hue lives as ONE CSS custom property
+// in app/globals.css (--subject-{family}), and TYT/AYT/Branş Denemesi
+// below apply /6, /12, /20 opacity on top of it -- same percentages, same
+// "transparent wash over the surface" mechanism the original all-Tailwind
+// system used, which is also what keeps this theme-safe in both light and
+// dark mode with a single value (no light/dark pair needed). An earlier
+// version of this revision used solid pre-lightened fills per tier
+// instead; even at "pastel" lightness values those read as far more
+// present/heavy than the old wash ever did, so this went back to opacity.
 //
 // Fen and İngilizce (LGS-only) are still on the original Tailwind
 // bg-{hue}-500/N opacity system, not yet revised -- a separate pass.
@@ -34,47 +35,31 @@ export type SubjectFamily =
   | "fen"
   | "ingilizce";
 
-// [TYT, AYT, Branş Denemesi] -- the YKS families reference the custom
-// pastel tokens in app/globals.css via Tailwind's arbitrary-value syntax
-// (bg-[var(--subject-...)]); Fen/İngilizce are still plain bg-{hue}-500/N
-// Tailwind utilities (unrevised). Every class string is written out in
-// full (never built with string concatenation) so Tailwind's static
-// scanner can find it -- a dynamically interpolated class name would
-// silently produce no CSS.
+// [TYT, AYT, Branş Denemesi] -- the YKS families apply /6, /12, /20
+// opacity on top of the custom pure-hue tokens in app/globals.css via
+// Tailwind's arbitrary-value syntax (bg-[var(--subject-...)]/N); Fen/
+// İngilizce are still plain bg-{hue}-500/N Tailwind utilities (unrevised).
+// Every class string is written out in full (never built with string
+// concatenation) so Tailwind's static scanner can find it -- a
+// dynamically interpolated class name would silently produce no CSS.
 const FAMILY_CLASSES: Record<SubjectFamily, [string, string, string]> = {
-  turkce: ["bg-[var(--subject-turkce-tyt)]", "bg-[var(--subject-turkce-ayt)]", "bg-[var(--subject-turkce-brans)]"],
+  turkce: ["bg-[var(--subject-turkce)]/6", "bg-[var(--subject-turkce)]/12", "bg-[var(--subject-turkce)]/20"],
   matematik: [
-    "bg-[var(--subject-matematik-tyt)]",
-    "bg-[var(--subject-matematik-ayt)]",
-    "bg-[var(--subject-matematik-brans)]",
+    "bg-[var(--subject-matematik)]/6",
+    "bg-[var(--subject-matematik)]/12",
+    "bg-[var(--subject-matematik)]/20",
   ],
-  geometri: [
-    "bg-[var(--subject-geometri-tyt)]",
-    "bg-[var(--subject-geometri-ayt)]",
-    "bg-[var(--subject-geometri-brans)]",
-  ],
-  fizik: ["bg-[var(--subject-fizik-tyt)]", "bg-[var(--subject-fizik-ayt)]", "bg-[var(--subject-fizik-brans)]"],
-  kimya: ["bg-[var(--subject-kimya-tyt)]", "bg-[var(--subject-kimya-ayt)]", "bg-[var(--subject-kimya-brans)]"],
-  biyoloji: [
-    "bg-[var(--subject-biyoloji-tyt)]",
-    "bg-[var(--subject-biyoloji-ayt)]",
-    "bg-[var(--subject-biyoloji-brans)]",
-  ],
-  tarih: ["bg-[var(--subject-tarih-tyt)]", "bg-[var(--subject-tarih-ayt)]", "bg-[var(--subject-tarih-brans)]"],
-  cografya: [
-    "bg-[var(--subject-cografya-tyt)]",
-    "bg-[var(--subject-cografya-ayt)]",
-    "bg-[var(--subject-cografya-brans)]",
-  ],
+  geometri: ["bg-[var(--subject-geometri)]/6", "bg-[var(--subject-geometri)]/12", "bg-[var(--subject-geometri)]/20"],
+  fizik: ["bg-[var(--subject-fizik)]/6", "bg-[var(--subject-fizik)]/12", "bg-[var(--subject-fizik)]/20"],
+  kimya: ["bg-[var(--subject-kimya)]/6", "bg-[var(--subject-kimya)]/12", "bg-[var(--subject-kimya)]/20"],
+  biyoloji: ["bg-[var(--subject-biyoloji)]/6", "bg-[var(--subject-biyoloji)]/12", "bg-[var(--subject-biyoloji)]/20"],
+  tarih: ["bg-[var(--subject-tarih)]/6", "bg-[var(--subject-tarih)]/12", "bg-[var(--subject-tarih)]/20"],
+  cografya: ["bg-[var(--subject-cografya)]/6", "bg-[var(--subject-cografya)]/12", "bg-[var(--subject-cografya)]/20"],
   // Felsefe Grubu: Felsefe + Psikoloji + Sosyoloji + Mantık share this hue
   // (see COURSE_FAMILY below) -- they're taught/tested together in real
   // AYT Sözel curriculum practice and have no TYT sibling of their own.
-  felsefe: [
-    "bg-[var(--subject-felsefe-tyt)]",
-    "bg-[var(--subject-felsefe-ayt)]",
-    "bg-[var(--subject-felsefe-brans)]",
-  ],
-  din: ["bg-[var(--subject-din-tyt)]", "bg-[var(--subject-din-ayt)]", "bg-[var(--subject-din-brans)]"],
+  felsefe: ["bg-[var(--subject-felsefe)]/6", "bg-[var(--subject-felsefe)]/12", "bg-[var(--subject-felsefe)]/20"],
+  din: ["bg-[var(--subject-din)]/6", "bg-[var(--subject-din)]/12", "bg-[var(--subject-din)]/20"],
   // LGS-only families (TYT/AYT split Fen into Fizik/Kimya/Biyoloji and have
   // no English section) -- distinct hues from every family above and from
   // the reserved emerald/amber/rose status colors. Not yet revised to the
