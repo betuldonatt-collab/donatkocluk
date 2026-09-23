@@ -6,18 +6,25 @@ import { cn } from "@/lib/utils";
 import { completionCounts, completionPercent, completionStart } from "@/lib/completion";
 import type { StudentTask } from "./types";
 
-// "Bugüne Kadarki İlerleme": how much of what was due so far the student has
-// finished. Only tasks from the day the coach locked this week's schedule (or the
-// week's Monday until it is locked) up to today count -- tomorrow's tasks are in
-// neither number (lib/completion.ts) -- so finishing everything due reads 100%.
+// Same underlying calculation (lib/completion.ts: only tasks from the day the
+// coach locked this week's schedule, or the week's Monday until it is locked,
+// up to today) rendered with two different framings depending on which tab it
+// sits under -- see TaskBoard, which mounts exactly one of these per view
+// instead of one bar shared across both:
+//   "today" -- under Bugün. Headed by today's own date + day name (e.g. "24
+//     Eylül Perşembe"), since that tab is about today specifically even
+//     though the number itself can span back further than today alone.
+//   "week"  -- under Bu Hafta. Framed as the active week's own progress.
 export function WeekProgressBar({
   tasks,
   today,
   lockedAt,
+  variant,
 }: {
   tasks: StudentTask[];
   today: string;
   lockedAt: string | null;
+  variant: "today" | "week";
 }) {
   const counts = completionCounts(tasks, today, lockedAt);
   const pct = completionPercent(counts);
@@ -25,6 +32,12 @@ export function WeekProgressBar({
   const since = new Date(`${completionStart(today, lockedAt)}T00:00:00Z`).toLocaleDateString("tr-TR", {
     day: "numeric",
     month: "long",
+    timeZone: "UTC",
+  });
+  const todayLabel = new Date(`${today}T00:00:00Z`).toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    weekday: "long",
     timeZone: "UTC",
   });
 
@@ -36,7 +49,12 @@ export function WeekProgressBar({
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-foreground text-sm font-semibold">Bugüne Kadarki İlerleme</p>
+        <div>
+          <p className="text-foreground text-sm font-semibold">
+            {variant === "today" ? "Bugüne Kadarki İlerleme" : "Bu Haftaki İlerleme"}
+          </p>
+          {variant === "today" && <p className="text-muted-foreground text-xs">{todayLabel}</p>}
+        </div>
         <p className={cn("text-lg font-bold tabular-nums", complete ? "text-emerald-600" : "text-foreground")}>
           {pct === null ? "—" : `%${pct}`}
         </p>
@@ -48,7 +66,7 @@ export function WeekProgressBar({
         aria-valuenow={pct ?? 0}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Bugüne kadarki ilerleme"
+        aria-label={variant === "today" ? "Bugüne kadarki ilerleme" : "Bu haftaki ilerleme"}
       >
         <div
           className={cn(

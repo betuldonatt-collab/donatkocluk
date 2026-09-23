@@ -330,7 +330,11 @@ export function TaskBoard({
     <div className="space-y-6">
       <PendingAnalysisAlert tasks={tasks} onOpenTask={(t) => openTask(t, "analysis")} />
 
-      <WeekProgressBar tasks={progressTasks} today={today} lockedAt={progressLockedAt} />
+      {/* Same bar/calculation either way (progressTasks/progressLockedAt,
+          always about the current week regardless of which week the grid
+          below is browsing) -- only the heading framing switches with the
+          view, see WeekProgressBar's own comment. */}
+      <WeekProgressBar tasks={progressTasks} today={today} lockedAt={progressLockedAt} variant={view} />
 
       {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/
           Haftalık Toplam below, this doesn't reset when switching views or
