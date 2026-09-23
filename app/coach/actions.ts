@@ -2651,22 +2651,35 @@ export async function overrideStudentDailyStats(
 
 // --- Trial (branş/genel deneme) result entry -----------------------------
 
+export type CoachTopicMistake = { course_id: string; topic_id: string; status: "wrong" | "blank" };
+export type CoachTopicMistakesResult = { ok: true; mistakes: CoachTopicMistake[] } | { ok: false; error: string };
+
 // Coach-side mirror of getTaskTopicMistakes (app/student/actions.ts) --
 // duplicated per this file's convention, RLS (student_task_topic_mistakes_coach_all)
 // already scopes it to the coach's own roster either way.
-export async function getTaskTopicMistakesForCoach(studentId: string, taskId: string) {
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const taskIdV = parseInput(uuidSchema, taskId);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  await requireCoachAccess(supabase, user.id, studentIdV);
+//
+// Returns a result object rather than throwing -- a thrown message from a
+// Server Action invoked directly (not through useActionState) gets
+// stripped to a generic, redacted one in production builds, same reason
+// as setStudentTopicPipelineStep/getTaskEvidenceForCoach above.
+export async function getTaskTopicMistakesForCoach(studentId: string, taskId: string): Promise<CoachTopicMistakesResult> {
+  try {
+    const studentIdV = parseInput(uuidSchema, studentId);
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const { data, error } = await supabase
-    .from("student_task_topic_mistakes")
-    .select("course_id, topic_id, status")
-    .eq("task_id", taskIdV);
-  if (error) throw dbError(error);
-  return data as { course_id: string; topic_id: string; status: "wrong" | "blank" }[];
+    const { data, error } = await supabase
+      .from("student_task_topic_mistakes")
+      .select("course_id, topic_id, status")
+      .eq("task_id", taskIdV);
+    if (error) throw dbError(error);
+    return { ok: true, mistakes: data as CoachTopicMistake[] };
+  } catch (e) {
+    console.error("[getTaskTopicMistakesForCoach] failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
 }
 
 const coachTrialMistakeSchema = z.object({
@@ -2703,12 +2716,25 @@ const saveCoachTrialResultsSchema = z
     { message: "Toplam, Doğru + Yanlış + Boş toplamına eşit olmalıdır.", path: ["totalCount"] },
   );
 
+export type SaveCoachTrialResultsResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
+
 // Lets a coach record a branş/genel deneme's actual results on the
 // student's behalf -- previously the only way results got recorded was
 // the student's own task modal. Deliberately simpler than that modal's
 // general_exam flow (no per-subject breakdown, one overall Doğru/Yanlış/
 // Boş) -- a quick coach-side entry, not full parity. Mirrors
 // saveTaskAnalysis's delete-then-reinsert for the topic-mistake set.
+//
+// Returns a result object rather than throwing -- same reason as
+// setStudentTopicPipelineStep/getTaskEvidenceForCoach above: a thrown
+// message from a Server Action invoked directly (awaited from a client
+// event handler, not through useActionState) gets stripped to a generic,
+// redacted "Minified React error #441" in production builds. This
+// function used to throw on every failure path (including its own
+// intentional, readable ones, like the LGS-title guard below), which is
+// exactly what coaches were hitting when saving a trial's analysis -- the
+// write itself may well have gone through, they just never found out
+// either way.
 export async function saveCoachTrialResults(
   studentId: string,
   taskId: string,
@@ -2720,7 +2746,8 @@ export async function saveCoachTrialResults(
     mistakes: { courseId: string; topicId: string; status: "wrong" | "blank" }[];
     subjectScores?: Record<string, { correct: number | null; wrong: number | null; empty?: number | null }>;
   },
-) {
+): Promise<SaveCoachTrialResultsResult> {
+ try {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
   const taskIdV = parseInput(uuidSchema, taskId);
@@ -2741,10 +2768,10 @@ export async function saveCoachTrialResults(
       .maybeSingle();
     if (existingError) throw dbError(existingError);
     if (!existing || existing.task_type !== "general_exam" || !/^LGS/i.test(existing.title)) {
-      throw new Error("Ders bazlı sonuç yalnızca LGS Genel Deneme için girilebilir.");
+      return { ok: false, error: "Ders bazlı sonuç yalnızca LGS Genel Deneme için girilebilir." };
     }
     const normalized = normalizeLgsScores(inputV.subjectScores);
-    if (!normalized.ok) throw new Error(normalized.error);
+    if (!normalized.ok) return { ok: false, error: normalized.error };
     lgs = normalized;
   }
 
@@ -2788,7 +2815,11 @@ export async function saveCoachTrialResults(
 
   revalidatePath(`/coach/students/${studentIdV}`);
   revalidatePath(`/coach/students/${studentIdV}/schedule`);
-  return data;
+  return { ok: true, data };
+ } catch (e) {
+  console.error("[saveCoachTrialResults] failed:", e);
+  return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+ }
 }
 
 // --- Karne v2: cycle-based, archived, coach-approved report cards --------

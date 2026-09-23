@@ -305,31 +305,60 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
 
   const view = await getViewContext("coach");
 
-  const [data, pendingApprovals, focusReviews] = view
-    ? await Promise.all([
+  const emptyDashboard: [
+    {
+      roster: RosterStudent[];
+      bannerSession: CoachingSession | null;
+      weekSessions: CoachingSession[];
+      weekBlocks: CalendarBlock[];
+      weekTasks: CoachTask[];
+      alerts: CoachAlerts;
+    },
+    (PendingStudentTask & { studentId: string; studentName: string | null })[],
+    PendingFocusReview[],
+  ] = [
+    {
+      roster: [],
+      bannerSession: null,
+      weekSessions: [],
+      weekBlocks: [],
+      weekTasks: [],
+      alerts: { inactive: [], lowPerformance: [], missingExams: [], emptyPrograms: [], pendingReportCards: [], rsvpDeclines: [] },
+    },
+    [],
+    [],
+  ];
+
+  // Next.js implicitly re-renders whichever page a Server Action was
+  // invoked FROM once that action resolves (e.g. any cookie write inside
+  // it -- see lib/supabase/server.ts's createClient, which writes a
+  // refreshed auth cookie whenever the session token happens to be near
+  // expiry -- triggers this). The dashboard is exactly that page for the
+  // "Analizi öğrenci yerine yap" action: a coach can spend several
+  // minutes marking up a full LGS Genel Deneme's topic list before
+  // hitting Kaydet, which is plenty of time for a due token refresh to
+  // land mid-save. If THIS re-render throws for any reason (a transient
+  // Supabase hiccup, a connection-pool limit under concurrent load, or a
+  // genuine bug), Next.js redacts the message and the coach's own Server
+  // Action promise rejects with an opaque "Minified React error" instead
+  // of resolving -- even though their save may have already gone through.
+  // Falling back to an empty-but-valid dashboard render here means a
+  // transient failure in THIS fetch can no longer take the whole RSC
+  // response down with it.
+  let data = emptyDashboard[0];
+  let pendingApprovals = emptyDashboard[1];
+  let focusReviews = emptyDashboard[2];
+  if (view) {
+    try {
+      [data, pendingApprovals, focusReviews] = await Promise.all([
         fetchDashboardData(view.effectiveUserId, today, weekDays),
         getPendingStudentTasks(),
         getPendingFocusReviews(),
-      ])
-    : [
-        {
-          roster: [] as RosterStudent[],
-          bannerSession: null,
-          weekSessions: [] as CoachingSession[],
-          weekBlocks: [] as CalendarBlock[],
-          weekTasks: [] as CoachTask[],
-          alerts: {
-            inactive: [],
-            lowPerformance: [],
-            missingExams: [],
-            emptyPrograms: [],
-            pendingReportCards: [],
-            rsvpDeclines: [],
-          } as CoachAlerts,
-        },
-        [] as (PendingStudentTask & { studentId: string; studentName: string | null })[],
-        [] as PendingFocusReview[],
-      ];
+      ]);
+    } catch (e) {
+      console.error("[CoachDashboardPage] fetchDashboardData failed", e);
+    }
+  }
 
   // Notification-side echo of the pending-approvals card above -- see
   // syncPendingApprovalNotifications' own comment (app/coach/actions.ts).

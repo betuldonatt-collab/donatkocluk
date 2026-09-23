@@ -25,17 +25,20 @@ import { getTaskTopicMistakesForCoach, saveCoachTrialResults } from "../../../..
 import type { DetailTask } from "../../types";
 import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selector";
 
-// saveCoachTrialResults' own intentional `throw new Error("...")` calls
-// reach the client with their real message intact -- but "Minified React
-// error #NNN" is a different thing: it's what Next.js shows when
-// something breaks in the re-render Next automatically runs right after
-// a Server Action returns (see lib/supabase/server.ts's createClient --
-// an auth token refresh mid-action is a cookie write, and any cookie
-// write from a Server Action makes Next re-render the current page and
-// its layouts before resolving the action's own promise). The database
-// write itself has very likely already gone through by that point -- the
-// coach just never gets told so -- so this swaps the unreadable digest
-// for guidance to go check, instead of a dead-end wall of framework text.
+// saveCoachTrialResults/getTaskTopicMistakesForCoach now return a result
+// object instead of throwing (root cause: a thrown message from a Server
+// Action invoked directly -- not through useActionState -- gets stripped
+// to a generic, redacted "Minified React error #441" in production, which
+// is exactly what coaches were hitting on every failure path here,
+// intentional or not; see app/coach/actions.ts's own comment on
+// saveCoachTrialResults). So the code above only ever reaches this catch
+// for something genuinely outside that function's own control -- the
+// network request to invoke it failing outright, or a Server Action
+// invoked from the *dashboard's* Analizi-öğrenci-yerine-yap flow tripping
+// over Next re-rendering that page's layout mid-action (a cookie write --
+// e.g. an auth token refresh -- from a Server Action does that). Same
+// digest text either way if it happens; this keeps that from ever
+// reaching the coach as raw framework output.
 function friendlySaveError(e: unknown): string {
   if (e instanceof Error && !/minified react error/i.test(e.message)) return e.message;
   return "Kaydedilemedi ya da sonuç belirsiz kaldı. Listeye dönüp bu denemenin hâlâ \"Analiz Bekliyor\" durumunda olup olmadığını kontrol et, gerekirse tekrar dene.";
@@ -135,21 +138,19 @@ export function TrialResultsSection({
 
   useEffect(() => {
     let cancelled = false;
-    getTaskTopicMistakesForCoach(studentId, task.id)
-      .then((rows) => {
-        if (cancelled) return;
-        setMistakes(rows.map((r) => ({ course_id: r.course_id, topic_id: r.topic_id, status: r.status })));
-        setMistakesLoaded(true);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        // Without this, a fetch failure leaves mistakesLoaded stuck
-        // false forever and the section shows "Yükleniyor..." with no
-        // way out -- surface the error and unblock the UI with an empty
-        // mistake list instead.
-        setMistakesLoaded(true);
-        toast.error(e instanceof Error && !/minified react error/i.test(e.message) ? e.message : "Konu hataları yüklenemedi.");
-      });
+    getTaskTopicMistakesForCoach(studentId, task.id).then((result) => {
+      if (cancelled) return;
+      // Without this, a fetch failure leaves mistakesLoaded stuck false
+      // forever and the section shows "Yükleniyor..." with no way out --
+      // surface the error and unblock the UI with an empty mistake list
+      // instead.
+      setMistakesLoaded(true);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setMistakes(result.mistakes.map((r) => ({ course_id: r.course_id, topic_id: r.topic_id, status: r.status })));
+    });
     return () => {
       cancelled = true;
     };
@@ -225,7 +226,7 @@ export function TrialResultsSection({
           Object.entries(lgsInputs).map(([key, v]) => [key, { correct: Number(v.correct), wrong: Number(v.wrong), empty: Number(v.empty) }]),
         );
         const sum = (f: "correct" | "wrong" | "empty") => Object.values(rows).reduce((n, r) => n + r[f], 0);
-        const updated = await saveCoachTrialResults(studentId, task.id, {
+        const result = await saveCoachTrialResults(studentId, task.id, {
           totalCount: sum("correct") + sum("wrong") + sum("empty"),
           correctCount: sum("correct"),
           wrongCount: sum("wrong"),
@@ -233,7 +234,11 @@ export function TrialResultsSection({
           subjectScores: rows,
           mistakes: mistakes.map((m) => ({ courseId: m.course_id, topicId: m.topic_id, status: m.status })),
         });
-        onSaved(updated as DetailTask);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        onSaved(result.data as DetailTask);
       } catch (e) {
         setError(friendlySaveError(e));
       } finally {
@@ -252,14 +257,18 @@ export function TrialResultsSection({
     setSaving(true);
     try {
       const toNumOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
-      const updated = await saveCoachTrialResults(studentId, task.id, {
+      const result = await saveCoachTrialResults(studentId, task.id, {
         totalCount: toNumOrNull(totalCount),
         correctCount: toNumOrNull(correctCount),
         wrongCount: toNumOrNull(wrongCount),
         emptyCount: toNumOrNull(emptyCount),
         mistakes: mistakes.map((m) => ({ courseId: m.course_id, topicId: m.topic_id, status: m.status })),
       });
-      onSaved(updated as DetailTask);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as DetailTask);
     } catch (e) {
       setError(friendlySaveError(e));
     } finally {

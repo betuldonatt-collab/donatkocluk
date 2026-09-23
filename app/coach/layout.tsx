@@ -52,25 +52,41 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
   const view = await requireViewContext("coach");
   const { effectiveUserId, realUserId, isImpersonating, targetName } = view;
   const now = new Date();
-  const [{ unreadCount, fullName }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
-    fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
-    fetchCoachAnnouncements(),
-    // Skipped while impersonating for the same reason announcements is --
-    // the whole panel renders inside a disabled <fieldset> then anyway,
-    // so there's nothing for this widget to usefully show.
-    isImpersonating
-      ? Promise.resolve([] as StopwatchRosterRow[])
-      : (async () => {
-          const supabase = await createClient();
-          return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1);
-        })(),
-    isImpersonating
-      ? Promise.resolve(null as YesterdaysStopwatchWinner)
-      : (async () => {
-          const supabase = await createClient();
-          return fetchYesterdaysStopwatchWinner(supabase, effectiveUserId);
-        })(),
-  ]);
+
+  // Same reasoning as CoachDashboardPage's own fallback: this layout
+  // wraps every /coach/* route, so it re-renders (alongside the page)
+  // whenever a Server Action invoked from one of them resolves -- a
+  // transient failure here shouldn't be able to take that action's own
+  // response down with it. Sidebar badge/greeting/widgets degrading to
+  // their empty state for one render is a fine trade for that.
+  let unreadCount = 0;
+  let fullName: string | null = null;
+  let announcements: Awaited<ReturnType<typeof fetchCoachAnnouncements>> = [];
+  let stopwatchRoster: StopwatchRosterRow[] = [];
+  let yesterdaysWinner: YesterdaysStopwatchWinner = null;
+  try {
+    [{ unreadCount, fullName }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
+      fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
+      fetchCoachAnnouncements(),
+      // Skipped while impersonating for the same reason announcements is --
+      // the whole panel renders inside a disabled <fieldset> then anyway,
+      // so there's nothing for this widget to usefully show.
+      isImpersonating
+        ? Promise.resolve([] as StopwatchRosterRow[])
+        : (async () => {
+            const supabase = await createClient();
+            return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+          })(),
+      isImpersonating
+        ? Promise.resolve(null as YesterdaysStopwatchWinner)
+        : (async () => {
+            const supabase = await createClient();
+            return fetchYesterdaysStopwatchWinner(supabase, effectiveUserId);
+          })(),
+    ]);
+  } catch (e) {
+    console.error("[CoachLayout] layout data fetch failed", e);
+  }
 
   return (
     <div className="flex flex-1 flex-col">

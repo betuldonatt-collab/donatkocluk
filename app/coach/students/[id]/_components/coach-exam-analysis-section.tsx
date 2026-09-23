@@ -182,10 +182,14 @@ export function CoachExamAnalysisSection({
 
   async function handleSaved(updated: DetailTask) {
     setExams((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-    const rows = await getTaskTopicMistakesForCoach(studentId, updated.id);
+    const result = await getTaskTopicMistakesForCoach(studentId, updated.id);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
     setMistakes((prev) => [
       ...prev.filter((m) => m.task_id !== updated.id),
-      ...rows.map((r) => ({ task_id: updated.id, course_id: r.course_id, topic_id: r.topic_id })),
+      ...result.mistakes.map((r) => ({ task_id: updated.id, course_id: r.course_id, topic_id: r.topic_id })),
     ]);
   }
 
