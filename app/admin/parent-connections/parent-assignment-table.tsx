@@ -8,48 +8,61 @@ import { ResetPasswordButton } from "../_components/reset-password-button";
 
 type Person = { id: string; full_name: string | null };
 
-export function ParentAssignmentTable({
-  parents,
+// Student-centric: one row per STUDENT, each showing every currently
+// linked parent as a removable chip plus an "add another parent"
+// picker -- neither adding nor removing a link ever touches any other
+// link, since parent_students has no unique constraint on student_id
+// (only on the (parent_id, student_id) PAIR, see migration 0026's own
+// header comment) and linkParent/unlinkParent only ever insert/delete
+// that one row. A student can end up with several parent chips (mother +
+// father, ...) and the same parent can appear under several different
+// students' rows (siblings) -- both directions were already fully
+// supported by the schema and these same two actions; this component is
+// just the UI that makes adding a SECOND parent to an already-linked
+// student actually reachable, instead of only ever showing one.
+function StudentParentAssignments({
   students,
-  linksByParent,
+  parents,
+  linksByStudent,
+  onLink,
+  onUnlink,
 }: {
-  parents: Person[];
   students: Person[];
-  linksByParent: Record<string, string[]>;
+  parents: Person[];
+  linksByStudent: Record<string, string[]>;
+  onLink: (studentId: string, parentId: string) => Promise<void>;
+  onUnlink: (studentId: string, parentId: string) => Promise<void>;
 }) {
-  const [links, setLinks] = useState(linksByParent);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
-  const studentsById = new Map(students.map((s) => [s.id, s]));
+  const parentsById = new Map(parents.map((p) => [p.id, p]));
 
-  async function handleAdd(parentId: string) {
-    const studentId = selected[parentId];
-    if (!studentId) return;
-    const key = `${parentId}:${studentId}`;
+  async function handleAdd(studentId: string) {
+    const parentId = selected[studentId];
+    if (!parentId) return;
+    const key = `${studentId}:${parentId}`;
     setSavingKey(key);
     try {
-      await linkParent(parentId, studentId);
-      setLinks((prev) => ({ ...prev, [parentId]: [...(prev[parentId] ?? []), studentId] }));
-      setSelected((prev) => ({ ...prev, [parentId]: "" }));
+      await onLink(studentId, parentId);
+      setSelected((prev) => ({ ...prev, [studentId]: "" }));
     } finally {
       setSavingKey(null);
     }
   }
 
-  async function handleRemove(parentId: string, studentId: string) {
-    const key = `${parentId}:${studentId}`;
+  async function handleRemove(studentId: string, parentId: string) {
+    const key = `${studentId}:${parentId}`;
     setSavingKey(key);
     try {
-      await unlinkParent(parentId, studentId);
-      setLinks((prev) => ({ ...prev, [parentId]: (prev[parentId] ?? []).filter((id) => id !== studentId) }));
+      await onUnlink(studentId, parentId);
     } finally {
       setSavingKey(null);
     }
   }
 
-  if (parents.length === 0) {
-    return <p className="text-muted-foreground text-sm">Henüz kayıtlı veli yok.</p>;
+  if (students.length === 0) {
+    return <p className="text-muted-foreground text-sm">Henüz kayıtlı öğrenci yok.</p>;
   }
 
   const selectClass =
@@ -57,28 +70,28 @@ export function ParentAssignmentTable({
 
   return (
     <div className="space-y-4">
-      {parents.map((parent) => {
-        const linkedStudentIds = links[parent.id] ?? [];
-        const unlinkedStudents = students.filter((s) => !linkedStudentIds.includes(s.id));
+      {students.map((student) => {
+        const linkedParentIds = linksByStudent[student.id] ?? [];
+        const unlinkedParents = parents.filter((p) => !linkedParentIds.includes(p.id));
         return (
-          <div key={parent.id} className="border-border rounded-lg border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-foreground text-sm font-medium">{parent.full_name ?? "(İsimsiz)"}</p>
-              <ResetPasswordButton userId={parent.id} />
-            </div>
+          <div key={student.id} className="border-border rounded-lg border p-3">
+            <p className="text-foreground text-sm font-medium">{student.full_name ?? "(İsimsiz)"}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {linkedStudentIds.map((studentId) => {
-                const student = studentsById.get(studentId);
-                const key = `${parent.id}:${studentId}`;
+              {linkedParentIds.length === 0 && (
+                <span className="text-muted-foreground text-xs">Henüz veli eşleştirilmedi.</span>
+              )}
+              {linkedParentIds.map((parentId) => {
+                const parent = parentsById.get(parentId);
+                const key = `${student.id}:${parentId}`;
                 return (
                   <span
-                    key={studentId}
+                    key={parentId}
                     className="bg-secondary inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs"
                   >
-                    {student?.full_name ?? "(İsimsiz)"}
+                    {parent?.full_name ?? "(İsimsiz)"}
                     <button
                       type="button"
-                      onClick={() => handleRemove(parent.id, studentId)}
+                      onClick={() => handleRemove(student.id, parentId)}
                       disabled={savingKey === key}
                       className="text-muted-foreground hover:text-foreground disabled:opacity-50"
                       aria-label="Bağlantıyı kaldır"
@@ -88,27 +101,28 @@ export function ParentAssignmentTable({
                   </span>
                 );
               })}
-              {unlinkedStudents.length > 0 && (
+              {unlinkedParents.length > 0 && (
                 <div className="flex items-center gap-1.5">
                   <select
-                    value={selected[parent.id] ?? ""}
-                    onChange={(e) => setSelected((prev) => ({ ...prev, [parent.id]: e.target.value }))}
+                    value={selected[student.id] ?? ""}
+                    onChange={(e) => setSelected((prev) => ({ ...prev, [student.id]: e.target.value }))}
                     className={selectClass}
+                    aria-label={`${student.full_name ?? "Öğrenci"} için veli seç`}
                   >
-                    <option value="">Öğrenci seç...</option>
-                    {unlinkedStudents.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name ?? "(İsimsiz)"}
+                    <option value="">Veli seç...</option>
+                    {unlinkedParents.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name ?? "(İsimsiz)"}
                       </option>
                     ))}
                   </select>
                   <button
                     type="button"
-                    onClick={() => handleAdd(parent.id)}
-                    disabled={!selected[parent.id]}
+                    onClick={() => handleAdd(student.id)}
+                    disabled={!selected[student.id] || savingKey !== null}
                     className="text-primary text-xs font-medium underline disabled:opacity-50"
                   >
-                    Ekle
+                    {linkedParentIds.length > 0 ? "Başka veli ekle" : "Ekle"}
                   </button>
                 </div>
               )}
@@ -116,6 +130,80 @@ export function ParentAssignmentTable({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Plain roster with just a name + "Şifreyi Sıfırla" -- the one thing a
+// parent CHIP above (repeated once per linked student) has no natural
+// place for, so it lives here once per parent instead.
+function ParentRoster({ parents }: { parents: Person[] }) {
+  if (parents.length === 0) {
+    return <p className="text-muted-foreground text-sm">Henüz kayıtlı veli yok.</p>;
+  }
+  return (
+    <div className="flex flex-wrap gap-3">
+      {parents.map((parent) => (
+        <div key={parent.id} className="border-border flex items-center gap-2 rounded-lg border px-3 py-2">
+          <span className="text-foreground text-sm font-medium">{parent.full_name ?? "(İsimsiz)"}</span>
+          <ResetPasswordButton userId={parent.id} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ParentAssignmentTable({
+  parents,
+  students,
+  linksByParent,
+}: {
+  parents: Person[];
+  students: Person[];
+  // parent_id -> student_id[], as fetched -- flipped to student-centric
+  // locally since that's the orientation the UI below actually needs.
+  linksByParent: Record<string, string[]>;
+}) {
+  const [linksByStudent, setLinksByStudent] = useState<Record<string, string[]>>(() => {
+    const out: Record<string, string[]> = {};
+    for (const [parentId, studentIds] of Object.entries(linksByParent)) {
+      for (const studentId of studentIds) (out[studentId] ??= []).push(parentId);
+    }
+    return out;
+  });
+
+  async function handleLink(studentId: string, parentId: string) {
+    await linkParent(parentId, studentId);
+    setLinksByStudent((prev) => ({ ...prev, [studentId]: [...(prev[studentId] ?? []), parentId] }));
+  }
+
+  async function handleUnlink(studentId: string, parentId: string) {
+    await unlinkParent(parentId, studentId);
+    setLinksByStudent((prev) => ({ ...prev, [studentId]: (prev[studentId] ?? []).filter((id) => id !== parentId) }));
+  }
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <h3 className="text-foreground text-sm font-semibold tracking-wide uppercase">Veliler</h3>
+        <p className="text-muted-foreground mb-3 text-xs">Şifre sıfırlama burada, öğrenci eşleştirmeleri aşağıda.</p>
+        <ParentRoster parents={parents} />
+      </section>
+
+      <section>
+        <h3 className="text-foreground text-sm font-semibold tracking-wide uppercase">Öğrenci - Veli Eşleştirmeleri</h3>
+        <p className="text-muted-foreground mb-3 text-xs">
+          Bir öğrenciye birden fazla veli (anne + baba gibi) eklenebilir; aynı veli birden fazla öğrenciyle
+          (kardeşler) eşleştirilebilir.
+        </p>
+        <StudentParentAssignments
+          students={students}
+          parents={parents}
+          linksByStudent={linksByStudent}
+          onLink={handleLink}
+          onUnlink={handleUnlink}
+        />
+      </section>
     </div>
   );
 }
