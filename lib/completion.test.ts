@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completionCounts, completionPercent, completionStart, tasksDueSoFar } from "./completion";
+import { completionCounts, completionPercent, completionStart, tasksDueSoFar, weekCompletionCounts } from "./completion";
 
 // 2026-09-23 is a Wednesday; its week runs Mon 2026-09-21 .. Sun 2026-09-27.
 const WED = "2026-09-23";
@@ -96,5 +96,55 @@ describe("lock-day start", () => {
 
   it("is null when nothing lies between the lock day and today", () => {
     expect(completionPercent(completionCounts([task("2026-09-24", "pending")], WED, "2026-09-23T06:00:00Z"))).toBeNull();
+  });
+});
+
+describe("weekCompletionCounts (the 'Bu Hafta' macro view)", () => {
+  it("counts the WHOLE week, future days included in the denominator from day one", () => {
+    const tasks = [
+      task("2026-09-21", "done"), // Mon
+      task("2026-09-22", "done"),
+      task("2026-09-23", "done"), // today
+      task("2026-09-24", "pending"), // tomorrow -- IS counted (unlike completionCounts)
+      task("2026-09-25", "pending"),
+      task("2026-09-26", "pending"),
+      task("2026-09-27", "pending"), // Sun
+    ];
+    // Contrast with completionCounts on the exact same data: that one reads
+    // 100% (3/3, future excluded) -- this one reads the true whole-week state.
+    expect(completionCounts(tasks, WED)).toEqual({ done: 3, total: 3 });
+    expect(weekCompletionCounts(tasks, WED)).toEqual({ done: 3, total: 7 });
+    expect(completionPercent(weekCompletionCounts(tasks, WED))).toBe(43);
+  });
+
+  it("the total is fixed for the week -- finishing a future task moves done, never total", () => {
+    const total = weekCompletionCounts(
+      [task("2026-09-21", "done"), task("2026-09-24", "pending"), task("2026-09-27", "pending")],
+      WED,
+    ).total;
+    const afterFinishingTomorrow = weekCompletionCounts(
+      [task("2026-09-21", "done"), task("2026-09-24", "done"), task("2026-09-27", "pending")],
+      WED,
+    );
+    expect(afterFinishingTomorrow.total).toBe(total);
+    expect(afterFinishingTomorrow.done).toBe(2);
+  });
+
+  it("still respects the lock day as the start, same as the micro view", () => {
+    const tasks = [task("2026-09-21", "not_done"), task("2026-09-22", "done"), task("2026-09-27", "pending")];
+    // Monday is before the Tuesday lock day, so it's excluded even though
+    // it's within the calendar week.
+    expect(weekCompletionCounts(tasks, WED, "2026-09-22T08:30:00Z")).toEqual({ done: 1, total: 2 });
+  });
+
+  it("ignores earlier weeks, same as tasksDueSoFar", () => {
+    expect(weekCompletionCounts([task("2026-09-14", "done"), task("2026-09-20", "done")], WED)).toEqual({
+      done: 0,
+      total: 0,
+    });
+  });
+
+  it("is null only when the whole week has no tasks at all", () => {
+    expect(completionPercent(weekCompletionCounts([], WED))).toBeNull();
   });
 });

@@ -3,18 +3,20 @@
 import { Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { completionCounts, completionPercent, completionStart } from "@/lib/completion";
+import { completionCounts, completionPercent, completionStart, weekCompletionCounts } from "@/lib/completion";
 import type { StudentTask } from "./types";
 
-// Same underlying calculation (lib/completion.ts: only tasks from the day the
-// coach locked this week's schedule, or the week's Monday until it is locked,
-// up to today) rendered with two different framings depending on which tab it
-// sits under -- see TaskBoard, which mounts exactly one of these per view
-// instead of one bar shared across both:
-//   "today" -- under Bugün. Headed by today's own date + day name (e.g. "24
-//     Eylül Perşembe"), since that tab is about today specifically even
-//     though the number itself can span back further than today alone.
-//   "week"  -- under Bu Hafta. Framed as the active week's own progress.
+// Two different views of the same lock-timestamp start rule (lib/
+// completion.ts), one per tab -- see TaskBoard, which mounts exactly one
+// of these per view instead of one bar shared across both:
+//   "today" -- under Bugün. "Micro" view (completionCounts): counts only
+//     through today, so tomorrow's tasks aren't in the denominator yet.
+//     Headed by today's own date + day name (e.g. "24 Eylül Perşembe").
+//   "week"  -- under Bu Hafta. "Macro" view (weekCompletionCounts): counts
+//     the WHOLE locked week through Sunday, future days included in the
+//     denominator from day one -- the total is fixed for the week and
+//     only ever climbs toward 100% as tasks get done, it never grows
+//     day by day the way the "today" view's own total does.
 export function WeekProgressBar({
   tasks,
   today,
@@ -26,7 +28,7 @@ export function WeekProgressBar({
   lockedAt: string | null;
   variant: "today" | "week";
 }) {
-  const counts = completionCounts(tasks, today, lockedAt);
+  const counts = variant === "today" ? completionCounts(tasks, today, lockedAt) : weekCompletionCounts(tasks, today, lockedAt);
   const pct = completionPercent(counts);
   const complete = pct === 100;
   const since = new Date(`${completionStart(today, lockedAt)}T00:00:00Z`).toLocaleDateString("tr-TR", {
@@ -79,15 +81,21 @@ export function WeekProgressBar({
 
       <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
         {pct === null ? (
-          "Bugüne kadar tamamlaman gereken görev yok."
+          variant === "today" ? "Bugüne kadar tamamlaman gereken görev yok." : "Bu hafta için henüz atanmış görev yok."
         ) : complete ? (
           <>
             <Trophy className="size-3.5 shrink-0 text-emerald-600" />
-            <span className="font-medium text-emerald-700">Harika! Bugüne kadarki tüm görevlerini tamamladın.</span>
+            <span className="font-medium text-emerald-700">
+              {variant === "today" ? "Harika! Bugüne kadarki tüm görevlerini tamamladın." : "Harika! Bu haftanın tüm görevlerini tamamladın."}
+            </span>
+          </>
+        ) : variant === "today" ? (
+          <>
+            {counts.done}/{counts.total} görev tamam · {since} tarihinden bugüne kadar
           </>
         ) : (
           <>
-            {counts.done}/{counts.total} görev tamam · {since} tarihinden bugüne kadar
+            {counts.done}/{counts.total} görev tamam · {since} tarihinden bu haftanın sonuna kadar
           </>
         )}
       </p>

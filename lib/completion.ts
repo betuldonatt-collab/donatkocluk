@@ -1,4 +1,4 @@
-import { mondayOf } from "./date";
+import { mondayOf, weekDates } from "./date";
 
 // Program completion ("Tamamlama %") is time-aware: it only counts tasks the
 // student can already have done -- from the day the coach LOCKED the current
@@ -42,6 +42,21 @@ export type CompletionCounts = { done: number; total: number };
 
 export function completionCounts(tasks: CompletionTask[], todayIso: string, lockedAt?: string | null): CompletionCounts {
   const due = tasksDueSoFar(tasks, todayIso, lockedAt);
+  return { done: due.filter((t) => t.status === "done").length, total: due.length };
+}
+
+// Whole-week ("macro") completion: same start rule as completionCounts
+// above (locked_at, or Monday until locked) but counts through the END of
+// the 7-day cycle instead of stopping at today -- so a not-yet-arrived
+// day's tasks count against the denominator from day one, and the total
+// never grows as the week goes by; it only ever climbs toward 100% as
+// tasks get marked done. Used by the student board's "Bu Hafta" tab
+// specifically (WeekProgressBar's "week" variant) -- the "Bugün" tab
+// keeps using completionCounts above, the today-capped ("micro") view.
+export function weekCompletionCounts(tasks: CompletionTask[], todayIso: string, lockedAt?: string | null): CompletionCounts {
+  const start = completionStart(todayIso, lockedAt);
+  const weekEnd = weekDates(todayIso)[6];
+  const due = tasks.filter((t) => t.task_date >= start && t.task_date <= weekEnd);
   return { done: due.filter((t) => t.status === "done").length, total: due.length };
 }
 
