@@ -13,8 +13,13 @@
 // instead; even at "pastel" lightness values those read as far more
 // present/heavy than the old wash ever did, so this went back to opacity.
 //
-// Fen and İngilizce (LGS-only) are still on the original Tailwind
-// bg-{hue}-500/N opacity system, not yet revised -- a separate pass.
+// Fen and İngilizce (LGS-only) revised 2026-09-23 too: rather than new
+// pure hues, they reuse Felsefe's and Kimya's tokens respectively --
+// both YKS-exclusive families an LGS student never sees on the same
+// screen, so there's no real collision even though the CSS variable is
+// shared. LGS's other four subjects (Türkçe, Matematik, T.C. İnkılap
+// Tarihi, Din Kültürü) already reused their YKS family's hue via
+// COURSE_FAMILY below before this revision -- nothing new there.
 //
 // Deliberately excludes emerald, amber and rose from every family/general
 // hue below -- those three are reserved for the task-completion status
@@ -35,13 +40,13 @@ export type SubjectFamily =
   | "fen"
   | "ingilizce";
 
-// [TYT, AYT, Branş Denemesi] -- the YKS families apply /6, /12, /20
-// opacity on top of the custom pure-hue tokens in app/globals.css via
-// Tailwind's arbitrary-value syntax (bg-[var(--subject-...)]/N); Fen/
-// İngilizce are still plain bg-{hue}-500/N Tailwind utilities (unrevised).
-// Every class string is written out in full (never built with string
-// concatenation) so Tailwind's static scanner can find it -- a
-// dynamically interpolated class name would silently produce no CSS.
+// [TYT, AYT, Branş Denemesi] -- every family, YKS and LGS-only alike,
+// applies /6, /12, /20 opacity on top of a pure-hue token in
+// app/globals.css via Tailwind's arbitrary-value syntax
+// (bg-[var(--subject-...)]/N). Every class string is written out in full
+// (never built with string concatenation) so Tailwind's static scanner
+// can find it -- a dynamically interpolated class name would silently
+// produce no CSS.
 const FAMILY_CLASSES: Record<SubjectFamily, [string, string, string]> = {
   turkce: ["bg-[var(--subject-turkce)]/6", "bg-[var(--subject-turkce)]/12", "bg-[var(--subject-turkce)]/20"],
   matematik: [
@@ -61,11 +66,11 @@ const FAMILY_CLASSES: Record<SubjectFamily, [string, string, string]> = {
   felsefe: ["bg-[var(--subject-felsefe)]/6", "bg-[var(--subject-felsefe)]/12", "bg-[var(--subject-felsefe)]/20"],
   din: ["bg-[var(--subject-din)]/6", "bg-[var(--subject-din)]/12", "bg-[var(--subject-din)]/20"],
   // LGS-only families (TYT/AYT split Fen into Fizik/Kimya/Biyoloji and have
-  // no English section) -- distinct hues from every family above and from
-  // the reserved emerald/amber/rose status colors. Not yet revised to the
-  // custom-pastel system above.
-  fen: ["bg-cyan-500/6", "bg-cyan-500/12", "bg-cyan-500/20"],
-  ingilizce: ["bg-lime-500/6", "bg-lime-500/12", "bg-lime-500/20"],
+  // no English section) -- reuse Felsefe's/Kimya's pure-hue tokens (see
+  // comment above); never shown alongside the real Felsefe/Kimya since
+  // LGS and YKS never mix on one student's screen.
+  fen: ["bg-[var(--subject-felsefe)]/6", "bg-[var(--subject-felsefe)]/12", "bg-[var(--subject-felsefe)]/20"],
+  ingilizce: ["bg-[var(--subject-kimya)]/6", "bg-[var(--subject-kimya)]/12", "bg-[var(--subject-kimya)]/20"],
 };
 
 // Atomic TYT/AYT curriculum course id -> family. Every id here is read
