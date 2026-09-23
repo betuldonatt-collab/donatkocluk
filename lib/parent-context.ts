@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +13,18 @@ export type LinkedStudent = { id: string; full_name: string | null };
 // Every linked child, name-sorted. Most parents have exactly one -- the
 // switcher UI (student-switcher.tsx) only renders when this has more than
 // one entry, per the explicit "hide it for a single child" requirement.
-export async function getLinkedStudents(): Promise<LinkedStudent[]> {
+//
+// Wrapped in React's cache(): ParentLayout, every parent page (page.tsx,
+// settings/page.tsx, notes/page.tsx, karne/...) AND getActiveStudentId
+// below all call this independently, with no way for a layout to hand its
+// own already-fetched result down to a sibling page in the RSC tree --
+// without this, a single page load (and every router.refresh(), which is
+// exactly what the switcher triggers) re-ran this same parent_students +
+// profiles round trip 3-4 times over. cache() dedupes repeat calls with
+// the same arguments to one real fetch per request, so every one of those
+// call sites still reads naturally as "just fetch the list" while only
+// the first call actually hits the database.
+export const getLinkedStudents = cache(async (): Promise<LinkedStudent[]> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,14 +41,17 @@ export async function getLinkedStudents(): Promise<LinkedStudent[]> {
     .in("id", ids)
     .order("full_name", { ascending: true });
   return (profiles ?? []) as LinkedStudent[];
-}
+});
 
 // The student every parent page should read/act on. A single-child parent
 // never touches the cookie at all -- their one child is always the
 // answer. A multi-child parent's choice persists across visits via the
 // cookie; an invalid/stale cookie value (e.g. a since-unlinked student)
-// silently falls back to the first child rather than erroring.
-export async function getActiveStudentId(): Promise<string | null> {
+// silently falls back to the first child rather than erroring. Also
+// cache()d, same reasoning as getLinkedStudents above -- and since it
+// calls that same cached function internally, calling both in one request
+// (ParentLayout does) still only costs one real fetch total, not two.
+export const getActiveStudentId = cache(async (): Promise<string | null> => {
   const students = await getLinkedStudents();
   if (students.length === 0) return null;
   if (students.length === 1) return students[0].id;
@@ -45,7 +60,7 @@ export async function getActiveStudentId(): Promise<string | null> {
   const cookieValue = store.get(COOKIE_NAME)?.value;
   if (cookieValue && students.some((s) => s.id === cookieValue)) return cookieValue;
   return students[0].id;
-}
+});
 
 // Called from the client-side switcher. Re-validates against the parent's
 // own links (not trusted from the client) before persisting.
