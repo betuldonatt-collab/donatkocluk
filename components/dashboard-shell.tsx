@@ -41,7 +41,13 @@ export function DashboardShell({ sidebar, children }: { sidebar: React.ReactNode
         // on top of --primary in both themes (near-white on the light
         // navy, near-black on the light-mode-dark's own lighter blue), so
         // contrast holds regardless of theme without hand-picking a color.
-        className="bg-primary text-primary-foreground hover:bg-primary/90 fixed top-3 left-3 z-50 flex size-10 items-center justify-center rounded-lg shadow-xs transition-colors md:hidden print:hidden"
+        //
+        // top/left add env(safe-area-inset-*) on top of the original
+        // 0.75rem offset, not instead of it -- position: fixed ignores
+        // body's own safe-area padding (globals.css) entirely, so a
+        // notch/Dynamic Island would otherwise sit right on top of this
+        // button in standalone/PWA mode. A no-op +0 everywhere else.
+        className="bg-primary text-primary-foreground hover:bg-primary/90 fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-[calc(0.75rem+env(safe-area-inset-left))] z-50 flex size-10 items-center justify-center rounded-lg shadow-xs transition-colors md:hidden print:hidden"
       >
         {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>

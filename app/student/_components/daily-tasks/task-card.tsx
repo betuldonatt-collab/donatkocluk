@@ -219,8 +219,12 @@ export function TaskCard({
         {/* items-start (not -center): on md+ the title wraps freely (no
             line-clamp cap there) so a long course+topic combination is
             never cut off -- centering these badges against a
-            possibly-taller title would float them awkwardly mid-block. */}
-        <div className="flex items-start gap-1.5">
+            possibly-taller title would float them awkwardly mid-block.
+            flex-wrap: up to 4 shrink-0 badges (tracked time, locked,
+            analiz bekliyor, evidence status...) can appear at once --
+            without wrapping, a narrow phone had nowhere for their
+            combined width to go but past the card's own edge. */}
+        <div className="flex flex-wrap items-start gap-1.5">
           <p
             className={cn(
               "text-foreground min-w-0 flex-1 text-sm font-medium break-words md:line-clamp-none",

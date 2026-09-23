@@ -123,7 +123,49 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* No horizontal scroll anywhere, full stop -- a safety net alongside
+       fixing the actual per-component overflow causes, since a single
+       missed min-w-0/flex-wrap on a narrow phone is otherwise enough to
+       let the whole page scroll sideways. Inner elements that DO scroll
+       horizontally on purpose (the coach/student exam tables, the Bu
+       Hafta week grid) set their own overflow-x-auto and are completely
+       unaffected -- overflow is a per-element property, not inherited. */
+    @apply overflow-x-hidden;
+    /* No pull-to-refresh / rubber-band bounce past the top or bottom of
+       the page -- standalone/PWA apps don't have that, and it's one of
+       the biggest "this feels like a website, not an app" tells. */
+    overscroll-behavior-y: none;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
+    /* iPhone notch/Dynamic Island and home-indicator clearance -- a
+       no-op zero value everywhere else, since env(safe-area-inset-*)
+       only resolves to something non-zero when viewport-fit=cover is
+       set (see app/layout.tsx's viewport export) on a device that
+       actually has an inset region. */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* No flash of the browser's default tap-highlight rectangle, and no
+     accidental text selection from a press-and-hold, on anything that
+     acts like a control (buttons, task cards -- role="button", the
+     TYT/AYT-style tab toggles -- role="tab") -- exactly what a native
+     app's own controls do. Real text inputs are explicitly carved back
+     out below, so typing and selecting in a form field is untouched. */
+  button,
+  [role="button"],
+  [role="tab"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
