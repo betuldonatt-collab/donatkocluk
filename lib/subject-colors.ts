@@ -1,12 +1,24 @@
-// Subject-hierarchical pastel color-coding, approved 2026-09-16: each
-// curriculum subject family gets one hue, and TYT/AYT/Branş Denemesi
-// progress that hue from lightest to deepest via opacity (the same
-// theme-safe bg-{hue}-500/N convention already used elsewhere in this
-// app), never via a flat/fixed light-mode-only shade. Deliberately
-// excludes emerald, amber and rose from every family hue below -- those
-// three are reserved for the task-completion status border
-// (taskStatusBorderClass), so a subject's background can never collide in
-// meaning with the status drawn on top of it.
+// Subject-hierarchical pastel color-coding. YKS families (turkce through
+// din below) were revised 2026-09-23: custom hex pastels, hand-spaced
+// evenly around the hue wheel (Tailwind's own named hues cluster unevenly
+// in the blue/violet/purple range, which is what made Kimya/Biyoloji and
+// Fizik/Felsefe hard to tell apart under the original bg-{hue}-500/N
+// system) and reviewed swatch-by-swatch before approval. Each family's
+// [TYT, AYT, Branş Denemesi] triple lives as CSS custom properties in
+// app/globals.css (--subject-{family}-{tier}, with a separate :root/.dark
+// pair per token -- this replaces the old opacity trick as this system's
+// theme-safety mechanism, since these are solid fills now, not a
+// transparent wash over the surface). Branş Denemesi is the most
+// saturated of the three but still a light pastel -- dark text stays
+// readable on all three tiers, never a solid/bold fill.
+//
+// Fen and İngilizce (LGS-only) are still on the original Tailwind
+// bg-{hue}-500/N opacity system, not yet revised -- a separate pass.
+//
+// Deliberately excludes emerald, amber and rose from every family/general
+// hue below -- those three are reserved for the task-completion status
+// border (taskStatusBorderClass), so a subject's background can never
+// collide in meaning with the status drawn on top of it.
 
 export type SubjectFamily =
   | "turkce"
@@ -22,27 +34,51 @@ export type SubjectFamily =
   | "fen"
   | "ingilizce";
 
-// [TYT, AYT, Branş Denemesi] -- every class string is written out in full
-// (never built with string concatenation) so Tailwind's static scanner
-// can find it; a dynamically interpolated class name would silently
-// produce no CSS.
+// [TYT, AYT, Branş Denemesi] -- the YKS families reference the custom
+// pastel tokens in app/globals.css via Tailwind's arbitrary-value syntax
+// (bg-[var(--subject-...)]); Fen/İngilizce are still plain bg-{hue}-500/N
+// Tailwind utilities (unrevised). Every class string is written out in
+// full (never built with string concatenation) so Tailwind's static
+// scanner can find it -- a dynamically interpolated class name would
+// silently produce no CSS.
 const FAMILY_CLASSES: Record<SubjectFamily, [string, string, string]> = {
-  turkce: ["bg-pink-500/6", "bg-pink-500/12", "bg-pink-500/20"],
-  matematik: ["bg-blue-500/6", "bg-blue-500/12", "bg-blue-500/20"],
-  geometri: ["bg-sky-500/6", "bg-sky-500/12", "bg-sky-500/20"],
-  fizik: ["bg-violet-500/6", "bg-violet-500/12", "bg-violet-500/20"],
-  kimya: ["bg-teal-500/6", "bg-teal-500/12", "bg-teal-500/20"],
-  biyoloji: ["bg-green-500/6", "bg-green-500/12", "bg-green-500/20"],
-  tarih: ["bg-yellow-500/6", "bg-yellow-500/12", "bg-yellow-500/20"],
-  cografya: ["bg-orange-500/6", "bg-orange-500/12", "bg-orange-500/20"],
+  turkce: ["bg-[var(--subject-turkce-tyt)]", "bg-[var(--subject-turkce-ayt)]", "bg-[var(--subject-turkce-brans)]"],
+  matematik: [
+    "bg-[var(--subject-matematik-tyt)]",
+    "bg-[var(--subject-matematik-ayt)]",
+    "bg-[var(--subject-matematik-brans)]",
+  ],
+  geometri: [
+    "bg-[var(--subject-geometri-tyt)]",
+    "bg-[var(--subject-geometri-ayt)]",
+    "bg-[var(--subject-geometri-brans)]",
+  ],
+  fizik: ["bg-[var(--subject-fizik-tyt)]", "bg-[var(--subject-fizik-ayt)]", "bg-[var(--subject-fizik-brans)]"],
+  kimya: ["bg-[var(--subject-kimya-tyt)]", "bg-[var(--subject-kimya-ayt)]", "bg-[var(--subject-kimya-brans)]"],
+  biyoloji: [
+    "bg-[var(--subject-biyoloji-tyt)]",
+    "bg-[var(--subject-biyoloji-ayt)]",
+    "bg-[var(--subject-biyoloji-brans)]",
+  ],
+  tarih: ["bg-[var(--subject-tarih-tyt)]", "bg-[var(--subject-tarih-ayt)]", "bg-[var(--subject-tarih-brans)]"],
+  cografya: [
+    "bg-[var(--subject-cografya-tyt)]",
+    "bg-[var(--subject-cografya-ayt)]",
+    "bg-[var(--subject-cografya-brans)]",
+  ],
   // Felsefe Grubu: Felsefe + Psikoloji + Sosyoloji + Mantık share this hue
   // (see COURSE_FAMILY below) -- they're taught/tested together in real
   // AYT Sözel curriculum practice and have no TYT sibling of their own.
-  felsefe: ["bg-purple-500/6", "bg-purple-500/12", "bg-purple-500/20"],
-  din: ["bg-fuchsia-500/6", "bg-fuchsia-500/12", "bg-fuchsia-500/20"],
+  felsefe: [
+    "bg-[var(--subject-felsefe-tyt)]",
+    "bg-[var(--subject-felsefe-ayt)]",
+    "bg-[var(--subject-felsefe-brans)]",
+  ],
+  din: ["bg-[var(--subject-din-tyt)]", "bg-[var(--subject-din-ayt)]", "bg-[var(--subject-din-brans)]"],
   // LGS-only families (TYT/AYT split Fen into Fizik/Kimya/Biyoloji and have
   // no English section) -- distinct hues from every family above and from
-  // the reserved emerald/amber/rose status colors.
+  // the reserved emerald/amber/rose status colors. Not yet revised to the
+  // custom-pastel system above.
   fen: ["bg-cyan-500/6", "bg-cyan-500/12", "bg-cyan-500/20"],
   ingilizce: ["bg-lime-500/6", "bg-lime-500/12", "bg-lime-500/20"],
 };
@@ -120,7 +156,10 @@ const ROUTINE_CLASSES: Record<string, string> = {
 };
 
 export function subjectBackgroundClass(courseId: string | null, taskType: string): string {
-  if (taskType === "general_exam") return "bg-indigo-500/20"; // unchanged from before this system
+  // Standalone punchy color, not part of the TYT/AYT/Branş tier system --
+  // Genel Deneme is a milestone, meant to stand out rather than blend
+  // into the subject palette.
+  if (taskType === "general_exam") return "bg-[var(--subject-genel-deneme)]";
   if (courseId) {
     const routineClass = ROUTINE_CLASSES[courseId];
     if (routineClass) return routineClass;

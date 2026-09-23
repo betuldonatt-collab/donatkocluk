@@ -24,6 +24,47 @@
   --border: oklch(0.88 0.008 264);
   --input: oklch(0.88 0.008 264);
   --ring: oklch(0.28 0.07 265);
+
+  /* YKS subject color system (lib/subject-colors.ts) -- custom pastel hex
+     per subject family, evenly spaced around the hue wheel, reviewed and
+     approved directly (not derived from Tailwind's own uneven hue
+     spacing, which is what the previous bg-{hue}-500/N system rode on).
+     Three tiers per subject: TYT (lightest wash) < AYT (medium) < Branş
+     Denemesi (most saturated, still pastel -- dark text stays readable on
+     all three). Genel Deneme is its own standalone punchy color, not part
+     of the tier system. LGS-only subjects (Fen, İngilizce) are unchanged,
+     still on the original bg-{hue}-500/N system -- a separate pass. */
+  --subject-turkce-tyt: #fce2ef;
+  --subject-turkce-ayt: #f6bee0;
+  --subject-turkce-brans: #ed8bc6;
+  --subject-matematik-tyt: #dae9f8;
+  --subject-matematik-ayt: #b6d3f2;
+  --subject-matematik-brans: #74aeea;
+  --subject-geometri-tyt: #e9dff8;
+  --subject-geometri-ayt: #d2c2f2;
+  --subject-geometri-brans: #ac8ee5;
+  --subject-fizik-tyt: #e1dff8;
+  --subject-fizik-ayt: #c5c2f2;
+  --subject-fizik-brans: #948ee5;
+  --subject-kimya-tyt: #fce3e1;
+  --subject-kimya-ayt: #f6bcb8;
+  --subject-kimya-brans: #ed8983;
+  --subject-biyoloji-tyt: #dff2e5;
+  --subject-biyoloji-ayt: #c0e8ce;
+  --subject-biyoloji-brans: #85d0a3;
+  --subject-tarih-tyt: #f6f0ce;
+  --subject-tarih-ayt: #eee3a0;
+  --subject-tarih-brans: #dcc85c;
+  --subject-cografya-tyt: #fce8d6;
+  --subject-cografya-ayt: #f6d0a8;
+  --subject-cografya-brans: #edad6b;
+  --subject-felsefe-tyt: #d6f0ee;
+  --subject-felsefe-ayt: #abe2de;
+  --subject-felsefe-brans: #62c7c0;
+  --subject-din-tyt: #e6f0d4;
+  --subject-din-ayt: #d2e6ac;
+  --subject-din-brans: #a8cc6e;
+  --subject-genel-deneme: #d94fc7;
 }
 
 /* Soft dark mode -- same hue (265, the brand's blue/teal) as light mode at
@@ -49,6 +90,41 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.72 0.09 265 / 50%);
+
+  /* Same hues as :root's YKS subject colors, re-lightness'd for a dark
+     surface (deep, saturated tint sitting on --card ~24% L, rather than
+     the same near-white pastel glaring against a dark background). */
+  --subject-turkce-tyt: #711442;
+  --subject-turkce-ayt: #8b185e;
+  --subject-turkce-brans: #ad1f75;
+  --subject-matematik-tyt: #144271;
+  --subject-matematik-ayt: #18508b;
+  --subject-matematik-brans: #1f65ad;
+  --subject-geometri-tyt: #391471;
+  --subject-geometri-ayt: #3f188b;
+  --subject-geometri-brans: #501fad;
+  --subject-fizik-tyt: #1b1471;
+  --subject-fizik-ayt: #20188b;
+  --subject-fizik-brans: #281fad;
+  --subject-kimya-tyt: #711b14;
+  --subject-kimya-ayt: #8b2018;
+  --subject-kimya-brans: #ad271f;
+  --subject-biyoloji-tyt: #1e6635;
+  --subject-biyoloji-ayt: #228143;
+  --subject-biyoloji-brans: #2ca05a;
+  --subject-tarih-tyt: #716314;
+  --subject-tarih-ayt: #8b7b18;
+  --subject-tarih-brans: #ad971f;
+  --subject-cografya-tyt: #714014;
+  --subject-cografya-ayt: #8b5318;
+  --subject-cografya-brans: #ad671f;
+  --subject-felsefe-tyt: #1c6963;
+  --subject-felsefe-ayt: #20837c;
+  --subject-felsefe-brans: #29a39a;
+  --subject-din-tyt: #4e6a1a;
+  --subject-din-ayt: #62871c;
+  --subject-din-brans: #74a329;
+  --subject-genel-deneme: #c12aad;
 }
 
 @theme inline {
