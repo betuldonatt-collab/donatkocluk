@@ -218,6 +218,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
         <CardTitle className="text-base">{course.name}</CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -285,6 +286,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );

@@ -60,7 +60,7 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
 
   return (
     <div className="space-y-4">
-      <div className="border-border bg-card grid grid-cols-3 divide-x divide-border rounded-lg border">
+      <div className="border-border bg-card grid grid-cols-1 divide-y divide-border rounded-lg border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <div className="px-4 py-3 text-center">
           <p className="text-muted-foreground text-xs">Ödenmiş</p>
           <p className="text-foreground text-lg font-semibold tabular-nums">{paidCount}</p>

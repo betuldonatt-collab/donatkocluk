@@ -119,7 +119,7 @@ export function CreateEventDialog({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="event-date">Tarih</Label>
             <Input id="event-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

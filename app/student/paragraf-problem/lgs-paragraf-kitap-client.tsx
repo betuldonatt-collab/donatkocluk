@@ -349,6 +349,7 @@ export function LgsParagrafKitapClient({
               {paragrafHistory.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -371,6 +372,7 @@ export function LgsParagrafKitapClient({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -383,6 +385,7 @@ export function LgsParagrafKitapClient({
               {kitapHistory.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -412,6 +415,7 @@ export function LgsParagrafKitapClient({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

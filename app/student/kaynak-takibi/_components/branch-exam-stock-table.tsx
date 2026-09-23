@@ -137,6 +137,7 @@ export function BranchExamStockTable({
         </Button>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -155,6 +156,7 @@ export function BranchExamStockTable({
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
 
       <AddDialog
@@ -207,7 +209,7 @@ function AddDialog({
             <Label htmlFor="student-branch-exam-name">Yayınevi / Kaynak adı</Label>
             <Input id="student-branch-exam-name" placeholder="Örn: Anka Yayınları" value={name} onChange={(e) => onNameChange(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="student-branch-exam-total-stock">Toplam Stok</Label>
               <Input
