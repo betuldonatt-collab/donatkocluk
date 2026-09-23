@@ -25,6 +25,22 @@ import { getTaskTopicMistakesForCoach, saveCoachTrialResults } from "../../../..
 import type { DetailTask } from "../../types";
 import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selector";
 
+// saveCoachTrialResults' own intentional `throw new Error("...")` calls
+// reach the client with their real message intact -- but "Minified React
+// error #NNN" is a different thing: it's what Next.js shows when
+// something breaks in the re-render Next automatically runs right after
+// a Server Action returns (see lib/supabase/server.ts's createClient --
+// an auth token refresh mid-action is a cookie write, and any cookie
+// write from a Server Action makes Next re-render the current page and
+// its layouts before resolving the action's own promise). The database
+// write itself has very likely already gone through by that point -- the
+// coach just never gets told so -- so this swaps the unreadable digest
+// for guidance to go check, instead of a dead-end wall of framework text.
+function friendlySaveError(e: unknown): string {
+  if (e instanceof Error && !/minified react error/i.test(e.message)) return e.message;
+  return "Kaydedilemedi ya da sonuç belirsiz kaldı. Listeye dönüp bu denemenin hâlâ \"Analiz Bekliyor\" durumunda olup olmadığını kontrol et, gerekirse tekrar dene.";
+}
+
 // Mirrors task-modal.tsx's own parseGeneralExamTitle track-recovery
 // (duplicated, not imported -- that lives under app/student).
 function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
@@ -132,7 +148,7 @@ export function TrialResultsSection({
         // way out -- surface the error and unblock the UI with an empty
         // mistake list instead.
         setMistakesLoaded(true);
-        toast.error(e instanceof Error ? e.message : "Konu hataları yüklenemedi.");
+        toast.error(e instanceof Error && !/minified react error/i.test(e.message) ? e.message : "Konu hataları yüklenemedi.");
       });
     return () => {
       cancelled = true;
@@ -219,7 +235,7 @@ export function TrialResultsSection({
         });
         onSaved(updated as DetailTask);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+        setError(friendlySaveError(e));
       } finally {
         setSaving(false);
       }
@@ -245,7 +261,7 @@ export function TrialResultsSection({
       });
       onSaved(updated as DetailTask);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlySaveError(e));
     } finally {
       setSaving(false);
     }
