@@ -494,6 +494,15 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
   if (fetchError) throw dbError(fetchError);
   if (request.status !== "pending") throw new Error("Bu istek zaten işlenmiş.");
 
+  // 9th-grade flag (migration 0097), read separately and tolerant of the column
+  // not existing yet -- any error just means "not a 9th grader".
+  const { data: maarif9Row, error: maarif9Error } = await supabase
+    .from("signup_requests")
+    .select("is_maarif9")
+    .eq("id", requestIdV)
+    .maybeSingle();
+  const requestedMaarif9 = !maarif9Error && (maarif9Row as { is_maarif9?: boolean } | null)?.is_maarif9 === true;
+
   const tempPassword = generateTempPassword();
   const adminClient = createAdminClient();
   // role goes in app_metadata, not user_metadata -- handle_new_user() (0062)
@@ -528,6 +537,7 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
       // student requests carry a value here at all (see
       // submitSignupRequest, app/login/actions.ts).
       ...(request.requested_role === "student" && request.exam_type ? { exam_type: request.exam_type } : {}),
+      ...(request.requested_role === "student" && requestedMaarif9 ? { is_maarif9: true } : {}),
     })
     .eq("id", createData.user.id);
   if (roleFixError) throw dbError(roleFixError);

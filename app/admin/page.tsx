@@ -116,6 +116,15 @@ export default async function AdminPage() {
       .limit(200),
   ]);
 
+  // 9th-grade signup flag (migration 0097), read separately and tolerant of the
+  // column not existing yet.
+  const requestIds = (signupRequests ?? []).map((r) => r.id);
+  const { data: maarif9RequestRows, error: maarif9RequestError } = requestIds.length
+    ? await supabase.from("signup_requests").select("id").eq("is_maarif9", true).in("id", requestIds)
+    : { data: [], error: null };
+  const maarif9RequestIds = new Set(maarif9RequestError ? [] : (maarif9RequestRows ?? []).map((r) => r.id));
+  const signupRequestsWithGrade = (signupRequests ?? []).map((r) => ({ ...r, is_maarif9: maarif9RequestIds.has(r.id) }));
+
   const peopleById = new Map(
     [...(students ?? []), ...(coaches ?? [])].map((p) => [p.id, { id: p.id, full_name: p.full_name }]),
   );
@@ -162,7 +171,7 @@ export default async function AdminPage() {
         <p className="text-muted-foreground mb-4 text-sm">
           Yeni hesap talep eden öğrenci, veli ve koçlar -- onaylanana kadar hiçbir hesap oluşmaz.
         </p>
-        <PendingSignupRequests requests={signupRequests ?? []} />
+        <PendingSignupRequests requests={signupRequestsWithGrade} />
       </section>
 
       <section className="mt-10">

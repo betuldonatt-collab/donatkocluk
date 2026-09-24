@@ -187,12 +187,17 @@ export async function submitSignupRequest(
   }
   // Only a student request carries a cohort -- parent/coach requests leave
   // this null regardless of what the form sent.
-  const examType = role === "student" && EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null;
+  const isMaarif9 = role === "student" && examTypeRaw === "MAARIF9";
+  // "9. Sınıf (Maarif)" is not an exam_type: those students stay on the YKS default
+  // and are marked by profiles.is_maarif9 (carried as signup_requests.is_maarif9).
+  const examType = role === "student" ? (isMaarif9 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("signup_requests")
-    .insert({ full_name: fullName, phone, requested_role: role, exam_type: examType });
+    // is_maarif9 is only sent when true, so every other signup keeps working
+    // exactly as before even if migration 0097 has not been applied yet.
+    .insert({ full_name: fullName, phone, requested_role: role, exam_type: examType, ...(isMaarif9 ? { is_maarif9: true } : {}) });
 
   if (error) {
     // dbError logs the full raw Postgres error (message/code/details/hint)

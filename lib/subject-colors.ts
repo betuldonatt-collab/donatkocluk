@@ -112,6 +112,26 @@ const COURSE_FAMILY: Record<string, SubjectFamily> = {
   "lgs-inkilap-tarihi": "tarih",
   "lgs-din-kulturu": "din",
   "lgs-ingilizce": "ingilizce",
+  // 9th grade (Maarif): Kaynak Takibi courses and the Genel Deneme sheet's own
+  // subject courses reuse the matching existing family (same hue as the
+  // TYT/AYT/LGS subject of the same name).
+  "maarif9-turk-dili-ve-edebiyati": "turkce",
+  "maarif9-matematik": "matematik",
+  "maarif9-fizik": "fizik",
+  "maarif9-kimya": "kimya",
+  "maarif9-biyoloji": "biyoloji",
+  "maarif9-tarih": "tarih",
+  "maarif9-cografya": "cografya",
+  "maarif9-din": "din",
+  "maarif9-ingilizce": "ingilizce",
+  "maarif9-gd-turk-dili-ve-edebiyati": "turkce",
+  "maarif9-gd-matematik": "matematik",
+  "maarif9-gd-fizik": "fizik",
+  "maarif9-gd-kimya": "kimya",
+  "maarif9-gd-biyoloji": "biyoloji",
+  "maarif9-gd-tarih": "tarih",
+  "maarif9-gd-cografya": "cografya",
+  "maarif9-gd-din-kulturu": "din",
 };
 
 // Branch-exam "macro" course ids (lib/curriculum's BRANCH_EXAM_MACRO_COURSES)

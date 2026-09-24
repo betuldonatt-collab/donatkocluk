@@ -17,7 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CourseTabs } from "@/components/course-tabs";
+import { CourseChips, CourseTabs } from "@/components/course-tabs";
+import { useIsMaarif9 } from "@/components/maarif9-context";
+import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
 import type { Course } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import { addResource } from "./actions";
@@ -35,6 +37,7 @@ export function KaynakKutuphanesiClient({
   examType: ExamType;
 }) {
   const [resources, setResources] = useState(initialResources);
+  const isMaarif9 = useIsMaarif9();
 
   function addToState(rows: LibraryResource[]) {
     setResources((prev) => [...prev, ...rows]);
@@ -50,12 +53,39 @@ export function KaynakKutuphanesiClient({
         </p>
       </header>
 
-      <CourseTabs
-        examType={examType}
-        render={(course) => (
-          <CourseLibraryPanel course={course} resources={resources} onAdded={addToState} />
-        )}
+      {isMaarif9 ? (
+        <Maarif9Library resources={resources} onAdded={addToState} />
+      ) : (
+        <CourseTabs
+          examType={examType}
+          render={(course) => (
+            <CourseLibraryPanel course={course} resources={resources} onAdded={addToState} />
+          )}
+        />
+      )}
+    </div>
+  );
+}
+
+// 9th graders: one chip row of the 9th-grade subjects (no TYT/AYT split), same
+// per-course library panel as everyone else.
+function Maarif9Library({
+  resources,
+  onAdded,
+}: {
+  resources: LibraryResource[];
+  onAdded: (rows: LibraryResource[]) => void;
+}) {
+  const [courseId, setCourseId] = useState(MAARIF9_KAYNAK_COURSES[0].id);
+  const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === courseId) ?? MAARIF9_KAYNAK_COURSES[0];
+  return (
+    <div className="space-y-4">
+      <CourseChips
+        courses={MAARIF9_KAYNAK_COURSES.map((c) => ({ ...c, name: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }))}
+        selectedId={course.id}
+        onSelect={setCourseId}
       />
+      <CourseLibraryPanel course={course} resources={resources} onAdded={onAdded} />
     </div>
   );
 }

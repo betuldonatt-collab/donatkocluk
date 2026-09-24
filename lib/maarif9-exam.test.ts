@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAARIF9_EXAM_QUESTION_TOTAL, MAARIF9_EXAM_SUBJECTS, coursesForMaarif9ExamSubject } from "./curriculum/subject-groups";
 import { findCourseById } from "./curriculum";
+import { subjectBackgroundClass } from "./subject-colors";
 import {
   expectedGeneralExamKeys,
   findGeneralExamTotalMismatch,
@@ -62,5 +63,28 @@ describe("9th-grade Genel Deneme", () => {
   it("leaves TYT and LGS titles resolving exactly as before", () => {
     expect(expectedGeneralExamKeys("TYT Genel Deneme", null)).toEqual(["turkce", "sosyal", "matematik", "fen"]);
     expect(expectedGeneralExamKeys("LGS Genel Deneme", null)).toContain("lgs_turkce");
+  });
+});
+
+describe("9th-grade subject colours", () => {
+  it("reuse the existing subject family colours", () => {
+    const pairs: [string, string][] = [
+      ["maarif9-matematik", "tyt-matematik"],
+      ["maarif9-fizik", "tyt-fizik"],
+      ["maarif9-kimya", "tyt-kimya"],
+      ["maarif9-biyoloji", "tyt-biyoloji"],
+      ["maarif9-tarih", "tyt-tarih"],
+      ["maarif9-cografya", "tyt-cografya"],
+      ["maarif9-din", "tyt-din"],
+      ["maarif9-turk-dili-ve-edebiyati", "tyt-turkce"],
+      ["maarif9-ingilizce", "lgs-ingilizce"],
+      ["maarif9-gd-matematik", "tyt-matematik"],
+    ];
+    for (const [nine, existing] of pairs) {
+      for (const type of ["question_bank", "branch_exam"]) {
+        expect(subjectBackgroundClass(nine, type)).toBe(subjectBackgroundClass(existing, type));
+      }
+      expect(subjectBackgroundClass(nine, "question_bank")).not.toBe("bg-slate-500/10");
+    }
   });
 });
