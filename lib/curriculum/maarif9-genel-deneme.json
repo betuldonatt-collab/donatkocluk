@@ -1,0 +1,797 @@
+[
+  {
+    "id": "maarif9-gd-turk-dili-ve-edebiyati",
+    "group": "TÜRKÇE",
+    "name": "TÜRK DİLİ VE EDEBİYATI",
+    "units": [
+      {
+        "unit": null,
+        "topics": [
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t0",
+            "name": "Edebiyat ve Dil"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t1",
+            "name": "Metin Türleri (Deneme/ Mülakat)"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t2",
+            "name": "Paragrafta Anlam"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t3",
+            "name": "Dil Bilgisi › Ses Bilgisi"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t4",
+            "name": "Dil Bilgisi › Yazım Kuralları"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t5",
+            "name": "Dil Bilgisi › Noktalama İşaretleri"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t6",
+            "name": "Hikâye ve Anlatmaya Bağlı Metinler"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t7",
+            "name": "Şiir"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t8",
+            "name": "Anı"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t9",
+            "name": "Paragrafta Anlam"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t10",
+            "name": "Hikâyede Yapı ve Anlatım"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t11",
+            "name": "Gezi Yazısı"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t12",
+            "name": "Roman"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t13",
+            "name": "Eleştiri"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t14",
+            "name": "Tiyatro"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t15",
+            "name": "Dil Bilgisi › Sıfatlar"
+          },
+          {
+            "id": "maarif9-gd-turk-dili-ve-edebiyati-u0-t16",
+            "name": "Dil Bilgisi › Zarflar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-tarih",
+    "group": "SOSYAL BİLİMLER",
+    "name": "TARİH",
+    "units": [
+      {
+        "unit": "1.ÜNİTE: GEÇMİŞİN İNŞA SÜRECİNDE TARİH",
+        "topics": [
+          {
+            "id": "maarif9-gd-tarih-u0-t0",
+            "name": "Tarih Öğrenmenin Faydaları"
+          },
+          {
+            "id": "maarif9-gd-tarih-u0-t1",
+            "name": "Tarihin Doğası"
+          },
+          {
+            "id": "maarif9-gd-tarih-u0-t2",
+            "name": "Tarihsel Bilginin Üretim Süreci"
+          },
+          {
+            "id": "maarif9-gd-tarih-u0-t3",
+            "name": "Tarih Araştırma ve Yazımında Dijital Dönüşüm"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: ESKİ ÇAĞ MEDENİYETLERİ",
+        "topics": [
+          {
+            "id": "maarif9-gd-tarih-u1-t0",
+            "name": "Tarım Devrimi’nin Eski Çağ’a Etkileri"
+          },
+          {
+            "id": "maarif9-gd-tarih-u1-t1",
+            "name": "Eski Çağ’da Yönetenler ve Savaşanlar"
+          },
+          {
+            "id": "maarif9-gd-tarih-u1-t2",
+            "name": "Eski Çağ’da Hukuk"
+          },
+          {
+            "id": "maarif9-gd-tarih-u1-t3",
+            "name": "Eski Çağ’da İnanç, Bilim ve Sanat"
+          },
+          {
+            "id": "maarif9-gd-tarih-u1-t4",
+            "name": "Türklerde Konargöçer Yaşam"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: ORTA ÇAĞ MEDENİYETLERİ",
+        "topics": [
+          {
+            "id": "maarif9-gd-tarih-u2-t0",
+            "name": "Orta Çağ’daki Kitlesel Göçler"
+          },
+          {
+            "id": "maarif9-gd-tarih-u2-t1",
+            "name": "Orta Çağ’daki Siyasi ve Askerî Gelişmeler"
+          },
+          {
+            "id": "maarif9-gd-tarih-u2-t2",
+            "name": "Orta Çağ’da Ticaret Yolları"
+          },
+          {
+            "id": "maarif9-gd-tarih-u2-t3",
+            "name": "Orta Çağ’da Bilim, Kültür ve Sanat"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-cografya",
+    "group": "SOSYAL BİLİMLER",
+    "name": "COĞRAFYA",
+    "units": [
+      {
+        "unit": "1.Ünite: Coğrafyanın Doğası",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u0-t0",
+            "name": "Coğrafya Bilimi"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Mekânsal Bilgi Teknolojileri",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u1-t0",
+            "name": "Harita Okuryazarlığı"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Doğal Sistemler Ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u2-t0",
+            "name": "İklim Sistemini Anlamak"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Beşerî Sistemler Ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u3-t0",
+            "name": "Nüfus Dinamikleri"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Ekonomik Faaliyetler Ve Etkileri",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u4-t0",
+            "name": "Ekonomik Faaliyetleri Etkileyen Coğrafi Faktörler"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite: Afetler Ve Sürdürülebilir Çevre",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u5-t0",
+            "name": "Afetler"
+          }
+        ]
+      },
+      {
+        "unit": "7. Ünite: Bölgeler, Ülkeler Ve Küresel Bağlantılar",
+        "topics": [
+          {
+            "id": "maarif9-gd-cografya-u6-t0",
+            "name": "Bölge ve Bölge Sınırı"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-din-kulturu",
+    "group": "SOSYAL BİLİMLER",
+    "name": "DİN KÜLTÜRÜ",
+    "units": [
+      {
+        "unit": "1.Ünite: Allah İnsan İlişkisi",
+        "topics": []
+      },
+      {
+        "unit": "2.Ünite: İslam'da İnanç Esasları",
+        "topics": []
+      },
+      {
+        "unit": "3.Ünite: İslam'da İbadetler",
+        "topics": []
+      },
+      {
+        "unit": "4.Ünite: İslam'da Ahlak İlkeleri",
+        "topics": []
+      },
+      {
+        "unit": "5.Ünite: Kur'an'a Göre Hz. Muhammed",
+        "topics": []
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-matematik",
+    "group": "MATEMATİK",
+    "name": "MATEMATİK",
+    "units": [
+      {
+        "unit": "1. TEMA: SAYILAR",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u0-t0",
+            "name": "Gerçek Sayıların Üslü Ve Köklü Gösterimleri İle Yapılan İşlemler"
+          },
+          {
+            "id": "maarif9-gd-matematik-u0-t1",
+            "name": "Gerçek Sayı Aralıklarının Gösteriminde Ve Aralıklarla İlgili İşlemlerde Küme Sembol Ve İşlemleri"
+          },
+          {
+            "id": "maarif9-gd-matematik-u0-t2",
+            "name": "Sayı Kümelerinin Özellikleri"
+          },
+          {
+            "id": "maarif9-gd-matematik-u0-t3",
+            "name": "Gerçek Sayıların İşlem Özellikleri"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: NİCELİKLER VE DEĞİŞİMLER",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u1-t0",
+            "name": "Gerçek Sayılarda Tanımlı Doğrusal Fonksiyonlar Ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif9-gd-matematik-u1-t1",
+            "name": "Gerçek Sayılarda Tanımlı Mutlak Değer Fonksiyonları Ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif9-gd-matematik-u1-t2",
+            "name": "Doğrusal Fonksiyonlarla İfade Edilebilen Denklem Ve Eşitsizlikler İçeren Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "3. TEMA: GEOMETRİK ŞEKİLLER",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u2-t0",
+            "name": "Üçgende Açı Ve Kenarlarla İlgili Özellikler"
+          }
+        ]
+      },
+      {
+        "unit": "4. TEMA: EŞLİK VE BENZERLİK",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u3-t0",
+            "name": "Geometrik Dönüşümler"
+          },
+          {
+            "id": "maarif9-gd-matematik-u3-t1",
+            "name": "İki Üçgenin Eş Veya Benzer Olması İçin Gerekli Olan Asgari Koşullar"
+          },
+          {
+            "id": "maarif9-gd-matematik-u3-t2",
+            "name": "Bir Üçgenden Hareketle Ona Benzer Üçgenler Oluşturma"
+          },
+          {
+            "id": "maarif9-gd-matematik-u3-t3",
+            "name": "Tales, Öklid Ve Pisagor Teoremleri"
+          },
+          {
+            "id": "maarif9-gd-matematik-u3-t4",
+            "name": "Eşlik Ve Benzerlikle İlgili Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "5. TEMA: ALGORİTMA VE BİLİŞİM",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u4-t0",
+            "name": "Algoritma Temelli Yaklaşımlarla Problem Çözme"
+          },
+          {
+            "id": "maarif9-gd-matematik-u4-t1",
+            "name": "Algoritmik Yapılar İçerisindeki Mantık Bağlaçları Ve Niceleyiciler"
+          },
+          {
+            "id": "maarif9-gd-matematik-u4-t2",
+            "name": "Algoritmalarda Ve Matematiksel İspatlarda Mantık Bağlaçları Ve Niceleyiciler"
+          }
+        ]
+      },
+      {
+        "unit": "6. TEMA: İSTATİSTİKSEL ARAŞTIRMA SÜRECİ",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u5-t0",
+            "name": "Ek Nicel Değişkenli Veri Dağılımları İle Çalışma Ve Veriye Dayalı Karar Verme"
+          },
+          {
+            "id": "maarif9-gd-matematik-u5-t1",
+            "name": "Başkaları Tarafından Oluşturulan Tek Nicel Değişkenli Veri Dağılımlarına Dayalı Sonuç Veya Yorumları Tartışabilme"
+          }
+        ]
+      },
+      {
+        "unit": "7. TEMA: VERİDEN OLASILIĞA",
+        "topics": [
+          {
+            "id": "maarif9-gd-matematik-u6-t0",
+            "name": "Olayların Olasılığını Gözleme Dayalı Tahmin Etme"
+          },
+          {
+            "id": "maarif9-gd-matematik-u6-t1",
+            "name": "Olayların Olasılığına İlişkin Tümevarımsal Akıl Yürütme"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-fizik",
+    "group": "FEN BİLİMLERİ",
+    "name": "FİZİK",
+    "units": [
+      {
+        "unit": "1. ÜNİTE: FİZİK BİLİMİ VE KARİYER KEŞFİ",
+        "topics": [
+          {
+            "id": "maarif9-gd-fizik-u0-t0",
+            "name": "Fizik Bilimi"
+          },
+          {
+            "id": "maarif9-gd-fizik-u0-t1",
+            "name": "Fizik Biliminin Alt Dalları"
+          },
+          {
+            "id": "maarif9-gd-fizik-u0-t2",
+            "name": "Fizik Bilimine Yön Verenler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u0-t3",
+            "name": "Fizik Bilimi İle İlgili Kariyer Keşfi"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: KUVVET VE HAREKET",
+        "topics": [
+          {
+            "id": "maarif9-gd-fizik-u1-t0",
+            "name": "Temel Ve Türetilmiş Nicelikler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t1",
+            "name": "Skaler Ve Vektörel Nicelikler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t2",
+            "name": "Vektörler › Vektörlerin Özellikleri"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t3",
+            "name": "Vektörler › Vektörlerin Toplanması"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t4",
+            "name": "Vektörler › Vektörlerin Toplanmasında Kullanılan Yöntemler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t5",
+            "name": "Doğadaki Temel Kuvvetler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t6",
+            "name": "Hareket Ve Hareket Türleri › Hareketin Temel Kavramları"
+          },
+          {
+            "id": "maarif9-gd-fizik-u1-t7",
+            "name": "Hareket Ve Hareket Türleri › Hareket Türleri"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: AKIŞKANLAR",
+        "topics": [
+          {
+            "id": "maarif9-gd-fizik-u2-t0",
+            "name": "Basınç"
+          },
+          {
+            "id": "maarif9-gd-fizik-u2-t1",
+            "name": "Sıvılarda Basınç"
+          },
+          {
+            "id": "maarif9-gd-fizik-u2-t2",
+            "name": "Açık Hava Basıncı"
+          },
+          {
+            "id": "maarif9-gd-fizik-u2-t3",
+            "name": "Kaldırma Kuvveti"
+          },
+          {
+            "id": "maarif9-gd-fizik-u2-t4",
+            "name": "Bernoulli İlkesi"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: ENERJİ",
+        "topics": [
+          {
+            "id": "maarif9-gd-fizik-u3-t0",
+            "name": "İç Enerji, Isı Sıcaklık Arasındaki İlişki"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t1",
+            "name": "Isı, Öz Isı, Isı Sığası Ve Sıcaklık Farkı Arasındaki İlişki › Termometreler"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t2",
+            "name": "Isı, Öz Isı, Isı Sığası Ve Sıcaklık Farkı Arasındaki İlişki › Öz Isı ve Isı Sığası"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t3",
+            "name": "Hâl Değişimi"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t4",
+            "name": "Isıl Denge"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t5",
+            "name": "Isı Aktarım Yolları"
+          },
+          {
+            "id": "maarif9-gd-fizik-u3-t6",
+            "name": "Isı İletim Hızı"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-kimya",
+    "group": "FEN BİLİMLERİ",
+    "name": "KİMYA",
+    "units": [
+      {
+        "unit": "1. TEMA: ETKİLEŞİM",
+        "topics": [
+          {
+            "id": "maarif9-gd-kimya-u0-t0",
+            "name": "Kimya Hayattır › Günlük Hayatta Kimya"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t1",
+            "name": "Kimya Hayattır › Kimyanın Alt Disiplinleri"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t2",
+            "name": "Kimya Hayattır › Kimya Alanında Kariyer Olanakları"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t3",
+            "name": "Kimya Hayattır › Kimyasal Maddelerin Kullanımı ve Güvenlik"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t4",
+            "name": "Atomdan Periyodik Tabloya › Atom Teorileri ve Atomun Yapısı"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t5",
+            "name": "Atomdan Periyodik Tabloya › Atom Orbitalleri ve Elektron Dizilim"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t6",
+            "name": "Atomdan Periyodik Tabloya › Periyodik Tabloda Yer Bulma"
+          },
+          {
+            "id": "maarif9-gd-kimya-u0-t7",
+            "name": "Atomdan Periyodik Tabloya › Periyodik Özellikler"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: ÇEŞİTLİLİK",
+        "topics": [
+          {
+            "id": "maarif9-gd-kimya-u1-t0",
+            "name": "Etkileşimler › Metalik Bağ"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t1",
+            "name": "Etkileşimler › İyonik Bağ"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t2",
+            "name": "Etkileşimler › Kovalent Bağ"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t3",
+            "name": "Etkileşimler › Lewis Nokta Yapısı"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t4",
+            "name": "Etkileşimler › Molekül Polarlığı ve Apolarlığı"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t5",
+            "name": "Etkileşimler › Bileşiklerin Adlandırılması"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t6",
+            "name": "Etkileşimden Maddeye › Moleküller Arası Etkileşimler"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t7",
+            "name": "Etkileşimden Maddeye › Katılar ve Özellikleri"
+          },
+          {
+            "id": "maarif9-gd-kimya-u1-t8",
+            "name": "Etkileşimden Maddeye › Sıvılar ve Özellikleri"
+          }
+        ]
+      },
+      {
+        "unit": "3. TEMA: SÜRDÜRÜLEBİLİRLİK",
+        "topics": [
+          {
+            "id": "maarif9-gd-kimya-u2-t0",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Metal Nanoparçacıklar"
+          },
+          {
+            "id": "maarif9-gd-kimya-u2-t1",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Yeşil Kimyanın Atık Önleme İlkesi"
+          },
+          {
+            "id": "maarif9-gd-kimya-u2-t2",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Metal, Alaşım ve Metal Nanoparçacıkların Çevre"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-gd-biyoloji",
+    "group": "FEN BİLİMLERİ",
+    "name": "BİYOLOJİ",
+    "units": [
+      {
+        "unit": "1. TEMA: YAŞAM",
+        "topics": [
+          {
+            "id": "maarif9-gd-biyoloji-u0-t0",
+            "name": "1.1. Biyolojinin Önemi Ve Biyolojideki Dönüm Noktalarının İnsan Hayatına Katkıları"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t1",
+            "name": "1.2. Bilim, Bilimin Doğası Ve Bilimsel Araştırma Süreçleri"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t2",
+            "name": "1.3. Bilimsel Araştırmaların Bilim Etiğine Uygunluğu"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t3",
+            "name": "1.4. Canlıların Ortak Özellikleri › Hücresel Yapı"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t4",
+            "name": "1.4. Canlıların Ortak Özellikleri › Organizasyon"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t5",
+            "name": "1.4. Canlıların Ortak Özellikleri › Beslenme"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t6",
+            "name": "1.4. Canlıların Ortak Özellikleri › Enerji Üretimi ve Tüketimi"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t7",
+            "name": "1.4. Canlıların Ortak Özellikleri › Metabolizma"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t8",
+            "name": "1.4. Canlıların Ortak Özellikleri › Boşaltım"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t9",
+            "name": "1.4. Canlıların Ortak Özellikleri › Büyüme ve Gelişme"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t10",
+            "name": "1.4. Canlıların Ortak Özellikleri › Üreme"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t11",
+            "name": "1.4. Canlıların Ortak Özellikleri › Uyarılara Tepki"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t12",
+            "name": "1.4. Canlıların Ortak Özellikleri › Homeostazi"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t13",
+            "name": "1.4. Canlıların Ortak Özellikleri › Varyasyon ve Adaptasyon"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t14",
+            "name": "1.4. Canlıların Ortak Özellikleri › Virüsler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t15",
+            "name": "1.5. Sınıflandırmada Temel Yaklaşımlar Ve Modern Sınıflandırma"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t16",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Bakteriler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t17",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Arkeler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t18",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Ökaryotlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t19",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Protista"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t20",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Bitkiler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t21",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Mantarlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t22",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Hayvanlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t23",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Omurgasız Hayvanlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t24",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Omurgalı Hayvanlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t25",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.3. Canlıların Biyolojik Çeşitlilik Veri Tabanı"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u0-t26",
+            "name": "1.7. Biyoçeşitlilik"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: ORGANİZASYON",
+        "topics": [
+          {
+            "id": "maarif9-gd-biyoloji-u1-t0",
+            "name": "2.1. İnorganik Moleküller › Su"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t1",
+            "name": "2.1. İnorganik Moleküller › Mineraller"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t2",
+            "name": "2.2. Organik Moleküller › Karbonhidratlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t3",
+            "name": "2.2. Organik Moleküller › Lipitler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t4",
+            "name": "2.2. Organik Moleküller › Proteinler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t5",
+            "name": "2.2. Organik Moleküller › Enzim Aktivitesini Etkileyen Koşullar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t6",
+            "name": "2.2. Organik Moleküller › Nükleik Asitler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t7",
+            "name": "2.2. Organik Moleküller › Vitaminler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t8",
+            "name": "2.2. Organik Moleküller › Yağda Çözünen Vitaminler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t9",
+            "name": "2.2. Organik Moleküller › Suda Çözünen Vitaminler"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t10",
+            "name": "2.3. Organik Moleküllerin Tayininde Kullanılan Ayıraçlar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t11",
+            "name": "2.4. Enzim Aktivitesini Etkileyen Koşullar"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t12",
+            "name": "2.5. Hücre ve Alt Birimleri › Prokaryot ve Ökaryot Hücre Yapısı"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t13",
+            "name": "2.5. Hücre ve Alt Birimleri › Hücrelerin Yapısal Bileşenleri"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t14",
+            "name": "2.5. Hücre ve Alt Birimleri › Organeller"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t15",
+            "name": "2.6. Hücre Zarından Madde Geçişleri"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t16",
+            "name": "2.7. Küçük Moleküllerin Hareketi: Difüzyon ve Ozmoz"
+          },
+          {
+            "id": "maarif9-gd-biyoloji-u1-t17",
+            "name": "2.8. Hücre, Doku, Organ ve Sistemlerin Organizasyonu"
+          }
+        ]
+      }
+    ]
+  }
+]

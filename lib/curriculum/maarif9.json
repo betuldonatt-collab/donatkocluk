@@ -1,0 +1,1051 @@
+[
+  {
+    "id": "maarif9-turk-dili-ve-edebiyati",
+    "name": "9. Sınıf TÜRK DİLİ VE EDEBİYATI",
+    "units": [
+      {
+        "unit": "TEMA 1: SÖZÜN İNCELİĞİ",
+        "topics": [
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t0",
+            "name": "1.1. Edebiyat ve Dil"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t1",
+            "name": "1.2. Metin Türleri › Deneme"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t2",
+            "name": "1.2. Metin Türleri › Mülakat"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t3",
+            "name": "1.3. Dil Bilgisi › Ses bilgisi"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t4",
+            "name": "1.3. Dil Bilgisi › Yazım kuralları"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u0-t5",
+            "name": "1.3. Dil Bilgisi › Noktalama işaretleri"
+          }
+        ]
+      },
+      {
+        "unit": "TEMA 2: ANLAM ARAYIŞI",
+        "topics": [
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t0",
+            "name": "2.1. Hikâye ve Anlatmaya Bağlı Metinler"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t1",
+            "name": "2.2. Şiir › Şiirin özellikleri"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t2",
+            "name": "2.2. Şiir › Ahenk unsurları (ölçü, kafiye, redif)"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t3",
+            "name": "2.2. Şiir › Şiirde anlam ve duygu"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t4",
+            "name": "2.3. Anı"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t5",
+            "name": "2.4. Metni Anlama › Konu"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t6",
+            "name": "2.4. Metni Anlama › Ana düşünce"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u1-t7",
+            "name": "2.4. Metni Anlama › Ana duygu"
+          }
+        ]
+      },
+      {
+        "unit": "TEMA 3: ANLAMIN YAPI TAŞLARI",
+        "topics": [
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u2-t0",
+            "name": "3.1. Hikâyede Yapı ve Anlatım"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u2-t1",
+            "name": "3.2. Gezi Yazısı"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u2-t2",
+            "name": "3.3. Şiir İnceleme › Şekil ve içerik"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u2-t3",
+            "name": "3.3. Şiir İnceleme › Ahenk unsurları"
+          }
+        ]
+      },
+      {
+        "unit": "TEMA 4: DİLİN ZENGİNLİĞİ",
+        "topics": [
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u3-t0",
+            "name": "4.1. Roman"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u3-t1",
+            "name": "4.2. Eleştiri"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u3-t2",
+            "name": "4.3. Tiyatro"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u3-t3",
+            "name": "4.4. Dil Bilgisi › Sıfatlar"
+          },
+          {
+            "id": "maarif9-turk-dili-ve-edebiyati-u3-t4",
+            "name": "4.4. Dil Bilgisi › Zarflar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-matematik",
+    "name": "9. Sınıf: MATEMATİK",
+    "units": [
+      {
+        "unit": "1. TEMA: SAYILAR",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u0-t0",
+            "name": "Gerçek Sayıların Üslü Ve Köklü Gösterimleri İle Yapılan İşlemler"
+          },
+          {
+            "id": "maarif9-matematik-u0-t1",
+            "name": "Gerçek Sayı Aralıklarının Gösteriminde Ve Aralıklarla İlgili İşlemlerde Küme Sembol Ve İşlemleri"
+          },
+          {
+            "id": "maarif9-matematik-u0-t2",
+            "name": "Sayı Kümelerinin Özellikleri"
+          },
+          {
+            "id": "maarif9-matematik-u0-t3",
+            "name": "Gerçek Sayıların İşlem Özellikleri"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: NİCELİKLER VE DEĞİŞİMLER",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u1-t0",
+            "name": "Gerçek Sayılarda Tanımlı Doğrusal Fonksiyonlar Ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif9-matematik-u1-t1",
+            "name": "Gerçek Sayılarda Tanımlı Mutlak Değer Fonksiyonları Ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif9-matematik-u1-t2",
+            "name": "Doğrusal Fonksiyonlarla İfade Edilebilen Denklem Ve Eşitsizlikler İçeren Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "3. TEMA: GEOMETRİK ŞEKİLLER",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u2-t0",
+            "name": "Üçgende Açı Ve Kenarlarla İlgili Özellikler"
+          }
+        ]
+      },
+      {
+        "unit": "4. TEMA: EŞLİK VE BENZERLİK",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u3-t0",
+            "name": "Geometrik Dönüşümler"
+          },
+          {
+            "id": "maarif9-matematik-u3-t1",
+            "name": "İki Üçgenin Eş Veya Benzer Olması İçin Gerekli Olan Asgari Koşullar"
+          },
+          {
+            "id": "maarif9-matematik-u3-t2",
+            "name": "Bir Üçgenden Hareketle Ona Benzer Üçgenler Oluşturma"
+          },
+          {
+            "id": "maarif9-matematik-u3-t3",
+            "name": "Tales, Öklid Ve Pisagor Teoremleri"
+          },
+          {
+            "id": "maarif9-matematik-u3-t4",
+            "name": "Eşlik Ve Benzerlikle İlgili Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "5. TEMA: ALGORİTMA VE BİLİŞİM",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u4-t0",
+            "name": "Algoritma Temelli Yaklaşımlarla Problem Çözme"
+          },
+          {
+            "id": "maarif9-matematik-u4-t1",
+            "name": "Algoritmik Yapılar İçerisindeki Mantık Bağlaçları Ve Niceleyiciler"
+          },
+          {
+            "id": "maarif9-matematik-u4-t2",
+            "name": "Algoritmalarda Ve Matematiksel İspatlarda Mantık Bağlaçları Ve Niceleyiciler"
+          }
+        ]
+      },
+      {
+        "unit": "6. TEMA: İSTATİSTİKSEL ARAŞTIRMA SÜRECİ",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u5-t0",
+            "name": "Ek Nicel Değişkenli Veri Dağılımları İle Çalışma Ve Veriye Dayalı Karar Verme"
+          },
+          {
+            "id": "maarif9-matematik-u5-t1",
+            "name": "Başkaları Tarafından Oluşturulan Tek Nicel Değişkenli Veri Dağılımlarına Dayalı Sonuç Veya Yorumları Tartışabilme"
+          }
+        ]
+      },
+      {
+        "unit": "7. TEMA: VERİDEN OLASILIĞA",
+        "topics": [
+          {
+            "id": "maarif9-matematik-u6-t0",
+            "name": "Olayların Olasılığını Gözleme Dayalı Tahmin Etme"
+          },
+          {
+            "id": "maarif9-matematik-u6-t1",
+            "name": "Olayların Olasılığına İlişkin Tümevarımsal Akıl Yürütme"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-cografya",
+    "name": "9. Sınıf COĞRAFYA",
+    "units": [
+      {
+        "unit": "1.ÜNİTE: COĞRAFYANIN DOĞASI",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u0-t0",
+            "name": "Coğrafya Bilimi › Coğrafya Biliminin Konusu ve Bölümleri"
+          },
+          {
+            "id": "maarif9-cografya-u0-t1",
+            "name": "Coğrafya Bilimi › Niçin Coğrafya Öğrenmeliyiz?"
+          },
+          {
+            "id": "maarif9-cografya-u0-t2",
+            "name": "Coğrafya Bilimi › Coğrafya Biliminin Gelişimi"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: MEKÂNSAL BİLGİ TEKNOLOJİLERİ",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u1-t0",
+            "name": "Harita Okuryazarlığı › Mekânın Sembolik Dili: Harita"
+          },
+          {
+            "id": "maarif9-cografya-u1-t1",
+            "name": "Harita Okuryazarlığı › Türkiye’nin Coğrafi Konumu"
+          },
+          {
+            "id": "maarif9-cografya-u1-t2",
+            "name": "Harita Okuryazarlığı › Mekânsal Bilgi Teknolojilerinin Bileşenleri"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: DOĞAL SİSTEMLER VE SÜREÇLER",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u2-t0",
+            "name": "İklim Sistemini Anlamak › Hava Olayları"
+          },
+          {
+            "id": "maarif9-cografya-u2-t1",
+            "name": "İklim Sistemini Anlamak › İklim Sistemi"
+          },
+          {
+            "id": "maarif9-cografya-u2-t2",
+            "name": "İklim Sistemini Anlamak › İklim Türleri"
+          },
+          {
+            "id": "maarif9-cografya-u2-t3",
+            "name": "İklim Sistemini Anlamak › İklim Sisteminde Yaşanan Değişiklikler"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: BEŞERÎ SİSTEMLER VE SÜREÇLER",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u3-t0",
+            "name": "Nüfus Dinamikleri › Nüfusun Tarihsel Değişimi ve Geleceği"
+          },
+          {
+            "id": "maarif9-cografya-u3-t1",
+            "name": "Nüfus Dinamikleri › Nüfusun Dağılışı ve Hareketleri"
+          },
+          {
+            "id": "maarif9-cografya-u3-t2",
+            "name": "Nüfus Dinamikleri › Demografik Dönüşüm Süreci ve Nüfus Piramitleri"
+          },
+          {
+            "id": "maarif9-cografya-u3-t3",
+            "name": "Nüfus Dinamikleri › Nüfus Politikaları"
+          }
+        ]
+      },
+      {
+        "unit": "5. ÜNİTE: EKONOMİK FAALİYETLER VE ETKİLERİ",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u4-t0",
+            "name": "Ekonomik Faaliyetleri Etkileyen Coğrafi Faktörler › Ekonomik Faaliyetleri Etkileyen Doğal Faktörler"
+          },
+          {
+            "id": "maarif9-cografya-u4-t1",
+            "name": "Ekonomik Faaliyetleri Etkileyen Coğrafi Faktörler › Ekonomik Faaliyetleri Etkileyen Beşerî Faktörler"
+          }
+        ]
+      },
+      {
+        "unit": "6. ÜNİTE: AFETLER VE SÜRDÜRÜLEBİLİR ÇEVRE",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u5-t0",
+            "name": "Afetler › Tehlike, Risk ve Afet"
+          },
+          {
+            "id": "maarif9-cografya-u5-t1",
+            "name": "Afetler › Afet Türleri"
+          },
+          {
+            "id": "maarif9-cografya-u5-t2",
+            "name": "Afetler › Bütüncül Afet Yönetimi"
+          }
+        ]
+      },
+      {
+        "unit": "7. ÜNİTE: BÖLGELER, ÜLKELER VE KÜRESEL BAĞLANTILAR",
+        "topics": [
+          {
+            "id": "maarif9-cografya-u6-t0",
+            "name": "Bölge ve Bölge Sınırı › Bölge Belirleme Kriterleri ve Bölge Türleri"
+          },
+          {
+            "id": "maarif9-cografya-u6-t1",
+            "name": "Bölge ve Bölge Sınırı › Kriterlere Göre Bölge Sınırları"
+          },
+          {
+            "id": "maarif9-cografya-u6-t2",
+            "name": "Bölge ve Bölge Sınırı › Bölge Sınırlarında Değişim"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-ingilizce",
+    "name": "9. Sınıf İNGİLİZCE",
+    "units": [
+      {
+        "unit": "THEME 1",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u0-t0",
+            "name": "School Life (Okul Hayatı)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 2",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u1-t0",
+            "name": "Classroom Life (Sınıf Hayatı)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 3",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u2-t0",
+            "name": "Personal Life: Physical Appearance & Personality (Kişisel Yaşam: Fiziksel Görünüm ve Kişilik)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 4",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u3-t0",
+            "name": "Family Life (Aile Hayatı)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 5",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u4-t0",
+            "name": "Life In The House & Neighbourhood (Evde ve Mahallede Yaşam)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 6",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u5-t0",
+            "name": "Life In The City & Country (Şehirde ve Kırsalda Yaşam)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 7",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u6-t0",
+            "name": "Life In The World & Nature (Dünyadaki Yaşam ve Doğa)"
+          }
+        ]
+      },
+      {
+        "unit": "THEME 8",
+        "topics": [
+          {
+            "id": "maarif9-ingilizce-u7-t0",
+            "name": "Life In The Universe & Future (Evrende Yaşam ve Gelecek)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-fizik",
+    "name": "9. Sınıf FİZİK",
+    "units": [
+      {
+        "unit": "1. ÜNİTE: FİZİK BİLİMİ VE KARİYER KEŞFİ",
+        "topics": [
+          {
+            "id": "maarif9-fizik-u0-t0",
+            "name": "Fizik Bilimi"
+          },
+          {
+            "id": "maarif9-fizik-u0-t1",
+            "name": "Fizik Biliminin Alt Dalları"
+          },
+          {
+            "id": "maarif9-fizik-u0-t2",
+            "name": "Fizik Bilimine Yön Verenler"
+          },
+          {
+            "id": "maarif9-fizik-u0-t3",
+            "name": "Fizik Bilimi İle İlgili Kariyer Keşfi"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: KUVVET VE HAREKET",
+        "topics": [
+          {
+            "id": "maarif9-fizik-u1-t0",
+            "name": "Temel Ve Türetilmiş Nicelikler"
+          },
+          {
+            "id": "maarif9-fizik-u1-t1",
+            "name": "Skaler Ve Vektörel Nicelikler"
+          },
+          {
+            "id": "maarif9-fizik-u1-t2",
+            "name": "Vektörler › Vektörlerin Özellikleri"
+          },
+          {
+            "id": "maarif9-fizik-u1-t3",
+            "name": "Vektörler › Vektörlerin Toplanması"
+          },
+          {
+            "id": "maarif9-fizik-u1-t4",
+            "name": "Vektörler › Vektörlerin Toplanmasında Kullanılan Yöntemler"
+          },
+          {
+            "id": "maarif9-fizik-u1-t5",
+            "name": "Doğadaki Temel Kuvvetler"
+          },
+          {
+            "id": "maarif9-fizik-u1-t6",
+            "name": "Hareket Ve Hareket Türleri › Hareketin Temel Kavramları"
+          },
+          {
+            "id": "maarif9-fizik-u1-t7",
+            "name": "Hareket Ve Hareket Türleri › Hareket Türleri"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: AKIŞKANLAR",
+        "topics": [
+          {
+            "id": "maarif9-fizik-u2-t0",
+            "name": "Basınç"
+          },
+          {
+            "id": "maarif9-fizik-u2-t1",
+            "name": "Sıvılarda Basınç"
+          },
+          {
+            "id": "maarif9-fizik-u2-t2",
+            "name": "Açık Hava Basıncı"
+          },
+          {
+            "id": "maarif9-fizik-u2-t3",
+            "name": "Kaldırma Kuvveti"
+          },
+          {
+            "id": "maarif9-fizik-u2-t4",
+            "name": "Bernoulli İlkesi"
+          }
+        ]
+      },
+      {
+        "unit": "4. ÜNİTE: ENERJİ",
+        "topics": [
+          {
+            "id": "maarif9-fizik-u3-t0",
+            "name": "İç Enerji, Isı Sıcaklık Arasındaki İlişki"
+          },
+          {
+            "id": "maarif9-fizik-u3-t1",
+            "name": "Isı, Öz Isı, Isı Sığası Ve Sıcaklık Farkı Arasındaki İlişki › Termometreler"
+          },
+          {
+            "id": "maarif9-fizik-u3-t2",
+            "name": "Isı, Öz Isı, Isı Sığası Ve Sıcaklık Farkı Arasındaki İlişki › Öz Isı ve Isı Sığası"
+          },
+          {
+            "id": "maarif9-fizik-u3-t3",
+            "name": "Hâl Değişimi"
+          },
+          {
+            "id": "maarif9-fizik-u3-t4",
+            "name": "Isıl Denge"
+          },
+          {
+            "id": "maarif9-fizik-u3-t5",
+            "name": "Isı Aktarım Yolları"
+          },
+          {
+            "id": "maarif9-fizik-u3-t6",
+            "name": "Isı İletim Hızı"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-kimya",
+    "name": "9. Sınıf KİMYA",
+    "units": [
+      {
+        "unit": "1. TEMA: ETKİLEŞİM",
+        "topics": [
+          {
+            "id": "maarif9-kimya-u0-t0",
+            "name": "Kimya Hayattır › Günlük Hayatta Kimya"
+          },
+          {
+            "id": "maarif9-kimya-u0-t1",
+            "name": "Kimya Hayattır › Kimyanın Alt Disiplinleri"
+          },
+          {
+            "id": "maarif9-kimya-u0-t2",
+            "name": "Kimya Hayattır › Kimya Alanında Kariyer Olanakları"
+          },
+          {
+            "id": "maarif9-kimya-u0-t3",
+            "name": "Kimya Hayattır › Kimyasal Maddelerin Kullanımı ve Güvenlik"
+          },
+          {
+            "id": "maarif9-kimya-u0-t4",
+            "name": "Atomdan Periyodik Tabloya › Atom Teorileri ve Atomun Yapısı"
+          },
+          {
+            "id": "maarif9-kimya-u0-t5",
+            "name": "Atomdan Periyodik Tabloya › Atom Orbitalleri ve Elektron Dizilim"
+          },
+          {
+            "id": "maarif9-kimya-u0-t6",
+            "name": "Atomdan Periyodik Tabloya › Periyodik Tabloda Yer Bulma"
+          },
+          {
+            "id": "maarif9-kimya-u0-t7",
+            "name": "Atomdan Periyodik Tabloya › Periyodik Özellikler"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: ÇEŞİTLİLİK",
+        "topics": [
+          {
+            "id": "maarif9-kimya-u1-t0",
+            "name": "Etkileşimler › Metalik Bağ"
+          },
+          {
+            "id": "maarif9-kimya-u1-t1",
+            "name": "Etkileşimler › İyonik Bağ"
+          },
+          {
+            "id": "maarif9-kimya-u1-t2",
+            "name": "Etkileşimler › Kovalent Bağ"
+          },
+          {
+            "id": "maarif9-kimya-u1-t3",
+            "name": "Etkileşimler › Lewis Nokta Yapısı"
+          },
+          {
+            "id": "maarif9-kimya-u1-t4",
+            "name": "Etkileşimler › Molekül Polarlığı ve Apolarlığı"
+          },
+          {
+            "id": "maarif9-kimya-u1-t5",
+            "name": "Etkileşimler › Bileşiklerin Adlandırılması"
+          },
+          {
+            "id": "maarif9-kimya-u1-t6",
+            "name": "Etkileşimden Maddeye › Moleküller Arası Etkileşimler"
+          },
+          {
+            "id": "maarif9-kimya-u1-t7",
+            "name": "Etkileşimden Maddeye › Katılar ve Özellikleri"
+          },
+          {
+            "id": "maarif9-kimya-u1-t8",
+            "name": "Etkileşimden Maddeye › Sıvılar ve Özellikleri"
+          }
+        ]
+      },
+      {
+        "unit": "3. TEMA: SÜRDÜRÜLEBİLİRLİK",
+        "topics": [
+          {
+            "id": "maarif9-kimya-u2-t0",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Metal Nanoparçacıklar"
+          },
+          {
+            "id": "maarif9-kimya-u2-t1",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Yeşil Kimyanın Atık Önleme İlkesi"
+          },
+          {
+            "id": "maarif9-kimya-u2-t2",
+            "name": "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik › Metal, Alaşım ve Metal Nanoparçacıkların Çevre"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-din",
+    "name": "9. Sınıf DİN",
+    "units": [
+      {
+        "unit": "1.ÜNİTE: ALLAH İNSAN İLİŞKİSİ",
+        "topics": [
+          {
+            "id": "maarif9-din-u0-t0",
+            "name": "İnsan ve İnsanın Yaratılışı"
+          },
+          {
+            "id": "maarif9-din-u0-t1",
+            "name": "Doğruyu Arayan Bir Varlık Olarak İnsan"
+          },
+          {
+            "id": "maarif9-din-u0-t2",
+            "name": "İbadet ve Dua Eden Bir Varlık Olarak İnsan"
+          },
+          {
+            "id": "maarif9-din-u0-t3",
+            "name": "Kur’an’dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "2.ÜNİTE: İSLAM'DA İNANÇ ESASLARI",
+        "topics": [
+          {
+            "id": "maarif9-din-u1-t0",
+            "name": "İman ve İmanın Mahiyeti"
+          },
+          {
+            "id": "maarif9-din-u1-t1",
+            "name": "İslam’da İman Esasları"
+          },
+          {
+            "id": "maarif9-din-u1-t2",
+            "name": "İmanın Bireye ve Topluma Kazandırdıklar"
+          },
+          {
+            "id": "maarif9-din-u1-t3",
+            "name": "Kur’an’dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "3.ÜNİTE: İSLAM'DA İBADETLER",
+        "topics": [
+          {
+            "id": "maarif9-din-u2-t0",
+            "name": "İslam’da İbadetin Kapsamı"
+          },
+          {
+            "id": "maarif9-din-u2-t1",
+            "name": "İslam’da Temel İbadetler"
+          },
+          {
+            "id": "maarif9-din-u2-t2",
+            "name": "İnsan ve İbadet"
+          },
+          {
+            "id": "maarif9-din-u2-t3",
+            "name": "Kur’an’dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "4.ÜNİTE: İSLAM'DA AHLAK İLKELERİ",
+        "topics": [
+          {
+            "id": "maarif9-din-u3-t0",
+            "name": "İslam’da Ahlakın Mahiyeti"
+          },
+          {
+            "id": "maarif9-din-u3-t1",
+            "name": "Ahlakın Temel Unsurları"
+          },
+          {
+            "id": "maarif9-din-u3-t2",
+            "name": "Ahlaki Tutum ve Davranışlar"
+          },
+          {
+            "id": "maarif9-din-u3-t3",
+            "name": "Kur’an’dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "5.ÜNİTE: KUR'AN'A GÖRE HZ. MUHAMMED",
+        "topics": [
+          {
+            "id": "maarif9-din-u4-t0",
+            "name": "Hz. Muhammed’in Beşerî ve Peygamberlik Yönü"
+          },
+          {
+            "id": "maarif9-din-u4-t1",
+            "name": "Hz. Muhammed’in Örnekliği"
+          },
+          {
+            "id": "maarif9-din-u4-t2",
+            "name": "Kültürümüzde Hz. Muhammed ve Ehlibeyt Sevgisi"
+          },
+          {
+            "id": "maarif9-din-u4-t3",
+            "name": "Kur’an’dan Mesajlar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-tarih",
+    "name": "9. Sınıf TARİH",
+    "units": [
+      {
+        "unit": "1.ÜNİTE: GEÇMİŞİN İNŞA SÜRECİNDE TARİH",
+        "topics": [
+          {
+            "id": "maarif9-tarih-u0-t0",
+            "name": "Tarih Öğrenmenin Faydaları"
+          },
+          {
+            "id": "maarif9-tarih-u0-t1",
+            "name": "Tarihin Doğası"
+          },
+          {
+            "id": "maarif9-tarih-u0-t2",
+            "name": "Tarihsel Bilginin Üretim Süreci"
+          },
+          {
+            "id": "maarif9-tarih-u0-t3",
+            "name": "Tarih Araştırma ve Yazımında Dijital Dönüşüm"
+          }
+        ]
+      },
+      {
+        "unit": "2. ÜNİTE: ESKİ ÇAĞ MEDENİYETLERİ",
+        "topics": [
+          {
+            "id": "maarif9-tarih-u1-t0",
+            "name": "Tarım Devrimi’nin Eski Çağ’a Etkileri"
+          },
+          {
+            "id": "maarif9-tarih-u1-t1",
+            "name": "Eski Çağ’da Yönetenler ve Savaşanlar"
+          },
+          {
+            "id": "maarif9-tarih-u1-t2",
+            "name": "Eski Çağ’da Hukuk"
+          },
+          {
+            "id": "maarif9-tarih-u1-t3",
+            "name": "Eski Çağ’da İnanç, Bilim ve Sanat"
+          },
+          {
+            "id": "maarif9-tarih-u1-t4",
+            "name": "Türklerde Konargöçer Yaşam"
+          }
+        ]
+      },
+      {
+        "unit": "3. ÜNİTE: ORTA ÇAĞ MEDENİYETLERİ",
+        "topics": [
+          {
+            "id": "maarif9-tarih-u2-t0",
+            "name": "Orta Çağ’daki Kitlesel Göçler"
+          },
+          {
+            "id": "maarif9-tarih-u2-t1",
+            "name": "Orta Çağ’daki Siyasi ve Askerî Gelişmeler"
+          },
+          {
+            "id": "maarif9-tarih-u2-t2",
+            "name": "Orta Çağ’da Ticaret Yolları"
+          },
+          {
+            "id": "maarif9-tarih-u2-t3",
+            "name": "Orta Çağ’da Bilim, Kültür ve Sanat"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif9-biyoloji",
+    "name": "9. Sınıf BİYOLOJİ",
+    "units": [
+      {
+        "unit": "1. TEMA: YAŞAM",
+        "topics": [
+          {
+            "id": "maarif9-biyoloji-u0-t0",
+            "name": "1.1. Biyolojinin Önemi Ve Biyolojideki Dönüm Noktalarının İnsan Hayatına Katkıları"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t1",
+            "name": "1.2. Bilim, Bilimin Doğası Ve Bilimsel Araştırma Süreçleri"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t2",
+            "name": "1.3. Bilimsel Araştırmaların Bilim Etiğine Uygunluğu"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t3",
+            "name": "1.4. Canlıların Ortak Özellikleri › Hücresel Yapı"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t4",
+            "name": "1.4. Canlıların Ortak Özellikleri › Organizasyon"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t5",
+            "name": "1.4. Canlıların Ortak Özellikleri › Beslenme"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t6",
+            "name": "1.4. Canlıların Ortak Özellikleri › Enerji Üretimi ve Tüketimi"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t7",
+            "name": "1.4. Canlıların Ortak Özellikleri › Metabolizma"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t8",
+            "name": "1.4. Canlıların Ortak Özellikleri › Boşaltım"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t9",
+            "name": "1.4. Canlıların Ortak Özellikleri › Büyüme ve Gelişme"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t10",
+            "name": "1.4. Canlıların Ortak Özellikleri › Üreme"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t11",
+            "name": "1.4. Canlıların Ortak Özellikleri › Uyarılara Tepki"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t12",
+            "name": "1.4. Canlıların Ortak Özellikleri › Homeostazi"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t13",
+            "name": "1.4. Canlıların Ortak Özellikleri › Varyasyon ve Adaptasyon"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t14",
+            "name": "1.4. Canlıların Ortak Özellikleri › Virüsler"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t15",
+            "name": "1.5. Sınıflandırmada Temel Yaklaşımlar Ve Modern Sınıflandırma"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t16",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Bakteriler"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t17",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Arkeler"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t18",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Ökaryotlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t19",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Protista"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t20",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Bitkiler"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t21",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Mantarlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t22",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Hayvanlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t23",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Omurgasız Hayvanlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t24",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.2. Ökaryotik Canlıların Sınıflandırılması › Omurgalı Hayvanlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t25",
+            "name": "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.3. Canlıların Biyolojik Çeşitlilik Veri Tabanı"
+          },
+          {
+            "id": "maarif9-biyoloji-u0-t26",
+            "name": "1.7. Biyoçeşitlilik"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: ORGANİZASYON",
+        "topics": [
+          {
+            "id": "maarif9-biyoloji-u1-t0",
+            "name": "2.1. İnorganik Moleküller › Su"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t1",
+            "name": "2.1. İnorganik Moleküller › Mineraller"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t2",
+            "name": "2.2. Organik Moleküller › Karbonhidratlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t3",
+            "name": "2.2. Organik Moleküller › Lipitler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t4",
+            "name": "2.2. Organik Moleküller › Proteinler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t5",
+            "name": "2.2. Organik Moleküller › Enzim Aktivitesini Etkileyen Koşullar"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t6",
+            "name": "2.2. Organik Moleküller › Nükleik Asitler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t7",
+            "name": "2.2. Organik Moleküller › Vitaminler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t8",
+            "name": "2.2. Organik Moleküller › Yağda Çözünen Vitaminler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t9",
+            "name": "2.2. Organik Moleküller › Suda Çözünen Vitaminler"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t10",
+            "name": "2.3. Organik Moleküllerin Tayininde Kullanılan Ayıraçlar"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t11",
+            "name": "2.4. Enzim Aktivitesini Etkileyen Koşullar"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t12",
+            "name": "2.5. Hücre ve Alt Birimleri › Prokaryot ve Ökaryot Hücre Yapısı"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t13",
+            "name": "2.5. Hücre ve Alt Birimleri › Hücrelerin Yapısal Bileşenleri"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t14",
+            "name": "2.5. Hücre ve Alt Birimleri › Organeller"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t15",
+            "name": "2.6. Hücre Zarından Madde Geçişleri"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t16",
+            "name": "2.7. Küçük Moleküllerin Hareketi: Difüzyon ve Ozmoz"
+          },
+          {
+            "id": "maarif9-biyoloji-u1-t17",
+            "name": "2.8. Hücre, Doku, Organ ve Sistemlerin Organizasyonu"
+          }
+        ]
+      }
+    ]
+  }
+]
