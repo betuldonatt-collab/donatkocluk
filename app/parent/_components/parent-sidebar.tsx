@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, FileText, Home, MessageSquare, Settings } fr
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
+import { LogoutButton } from "@/components/logout-button";
 import { PARENT_LANDING_PATH, PARENT_NAV_ITEMS, PARENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -68,6 +69,7 @@ export function ParentSidebar({ fullName = null }: { fullName?: string | null })
           <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
         )}
         <TourTrigger role="parent" welcome={PARENT_WELCOME_STEP} items={PARENT_NAV_ITEMS} landingPath={PARENT_LANDING_PATH} collapsed={effectiveCollapsed} />
+        <LogoutButton role="parent" collapsed={effectiveCollapsed} />
       </div>
 
       {/* Floating rail toggle, half-hanging off the sidebar's own right

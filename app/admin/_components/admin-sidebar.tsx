@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, GraduationCap, Home, Link2, Network, Setting
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
+import { LogoutButton } from "@/components/logout-button";
 import { ADMIN_LANDING_PATH, ADMIN_NAV_ITEMS, ADMIN_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -71,6 +72,7 @@ export function AdminSidebar({ fullName = null }: { fullName?: string | null }) 
           <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
         )}
         <TourTrigger role="admin" welcome={ADMIN_WELCOME_STEP} items={ADMIN_NAV_ITEMS} landingPath={ADMIN_LANDING_PATH} collapsed={effectiveCollapsed} />
+        <LogoutButton role="admin" collapsed={effectiveCollapsed} />
       </div>
 
       {/* Floating rail toggle, half-hanging off the sidebar's own right

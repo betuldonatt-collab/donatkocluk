@@ -58,6 +58,10 @@ export function applyRememberMeCookieOptions(
   rememberMe: boolean,
 ): CookieOptions {
   if (!AUTH_COOKIE_PATTERN.test(cookieName)) return options;
+  // A removal (Supabase signOut writes maxAge: 0 with an empty value) must
+  // stay a removal -- rewriting it would leave an empty auth cookie behind,
+  // or worse, keep it alive for 30 days when rememberMe is set.
+  if (options.maxAge === 0) return options;
   const rest = { ...options };
   delete rest.maxAge;
   delete rest.expires;

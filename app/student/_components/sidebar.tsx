@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
+import { LogoutButton } from "@/components/logout-button";
 import { YksCountdown } from "@/components/ui/yks-countdown";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
@@ -103,6 +104,7 @@ export function StudentSidebar({
           <p className="text-primary-foreground/70 mb-2 truncate text-xs">Hoş geldin, {fullName}</p>
         )}
         <TourTrigger role="student" welcome={STUDENT_WELCOME_STEP} items={tourItems} landingPath={STUDENT_LANDING_PATH} collapsed={effectiveCollapsed} />
+        <LogoutButton role="student" collapsed={effectiveCollapsed} />
       </div>
 
       {/* Floating rail toggle, half-hanging off the sidebar's own right

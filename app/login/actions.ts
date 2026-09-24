@@ -140,6 +140,25 @@ export async function signIn(
   redirect(ROLE_HOME[actualRole]);
 }
 
+// Logout: global-scope signOut revokes every refresh token for this user
+// (all devices/sessions, not just this browser) and clears the auth
+// cookies; the remember-me marker and any stale impersonation cookie are
+// removed too, so nothing carries over to whoever signs in next.
+export async function signOut(role?: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) {
+    console.error("[signOut] failed:", { message: error.message });
+    // Still fall back to clearing this browser's own session.
+    await supabase.auth.signOut({ scope: "local" });
+  }
+  const cookieStore = await cookies();
+  cookieStore.delete(REMEMBER_ME_COOKIE_NAME);
+  await clearImpersonationCookie();
+  const safeRole = role && role in ROLE_HOME ? role : "";
+  redirect(safeRole ? `/login?role=${safeRole}` : "/login");
+}
+
 export async function submitSignupRequest(
   _prevState: AuthFormState,
   formData: FormData,
