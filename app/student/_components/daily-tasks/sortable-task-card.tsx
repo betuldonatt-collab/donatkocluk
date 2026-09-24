@@ -19,7 +19,7 @@ export function SortableTaskCard({
   impactHint,
 }: {
   task: StudentTask;
-  impactHint?: string | null;
+  impactHint?: { pct: number; text: string } | null;
   onClick: () => void;
   trailing?: React.ReactNode;
   // Süre Tut only makes sense looking at the real, current day -- see

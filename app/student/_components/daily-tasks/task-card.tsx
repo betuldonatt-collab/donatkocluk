@@ -163,7 +163,7 @@ export function TaskCard({
   onClick: () => void;
   // e.g. "Bu görevi tamamladığında bugünkü ilerlemene yaklaşık %30 ekleyeceksin"
   // (see lib/effort-weight.ts). Null/absent hides it.
-  impactHint?: string | null;
+  impactHint?: { pct: number; text: string } | null;
   // Süre Tut is restricted to the real, current day (see TaskBoard's
   // canUseTimer) -- a student can't retroactively time something they
   // already did yesterday, or pre-log time on a task that hasn't happened
@@ -243,6 +243,22 @@ export function TaskCard({
               see that file), this stays visible even once the task is
               done, so a student can still see at a glance what they spent
               on it. */}
+          {/* Right-side header chip, next to the tracked-time/lock badges.
+              Compact on phones ("+%63"), "+%63 İlerleme" from sm up; the
+              full sentence lives in the tooltip / screen-reader label. */}
+          {impactHint && (
+            <span
+              className="bg-primary/10 text-primary inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+              title={impactHint.text}
+              aria-label={impactHint.text}
+            >
+              <TrendingUp className="size-3" aria-hidden />
+              <span aria-hidden>+%{impactHint.pct}</span>
+              <span className="hidden sm:inline" aria-hidden>
+                İlerleme
+              </span>
+            </span>
+          )}
           {task.tracked_duration_minutes > 0 && (
             <span
               className="bg-secondary text-muted-foreground inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
@@ -297,12 +313,6 @@ export function TaskCard({
             above) -- a mouse-only desktop session never sets it, so this
             stays exactly lines={3} there, unchanged. */}
         <TaskDescription text={task.description} lines={isPressed ? "all" : 3} className="mt-0.5" />
-        {impactHint && (
-          <p className="bg-primary/10 text-foreground mt-1.5 flex w-fit max-w-full items-start gap-1.5 rounded-md px-2 py-1 text-xs font-medium break-words">
-            <TrendingUp className="text-primary mt-0.5 size-3.5 shrink-0" />
-            <span>{impactHint}</span>
-          </p>
-        )}
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full
             task modal (traced to the fetch itself never joining

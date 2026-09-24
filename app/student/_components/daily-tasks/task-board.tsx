@@ -363,10 +363,10 @@ export function TaskBoard({
   // the task's effort share of its own day (lib/effort-weight.ts). Only for
   // unfinished tasks; nothing about the underlying units is ever shown.
   const impactDayWord = view === "yesterday" ? "dünkü" : view === "tomorrow" ? "yarınki" : "bugünkü";
-  function impactHintFor(task: StudentTask): string | null {
+  function impactHintFor(task: StudentTask): { pct: number; text: string } | null {
     if (task.status === "done" || task.completed) return null;
     const pct = impactPercent(task, selectedDayTasks);
-    return pct === null ? null : `Bu görevi tamamladığında ${impactDayWord} ilerlemene yaklaşık %${pct} ekleyeceksin`;
+    return pct === null ? null : { pct, text: `Bu görevi tamamladığında ${impactDayWord} ilerlemene yaklaşık %${pct} ekleyeceksin` };
   }
   const coachTasks = selectedDayTasks.filter((t) => t.is_coach_assigned).sort(byOrder);
   const customTasks = selectedDayTasks.filter((t) => !t.is_coach_assigned).sort(byOrder);
