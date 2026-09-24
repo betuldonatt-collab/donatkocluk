@@ -101,7 +101,7 @@ function FixedTaskChip({
     <div
       ref={innerRef}
       style={minHeight !== undefined ? { minHeight } : undefined}
-      className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs"
+      className="border-border/70 bg-muted/50 text-muted-foreground min-w-0 rounded-md border border-dashed px-2 py-1.5 text-xs [overflow-wrap:anywhere]"
     >
       {/* Time on its own top-right line -- sharing a row with the title (the old
           layout) squeezed the title/description into a narrow column and forced
