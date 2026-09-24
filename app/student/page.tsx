@@ -51,6 +51,7 @@ async function fetchHomeData(userId: string) {
   const weekDays = getWeekDays(today);
   const weekStart = weekDays[0].date;
   const weekEnd = weekDays[6].date;
+  const yesterdayIso = new Date(new Date(`${weekStart}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
   const prevWeekStart = new Date(new Date(`${weekStart}T00:00:00Z`).getTime() - 7 * 86400000).toISOString().slice(0, 10);
   const dayAfterWeek = new Date(new Date(`${weekEnd}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
   // Grace window so a session that just started still shows as "next"
@@ -80,7 +81,11 @@ async function fetchHomeData(userId: string) {
         .from("student_tasks")
         .select("*")
         .eq("student_id", userId)
-        .gte("task_date", weekStart)
+        // From YESTERDAY, not just today: the grid is a rolling 7 days that
+        // starts today, but the Dün tab needs yesterday's tasks on the very
+        // first render (they were missing until the student browsed away and
+        // back, so Dün showed the empty state).
+        .gte("task_date", yesterdayIso)
         .lte("task_date", weekEnd)
         .order("created_at", { ascending: true }),
       supabase
@@ -88,7 +93,7 @@ async function fetchHomeData(userId: string) {
         .select("*")
         .eq("student_id", userId)
         .eq("analysis_pending", true)
-        .lt("task_date", weekStart)
+        .lt("task_date", yesterdayIso)
         .order("task_date", { ascending: false }),
       supabase
         .from("coaching_sessions")

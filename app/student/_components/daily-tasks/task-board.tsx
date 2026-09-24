@@ -771,7 +771,7 @@ export function TaskBoard({
           </div>
         </div>
 
-        <WeeklyDybTotal tasks={tasks} />
+        <WeeklyDybTotal tasks={tasks.filter((t) => weekDays.some((d) => d.date === t.task_date))} />
         </>
       )}
 
