@@ -64,8 +64,13 @@ export function taskWeight(t: Partial<Omit<WeightableTask, "task_date" | "status
       const questions = positive(t.total_count) ? t.total_count : DEFAULT_BRANCH_EXAM_QUESTIONS;
       return Math.round(questions * UNITS_PER_QUESTION * coef + BRANCH_EXAM_FORMAT_BONUS);
     }
-    case "video":
     case "topic_study":
+      // A student-added "Konu Çalışması" can be a bare question target
+      // (Toplam only, no duration) -- weigh that like questions, not like
+      // the 30-minute default.
+      if (!positive(t.duration_minutes) && positive(t.total_count)) return Math.round(t.total_count * UNITS_PER_QUESTION * coef);
+      return Math.round(minutesUnits(t.duration_minutes));
+    case "video":
     case "reading":
       return Math.round(minutesUnits(t.duration_minutes));
     default: {

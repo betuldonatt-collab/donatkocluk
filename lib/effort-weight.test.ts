@@ -40,6 +40,19 @@ describe("taskWeight", () => {
     expect(taskWeight({ task_type: "video", duration_minutes: 0 })).toBe(150);
   });
 
+  it("weighs a student-added extra task by subject, duration or the default", () => {
+    // Ek çalışma: Soru Çözümü with a subject + count
+    expect(taskWeight({ task_type: "question_bank", course_id: "tyt-kimya", total_count: 40 })).toBe(600);
+    // Konu Çalışması as a bare question target
+    expect(taskWeight({ task_type: "topic_study", course_id: "tyt-matematik", total_count: 10, duration_minutes: null })).toBe(200);
+    // Konu Çalışması with a duration wins over any count
+    expect(taskWeight({ task_type: "topic_study", course_id: "tyt-matematik", total_count: 10, duration_minutes: 60 })).toBe(300);
+    // Free-title extra work: its own duration, else the 30-minute default
+    expect(taskWeight({ task_type: "extra_custom", duration_minutes: 20 })).toBe(100);
+    expect(taskWeight({ task_type: "extra_custom" })).toBe(150);
+    expect(taskWeight({ task_type: "reading", course_id: "kitap-okuma", duration_minutes: null })).toBe(150);
+  });
+
   it("scales branch exams by question count and coefficient plus a small bonus", () => {
     const bio6 = taskWeight({ task_type: "branch_exam", course_id: "tyt-biyoloji", total_count: 6 });
     const fen20 = taskWeight({ task_type: "branch_exam", course_id: "tyt-fen-macro", total_count: 20 });

@@ -198,6 +198,10 @@ export function TaskBoard({
   // is browsed (loadWeek swaps `tasks` for the browsed week's) -- so it reads its
   // own copy, kept in step with every save/create/delete.
   const [progressTasks, setProgressTasks] = useState(initialTasks);
+  // Last-week / next-day rows (Geçen Hafta, Yarın on a Sunday) live in their
+  // own list -- kept in step with edits/deletes too, or completing such a
+  // task would not move its bar until a reload.
+  const [extraProgressTasks, setExtraProgressTasks] = useState(progressExtraTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
   // The initial week IS the current week, so its lock state is exactly
   // todayLocked -- reused here instead of re-deriving it, since navigating
@@ -288,6 +292,7 @@ export function TaskBoard({
     }
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
     setProgressTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+    setExtraProgressTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
   function handleCreated(task: StudentTask) {
@@ -298,6 +303,7 @@ export function TaskBoard({
   async function handleDelete(taskId: string) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     setProgressTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setExtraProgressTasks((prev) => prev.filter((t) => t.id !== taskId));
     await deleteCustomTask(taskId);
   }
 
@@ -380,7 +386,7 @@ export function TaskBoard({
           browsed week is showing below. */}
       <ProgressOverview
         liveTasks={progressTasks}
-        extraTasks={progressExtraTasks}
+        extraTasks={extraProgressTasks}
         today={today}
         lockedAt={progressLockedAt}
         previousLockedAt={previousLockedAt}

@@ -11,6 +11,7 @@ import {
   PlayCircle,
   Sparkles,
   Timer,
+  TrendingUp,
   Video,
   XCircle,
 } from "lucide-react";
@@ -296,7 +297,12 @@ export function TaskCard({
             above) -- a mouse-only desktop session never sets it, so this
             stays exactly lines={3} there, unchanged. */}
         <TaskDescription text={task.description} lines={isPressed ? "all" : 3} className="mt-0.5" />
-        {impactHint && <p className="text-primary/80 mt-1 text-xs">{impactHint}</p>}
+        {impactHint && (
+          <p className="bg-primary/10 text-foreground mt-1.5 flex w-fit max-w-full items-start gap-1.5 rounded-md px-2 py-1 text-xs font-medium break-words">
+            <TrendingUp className="text-primary mt-0.5 size-3.5 shrink-0" />
+            <span>{impactHint}</span>
+          </p>
+        )}
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full
             task modal (traced to the fetch itself never joining
