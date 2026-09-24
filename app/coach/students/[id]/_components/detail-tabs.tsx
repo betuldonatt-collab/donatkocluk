@@ -28,7 +28,9 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 // only ever affects data -- while one of these three is active.
 const RANGE_FILTERED_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler"]);
 
-const MAARIF9_HIDDEN_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler", "kaynak-takibi", "karneler"]);
+// Analiz (Deneme Konu Analizi) and Kaynak Takibi are adapted to the 9th-grade
+// curriculum; the TYT/AYT-based Gelişim Haritası, Grafikler and Karneler stay hidden.
+const MAARIF9_HIDDEN_TABS = new Set(["gelisim-haritasi", "grafikler", "karneler"]);
 const NO_HIDDEN_TABS = new Set<string>();
 
 export function DetailTabs({

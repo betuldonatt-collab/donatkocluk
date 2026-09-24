@@ -2,7 +2,7 @@
   {
     "id": "maarif9-gd-turk-dili-ve-edebiyati",
     "group": "TÜRKÇE",
-    "name": "TÜRK DİLİ VE EDEBİYATI",
+    "name": "Türk Dili ve Edebiyatı",
     "units": [
       {
         "unit": null,
@@ -78,7 +78,7 @@
   {
     "id": "maarif9-gd-tarih",
     "group": "SOSYAL BİLİMLER",
-    "name": "TARİH",
+    "name": "Tarih",
     "units": [
       {
         "unit": "1.ÜNİTE: GEÇMİŞİN İNŞA SÜRECİNDE TARİH",
@@ -152,7 +152,7 @@
   {
     "id": "maarif9-gd-cografya",
     "group": "SOSYAL BİLİMLER",
-    "name": "COĞRAFYA",
+    "name": "Coğrafya",
     "units": [
       {
         "unit": "1.Ünite: Coğrafyanın Doğası",
@@ -222,7 +222,7 @@
   {
     "id": "maarif9-gd-din-kulturu",
     "group": "SOSYAL BİLİMLER",
-    "name": "DİN KÜLTÜRÜ",
+    "name": "Din Kültürü",
     "units": [
       {
         "unit": "1.Ünite: Allah İnsan İlişkisi",
@@ -249,7 +249,7 @@
   {
     "id": "maarif9-gd-matematik",
     "group": "MATEMATİK",
-    "name": "MATEMATİK",
+    "name": "Matematik",
     "units": [
       {
         "unit": "1. TEMA: SAYILAR",
@@ -371,7 +371,7 @@
   {
     "id": "maarif9-gd-fizik",
     "group": "FEN BİLİMLERİ",
-    "name": "FİZİK",
+    "name": "Fizik",
     "units": [
       {
         "unit": "1. ÜNİTE: FİZİK BİLİMİ VE KARİYER KEŞFİ",
@@ -494,7 +494,7 @@
   {
     "id": "maarif9-gd-kimya",
     "group": "FEN BİLİMLERİ",
-    "name": "KİMYA",
+    "name": "Kimya",
     "units": [
       {
         "unit": "1. TEMA: ETKİLEŞİM",
@@ -596,7 +596,7 @@
   {
     "id": "maarif9-gd-biyoloji",
     "group": "FEN BİLİMLERİ",
-    "name": "BİYOLOJİ",
+    "name": "Biyoloji",
     "units": [
       {
         "unit": "1. TEMA: YAŞAM",

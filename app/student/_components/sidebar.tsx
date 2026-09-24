@@ -36,7 +36,8 @@ const NAV_ITEMS = [
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
 
-const MAARIF9_HIDDEN_HREFS = new Set(["/student/kaynak-takibi", "/student/cikmis-sorular", "/student/deneme-analizleri"]);
+// Only the YKS past-questions page stays hidden for 9th graders.
+const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
 
 export function StudentSidebar({
   fullName = null,

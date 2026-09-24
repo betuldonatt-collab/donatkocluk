@@ -65,6 +65,23 @@ function clean(raw) {
   return s;
 }
 
+// Subject names are ALL CAPS in the workbook ("9. Sınıf MATEMATİK", "TÜRK DİLİ VE
+// EDEBİYATI"); the app shows them in Title Case ("9. Sınıf Matematik",
+// "Türk Dili ve Edebiyatı"). A stray colon ("9. Sınıf: MATEMATİK") is dropped.
+function titleCaseTr(s) {
+  return s
+    .replace(/:/g, "")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => {
+      if (/^\d/.test(w) || w === "Sınıf") return w;
+      const lower = w.toLocaleLowerCase("tr");
+      if (lower === "ve") return "ve";
+      return lower.charAt(0).toLocaleUpperCase("tr") + lower.slice(1);
+    })
+    .join(" ");
+}
+
 const isBool = (s) => /^(TRUE|FALSE)$/i.test(s);
 const UNIT_LABEL = /(ÜNİTE|ÜNITE|TEMA|THEME)/i;
 
@@ -165,7 +182,7 @@ function parseKaynakTakibi() {
       const tree = buildTree(current.cells);
       const subject = current.name.replace(/^9\.\s*Sınıf:?\s*/i, "");
       const id = `maarif9-${slugify(subject)}`;
-      courses.push({ id, name: current.name, units: withIds(id, applyOverrides(id, toUnits(tree))) });
+      courses.push({ id, name: titleCaseTr(current.name), units: withIds(id, applyOverrides(id, toUnits(tree))) });
       current = null;
     };
     rows.forEach((row) => {
@@ -201,7 +218,7 @@ function parseGenelDeneme() {
   const flush = () => {
     if (!current) return;
     const id = `maarif9-gd-${slugify(current.name)}`;
-    subjects.push({ id, group: current.group, name: current.name, units: withIds(id, applyOverrides(id, toUnits(buildTree(current.cells)))) });
+    subjects.push({ id, group: current.group, name: titleCaseTr(current.name), units: withIds(id, applyOverrides(id, toUnits(buildTree(current.cells)))) });
     current = null;
   };
   for (const row of rows) {

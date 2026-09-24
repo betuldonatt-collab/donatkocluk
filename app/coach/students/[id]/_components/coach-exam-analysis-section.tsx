@@ -1,5 +1,7 @@
 "use client";
 
+import { useIsMaarif9 } from "@/components/maarif9-context";
+import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +19,9 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_SUBJECT_GROUPS,
+  MAARIF9_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
+  coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
@@ -35,8 +39,8 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 // Mirrors buildGeneralExamTitle/parseGeneralExamTitle's own convention --
 // duplicated per call site across this app, not imported.
 function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
-  if (/^9.s*SINIF/i.test(title)) return "m9";
-  if (/^LGS/i.test(title)) return "lgs";
+  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
+  if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
@@ -95,7 +99,10 @@ export function CoachExamAnalysisSection({
   courseResourceData: CourseResourceData;
   examType?: ExamType;
 }) {
+  const isMaarif9 = useIsMaarif9();
   const isLgs = examType === "LGS";
+  // One flat cohort list (no TYT/AYT split) for LGS and for 9th graders.
+  const isFlat = isLgs || isMaarif9;
   const [exams, setExams] = useState<DetailTask[]>([...initialBranchExams, ...initialGeneralExams]);
   const [mistakes, setMistakes] = useState(examMistakes);
   const [courseResourceData, setCourseResourceData] = useState(initialCourseResourceData);
@@ -104,9 +111,11 @@ export function CoachExamAnalysisSection({
   const [examMode, setExamMode] = useState<ExamMode>("brans");
   const [mainTrack, setMainTrack] = useState<"tyt" | "ayt">("tyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState<string>(isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id);
+  const [branchCourseId, setBranchCourseId] = useState<string>(
+    isMaarif9 ? MAARIF9_KAYNAK_COURSES[0].id : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
+  );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    isMaarif9 ? MAARIF9_EXAM_SUBJECTS[0].key : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
@@ -127,18 +136,24 @@ export function CoachExamAnalysisSection({
   // independently assign/review either "Fizik" or "TYT Fen" as a branch exam.
   // LGS has no TYT/AYT split or macro subjects: one flat course list and the
   // two real sessions (Sözel / Sayısal) as the Genel Deneme groups.
-  const branchCourses = isLgs
+  const branchCourses = isMaarif9
+    ? MAARIF9_KAYNAK_COURSES
+    : isLgs
     ? LGS_COURSES
     : mainTrack === "tyt"
       ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
       : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytSubTrack], ...AYT_COURSES_BY_TRACK[aytSubTrack]];
-  const genelGroups = isLgs
+  const genelGroups = isMaarif9
+    ? MAARIF9_EXAM_SUBJECTS
+    : isLgs
     ? LGS_SUBJECT_GROUPS
     : mainTrack === "tyt"
       ? TYT_SUBJECT_GROUPS
       : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
-  const genelCoursesInGroup = isLgs
+  const genelCoursesInGroup = isMaarif9
+    ? coursesForMaarif9ExamSubject(genelGroupKey)
+    : isLgs
     ? coursesForLgsGroup(genelGroupKey)
     : mainTrack === "tyt" ? coursesForGroup(genelGroupKey as (typeof TYT_SUBJECT_GROUPS)[number]["key"]) : coursesForAytGroup(aytSubTrack, genelGroupKey);
 
@@ -160,7 +175,9 @@ export function CoachExamAnalysisSection({
     .filter(
       (e) =>
         e.task_type === "general_exam" &&
-        (isLgs
+        (isMaarif9
+          ? parseGeneralExamTrack(e.title) === "m9"
+          : isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"
           : parseGeneralExamTrack(e.title) === mainTrack &&
             (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
@@ -226,7 +243,7 @@ export function CoachExamAnalysisSection({
           value={examMode}
           onChange={setExamMode}
         />
-        {!isLgs && (
+        {!isFlat && (
           <TrackToggle
             options={[
               { value: "tyt", label: "TYT" },
@@ -236,7 +253,7 @@ export function CoachExamAnalysisSection({
             onChange={handleMainTrackChange}
           />
         )}
-        {!isLgs && mainTrack === "ayt" && (
+        {!isFlat && mainTrack === "ayt" && (
           <TrackToggle
             options={(Object.keys(TRACK_LABELS) as Track[]).map((t) => ({ value: t, label: TRACK_LABELS[t] }))}
             value={aytSubTrack}

@@ -8,15 +8,15 @@ describe("maarif9 curriculum data", () => {
   it("has the nine Kaynak Takibi subjects with the sheet's topic counts", () => {
     const counts = Object.fromEntries(MAARIF9_COURSES.map((c) => [c.name, topicCount(c.units)]));
     expect(counts).toEqual({
-      "9. Sınıf TÜRK DİLİ VE EDEBİYATI": 23,
-      "9. Sınıf: MATEMATİK": 20,
-      "9. Sınıf COĞRAFYA": 22,
-      "9. Sınıf İNGİLİZCE": 8,
-      "9. Sınıf FİZİK": 24,
-      "9. Sınıf KİMYA": 20,
-      "9. Sınıf DİN": 20,
-      "9. Sınıf TARİH": 13,
-      "9. Sınıf BİYOLOJİ": 43,
+      "9. Sınıf Türk Dili ve Edebiyatı": 23,
+      "9. Sınıf Matematik": 20,
+      "9. Sınıf Coğrafya": 22,
+      "9. Sınıf İngilizce": 8,
+      "9. Sınıf Fizik": 24,
+      "9. Sınıf Kimya": 20,
+      "9. Sınıf Din": 20,
+      "9. Sınıf Tarih": 13,
+      "9. Sınıf Biyoloji": 43,
     });
   });
 
@@ -47,16 +47,16 @@ describe("maarif9 curriculum data", () => {
 
   it("mirrors the Genel Deneme sheet's groups and its units-only Din list", () => {
     expect(MAARIF9_GENEL_DENEME_SUBJECTS.map((s) => `${s.group}/${s.name}`)).toEqual([
-      "TÜRKÇE/TÜRK DİLİ VE EDEBİYATI",
-      "SOSYAL BİLİMLER/TARİH",
-      "SOSYAL BİLİMLER/COĞRAFYA",
-      "SOSYAL BİLİMLER/DİN KÜLTÜRÜ",
-      "MATEMATİK/MATEMATİK",
-      "FEN BİLİMLERİ/FİZİK",
-      "FEN BİLİMLERİ/KİMYA",
-      "FEN BİLİMLERİ/BİYOLOJİ",
+      "TÜRKÇE/Türk Dili ve Edebiyatı",
+      "SOSYAL BİLİMLER/Tarih",
+      "SOSYAL BİLİMLER/Coğrafya",
+      "SOSYAL BİLİMLER/Din Kültürü",
+      "MATEMATİK/Matematik",
+      "FEN BİLİMLERİ/Fizik",
+      "FEN BİLİMLERİ/Kimya",
+      "FEN BİLİMLERİ/Biyoloji",
     ]);
-    const din = MAARIF9_GENEL_DENEME_SUBJECTS.find((s) => s.name === "DİN KÜLTÜRÜ")!;
+    const din = MAARIF9_GENEL_DENEME_SUBJECTS.find((s) => s.name === "Din Kültürü")!;
     expect(din.units).toHaveLength(5);
     expect(topicCount(din.units)).toBe(0);
     expect(MAARIF9_GENEL_DENEME_SUBJECTS[0].units[0].unit).toBeNull();

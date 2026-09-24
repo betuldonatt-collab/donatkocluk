@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
+import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import {
@@ -180,7 +181,7 @@ export async function setTopicPipelineStep(input: PipelineStepInput): Promise<Pi
 
     const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", user.id).maybeSingle();
     const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
-    validatePipelineStep(examType, inputV);
+    validatePipelineStep(examType, inputV, await fetchIsMaarif9(supabase, user.id));
 
     const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
       {

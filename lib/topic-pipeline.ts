@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isMaarif9CourseId } from "./curriculum/maarif9";
 import { AYT_COURSES_BY_TRACK, TYT_COURSES, findCourseById, isLgsCourseId, type Course } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 
@@ -144,13 +145,17 @@ export type PipelineActionResult = { ok: true } | { ok: false; error: string };
 // a student of this cohort: one of THEIR pipeline's steps, on a course of
 // THEIR curriculum, on a topic that belongs to that course. This is what
 // keeps an arbitrary column name or a cross-cohort course out of the upsert.
-export function validatePipelineStep(examType: ExamType, input: PipelineStepInput): void {
+export function validatePipelineStep(examType: ExamType, input: PipelineStepInput, isMaarif9 = false): void {
   const config = PIPELINE_CONFIG[examType];
   if (!allPipelineSteps(config).some((s) => s.key === input.step)) {
     throw new Error("Bu adım bu öğrenci için geçerli değil.");
   }
   const course = findCourseById(input.courseId);
-  const courseAllowed = examType === "LGS" ? isLgsCourseId(input.courseId) : yksCourseIds().has(input.courseId);
+  // A 9th grader (is_maarif9, an exam_type=YKS row) tracks the 9th-grade courses.
+  const courseAllowed =
+    examType === "LGS"
+      ? isLgsCourseId(input.courseId)
+      : yksCourseIds().has(input.courseId) || (isMaarif9 && isMaarif9CourseId(input.courseId));
   if (!course || !courseAllowed) throw new Error("Geçersiz ders.");
   if (!course.units.some((u) => u.topics.some((t) => t.id === input.topicId))) {
     throw new Error("Geçersiz konu.");

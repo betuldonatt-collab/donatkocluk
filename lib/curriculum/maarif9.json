@@ -1,7 +1,7 @@
 [
   {
     "id": "maarif9-turk-dili-ve-edebiyati",
-    "name": "9. Sınıf TÜRK DİLİ VE EDEBİYATI",
+    "name": "9. Sınıf Türk Dili ve Edebiyatı",
     "units": [
       {
         "unit": "TEMA 1: SÖZÜN İNCELİĞİ",
@@ -119,7 +119,7 @@
   },
   {
     "id": "maarif9-matematik",
-    "name": "9. Sınıf: MATEMATİK",
+    "name": "9. Sınıf Matematik",
     "units": [
       {
         "unit": "1. TEMA: SAYILAR",
@@ -240,7 +240,7 @@
   },
   {
     "id": "maarif9-cografya",
-    "name": "9. Sınıf COĞRAFYA",
+    "name": "9. Sınıf Coğrafya",
     "units": [
       {
         "unit": "1.ÜNİTE: COĞRAFYANIN DOĞASI",
@@ -369,7 +369,7 @@
   },
   {
     "id": "maarif9-ingilizce",
-    "name": "9. Sınıf İNGİLİZCE",
+    "name": "9. Sınıf İngilizce",
     "units": [
       {
         "unit": "THEME 1",
@@ -447,7 +447,7 @@
   },
   {
     "id": "maarif9-fizik",
-    "name": "9. Sınıf FİZİK",
+    "name": "9. Sınıf Fizik",
     "units": [
       {
         "unit": "1. ÜNİTE: FİZİK BİLİMİ VE KARİYER KEŞFİ",
@@ -569,7 +569,7 @@
   },
   {
     "id": "maarif9-kimya",
-    "name": "9. Sınıf KİMYA",
+    "name": "9. Sınıf Kimya",
     "units": [
       {
         "unit": "1. TEMA: ETKİLEŞİM",
@@ -670,7 +670,7 @@
   },
   {
     "id": "maarif9-din",
-    "name": "9. Sınıf DİN",
+    "name": "9. Sınıf Din",
     "units": [
       {
         "unit": "1.ÜNİTE: ALLAH İNSAN İLİŞKİSİ",
@@ -781,7 +781,7 @@
   },
   {
     "id": "maarif9-tarih",
-    "name": "9. Sınıf TARİH",
+    "name": "9. Sınıf Tarih",
     "units": [
       {
         "unit": "1.ÜNİTE: GEÇMİŞİN İNŞA SÜRECİNDE TARİH",
@@ -854,7 +854,7 @@
   },
   {
     "id": "maarif9-biyoloji",
-    "name": "9. Sınıf BİYOLOJİ",
+    "name": "9. Sınıf Biyoloji",
     "units": [
       {
         "unit": "1. TEMA: YAŞAM",

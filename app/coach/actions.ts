@@ -37,6 +37,7 @@ import {
   type KarneTopicRow,
   type NetSummary,
 } from "@/lib/karne";
+import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
 import {
   PIPELINE_CONFIG,
   pipelineStepSchema,
@@ -2420,7 +2421,7 @@ export async function setStudentTopicPipelineStep(studentId: string, input: Pipe
 
     const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", studentIdV).maybeSingle();
     const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
-    validatePipelineStep(examType, inputV);
+    validatePipelineStep(examType, inputV, await fetchIsMaarif9(supabase, studentIdV));
 
     const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
       {
