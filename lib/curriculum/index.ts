@@ -10,6 +10,8 @@ import aytSozelJson from "./ayt-sozel.json";
 // optional `konu` level below.
 import lgsJson from "./lgs.json";
 
+import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
+
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
 // `konu` is LGS's middle hierarchy level (Ünite -> Konu -> Alt Konu):
 // Matematik (and one Fen ünite) track progress at the Alt Konu level, so
@@ -166,9 +168,16 @@ const ALL_COURSES: Course[] = [
   ...BRANCH_EXAM_MACRO_COURSES,
 ];
 
+// 9th-grade (Maarif) courses are looked up as a fallback only -- they are
+// deliberately NOT part of ALL_COURSES, so no existing YKS/LGS list or picker
+// that iterates ALL_COURSES can ever pick them up.
+function findMaarif9Course(courseId: string): Course | null {
+  return MAARIF9_KAYNAK_COURSES.find((c) => c.id === courseId) ?? MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ?? null;
+}
+
 export function findCourseById(courseId: string | null | undefined): Course | null {
   if (!courseId) return null;
-  return ALL_COURSES.find((c) => c.id === courseId) ?? null;
+  return ALL_COURSES.find((c) => c.id === courseId) ?? findMaarif9Course(courseId);
 }
 
 // A synthetic, non-curriculum topic every course carries: assigning it

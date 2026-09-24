@@ -36,12 +36,17 @@ const NAV_ITEMS = [
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
 
+const MAARIF9_HIDDEN_HREFS = new Set(["/student/kaynak-takibi", "/student/cikmis-sorular", "/student/deneme-analizleri"]);
+
 export function StudentSidebar({
   fullName = null,
   examType = "YKS",
+  isMaarif9 = false,
 }: {
   fullName?: string | null;
   examType?: "YKS" | "LGS";
+  // 9th grader: no YKS countdown, no TYT/AYT-specific tracking/analytics pages.
+  isMaarif9?: boolean;
 }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
@@ -50,12 +55,12 @@ export function StudentSidebar({
   const effectiveCollapsed = collapsed && !isMobile;
   // LGS students get every page a YKS student does; only the Paragraf/
   // Problem page is renamed (it is Paragraf / Kitap Okuma for them).
-  const navItems = NAV_ITEMS.map((item) =>
+  const navItems = NAV_ITEMS.filter((item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href))).map((item) =>
     examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item,
   );
 
   // The guided tour walks the same list -- same rename.
-  const tourItems = STUDENT_NAV_ITEMS.map((item) =>
+  const tourItems = STUDENT_NAV_ITEMS.filter((item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href))).map((item) =>
     examType === "LGS" && item.href === "/student/paragraf-problem"
       ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
       : item,
@@ -73,7 +78,7 @@ export function StudentSidebar({
         <BrandLogo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
-      {!effectiveCollapsed && <YksCountdown variant="student" examType={examType} />}
+      {!effectiveCollapsed && !isMaarif9 && <YksCountdown variant="student" examType={examType} />}
       <nav className="flex flex-col gap-1 px-3">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === "/student" ? pathname === href : pathname.startsWith(href);

@@ -16,6 +16,8 @@ import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
+  MAARIF9_EXAM_SUBJECTS,
+  coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
@@ -46,20 +48,23 @@ function friendlySaveError(e: unknown): string {
 
 // Mirrors task-modal.tsx's own parseGeneralExamTitle track-recovery
 // (duplicated, not imported -- that lives under app/student).
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
-function subjectGroupsFor(examTrack: "tyt" | "ayt" | "lgs", aytTrack: Track | null) {
+function subjectGroupsFor(examTrack: "tyt" | "ayt" | "lgs" | "m9", aytTrack: Track | null) {
   if (examTrack === "lgs") return LGS_SUBJECT_GROUPS;
+  if (examTrack === "m9") return MAARIF9_EXAM_SUBJECTS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
   if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
   return [];
 }
 
-function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs", aytTrack: Track | null, key: string): Course[] {
+function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs" | "m9", aytTrack: Track | null, key: string): Course[] {
   if (examTrack === "lgs") return coursesForLgsGroup(key);
+  if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
   if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
   if (aytTrack) return coursesForAytGroup(aytTrack, key);
   return [];

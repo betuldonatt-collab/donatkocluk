@@ -12,6 +12,7 @@ import type { CourseResourceData } from "../kaynak-takibi-tab";
 import type { ExamType } from "@/lib/exam-type";
 import { TaskFormFields, defaultTaskFormValue, firstCourseIdFor, taskFormValueToPayload, valueFromTask, type TaskFormValue } from "./task-form-fields";
 import { TrialResultsSection } from "./trial-results-section";
+import { useIsMaarif9 } from "@/components/maarif9-context";
 import { isCourseRoutine, routineOptionsFor, type RoutineType } from "./routine-options";
 
 export type TaskDrawerState =
@@ -23,8 +24,8 @@ const DAY_LABELS_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-function firstNonRoutineCourseId(examType: ExamType): string {
-  return firstCourseIdFor(examType);
+function firstNonRoutineCourseId(examType: ExamType, isMaarif9 = false): string {
+  return firstCourseIdFor(examType, isMaarif9);
 }
 
 // Monday=0..Sunday=6, matching DAY_LABELS_SHORT's own order -- JS's native
@@ -82,13 +83,14 @@ export function TaskDrawer({
   // about it (drag, multi-day, resources, videos) is identical.
   examType?: ExamType;
 }) {
+  const isMaarif9 = useIsMaarif9();
   const initialTab = state.mode === "create-multi" ? (state.initialTab ?? "task") : "task";
   const [tab, setTab] = useState<"task" | "routine">(initialTab);
   const [routineType, setRoutineType] = useState<RoutineType>("paragraf");
   const [value, setValue] = useState<TaskFormValue>(() => {
     if (state.mode === "edit") return valueFromTask(state.task, courseResourceData);
-    if (initialTab === "routine") return { ...defaultTaskFormValue(examType), courseId: "paragraf" };
-    return defaultTaskFormValue(examType);
+    if (initialTab === "routine") return { ...defaultTaskFormValue(examType, isMaarif9), courseId: "paragraf" };
+    return defaultTaskFormValue(examType, isMaarif9);
   });
   // Which of the CURRENTLY VISIBLE 7 days (weekDays, as passed down from
   // the schedule board's own rolling window) to create on -- indices into
@@ -212,7 +214,7 @@ export function TaskDrawer({
       setRoutineType("paragraf");
       setValue((v) => ({ ...v, courseId: "paragraf", topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     } else {
-      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(examType), topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
+      setValue((v) => ({ ...v, courseId: firstNonRoutineCourseId(examType, isMaarif9), topicId: "", resources: [], taskType: resetReadingType(v.taskType) }));
     }
   }
 
@@ -225,7 +227,7 @@ export function TaskDrawer({
     } else {
       setValue((v) => ({
         ...v,
-        courseId: firstNonRoutineCourseId(examType),
+        courseId: firstNonRoutineCourseId(examType, isMaarif9),
         topicId: "",
         resources: [],
         taskType: resetReadingType(v.taskType),

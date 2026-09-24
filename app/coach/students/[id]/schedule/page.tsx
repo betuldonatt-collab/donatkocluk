@@ -1,3 +1,5 @@
+import { Maarif9Provider } from "@/components/maarif9-context";
+import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -145,37 +147,40 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
   const weekDays = getWeekDays(referenceDate);
   const [data, rowHeights] = await Promise.all([fetchScheduleData(id, weekDays), fetchCoachRowHeights()]);
   const studentName = data.profile?.full_name ?? "Öğrenci";
+  const isMaarif9 = await fetchIsMaarif9(await createClient(), id);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
-      <Link
-        href={`/coach/students/${id}`}
-        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
-      >
-        <ArrowLeft className="size-4" />
-        {studentName}
-      </Link>
+    <Maarif9Provider value={isMaarif9}>
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
+        <Link
+          href={`/coach/students/${id}`}
+          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
+        >
+          <ArrowLeft className="size-4" />
+          {studentName}
+        </Link>
 
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Haftalık Program</h1>
-        <p className="text-muted-foreground text-sm">
-          {studentName} için görev ata, kartları düzenle, kopyala veya sürükleyerek günler arasında taşı.
-        </p>
-      </header>
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-foreground">Haftalık Program</h1>
+          <p className="text-muted-foreground text-sm">
+            {studentName} için görev ata, kartları düzenle, kopyala veya sürükleyerek günler arasında taşı.
+          </p>
+        </header>
 
-      <ScheduleBoard
-        studentId={id}
-        initialWeekDays={weekDays}
-        initialTasks={data.weekTasks}
-        initialEvents={data.weekEvents}
-        fixedTasks={data.fixedTasks}
-        courseResourceData={data.courseResourceData}
-        highlightTaskId={highlightTaskId}
-        initialRoutineRowHeights={rowHeights.routine}
-        initialTaskRowHeights={rowHeights.task}
-        examType={data.profile?.exam_type ?? "YKS"}
-      />
-    </div>
+        <ScheduleBoard
+          studentId={id}
+          initialWeekDays={weekDays}
+          initialTasks={data.weekTasks}
+          initialEvents={data.weekEvents}
+          fixedTasks={data.fixedTasks}
+          courseResourceData={data.courseResourceData}
+          highlightTaskId={highlightTaskId}
+          initialRoutineRowHeights={rowHeights.routine}
+          initialTaskRowHeights={rowHeights.task}
+          examType={data.profile?.exam_type ?? "YKS"}
+        />
+      </div>
+    </Maarif9Provider>
   );
 }
 

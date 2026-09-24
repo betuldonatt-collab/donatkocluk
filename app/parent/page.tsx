@@ -18,7 +18,8 @@ type GeneralExam = { id: string; title: string; task_date: string; subject_score
 
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention the student/coach panels already parse.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+  if (/^9.s*SINIF/i.test(title)) return "m9";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }

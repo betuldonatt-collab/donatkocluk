@@ -234,6 +234,19 @@ export async function updateAcademicTrack(studentId: string, track: string | nul
   revalidatePath("/admin/students");
 }
 
+// 9th-grade (Maarif) flag, profiles.is_maarif9 (migration 0096). Admin-only;
+// the profiles guard trigger rejects anyone else's attempt at the DB level.
+export async function updateMaarif9Flag(studentId: string, value: boolean) {
+  await requireAdmin();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const valueV = parseInput(z.boolean(), value);
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ is_maarif9: valueV }).eq("id", studentIdV).eq("role", "student");
+  if (error) throw dbError(error);
+
+  revalidatePath("/admin/students");
+}
+
 // --- Announcements ---------------------------------------------------------
 
 const timeStringSchema = z

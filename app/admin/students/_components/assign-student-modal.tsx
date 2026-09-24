@@ -5,12 +5,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes } from "../../actions";
+import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes, updateMaarif9Flag } from "../../actions";
 import { ResetPasswordButton } from "../../_components/reset-password-button";
 import { SendToPoolButton } from "../../_components/send-to-pool-button";
 
 type Person = { id: string; full_name: string | null };
-type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null };
+type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; is_maarif9?: boolean };
 type PoolCoach = Person & { activeCount: number; maxStudents: number };
 
 const TRACK_OPTIONS: { value: string; label: string }[] = [
@@ -58,6 +58,40 @@ function AdminNotesField({ studentId, initialNotes }: { studentId: string; initi
         </Button>
         {saved && <span className="text-muted-foreground text-xs">Kaydedildi.</span>}
       </div>
+    </div>
+  );
+}
+
+// 9. Sınıf (Maarif) flag -- switches the student's panel and the coach's forms to the
+// 9th-grade curriculum (no YKS countdown / TYT-AYT tabs).
+function Maarif9Field({ studentId, initial }: { studentId: string; initial: boolean }) {
+  const [checked, setChecked] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(next: boolean) {
+    const previous = checked;
+    setChecked(next);
+    setSaving(true);
+    setError(null);
+    try {
+      await updateMaarif9Flag(studentId, next);
+    } catch {
+      setChecked(previous);
+      setError("Kaydedilemedi. Migration 0096 uygulandı mı?");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-foreground flex items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={checked} disabled={saving} onChange={(e) => handleChange(e.target.checked)} className="size-4" />
+        9. Sınıf (Maarif) öğrencisi
+      </label>
+      <p className="text-muted-foreground text-xs">İşaretlenince öğrenci ve koç 9. sınıf müfredatını görür; YKS geri sayımı ve TYT/AYT sekmeleri gizlenir.</p>
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -141,6 +175,7 @@ export function AssignStudentModal({
           <ResetPasswordButton userId={student.id} />
 
           <AcademicTrackField studentId={student.id} initialTrack={student.academic_track} />
+          <Maarif9Field studentId={student.id} initial={student.is_maarif9 === true} />
           <AdminNotesField studentId={student.id} initialNotes={student.admin_notes} />
 
           <div className="border-border space-y-4 border-t pt-4">

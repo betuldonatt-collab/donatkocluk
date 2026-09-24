@@ -1,6 +1,7 @@
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
+  MAARIF9_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
   inferAytTrackFromScores,
 } from "./curriculum/subject-groups";
@@ -40,7 +41,8 @@ type SubjectScore = { correct?: Filled; wrong?: Filled; empty?: Filled };
 
 // A general exam's title is the only place its track lives (no course_id) --
 // same convention every panel parses.
-function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" {
+function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
@@ -52,6 +54,7 @@ function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" {
 export function expectedGeneralExamKeys(title: string, scores: Record<string, unknown> | null | undefined): string[] | null {
   const track = examTrackFromTitle(title);
   if (track === "lgs") return LGS_EXAM_SUBJECTS.map((s) => s.key);
+  if (track === "m9") return MAARIF9_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "tyt") return TYT_SUBJECT_GROUPS.map((g) => g.key);
   const aytTrack = inferAytTrackFromScores(scores);
   return aytTrack ? AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => g.key) : null;
@@ -83,6 +86,7 @@ function questionsForGeneralExamKey(
 ): number | null {
   const track = examTrackFromTitle(title);
   if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
+  if (track === "m9") return MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
   const aytTrack = inferAytTrackFromScores(scores);
   if (!aytTrack) return null;
@@ -113,7 +117,9 @@ export function findGeneralExamTotalMismatch(
       const label =
         track === "lgs"
           ? LGS_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
-          : track === "tyt"
+          : track === "m9"
+            ? MAARIF9_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
+            : track === "tyt"
             ? TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.label
             : AYT_SUBJECT_GROUPS_BY_TRACK[inferAytTrackFromScores(scores)!].find((g) => g.key === key)?.label;
       return { label: label ?? key, questions };

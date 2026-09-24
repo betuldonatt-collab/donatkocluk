@@ -30,7 +30,8 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // General-exam tasks have no course_id -- the TYT/AYT/LGS track lives only in
 // the title text, same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+  if (/^9.s*SINIF/i.test(title)) return "m9";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }

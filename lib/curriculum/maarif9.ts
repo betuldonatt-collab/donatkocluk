@@ -12,6 +12,7 @@
 //     e.g. "1.2. Metin Türleri › Deneme";
 //   - Genel Deneme's Türk Dili list has no themes, so its single unit has
 //     `unit: null`.
+import type { Course } from "./index";
 import genelDenemeJson from "./maarif9-genel-deneme.json";
 import kaynakTakibiJson from "./maarif9.json";
 
@@ -32,3 +33,21 @@ export const MAARIF9_GENEL_DENEME_SUBJECTS: Maarif9GenelDenemeSubject[] = genelD
 export function isMaarif9CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif9-");
 }
+
+// The Genel Deneme sheet's subjects as ordinary Course objects (a null unit
+// label becomes ""), used for the per-topic analysis step of a 9th-grade
+// Genel Deneme. Ids are "maarif9-gd-*", distinct from the Kaynak Takibi
+// courses above.
+export const MAARIF9_GENEL_DENEME_COURSES: Course[] = MAARIF9_GENEL_DENEME_SUBJECTS.map((s) => ({
+  id: s.id,
+  name: s.name,
+  units: s.units.map((u) => ({ unit: u.unit ?? "", topics: u.topics })),
+}));
+
+// The Kaynak Takibi courses as ordinary Course objects (every unit there
+// carries a Tema/Ünite label; `?? ""` only satisfies the type).
+export const MAARIF9_KAYNAK_COURSES: Course[] = MAARIF9_COURSES.map((c) => ({
+  id: c.id,
+  name: c.name,
+  units: c.units.map((u) => ({ unit: u.unit ?? "", topics: u.topics })),
+}));

@@ -1,3 +1,5 @@
+import { Maarif9Provider } from "@/components/maarif9-context";
+import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -578,6 +580,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const searchParams = await props.searchParams;
   const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
   const detail = await fetchStudentDetail(id);
+  const isMaarif9 = detail ? await fetchIsMaarif9(await createClient(), id) : false;
   // This student's Süre Tut sessions over 6 hours, waiting for the coach's
   // decision (best-effort: [] on failure). Only asked for once the student
   // resolved, i.e. is actually on this coach's roster.
@@ -586,76 +589,78 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link
-        href="/coach/students"
-        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
-      >
-        <ArrowLeft className="size-4" />
-        Öğrencilerim
-      </Link>
+    <Maarif9Provider value={isMaarif9}>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Link
+          href="/coach/students"
+          className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
+        >
+          <ArrowLeft className="size-4" />
+          Öğrencilerim
+        </Link>
 
-      {!detail ? (
-        <p className="text-muted-foreground text-sm">Öğrenci bulunamadı veya bu öğrenci sana atanmamış.</p>
-      ) : (
-        <>
-          <header className="mb-6">
-            <h1 className="text-2xl font-semibold text-foreground">{detail.profile.full_name ?? "İsimsiz Öğrenci"}</h1>
-          </header>
+        {!detail ? (
+          <p className="text-muted-foreground text-sm">Öğrenci bulunamadı veya bu öğrenci sana atanmamış.</p>
+        ) : (
+          <>
+            <header className="mb-6">
+              <h1 className="text-2xl font-semibold text-foreground">{detail.profile.full_name ?? "İsimsiz Öğrenci"}</h1>
+            </header>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <ProfileOverviewCard studentId={id} profile={detail.profile} remainingSessions={sessionBalance(detail.sessions).remaining} />
-                <TargetsCompletionCard
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="space-y-6 lg:col-span-2">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                  <ProfileOverviewCard studentId={id} profile={detail.profile} remainingSessions={sessionBalance(detail.sessions).remaining} />
+                  <TargetsCompletionCard
+                    studentId={id}
+                    profile={detail.profile}
+                    completion={detail.completion}
+                    subjectCompletion={detail.subjectCompletion}
+                    progressFrom={detail.progressFrom}
+                    progressFromLock={detail.progressFromLock}
+                  />
+                </div>
+
+                <PendingFocusReviewsCard reviews={focusReviews} />
+
+                {examType === "LGS" && <LgsExamHistory exams={buildLgsExamHistory(detail.generalExams)} />}
+
+                <DetailTabs
                   studentId={id}
-                  profile={detail.profile}
-                  completion={detail.completion}
-                  subjectCompletion={detail.subjectCompletion}
-                  progressFrom={detail.progressFrom}
-                  progressFromLock={detail.progressFromLock}
+                  topicPerformance={detail.topicPerformance}
+                  curriculumCourseIds={detail.curriculumCourseIds}
+                  paragrafEntries={detail.paragrafEntries}
+                  generalExams={detail.generalExams}
+                  branchExams={detail.branchExams}
+                  initialWeekDays={detail.weekDays}
+                  initialWeekTasks={detail.weekTasks}
+                  initialFixedTasks={detail.fixedTasks}
+                  courseResourceData={detail.courseResourceData}
+                  today={detail.today}
+                  initialWeekStats={detail.weekStats}
+                  karneCycles={detail.karneCycles}
+                  defaultKarneRange={detail.defaultKarneRange}
+                  allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
+                  initialTab={initialTab}
+                  examType={examType}
+                  lgsRoutines={detail.lgsRoutines}
+                  examMistakes={detail.examMistakes}
+                  sessions={detail.sessions}
                 />
               </div>
 
-              <PendingFocusReviewsCard reviews={focusReviews} />
-
-              {examType === "LGS" && <LgsExamHistory exams={buildLgsExamHistory(detail.generalExams)} />}
-
-              <DetailTabs
-                studentId={id}
-                topicPerformance={detail.topicPerformance}
-                curriculumCourseIds={detail.curriculumCourseIds}
-                paragrafEntries={detail.paragrafEntries}
-                generalExams={detail.generalExams}
-                branchExams={detail.branchExams}
-                initialWeekDays={detail.weekDays}
-                initialWeekTasks={detail.weekTasks}
-                initialFixedTasks={detail.fixedTasks}
-                courseResourceData={detail.courseResourceData}
-                today={detail.today}
-                initialWeekStats={detail.weekStats}
-                karneCycles={detail.karneCycles}
-                defaultKarneRange={detail.defaultKarneRange}
-                allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
-                initialTab={initialTab}
-                examType={examType}
-                lgsRoutines={detail.lgsRoutines}
-                examMistakes={detail.examMistakes}
-                sessions={detail.sessions}
-              />
+              <div className="lg:col-span-1">
+                <StudentTimelineCard
+                  studentId={id}
+                  notes={detail.notes}
+                  sessions={detail.sessions}
+                  initialHasMore={detail.notesHasMore}
+                />
+              </div>
             </div>
-
-            <div className="lg:col-span-1">
-              <StudentTimelineCard
-                studentId={id}
-                notes={detail.notes}
-                sessions={detail.sessions}
-                initialHasMore={detail.notesHasMore}
-              />
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </Maarif9Provider>
   );
 }

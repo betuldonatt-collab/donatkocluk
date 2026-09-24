@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsMaarif9 } from "@/components/maarif9-context";
 import { LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import type { DetailSession, DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
@@ -26,6 +27,9 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 // window doesn't meaningfully apply to, so the picker only shows -- and
 // only ever affects data -- while one of these three is active.
 const RANGE_FILTERED_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler"]);
+
+const MAARIF9_HIDDEN_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler", "kaynak-takibi", "karneler"]);
+const NO_HIDDEN_TABS = new Set<string>();
 
 export function DetailTabs({
   studentId,
@@ -76,7 +80,11 @@ export function DetailTabs({
   // LGS students' Paragraf / Kitap Okuma log (lgs_daily_routines).
   lgsRoutines?: LgsDailyRoutine[];
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+  // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
+  // hidden; Program and Görüşmeler remain.
+  const isMaarif9 = useIsMaarif9();
+  const hiddenTabs = isMaarif9 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS;
+  const [activeTab, setActiveTab] = useState(hiddenTabs.has(initialTab) ? "program" : initialTab);
   // One shared filter for Analiz / Gelişim Haritası / Grafikler -- lifted
   // above the tabs (not owned by any one of them) specifically so it
   // survives switching between them, defaulting to Son 30 Gün per the
@@ -90,12 +98,12 @@ export function DetailTabs({
     <Tabs value={activeTab} onValueChange={setActiveTab}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <TabsList>
-          <TabsTrigger value="analiz">Analiz</TabsTrigger>
-          <TabsTrigger value="gelisim-haritasi">Gelişim Haritası</TabsTrigger>
-          <TabsTrigger value="grafikler">Grafikler</TabsTrigger>
+          {!hiddenTabs.has("analiz") && <TabsTrigger value="analiz">Analiz</TabsTrigger>}
+          {!hiddenTabs.has("gelisim-haritasi") && <TabsTrigger value="gelisim-haritasi">Gelişim Haritası</TabsTrigger>}
+          {!hiddenTabs.has("grafikler") && <TabsTrigger value="grafikler">Grafikler</TabsTrigger>}
           <TabsTrigger value="program">Program</TabsTrigger>
-          <TabsTrigger value="kaynak-takibi">Kaynak Takibi</TabsTrigger>
-          <TabsTrigger value="karneler">Karneler</TabsTrigger>
+          {!hiddenTabs.has("kaynak-takibi") && <TabsTrigger value="kaynak-takibi">Kaynak Takibi</TabsTrigger>}
+          {!hiddenTabs.has("karneler") && <TabsTrigger value="karneler">Karneler</TabsTrigger>}
           <TabsTrigger value="gorusmeler">Görüşmeler</TabsTrigger>
         </TabsList>
         {RANGE_FILTERED_TABS.has(activeTab) && <ChartRangePicker value={chartRange} onChange={setChartRange} />}

@@ -34,7 +34,8 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // Mirrors buildGeneralExamTitle/parseGeneralExamTitle's own convention --
 // duplicated per call site across this app, not imported.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+  if (/^9.s*SINIF/i.test(title)) return "m9";
   if (/^LGS/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }

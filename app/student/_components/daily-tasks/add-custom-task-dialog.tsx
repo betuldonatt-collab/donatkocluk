@@ -19,6 +19,8 @@ import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
 import type { StudentTask } from "./types";
+import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
+import { useIsMaarif9 } from "@/components/maarif9-context";
 
 // Atomic TYT/AYT courses only -- deliberately NOT Paragraf/Problem's
 // routine pseudo-courses (which already have their own dedicated page).
@@ -78,7 +80,7 @@ type FormState = {
   // defaults to) rather than guessing "yes" just because it's the first
   // type selected.
   isCompleted: boolean;
-  generalExamTrack: "tyt" | "ayt" | "lgs";
+  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9";
   generalExamPublisher: string;
   freeTitle: string;
   freeDescription: string;
@@ -87,10 +89,10 @@ type FormState = {
   bookTitle: string;
 };
 
-function initialFormState(examType: ExamType): FormState {
+function initialFormState(examType: ExamType, isMaarif9 = false): FormState {
   return {
     taskType: "question_bank",
-    courseId: examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
+    courseId: isMaarif9 ? MAARIF9_KAYNAK_COURSES[0].id : examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
     topicId: "",
     resources: [],
     totalCount: "",
@@ -99,7 +101,7 @@ function initialFormState(examType: ExamType): FormState {
     emptyCount: "",
     durationMinutes: "",
     isCompleted: false,
-    generalExamTrack: examType === "LGS" ? "lgs" : "tyt",
+    generalExamTrack: isMaarif9 ? "m9" : examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     freeTitle: "",
     freeDescription: "",
@@ -178,7 +180,11 @@ export function AddCustomTaskDialog({
 }) {
   const [open, setOpen] = useState(false);
   const isLgs = examType === "LGS";
-  const [value, setValue] = useState<FormState>(() => initialFormState(examType));
+  // A 9th grader (profiles.is_maarif9) sees ONLY the 9th-grade courses here;
+  // everyone else is unchanged.
+  const isMaarif9 = useIsMaarif9();
+  const singleGeneralExamFormat = isLgs || isMaarif9;
+  const [value, setValue] = useState<FormState>(() => initialFormState(examType, isMaarif9));
   const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,10 +222,18 @@ export function AddCustomTaskDialog({
   // order the coach's own form uses -- every other type stays atomic-only.
   // LGS has no macro subjects (its branş denemeleri are per single subject)
   // and its own six-course list, offered SÖZEL first then SAYISAL.
-  const courseList: Course[] = isLgs ? LGS_COURSES : isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES] : ALL_COURSES;
-  const courseOptions: { id: string; label: string; group?: string }[] = isLgs
-    ? lgsCourseOptions()
-    : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));
+  const courseList: Course[] = isMaarif9
+    ? MAARIF9_KAYNAK_COURSES
+    : isLgs
+      ? LGS_COURSES
+      : isBranchExam
+        ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES]
+        : ALL_COURSES;
+  const courseOptions: { id: string; label: string; group?: string }[] = isMaarif9
+    ? courseList.map((c) => ({ id: c.id, label: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }))
+    : isLgs
+      ? lgsCourseOptions()
+      : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));
   const course = courseList.find((c) => c.id === value.courseId) ?? courseList[0];
   const topicOptions = topicOptionsForCourse(course);
 
@@ -410,7 +424,7 @@ export function AddCustomTaskDialog({
       // repeating it as a "Kaynak: X" line would just be a duplicate.
       const resourceNames = isBranchExam ? [] : resolvedResources.map((r) => r.name).filter(Boolean);
       onCreated({ ...task, resource_names: resourceNames } as StudentTask);
-      setValue(initialFormState(examType));
+      setValue(initialFormState(examType, isMaarif9));
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bir hata oluştu.");
@@ -421,7 +435,7 @@ export function AddCustomTaskDialog({
 
   function handleOpenChange(next: boolean) {
     if (next) {
-      setValue(initialFormState(examType));
+      setValue(initialFormState(examType, isMaarif9));
       setError(null);
     }
     setOpen(next);
@@ -521,10 +535,10 @@ export function AddCustomTaskDialog({
             )}
 
             {isGeneralExam && (
-              <div className={cn("grid grid-cols-1 gap-3", !isLgs && "sm:grid-cols-2")}>
+              <div className={cn("grid grid-cols-1 gap-3", !singleGeneralExamFormat && "sm:grid-cols-2")}>
                 {/* LGS has exactly one general exam format -- no TYT/AYT-style
                     Sınav Türü to choose between. */}
-                {!isLgs && (
+                {!singleGeneralExamFormat && (
                 <div className="space-y-1.5">
                   <Label>Sınav Türü</Label>
                   <div className="flex gap-1.5">

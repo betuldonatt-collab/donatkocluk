@@ -94,8 +94,9 @@ function buildTaskTitle(courseId: string | null | undefined, topicId: string | n
 // "Genel Deneme" has no course/topic at all -- per the coach's request,
 // the TYT/AYT track and publisher live only in the title text (no new
 // columns), e.g. "TYT Genel Deneme - 3D Yayınları".
-function buildGeneralExamTitle(track: "tyt" | "ayt" | "lgs" | null | undefined, publisher: string | null | undefined): string {
-  const prefix = track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : "TYT";
+function buildGeneralExamTitle(track: "tyt" | "ayt" | "lgs" | "m9" | null | undefined, publisher: string | null | undefined): string {
+  // "m9" = 9. sınıf (Maarif) Genel Deneme; parsed back by /^9\.\s*SINIF\b/ everywhere.
+  const prefix = track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : track === "m9" ? "9. SINIF" : "TYT";
   const pub = publisher?.trim();
   return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
 }
@@ -1178,7 +1179,7 @@ type AssignTaskInput = {
   totalCount?: number | null;
   durationMinutes?: number | null;
   videoLinks?: VideoLink[];
-  generalExamTrack?: "tyt" | "ayt" | "lgs" | null;
+  generalExamTrack?: "tyt" | "ayt" | "lgs" | "m9" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
   // "Kitap Okuma" only -- the book's name, lives directly on the title
@@ -1199,7 +1200,7 @@ const assignTaskInputSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1421,7 +1422,7 @@ const updateAssignedTaskSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1443,7 +1444,7 @@ export async function updateAssignedTask(
     totalCount?: number | null;
     durationMinutes?: number | null;
     videoLinks?: VideoLink[];
-    generalExamTrack?: "tyt" | "ayt" | "lgs" | null;
+    generalExamTrack?: "tyt" | "ayt" | "lgs" | "m9" | null;
     generalExamPublisher?: string | null;
     branchExamPublisher?: string | null;
     bookTitle?: string | null;

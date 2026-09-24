@@ -3,6 +3,7 @@
 // so their track (sayisal/ea/sozel) is recovered from which of the disjoint
 // key-sets below is present in a given exam's subject_scores -- see
 // inferAytTrackFromScores.
+import { MAARIF9_GENEL_DENEME_COURSES } from "./maarif9";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES, type Course, type Track } from "./index";
 
 // LGS's real exam is two sessions: Sözel (Türkçe 20, İnkılap 10, Din
@@ -181,4 +182,28 @@ export function inferAytTrackFromScores(scores: Record<string, unknown> | null |
     if (AYT_SUBJECT_GROUPS_BY_TRACK[track].some((g) => g.key in scores)) return track;
   }
   return null;
+}
+
+// 9th-grade (Maarif) Genel Deneme: 120 questions, scored per subject like
+// LGS. Keys are `m9_`-prefixed for the same reason LGS's are `lgs_`-prefixed:
+// they must never collide with TYT's unprefixed keys in subject_scores.
+// `courseIds` point at the "9. Sınıf Genel Deneme Analizi" sheet's own
+// subject list (MAARIF9_GENEL_DENEME_COURSES) used for topic analysis.
+export const MAARIF9_EXAM_SUBJECTS: { key: string; label: string; section: string; courseIds: string[]; questions: number }[] = [
+  { key: "m9_turkce", label: "Türk Dili ve Edebiyatı", section: "TÜRKÇE", courseIds: ["maarif9-gd-turk-dili-ve-edebiyati"], questions: 30 },
+  { key: "m9_tarih", label: "Tarih", section: "SOSYAL BİLİMLER", courseIds: ["maarif9-gd-tarih"], questions: 10 },
+  { key: "m9_cografya", label: "Coğrafya", section: "SOSYAL BİLİMLER", courseIds: ["maarif9-gd-cografya"], questions: 10 },
+  { key: "m9_din", label: "Din Kültürü", section: "SOSYAL BİLİMLER", courseIds: ["maarif9-gd-din-kulturu"], questions: 10 },
+  { key: "m9_matematik", label: "Matematik", section: "MATEMATİK", courseIds: ["maarif9-gd-matematik"], questions: 30 },
+  { key: "m9_fizik", label: "Fizik", section: "FEN BİLİMLERİ", courseIds: ["maarif9-gd-fizik"], questions: 10 },
+  { key: "m9_kimya", label: "Kimya", section: "FEN BİLİMLERİ", courseIds: ["maarif9-gd-kimya"], questions: 10 },
+  { key: "m9_biyoloji", label: "Biyoloji", section: "FEN BİLİMLERİ", courseIds: ["maarif9-gd-biyoloji"], questions: 10 },
+];
+
+export const MAARIF9_EXAM_QUESTION_TOTAL = MAARIF9_EXAM_SUBJECTS.reduce((sum, s) => sum + s.questions, 0); // 120
+
+export function coursesForMaarif9ExamSubject(key: string): Course[] {
+  const subject = MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key);
+  if (!subject) return [];
+  return subject.courseIds.map((id) => MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }
