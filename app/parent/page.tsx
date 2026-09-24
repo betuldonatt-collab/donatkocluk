@@ -3,8 +3,8 @@ import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
-import { completionCounts, completionPercent } from "@/lib/completion";
-import { CompletionBar } from "./_components/completion-bar";
+import { completionPercent, weekCompletionCounts } from "@/lib/completion";
+import { WeeklyProgressCard } from "./_components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
 import { SessionQuotaStats } from "./_components/session-quota-stats";
@@ -54,11 +54,18 @@ function getWeekRange(referenceIso: string) {
 
 type WeekTask = { task_date: string; status: "pending" | "done" | "half_done" | "not_done" };
 
+// Whole-week (macro) completion, same rule as the student's "Bu Hafta" bar.
 // Counts only what is due so far this week (from the day the schedule was locked,
 // Monday if not locked, up to today): tomorrow's tasks are in neither the numerator
 // nor the denominator (lib/completion.ts).
 function computeWeeklyCompletionPct(tasks: WeekTask[], today: string, lockedAt: string | null) {
-  return completionPercent(completionCounts(tasks, today, lockedAt));
+  return completionPercent(weekCompletionCounts(tasks, today, lockedAt));
+}
+
+function addDays(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 // Softened per product decision: sums only the total questions solved --
@@ -80,6 +87,8 @@ async function fetchDashboardData() {
 
   const today = todayISO();
   const { start, end } = getWeekRange(today);
+  const prevStart = addDays(start, -7);
+  const prevEnd = addDays(start, -1);
 
   const [
     { data: profile },
@@ -88,6 +97,8 @@ async function fetchDashboardData() {
     { data: dailyStatsRows },
     { data: examRows },
     { data: weekLockRow },
+    { data: prevTaskRows },
+    { data: prevLockRow },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -137,6 +148,14 @@ async function fetchDashboardData() {
         .order("task_date", { ascending: false }),
       // When this week's schedule was locked: where the weekly completion starts counting.
       supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", start).maybeSingle(),
+      // Last full week: a finished baseline shown next to the ongoing one.
+      supabase
+        .from("student_tasks")
+        .select("task_date, status")
+        .eq("student_id", studentId)
+        .gte("task_date", prevStart)
+        .lte("task_date", prevEnd),
+      supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", prevStart).maybeSingle(),
     ]);
 
   if (!profile) return { student: null };
@@ -169,7 +188,16 @@ async function fetchDashboardData() {
     completedCount,
     remaining: Math.max(0, profile.total_session_quota - completedCount),
     sessions,
-    weeklyCompletionPct: computeWeeklyCompletionPct(weekTasks, today, (weekLockRow?.locked_at ?? null) as string | null),
+    currentWeek: {
+      start,
+      end,
+      pct: computeWeeklyCompletionPct(weekTasks, today, (weekLockRow?.locked_at ?? null) as string | null),
+    },
+    previousWeek: {
+      start: prevStart,
+      end: prevEnd,
+      pct: computeWeeklyCompletionPct((prevTaskRows ?? []) as WeekTask[], prevStart, (prevLockRow?.locked_at ?? null) as string | null),
+    },
     weekStat,
     programTasks,
     tytNetChartData,
@@ -199,7 +227,8 @@ export default async function ParentPage() {
     completedCount,
     remaining,
     sessions,
-    weeklyCompletionPct,
+    currentWeek,
+    previousWeek,
     weekStat,
     programTasks,
     tytNetChartData,
@@ -232,10 +261,10 @@ export default async function ParentPage() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Bu Hafta Program Tamamlama</CardTitle>
+            <CardTitle className="text-base">Haftalık Program Tamamlama</CardTitle>
           </CardHeader>
           <CardContent>
-            <CompletionBar label="Genel" pct={weeklyCompletionPct} />
+            <WeeklyProgressCard previous={previousWeek} current={currentWeek} />
           </CardContent>
         </Card>
 
