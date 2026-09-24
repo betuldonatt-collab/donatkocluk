@@ -30,11 +30,11 @@ export function WeekNavigator({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
+      <div className="flex w-full items-center gap-2 sm:w-auto">
         <Button type="button" variant="outline" size="icon" onClick={() => goTo(addDaysISO(weekStart, -7))} aria-label="Önceki hafta">
           <ChevronLeft className="size-4" />
         </Button>
-        <span className="text-foreground min-w-[220px] text-center text-sm font-medium">{rangeLabel}</span>
+        <span className="text-foreground min-w-0 flex-1 text-center sm:min-w-[220px] sm:flex-none text-sm font-medium">{rangeLabel}</span>
         <Button type="button" variant="outline" size="icon" onClick={() => goTo(addDaysISO(weekStart, 7))} aria-label="Sonraki hafta">
           <ChevronRight className="size-4" />
         </Button>

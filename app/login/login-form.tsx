@@ -147,7 +147,7 @@ export function LoginForm({
                 name="role"
                 value={signupRole}
                 onChange={(e) => setSignupRole(e.target.value)}
-                className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
               >
                 {SIGNUP_ROLE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -164,7 +164,7 @@ export function LoginForm({
                   name="examType"
                   value={signupExamType}
                   onChange={(e) => setSignupExamType(e.target.value)}
-                  className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
+                  className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
                 >
                   <option value="YKS">YKS (Lise)</option>
                   <option value="LGS">LGS (8. Sınıf)</option>

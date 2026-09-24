@@ -445,7 +445,7 @@ export function AddCustomTaskDialog({
               <Label htmlFor="rich-task-type">Görev Türü</Label>
               <select
                 id="rich-task-type"
-                className="border-input bg-background flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                className="border-input bg-background flex h-10 md:h-9 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 value={value.taskType}
                 onChange={(e) => handleTaskTypeChange(e.target.value as RichTaskType)}
               >

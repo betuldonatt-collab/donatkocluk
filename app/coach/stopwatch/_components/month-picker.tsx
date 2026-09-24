@@ -38,7 +38,7 @@ export function MonthPicker({
         const [nextYear, nextMonth] = e.target.value.split("-").map(Number);
         onChange(nextYear, nextMonth);
       }}
-      className="border-input bg-background text-foreground h-9 rounded-md border px-3 text-sm"
+      className="border-input bg-background text-foreground h-10 md:h-9 rounded-md border px-3 text-sm"
     >
       {options.map((opt) => (
         <option key={`${opt.year}-${opt.month}`} value={`${opt.year}-${opt.month}`}>

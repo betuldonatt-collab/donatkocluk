@@ -64,7 +64,7 @@ export function WeeklyCalendar({
   const gridHeight = (RANGE_END_HOUR - RANGE_START_HOUR) * PX_PER_HOUR;
 
   return (
-    <div className="border-border overflow-x-auto rounded-xl border">
+    <div className="border-border touch-pan-x touch-pan-y overflow-x-auto overscroll-x-contain rounded-xl border [-webkit-overflow-scrolling:touch]">
       <div className="grid min-w-[900px] grid-cols-[56px_repeat(7,1fr)]">
         <div className="border-border border-b" />
         {weekDays.map((day) => (

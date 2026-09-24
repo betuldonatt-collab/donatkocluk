@@ -136,7 +136,7 @@ export function CoachAssignmentTable({
   }
 
   const selectClass =
-    "border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50";
+    "border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50";
 
   return (
     <div className="border-border overflow-x-auto rounded-lg border">
@@ -212,7 +212,7 @@ export function CoachAssignmentTable({
                       onBlur={() => handleQuotaBlur(student.id)}
                       disabled={quotaSavingId === student.id}
                       aria-label={`${student.full_name ?? "Öğrenci"} görüşme kotası`}
-                      className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-16 rounded-md border bg-transparent px-2 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
+                      className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 w-16 rounded-md border bg-transparent px-2 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
                     />
                   </div>
                 </TableCell>
@@ -241,7 +241,7 @@ export function CoachAssignmentTable({
                         value={status.exitNote}
                         onChange={(e) => updateStatusField(student.id, { exitNote: e.target.value })}
                         placeholder="Not (opsiyonel)"
-                        className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-40 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
+                        className="border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 w-40 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
                         disabled={statusSavingId === student.id}
                       />
                       <button

@@ -32,7 +32,7 @@ export function MonthNavigator({ month, isCurrentMonth }: { month: string; isCur
       <Button type="button" variant="outline" size="icon" onClick={() => goTo(addMonthsISO(month, -1))} aria-label="Önceki ay">
         <ChevronLeft className="size-4" />
       </Button>
-      <span className="text-foreground min-w-[160px] text-center text-sm font-medium">{label}</span>
+      <span className="text-foreground min-w-0 flex-1 text-center sm:min-w-[160px] sm:flex-none text-sm font-medium">{label}</span>
       <Button type="button" variant="outline" size="icon" onClick={() => goTo(addMonthsISO(month, 1))} aria-label="Sonraki ay">
         <ChevronRight className="size-4" />
       </Button>

@@ -68,7 +68,7 @@ export function DashboardShell({ sidebar, children }: { sidebar: React.ReactNode
           // below md since Tailwind's unprefixed classes are the base
           // (mobile) value and md: only overrides at that breakpoint and
           // up.
-          "ml-0 flex-1 transition-[margin-left] duration-200 ease-in-out print:ml-0",
+          "ml-0 min-w-0 flex-1 transition-[margin-left] duration-200 ease-in-out print:ml-0",
           collapsed ? "md:ml-16" : "md:ml-64",
         )}
       >

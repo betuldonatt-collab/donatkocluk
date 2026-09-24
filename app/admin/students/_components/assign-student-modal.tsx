@@ -22,7 +22,7 @@ const TRACK_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const selectClass =
-  "border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50";
+  "border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50";
 
 function AdminNotesField({ studentId, initialNotes }: { studentId: string; initialNotes: string | null }) {
   const [notes, setNotes] = useState(initialNotes ?? "");

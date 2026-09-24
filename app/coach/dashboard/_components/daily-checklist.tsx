@@ -179,7 +179,7 @@ export function DailyChecklist({
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <div className="overflow-x-auto pb-2">
+      <div className="touch-pan-x touch-pan-y overflow-x-auto overscroll-x-contain pb-2">
         <div className="grid min-w-[980px] grid-cols-7 gap-2">
           {weekDays.map((day) => (
             <DayColumn
@@ -315,7 +315,7 @@ function AddTaskDialog({
             <Label htmlFor="task-student">İlgili Öğrenci (opsiyonel)</Label>
             <select
               id="task-student"
-              className="border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className="border-input bg-background flex h-10 md:h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
             >
