@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
-import { completionPercent, weekCompletionCounts } from "@/lib/completion";
+import { completionPercent } from "@/lib/completion";
+import { weightedWeekCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
@@ -53,14 +54,14 @@ function getWeekRange(referenceIso: string) {
   return { start, end: sunday.toISOString().slice(0, 10) };
 }
 
-type WeekTask = { task_date: string; status: "pending" | "done" | "half_done" | "not_done" };
 
 // Whole-week (macro) completion, same rule as the student's "Bu Hafta" bar.
 // Counts only what is due so far this week (from the day the schedule was locked,
 // Monday if not locked, up to today): tomorrow's tasks are in neither the numerator
 // nor the denominator (lib/completion.ts).
-function computeWeeklyCompletionPct(tasks: WeekTask[], today: string, lockedAt: string | null) {
-  return completionPercent(weekCompletionCounts(tasks, today, lockedAt));
+// Effort-weighted (lib/effort-weight.ts): heavier tasks move the bar further.
+function computeWeeklyCompletionPct(tasks: WeightableTask[], today: string, lockedAt: string | null) {
+  return completionPercent(weightedWeekCompletionCounts(tasks, today, lockedAt));
 }
 
 function addDays(iso: string, days: number) {
@@ -98,6 +99,7 @@ async function fetchDashboardData() {
     { data: dailyStatsRows },
     { data: examRows },
     { data: weekLockRow },
+    { data: weightTaskRows },
     { data: prevTaskRows },
     { data: prevLockRow },
   ] = await Promise.all([
@@ -149,10 +151,18 @@ async function fetchDashboardData() {
         .order("task_date", { ascending: false }),
       // When this week's schedule was locked: where the weekly completion starts counting.
       supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", start).maybeSingle(),
+      // Server-only rows for the effort weighting -- only the resulting
+      // percentage ever leaves the server, never these counts.
+      supabase
+        .from("student_tasks")
+        .select("task_date, status, task_type, course_id, title, total_count, duration_minutes")
+        .eq("student_id", studentId)
+        .gte("task_date", start)
+        .lte("task_date", end),
       // Last full week: a finished baseline shown next to the ongoing one.
       supabase
         .from("student_tasks")
-        .select("task_date, status")
+        .select("task_date, status, task_type, course_id, title, total_count, duration_minutes")
         .eq("student_id", studentId)
         .gte("task_date", prevStart)
         .lte("task_date", prevEnd),
@@ -162,7 +172,6 @@ async function fetchDashboardData() {
   if (!profile) return { student: null };
 
   const sessions = (sessionRows ?? []) as ParentSession[];
-  const weekTasks = (weekTaskRows ?? []) as WeekTask[];
   const programTasks = (weekTaskRows ?? []) as ProgramTask[];
   // Scoped to the current quota cycle, same reset point + condition
   // (outcome = 'completed' and scheduled_at >= quota_cycle_start_at) as
@@ -197,12 +206,12 @@ async function fetchDashboardData() {
     currentWeek: {
       start,
       end,
-      pct: computeWeeklyCompletionPct(weekTasks, today, (weekLockRow?.locked_at ?? null) as string | null),
+      pct: computeWeeklyCompletionPct((weightTaskRows ?? []) as WeightableTask[], today, (weekLockRow?.locked_at ?? null) as string | null),
     },
     previousWeek: {
       start: prevStart,
       end: prevEnd,
-      pct: computeWeeklyCompletionPct((prevTaskRows ?? []) as WeekTask[], prevStart, (prevLockRow?.locked_at ?? null) as string | null),
+      pct: computeWeeklyCompletionPct((prevTaskRows ?? []) as WeightableTask[], prevStart, (prevLockRow?.locked_at ?? null) as string | null),
     },
     weekStat,
     programTasks,

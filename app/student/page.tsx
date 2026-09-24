@@ -7,6 +7,7 @@ import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-t
 import { NextSessionCard } from "./_components/next-session-card";
 import { RemainingSessionsCard } from "./_components/remaining-sessions-card";
 import { SessionRatingBanner } from "./_components/session-rating-banner";
+import type { ProgressTask } from "./_components/daily-tasks/progress-overview";
 import { TaskBoard } from "./_components/daily-tasks/task-board";
 import type { StudentFixedTask, StudentTask } from "./_components/daily-tasks/types";
 import type { ExamType } from "@/lib/exam-type";
@@ -135,7 +136,7 @@ async function fetchHomeData(userId: string) {
       // the same range.
       supabase
         .from("student_tasks")
-        .select("id, task_date, status")
+        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
         .eq("student_id", userId)
         .gte("task_date", prevWeekStart)
         .lte("task_date", dayAfterWeek),
@@ -207,7 +208,7 @@ async function fetchHomeData(userId: string) {
     // When the coach locked THIS week's schedule: where the student's
     // progress bar starts counting (lib/completion.ts).
     progressLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === mondayOf(today))?.locked_at ?? null) as string | null,
-    progressExtraTasks: (progressExtraRows ?? []) as { id: string; task_date: string; status: string }[],
+    progressExtraTasks: (progressExtraRows ?? []) as ProgressTask[],
     previousLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === prevWeekStart)?.locked_at ?? null) as string | null,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
@@ -249,7 +250,7 @@ export default async function StudentHomePage() {
         examType: "YKS" as ExamType,
         todayLocked: false,
         progressLockedAt: null as string | null,
-        progressExtraTasks: [] as { id: string; task_date: string; status: string }[],
+        progressExtraTasks: [] as ProgressTask[],
         previousLockedAt: null as string | null,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],

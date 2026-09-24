@@ -4,7 +4,8 @@ import { BookOpen, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { completionCounts, completionPercent } from "@/lib/completion";
+import { completionPercent } from "@/lib/completion";
+import { weightedCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
 import { mondayOf } from "@/lib/date";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
@@ -39,7 +40,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
       .from("profiles")
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
-    supabase.from("student_tasks").select("student_id, status, task_date").in("student_id", studentIds),
+    supabase.from("student_tasks").select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes").in("student_id", studentIds),
     supabase.from("week_locks").select("student_id, locked_at").in("student_id", studentIds).eq("week_start_date", mondayOf(today)),
     supabase.from("coaching_sessions").select("student_id, is_paid, outcome").in("student_id", studentIds),
   ]);
@@ -52,10 +53,18 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 
   // Only tasks from the lock day (Monday if not locked) up to today count (lib/completion.ts).
   const lockedAtByStudent = new Map((lockRows ?? []).map((r) => [r.student_id, r.locked_at as string]));
-  const tasksByStudent = new Map<string, { task_date: string; status: string }[]>();
+  const tasksByStudent = new Map<string, WeightableTask[]>();
   for (const t of taskRows ?? []) {
     const list = tasksByStudent.get(t.student_id) ?? [];
-    list.push({ task_date: t.task_date, status: t.status });
+    list.push({
+      task_date: t.task_date,
+      status: t.status,
+      task_type: t.task_type,
+      course_id: t.course_id,
+      title: t.title,
+      total_count: t.total_count,
+      duration_minutes: t.duration_minutes,
+    });
     tasksByStudent.set(t.student_id, list);
   }
 
@@ -63,7 +72,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
     ...p,
     // Derived balance (paid - completed), not the stale profiles column.
     remaining_sessions: sessionBalance(sessionsByStudent.get(p.id) ?? []).remaining,
-    completionPct: completionPercent(completionCounts(tasksByStudent.get(p.id) ?? [], today, lockedAtByStudent.get(p.id))),
+    completionPct: completionPercent(weightedCompletionCounts(tasksByStudent.get(p.id) ?? [], today, lockedAtByStudent.get(p.id))),
   }));
 }
 

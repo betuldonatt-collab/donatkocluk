@@ -156,9 +156,13 @@ export function TaskCard({
   task,
   onClick,
   showTimer = true,
+  impactHint,
 }: {
   task: StudentTask;
   onClick: () => void;
+  // e.g. "Bu görevi tamamladığında bugünkü ilerlemene yaklaşık %30 ekleyeceksin"
+  // (see lib/effort-weight.ts). Null/absent hides it.
+  impactHint?: string | null;
   // Süre Tut is restricted to the real, current day (see TaskBoard's
   // canUseTimer) -- a student can't retroactively time something they
   // already did yesterday, or pre-log time on a task that hasn't happened
@@ -292,6 +296,7 @@ export function TaskCard({
             above) -- a mouse-only desktop session never sets it, so this
             stays exactly lines={3} there, unchanged. */}
         <TaskDescription text={task.description} lines={isPressed ? "all" : 3} className="mt-0.5" />
+        {impactHint && <p className="text-primary/80 mt-1 text-xs">{impactHint}</p>}
         {/* Which book/kaynak the coach linked, if any -- previously
             invisible anywhere in the student panel, including the full
             task modal (traced to the fetch itself never joining

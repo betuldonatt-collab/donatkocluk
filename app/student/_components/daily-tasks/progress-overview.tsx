@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
-import { completionPercent, weekCompletionCounts } from "@/lib/completion";
+import { completionPercent } from "@/lib/completion";
+import { weightedDayCounts, weightedWeekCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { mondayOf } from "@/lib/date";
 import type { StudentTask } from "./types";
@@ -14,7 +15,8 @@ function addDaysISO(iso: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-type ProgressTask = { id: string; task_date: string; status: string };
+// Slim rows are enough: everything the effort weighting needs, nothing else.
+export type ProgressTask = WeightableTask & { id: string };
 
 // Dün / Bugün / Yarın as three separate bars: each is simply that
 // calendar day's tasks -- done / assigned -- with no lock-day or week
@@ -33,7 +35,9 @@ function DailyProgressCard({ tasks, today }: { tasks: ProgressTask[]; today: str
         {days.map((d) => {
           const dayTasks = tasks.filter((t) => t.task_date === d.date);
           const done = dayTasks.filter((t) => t.status === "done").length;
-          const pct = completionPercent({ done, total: dayTasks.length });
+          // Effort-weighted, not a task count: a heavy math set moves the
+          // bar further than a short reading task (lib/effort-weight.ts).
+          const pct = completionPercent(weightedDayCounts(dayTasks, d.date));
           const isToday = d.key === "today";
           const dateLabel = new Date(`${d.date}T00:00:00Z`).toLocaleDateString("tr-TR", {
             day: "numeric",
@@ -104,8 +108,8 @@ export function ProgressOverview({
 
   const weekStart = mondayOf(today);
   const prevStart = addDaysISO(weekStart, -7);
-  const current = { start: weekStart, end: addDaysISO(weekStart, 6), pct: completionPercent(weekCompletionCounts(all, today, lockedAt)) };
-  const previous = { start: prevStart, end: addDaysISO(weekStart, -1), pct: completionPercent(weekCompletionCounts(all, prevStart, previousLockedAt)) };
+  const current = { start: weekStart, end: addDaysISO(weekStart, 6), pct: completionPercent(weightedWeekCompletionCounts(all, today, lockedAt)) };
+  const previous = { start: prevStart, end: addDaysISO(weekStart, -1), pct: completionPercent(weightedWeekCompletionCounts(all, prevStart, previousLockedAt)) };
 
   return (
     <div className="grid gap-4 md:grid-cols-2">

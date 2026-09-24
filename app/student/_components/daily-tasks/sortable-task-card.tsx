@@ -16,8 +16,10 @@ export function SortableTaskCard({
   onClick,
   trailing,
   showTimer = true,
+  impactHint,
 }: {
   task: StudentTask;
+  impactHint?: string | null;
   onClick: () => void;
   trailing?: React.ReactNode;
   // Süre Tut only makes sense looking at the real, current day -- see
@@ -50,7 +52,7 @@ export function SortableTaskCard({
         <GripVertical className="size-4" />
       </button>
       <div className="min-w-0 flex-1">
-        <TaskCard task={task} onClick={onClick} showTimer={showTimer} />
+        <TaskCard task={task} onClick={onClick} showTimer={showTimer} impactHint={impactHint} />
       </div>
       {trailing}
     </div>

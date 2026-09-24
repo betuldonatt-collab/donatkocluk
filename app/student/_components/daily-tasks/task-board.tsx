@@ -35,7 +35,8 @@ import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
-import { ProgressOverview } from "./progress-overview";
+import { impactPercent } from "@/lib/effort-weight";
+import { ProgressOverview, type ProgressTask } from "./progress-overview";
 import { TaskDescription } from "@/components/task-description";
 import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
@@ -177,7 +178,7 @@ export function TaskBoard({
   progressLockedAt: string | null;
   // Slim last-week / next-day rows + last week's lock time, for the
   // Geçen Hafta bar and Dün/Yarın (see ProgressOverview).
-  progressExtraTasks: { id: string; task_date: string; status: string }[];
+  progressExtraTasks: ProgressTask[];
   previousLockedAt: string | null;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
@@ -352,6 +353,15 @@ export function TaskBoard({
   const canUseTimer = view === "today";
 
   const selectedDayTasks = tasks.filter((t) => t.task_date === selectedDate);
+  // "Bu görevi tamamladığında ... ilerlemene yaklaşık %X ekleyeceksin" --
+  // the task's effort share of its own day (lib/effort-weight.ts). Only for
+  // unfinished tasks; nothing about the underlying units is ever shown.
+  const impactDayWord = view === "yesterday" ? "dünkü" : view === "tomorrow" ? "yarınki" : "bugünkü";
+  function impactHintFor(task: StudentTask): string | null {
+    if (task.status === "done" || task.completed) return null;
+    const pct = impactPercent(task, selectedDayTasks);
+    return pct === null ? null : `Bu görevi tamamladığında ${impactDayWord} ilerlemene yaklaşık %${pct} ekleyeceksin`;
+  }
   const coachTasks = selectedDayTasks.filter((t) => t.is_coach_assigned).sort(byOrder);
   const customTasks = selectedDayTasks.filter((t) => !t.is_coach_assigned).sort(byOrder);
   const selectedDayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeekOf(selectedDate));
@@ -507,7 +517,7 @@ export function TaskBoard({
                       <SortableContext items={routineTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {routineTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} />
                           ))}
                         </div>
                       </SortableContext>
@@ -524,7 +534,7 @@ export function TaskBoard({
                       <SortableContext items={regularTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {regularTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} />
                           ))}
                         </div>
                       </SortableContext>
@@ -556,6 +566,7 @@ export function TaskBoard({
                         task={task}
                         onClick={() => openTask(task)}
                         showTimer={canUseTimer}
+                        impactHint={impactHintFor(task)}
                         trailing={
                           // Branch exams are coach/admin-delete-only, same
                           // as resource tracking -- RLS already rejects
