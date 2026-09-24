@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, Bell, Calendar, ChevronLeft, ChevronRight, Home, Settings, Timer, User, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { YksCountdown } from "@/components/ui/yks-countdown";
 import { COACH_LANDING_PATH, COACH_NAV_ITEMS, COACH_WELCOME_STEP } from "@/lib/tour-steps";
@@ -45,7 +45,7 @@ export function CoachSidebar({ unreadCount = 0, fullName = null }: { unreadCount
       )}
     >
       <div className={cn("flex items-center gap-2 px-6 py-5", effectiveCollapsed && "justify-center px-0")}>
-        <Logo className="size-6" contrastBg />
+        <BrandLogo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
       {/* A coach's roster spans both cohorts, so both countdowns show

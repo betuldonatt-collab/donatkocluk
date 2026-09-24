@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { resolveTourSteps, type TourNavItem } from "@/lib/tour-steps";
 import { useTourCompleted } from "@/lib/use-tour-completed";
 import { cn } from "@/lib/utils";
@@ -340,7 +340,7 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
 
   const mascot = (
     <div className="mb-1 shrink-0" style={mascotFlipped ? { transform: "scaleX(-1)" } : undefined}>
-      <Logo className="size-16" />
+      <BrandLogo className="size-16" />
     </div>
   );
 
@@ -446,7 +446,7 @@ export function TourTrigger({
           collapsed ? "w-full justify-center" : "w-full px-2.5",
         )}
       >
-        <Logo className="size-7 shrink-0" contrastBg />
+        <BrandLogo className="size-7 shrink-0" contrastBg />
         {!collapsed && <span className="text-sm font-medium">Rehberi Başlat</span>}
       </button>
 

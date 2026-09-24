@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, GraduationCap, Home, Link2, Network, Settings, UserCog, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { ADMIN_LANDING_PATH, ADMIN_NAV_ITEMS, ADMIN_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
@@ -38,7 +38,7 @@ export function AdminSidebar({ fullName = null }: { fullName?: string | null }) 
       )}
     >
       <div className={cn("flex items-center gap-2 px-6 py-5", effectiveCollapsed && "justify-center px-0")}>
-        <Logo className="size-6" contrastBg />
+        <BrandLogo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
       <nav className="flex flex-col gap-1 px-3">

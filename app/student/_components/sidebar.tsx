@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { YksCountdown } from "@/components/ui/yks-countdown";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
@@ -69,7 +69,7 @@ export function StudentSidebar({
       )}
     >
       <div className={cn("flex items-center gap-2 px-6 py-5", effectiveCollapsed && "justify-center px-0")}>
-        <Logo className="size-6" contrastBg />
+        <BrandLogo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
       {!effectiveCollapsed && <YksCountdown variant="student" examType={examType} />}

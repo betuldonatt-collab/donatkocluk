@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 
 import { LoginForm } from "./login-form";
 
@@ -26,7 +26,7 @@ export default async function LoginPage({
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <div className="flex items-center justify-center gap-2">
-            <Logo className="size-12" />
+            <BrandLogo className="size-12" />
             <span className="text-muted-foreground text-base font-semibold">Donat Koçluk</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">

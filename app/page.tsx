@@ -9,7 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
+import { BrandLogo } from "@/components/ui/brand-logo";
 
 const PANELS = [
   {
@@ -32,7 +32,7 @@ export default function Home() {
       <div className="w-full max-w-2xl space-y-8">
         <div className="space-y-2 text-center">
           <div className="flex items-center justify-center gap-3">
-            <Logo className="size-14" />
+            <BrandLogo className="size-14" />
             <h1 className="text-3xl font-semibold tracking-tight">
               Donat Koçluk
             </h1>

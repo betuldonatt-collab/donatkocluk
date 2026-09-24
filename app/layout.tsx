@@ -40,6 +40,12 @@ export const metadata: Metadata = {
     template: "%s | Donat Koçluk",
   },
   description: "Öğrenci, Veli, Koç ve Admin panelleri",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    shortcut: "/favicon.png",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   // Added to the home screen, this is what launches the app without
   // Safari's own address bar/chrome instead of just bookmarking the page.
   appleWebApp: {
