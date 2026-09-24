@@ -35,7 +35,7 @@ import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
 import { TaskModal } from "./task-modal";
-import { WeekProgressBar } from "./week-progress-bar";
+import { ProgressOverview } from "./progress-overview";
 import { TaskDescription } from "@/components/task-description";
 import type { StudentFixedTask, StudentTask } from "./types";
 import { DEFAULT_CELL_HEIGHT_PX, MIN_CELL_HEIGHT_PX, WeekTaskCell } from "./week-task-cell";
@@ -152,6 +152,8 @@ export function TaskBoard({
   allTimeTrackedMinutes,
   todayLocked,
   progressLockedAt,
+  progressExtraTasks,
+  previousLockedAt,
   initialRoutineRowHeights,
   initialTaskRowHeights,
   examType = "YKS",
@@ -173,6 +175,10 @@ export function TaskBoard({
   // When the coach locked the current week's schedule (null = not locked):
   // where the progress bar starts counting.
   progressLockedAt: string | null;
+  // Slim last-week / next-day rows + last week's lock time, for the
+  // Geçen Hafta bar and Dün/Yarın (see ProgressOverview).
+  progressExtraTasks: { id: string; task_date: string; status: string }[];
+  previousLockedAt: string | null;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
   // app/student/page.tsx so the very first render already matches their
@@ -359,17 +365,15 @@ export function TaskBoard({
     <div className="space-y-6">
       <PendingAnalysisAlert tasks={tasks} onOpenTask={(t) => openTask(t, "analysis")} />
 
-      {/* Same bar/calculation either way (progressTasks/progressLockedAt,
-          always about the current week regardless of which week the grid
-          below is browsing) -- only the heading framing switches, see
-          WeekProgressBar's own comment. This bar is always about the real
-          today specifically, not whichever of Dün/Bugün/Yarın is selected
-          -- it's a persistent status readout, not scoped to the tab. */}
-      <WeekProgressBar
-        tasks={progressTasks}
+      {/* Weekly (Geçen Hafta vs Bu Hafta) + daily (Dün/Bugün/Yarın) progress.
+          Always about the real current week/day, not whichever tab or
+          browsed week is showing below. */}
+      <ProgressOverview
+        liveTasks={progressTasks}
+        extraTasks={progressExtraTasks}
         today={today}
         lockedAt={progressLockedAt}
-        variant={view === "week" ? "week" : "today"}
+        previousLockedAt={previousLockedAt}
       />
 
       {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/

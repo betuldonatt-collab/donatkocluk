@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
 import { completionPercent, weekCompletionCounts } from "@/lib/completion";
-import { WeeklyProgressCard } from "./_components/weekly-progress-card";
+import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
 import { SessionQuotaStats } from "./_components/session-quota-stats";

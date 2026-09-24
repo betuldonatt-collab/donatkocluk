@@ -49,6 +49,8 @@ async function fetchHomeData(userId: string) {
   const weekDays = getWeekDays(today);
   const weekStart = weekDays[0].date;
   const weekEnd = weekDays[6].date;
+  const prevWeekStart = new Date(new Date(`${weekStart}T00:00:00Z`).getTime() - 7 * 86400000).toISOString().slice(0, 10);
+  const dayAfterWeek = new Date(new Date(`${weekEnd}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
@@ -63,6 +65,7 @@ async function fetchHomeData(userId: string) {
     { data: fixedTaskRows },
     { data: allTaskDurationRows },
     { data: sessionBalanceRows },
+    { data: progressExtraRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -126,6 +129,15 @@ async function fetchHomeData(userId: string) {
       // is_paid=true only: a completed-but-unpaid session must still count
       // against the balance for the negative number to ever appear.
       supabase.from("coaching_sessions").select("is_paid, outcome").eq("student_id", userId),
+      // Slim rows for the progress cards: last week (Geçen Hafta) plus the
+      // day after this week (Yarın on a Sunday). Dün on a Monday is inside
+      // the same range.
+      supabase
+        .from("student_tasks")
+        .select("id, task_date, status")
+        .eq("student_id", userId)
+        .gte("task_date", prevWeekStart)
+        .lte("task_date", dayAfterWeek),
     ]);
 
   const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
@@ -196,6 +208,8 @@ async function fetchHomeData(userId: string) {
     // When the coach locked THIS week's schedule: where the student's
     // progress bar starts counting (lib/completion.ts).
     progressLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === mondayOf(today))?.locked_at ?? null) as string | null,
+    progressExtraTasks: (progressExtraRows ?? []) as { id: string; task_date: string; status: string }[],
+    previousLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === prevWeekStart)?.locked_at ?? null) as string | null,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
   };
@@ -217,6 +231,8 @@ export default async function StudentHomePage() {
     examType,
     todayLocked,
     progressLockedAt,
+    progressExtraTasks,
+    previousLockedAt,
     routineRowHeights,
     taskRowHeights,
   } = view
@@ -234,6 +250,8 @@ export default async function StudentHomePage() {
         examType: "YKS" as ExamType,
         todayLocked: false,
         progressLockedAt: null as string | null,
+        progressExtraTasks: [] as { id: string; task_date: string; status: string }[],
+        previousLockedAt: null as string | null,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
       };
@@ -273,6 +291,8 @@ export default async function StudentHomePage() {
         allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
         progressLockedAt={progressLockedAt}
+        progressExtraTasks={progressExtraTasks}
+        previousLockedAt={previousLockedAt}
         examType={examType}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}
