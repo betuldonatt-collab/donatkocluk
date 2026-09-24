@@ -57,35 +57,56 @@ export function useAutoRowHeights(rowCount: number, deps: unknown[]): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowCount, ...deps]);
 
-  // Column WIDTH changes (sidebar expand/collapse, window resize, rotating a
-  // phone) re-wrap the chips' text without touching any data, so the row
-  // heights measured above go stale and neighbouring columns drift out of
-  // line. Re-measure when any chip's width actually changes -- width only,
-  // so the height changes this hook itself causes can never re-trigger it.
-  useEffect(() => {
-    if (typeof ResizeObserver === "undefined") return;
-    const widths = new WeakMap<Element, number>();
-    const observer = new ResizeObserver((entries) => {
-      let changed = false;
-      for (const entry of entries) {
-        const w = Math.round(entry.contentRect.width);
-        if (widths.get(entry.target) !== w) {
-          widths.set(entry.target, w);
-          changed = true;
+  // One ResizeObserver for every registered chip. It does two jobs:
+  //  1. A chip appearing at all -- the "Bu Hafta" grid only mounts when that
+  //     tab is selected, long after this hook's own layout effect ran (it saw
+  //     zero chips and reserved 0px), so without this the placeholders stayed
+  //     0px tall and every column's Rutinler drifted to a different Y. RO
+  //     reports a newly observed element once, which triggers the measure.
+  //  2. Column WIDTH changes (sidebar expand/collapse, window resize, phone
+  //     rotation) re-wrap the text without touching any data. Only width is
+  //     compared, so the height changes this hook itself causes can never
+  //     re-trigger it.
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const widthsRef = useRef<WeakMap<Element, number>>(new WeakMap());
+
+  function getObserver(): ResizeObserver | null {
+    if (typeof ResizeObserver === "undefined") return null;
+    if (!observerRef.current) {
+      observerRef.current = new ResizeObserver((entries) => {
+        let changed = false;
+        for (const entry of entries) {
+          const w = Math.round(entry.contentRect.width);
+          if (widthsRef.current.get(entry.target) !== w) {
+            widthsRef.current.set(entry.target, w);
+            changed = true;
+          }
         }
-      }
-      if (changed) measure();
-    });
-    for (const row of nodesRef.current) for (const el of row.values()) observer.observe(el);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [measure, rowCount, ...deps]);
+        if (changed) measure();
+      });
+    }
+    return observerRef.current;
+  }
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    },
+    [],
+  );
 
   function registerRef(rowIndex: number, columnKey: string) {
     return (el: HTMLDivElement | null) => {
       const row = (nodesRef.current[rowIndex] ??= new Map());
-      if (el) row.set(columnKey, el);
-      else row.delete(columnKey);
+      const previous = row.get(columnKey);
+      if (previous && previous !== el) getObserver()?.unobserve(previous);
+      if (el) {
+        row.set(columnKey, el);
+        getObserver()?.observe(el);
+      } else {
+        row.delete(columnKey);
+      }
     };
   }
 
