@@ -1,0 +1,967 @@
+[
+  {
+    "id": "maarif10-turk-dili-ve-edebiyati",
+    "name": "10. Sınıf Türk Dili ve Edebiyatı",
+    "units": [
+      {
+        "unit": "1. Ünite: Sözün Ezgisi",
+        "topics": [
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t0",
+            "name": "İslamiyet Öncesi Türk Şiiri (Koşuk, Sagu, Sav)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t1",
+            "name": "Anonim Halk Şiiri (Mani, Türkü, Ninni)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t2",
+            "name": "Âşık Tarzı Halk Şiiri (Koşma ve Türleri)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t3",
+            "name": "Şiir Bilgisi (Nazım Birimi, Kafiye, Redif, Ölçü)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t4",
+            "name": "Dil Bilgisi › İsimler (Adlar)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u0-t5",
+            "name": "Dil Bilgisi › İsim Tamlamaları"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Kelimelerin Ritmi",
+        "topics": [
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u1-t0",
+            "name": "Divan Edebiyatı Şiiri (Gazel, Kaside)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u1-t1",
+            "name": "Edebî Sanatlar (Söz Sanatları)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u1-t2",
+            "name": "Saf (Öz) Şiir Anlayışı (Modern Şiir)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u1-t3",
+            "name": "Dil Bilgisi › Zamirler (Adıllar)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u1-t4",
+            "name": "Dil Bilgisi › Edat, Bağlaç, Ünlem"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Dünden Bugüne",
+        "topics": [
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u2-t0",
+            "name": "Destanlar (Doğal ve Yapma Destanlar)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u2-t1",
+            "name": "Halk Hikâyeleri"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u2-t2",
+            "name": "Mesneviler (Olay Merkezli Anlatım)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u2-t3",
+            "name": "Dil Bilgisi › Fiiller (Eylemler) - Kip, Kişi, Yapı"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u2-t4",
+            "name": "Dil Bilgisi › Fiilimsiler (Eylemsiler)"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Nesillerin Mirası",
+        "topics": [
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t0",
+            "name": "Dede Korkut Hikâyeleri"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t1",
+            "name": "Geçiş Dönemi Eserleri (Kutadgu Bilig, Divânu Lugati't-Türk vb.)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t2",
+            "name": "Milli Edebiyat Hikayesi"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t3",
+            "name": "Roman, Tiyatro ve Anı (Giriş ve Tür Özellikleri)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t4",
+            "name": "Haber Metni (Tür Özellikleri)"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t5",
+            "name": "Edebiyat Akımları"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t6",
+            "name": "Dil Bilgisi › Cümle Türleri"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t7",
+            "name": "Dil Bilgisi › Yazım Kuralları"
+          },
+          {
+            "id": "maarif10-turk-dili-ve-edebiyati-u3-t8",
+            "name": "Dil Bilgisi › Noktalama İşaretleri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-tarih",
+    "name": "10. Sınıf Tarih",
+    "units": [
+      {
+        "unit": "1. Ünite: Türkistan'dan Türkiye'ye",
+        "topics": [
+          {
+            "id": "maarif10-tarih-u0-t0",
+            "name": "Önemleri Askeri Mücadelelerin Türk Tarihinin Seyrine Etkileri"
+          },
+          {
+            "id": "maarif10-tarih-u0-t1",
+            "name": "Türkistan'dan Türkiye'ye Türklerde Devlet ve Ordu Teşkilatları"
+          },
+          {
+            "id": "maarif10-tarih-u0-t2",
+            "name": "Türklerde Sosyoekonomik Hayat ve Şehirleşme"
+          },
+          {
+            "id": "maarif10-tarih-u0-t3",
+            "name": "Türk - İslam Medeniyetinde Bilim, Kültür, Eğitim ve Sanat"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Beylikten Devlete Osmanlı",
+        "topics": [
+          {
+            "id": "maarif10-tarih-u1-t0",
+            "name": "Osmanlı Devleti'nin Kuruluşuna Dair Görüşler"
+          },
+          {
+            "id": "maarif10-tarih-u1-t1",
+            "name": "Beylikten Devlete Siyasi ve Askeri Gelişmeler"
+          },
+          {
+            "id": "maarif10-tarih-u1-t2",
+            "name": "Osmanlı Devleti'nde Ordu, Hukuk ve Toprak Sistemi"
+          },
+          {
+            "id": "maarif10-tarih-u1-t3",
+            "name": "Osmanlı Devleti'nin İskan ve İstimalet Politikası"
+          },
+          {
+            "id": "maarif10-tarih-u1-t4",
+            "name": "Osmanlı Devleti'nin İlim ve İrfan Geleneği"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Cihan Devleti Osmanlı",
+        "topics": [
+          {
+            "id": "maarif10-tarih-u2-t0",
+            "name": "Osmanlı Devletinin Cihan Devleti Haline Gelmesi"
+          },
+          {
+            "id": "maarif10-tarih-u2-t1",
+            "name": "Osmanlı Devletinin Yönetim ve Ordu Yapısında Değişim"
+          },
+          {
+            "id": "maarif10-tarih-u2-t2",
+            "name": "Avrupalıların Sömürgeci Politikaları"
+          },
+          {
+            "id": "maarif10-tarih-u2-t3",
+            "name": "Osmanlı Devletinde İsyanlar"
+          },
+          {
+            "id": "maarif10-tarih-u2-t4",
+            "name": "Osmanlı Devletinde Bilim, Kültür, Eğitim ve Sanat"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-fizik",
+    "name": "10. Sınıf Fizik",
+    "units": [
+      {
+        "unit": "1. Ünite: Kuvvet ve Hareket",
+        "topics": [
+          {
+            "id": "maarif10-fizik-u0-t0",
+            "name": "Sabit Hızlı Hareket"
+          },
+          {
+            "id": "maarif10-fizik-u0-t1",
+            "name": "Bir Boyutta Sabit İvmeli Hareket"
+          },
+          {
+            "id": "maarif10-fizik-u0-t2",
+            "name": "Serbest Düşme"
+          },
+          {
+            "id": "maarif10-fizik-u0-t3",
+            "name": "İki Boyutta Sabit İvmeli Hareket"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Enerji",
+        "topics": [
+          {
+            "id": "maarif10-fizik-u1-t0",
+            "name": "İş, Enerji ve Güç"
+          },
+          {
+            "id": "maarif10-fizik-u1-t1",
+            "name": "Enerji Biçimleri"
+          },
+          {
+            "id": "maarif10-fizik-u1-t2",
+            "name": "Mekanik Enerji"
+          },
+          {
+            "id": "maarif10-fizik-u1-t3",
+            "name": "Enerji Kaynakları"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Elektrik",
+        "topics": [
+          {
+            "id": "maarif10-fizik-u2-t0",
+            "name": "Basit Elektrik Devreleri"
+          },
+          {
+            "id": "maarif10-fizik-u2-t1",
+            "name": "Elektrik Akımı"
+          },
+          {
+            "id": "maarif10-fizik-u2-t2",
+            "name": "Ohm Yasası"
+          },
+          {
+            "id": "maarif10-fizik-u2-t3",
+            "name": "Dirençlerin Bağlanması"
+          },
+          {
+            "id": "maarif10-fizik-u2-t4",
+            "name": "Üreteçlerin Bağlanması"
+          },
+          {
+            "id": "maarif10-fizik-u2-t5",
+            "name": "Elektrik Akımının Oluşturabileceği Tehlikelere Karşı Alınması Gereken Önlemler"
+          },
+          {
+            "id": "maarif10-fizik-u2-t6",
+            "name": "Topraklamanın Önemi"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Dalgalar",
+        "topics": [
+          {
+            "id": "maarif10-fizik-u3-t0",
+            "name": "Dalgaların Temel Kavramları"
+          },
+          {
+            "id": "maarif10-fizik-u3-t1",
+            "name": "Dalgaların Sınıflandırılması"
+          },
+          {
+            "id": "maarif10-fizik-u3-t2",
+            "name": "Dalgaların Yayılma Süratini Etkileyen Etmenler"
+          },
+          {
+            "id": "maarif10-fizik-u3-t3",
+            "name": "Periyodik Hareketler"
+          },
+          {
+            "id": "maarif10-fizik-u3-t4",
+            "name": "Su Dalgalarında Yansıma ve Kırılma"
+          },
+          {
+            "id": "maarif10-fizik-u3-t5",
+            "name": "Rezonans ve Deprem"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-din-kulturu-ve-ahlak-bilgisi",
+    "name": "10. Sınıf Din Kültürü ve Ahlak Bilgisi",
+    "units": [
+      {
+        "unit": "1. Ünite: İslam'da Varlık ve Bilgi",
+        "topics": [
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u0-t0",
+            "name": "İslam'da Bilgi ve Bilginin Kaynakları"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u0-t1",
+            "name": "Allah - Alem İlişkisi (Yaratılış ve Evrendeki Düzen)"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u0-t2",
+            "name": "Kur'an'dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Allah'ı Tanımak",
+        "topics": [
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u1-t0",
+            "name": "Allah'ın Varlığının Delilleri (Gaye, nizam ve ekmel varlık delilleri)"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u1-t1",
+            "name": "Allah'ı İsim ve Sıfatlarıyla Tanımak (Esma-i Hüsna ve zati/subuti sıfatlar)"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u1-t2",
+            "name": "Kur'an'dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: İslam'ın Evrensel Mesajları",
+        "topics": [
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u2-t0",
+            "name": "İslam'ın Tevhit İlkesi"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u2-t1",
+            "name": "İslam'da Adalet ve Eşitlik"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u2-t2",
+            "name": "İslam ve Barış"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u2-t3",
+            "name": "Kur'an'dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Din, Çevre ve Teknoloji",
+        "topics": [
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u3-t0",
+            "name": "İslam'da Çevre Bilinci ve Doğanın Korunması"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u3-t1",
+            "name": "Bilim, Teknoloji ve Etik İlişkisi (Yapay zeka, dijital dünya ve ahlaki sorumluluklar)"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u3-t2",
+            "name": "Kur'an'dan Mesajlar"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: İslam Düşüncesinde İtikadi - Siyasi ve Fıkhi Yorumlar",
+        "topics": [
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u4-t0",
+            "name": "Din ve Din Anlayışı Arasındaki Fark"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u4-t1",
+            "name": "İtikadi ve Siyasi Yorumlar"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u4-t2",
+            "name": "Ameli-Fıkhi Yorumlar"
+          },
+          {
+            "id": "maarif10-din-kulturu-ve-ahlak-bilgisi-u4-t3",
+            "name": "Kur'an'dan Mesajlar"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-matematik",
+    "name": "10. Sınıf Matematik",
+    "units": [
+      {
+        "unit": "1. Ünite: Geometrik Şekiller",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u0-t0",
+            "name": "Dik Üçgende Trigonometrik Oranlar ve Trigonometrik Özdeşlikler"
+          },
+          {
+            "id": "maarif10-matematik-u0-t1",
+            "name": "Üçgende Yardımcı Elemanlar ve Bunlar Arasındaki İlişkiler"
+          },
+          {
+            "id": "maarif10-matematik-u0-t2",
+            "name": "Üçgende Alan"
+          },
+          {
+            "id": "maarif10-matematik-u0-t3",
+            "name": "Sinüs ve Cosinüs Teoremleri"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: İstatistiksel Araştırma Süreci",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u1-t0",
+            "name": "İki Kategorik Değişkenin İlişkililiğini İçeren İstatistiksel Problemi Oluşturma, Veri Toplama, Analiz Etme ve Yorumlama"
+          },
+          {
+            "id": "maarif10-matematik-u1-t1",
+            "name": "Başkaları Tarafından Oluşturulan İki Kategorilik Değişkenli Verilerin İlişkililiğine Dayalı İstatistiksel Sonuç veya Yorumları Tartışma"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Sayılar",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u2-t0",
+            "name": "Bir Doğal Sayı ile Asal Çarpanları ve Bölenleri Arasındaki İlişkiler"
+          },
+          {
+            "id": "maarif10-matematik-u2-t1",
+            "name": "EBOB - EKOK"
+          },
+          {
+            "id": "maarif10-matematik-u2-t2",
+            "name": "Bölünebilme Özelliklerini Kullanarak Kalan Bulma"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Nicelikler ve Değişimler",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u3-t0",
+            "name": "Gerçek Sayılarda Tanımlı Fonksiyonların Nitel Özellikleri"
+          },
+          {
+            "id": "maarif10-matematik-u3-t1",
+            "name": "Gerçek Sayılarda Tanımlı Karesel Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif10-matematik-u3-t2",
+            "name": "Gerçek Sayılarda Tanımlı Karekök Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif10-matematik-u3-t3",
+            "name": "Gerçek Sayılarda Tanımlı Rasyonel Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif10-matematik-u3-t4",
+            "name": "Doğrusal, Karesel, Karekök ve Rasyonel Referans Fonksiyonlar ile Bu Fonksiyonlardan Türetilebilen Fonksiyonların Ters Fonksiyonları"
+          },
+          {
+            "id": "maarif10-matematik-u3-t5",
+            "name": "Doğrusal, Karesel, Karekök ve Rasyonel Referans Fonksiyonlar ve Bunlardan Türetilen Fonksiyonlarla İfade Edilebilen Denklem ve Eşitsizlikler İçeren Problemlerin Çözümü"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Sayma, Algoritma ve Bilişim",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u4-t0",
+            "name": "Sayma Stratejileri"
+          },
+          {
+            "id": "maarif10-matematik-u4-t1",
+            "name": "Cebirsel ve Fonksiyonel İşlemlerin Algoritmik Yapısı"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite: Analitik İnceleme",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u5-t0",
+            "name": "Dik Koordinat Sisteminde İki Nokta Arasındaki Uzaklık ve Bir Doğru Parçasını Belli Oranda Bölme"
+          },
+          {
+            "id": "maarif10-matematik-u5-t1",
+            "name": "Dik Koordinat Sisteminde Doğrunun Özellikleri ve Analitik İncelenmesi"
+          }
+        ]
+      },
+      {
+        "unit": "7. Ünite: Veriden Olasılığa",
+        "topics": [
+          {
+            "id": "maarif10-matematik-u6-t0",
+            "name": "Koşullu Olasılık, Bağımlı ve Bağımsız Olaylar"
+          },
+          {
+            "id": "maarif10-matematik-u6-t1",
+            "name": "Bayes Teoremi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-cografya",
+    "name": "10. Sınıf Coğrafya",
+    "units": [
+      {
+        "unit": "1. Ünite: Coğrafyanın Doğası",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u0-t0",
+            "name": "Coğrafi Bakış"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Mekansal Bilgi Teknolojileri",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u1-t0",
+            "name": "CBS ve Uzaktan Algılamanın Uygulama Alanları"
+          },
+          {
+            "id": "maarif10-cografya-u1-t1",
+            "name": "Mekânsal Verilerin Haritalara Aktarılması"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Doğal Sistemler ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u2-t0",
+            "name": "Tektonik Süreçler"
+          },
+          {
+            "id": "maarif10-cografya-u2-t1",
+            "name": "İklim ve Kayaç Yapısının Aşınma ve Çözünme Süreçlerine Etkisi"
+          },
+          {
+            "id": "maarif10-cografya-u2-t2",
+            "name": "Aşınma, Taşınma ve Biriktirme Süreçlerinin Yeryüzünün Şekillenmesine Etkisi"
+          },
+          {
+            "id": "maarif10-cografya-u2-t3",
+            "name": "Yeryüzü Şekilleri ile İlgili Gözlem ve Saha Çalışması"
+          },
+          {
+            "id": "maarif10-cografya-u2-t4",
+            "name": "Yeryüzü Şekilleri ile Beşerî Faaliyetler Arasındaki Etkileşim"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Beşeri Sistemler ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u3-t0",
+            "name": "Yerleşmelerin Kuruluşu ve Gelişimi"
+          },
+          {
+            "id": "maarif10-cografya-u3-t1",
+            "name": "Yerleşmelerin Fonksiyonları"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Ekonomik Faaliyetler ve Etkileri",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u4-t0",
+            "name": "Ekonomik Faaliyetlerin Özellikleri"
+          },
+          {
+            "id": "maarif10-cografya-u4-t1",
+            "name": "Ekonomik Sektörler ve Gelişmişlik"
+          },
+          {
+            "id": "maarif10-cografya-u4-t2",
+            "name": "Türkiye Ekonomisinin Sektörel Dağılımı"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite: Afetler ve Sürdürülebilir Çevre",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u5-t0",
+            "name": "Afetlerle Mücadelede İyi Uygulama Örnekleri"
+          },
+          {
+            "id": "maarif10-cografya-u5-t1",
+            "name": "Afetlere Karşı Dirençli Yaşam Alanlar"
+          },
+          {
+            "id": "maarif10-cografya-u5-t2",
+            "name": "Afetlerden Korunma"
+          },
+          {
+            "id": "maarif10-cografya-u5-t3",
+            "name": "Afet Bilinci"
+          }
+        ]
+      },
+      {
+        "unit": "7. Ünite: Bölgeler, Ülkeler ve Küresel Bağlantılar",
+        "topics": [
+          {
+            "id": "maarif10-cografya-u6-t0",
+            "name": "Türk Kültürünün Mekânsal Özellikleri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-kimya",
+    "name": "10. Sınıf Kimya",
+    "units": [
+      {
+        "unit": "1. Ünite: Etkileşim",
+        "topics": [
+          {
+            "id": "maarif10-kimya-u0-t0",
+            "name": "1.1. Kimyasal Tepkimeler › 1.1.1. Kimyasal Tepkimelerin Oluşumu"
+          },
+          {
+            "id": "maarif10-kimya-u0-t1",
+            "name": "1.1. Kimyasal Tepkimeler › 1.1.2. Kimyasal Tepkime Türleri"
+          },
+          {
+            "id": "maarif10-kimya-u0-t2",
+            "name": "1.1. Kimyasal Tepkimeler › 1.1.3. Mol Kavramı"
+          },
+          {
+            "id": "maarif10-kimya-u0-t3",
+            "name": "1.1. Kimyasal Tepkimeler › 1.1.4. Kimyasal Tepkime Denklemlerinin Denkleştirilmesi"
+          },
+          {
+            "id": "maarif10-kimya-u0-t4",
+            "name": "1.1. Kimyasal Tepkimeler › 1.1.5. Kimyasal (Stokiyometrik) Hesaplamalar"
+          },
+          {
+            "id": "maarif10-kimya-u0-t5",
+            "name": "1.2. Gazlar › 1.2.1. Gazların Özellikleri ve Gaz Yasaları"
+          },
+          {
+            "id": "maarif10-kimya-u0-t6",
+            "name": "1.2. Gazlar › 1.2.2. Gazların Kinetik Moleküler Teorisi"
+          },
+          {
+            "id": "maarif10-kimya-u0-t7",
+            "name": "1.2. Gazlar › 1.2.3. İdeal Gaz Yasası"
+          },
+          {
+            "id": "maarif10-kimya-u0-t8",
+            "name": "1.2. Gazlar › 1.2.4. Graham Difüzyon ve Efüzyon Yasası"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Çeşitlilik",
+        "topics": [
+          {
+            "id": "maarif10-kimya-u1-t0",
+            "name": "2.1. Çözeltiler › 2.1.1. Çözünme Süreci"
+          },
+          {
+            "id": "maarif10-kimya-u1-t1",
+            "name": "2.1. Çözeltiler › 2.1.2. Maddelerin Birbiri İçindeki Çözünebilirliği"
+          },
+          {
+            "id": "maarif10-kimya-u1-t2",
+            "name": "2.1. Çözeltiler › 2.1.3. Çözünme Olayının Sınıflandırılması"
+          },
+          {
+            "id": "maarif10-kimya-u1-t3",
+            "name": "2.1. Çözeltiler › 2.1.4. Derişim Birimleri (Molarite, ppm)"
+          },
+          {
+            "id": "maarif10-kimya-u1-t4",
+            "name": "2.1. Çözeltiler › 2.1.5. Çözünürlük"
+          },
+          {
+            "id": "maarif10-kimya-u1-t5",
+            "name": "2.1. Çözeltiler › 2.1.6. Çözünürlüğe Etki Eden Faktörler (Sıcaklık, Basınç ve Madde Cinsi)"
+          },
+          {
+            "id": "maarif10-kimya-u1-t6",
+            "name": "2.1. Çözeltiler › 2.1.7. Çözeltilerin Sınıflandırılması"
+          },
+          {
+            "id": "maarif10-kimya-u1-t7",
+            "name": "2.1. Çözeltiler › 2.1.8. Koligatif Özellikler"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Sürdürülebilirlik",
+        "topics": [
+          {
+            "id": "maarif10-kimya-u2-t0",
+            "name": "3.1. Yeşil Kimya, Çevresel ve Ekolojik Sürdürülebilirlik"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-felsefe",
+    "name": "10. Sınıf Felsefe",
+    "units": [
+      {
+        "unit": "1. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u0-t0",
+            "name": "Felsefenin Doğası"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u1-t0",
+            "name": "Felsefe, Mantık ve Argümantasyon"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u2-t0",
+            "name": "Varlık Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u3-t0",
+            "name": "Bilgi Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u4-t0",
+            "name": "Ahlak Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u5-t0",
+            "name": "Estetik ve Sanat Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "7. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u6-t0",
+            "name": "Siyaset Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "8. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u7-t0",
+            "name": "Din Felsefesi"
+          }
+        ]
+      },
+      {
+        "unit": "9. Ünite",
+        "topics": [
+          {
+            "id": "maarif10-felsefe-u8-t0",
+            "name": "Bilim Felsefesi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-biyoloji",
+    "name": "10. Sınıf Biyoloji",
+    "units": [
+      {
+        "unit": "1. Ünite: Enerji",
+        "topics": [
+          {
+            "id": "maarif10-biyoloji-u0-t0",
+            "name": "1.1. Güneşten Besinlere › 1.1.1. Canlılık İçin Enerjinin Önemi"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t1",
+            "name": "1.1. Güneşten Besinlere › 1.1.2. Işık Enerjisi Kullanılarak Besin Sentezi (Fotosentez)"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t2",
+            "name": "1.1. Güneşten Besinlere › 1.1.3. Fotosentezde Kullanılan ve Üretilen Maddeler"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t3",
+            "name": "1.1. Güneşten Besinlere › 1.1.4. Işık Enerjisi Kullanılmadan Besin Sentezi (Kemosentez)"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t4",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.1. Sindirim"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t5",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.2. İnsanda Sindirim"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t6",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.3. Hücresel Solunum"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t7",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.4. Besinlerin Solunuma Katılma Yolları"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t8",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.5. Fermantasyon"
+          },
+          {
+            "id": "maarif10-biyoloji-u0-t9",
+            "name": "1.2. Besinlerden Enerjiye › 1.2.6. Enerji-Metabolizma İlişkisi"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Ekoloji",
+        "topics": [
+          {
+            "id": "maarif10-biyoloji-u1-t0",
+            "name": "2.1. Ekosistemler › 2.1.1. Ekosistemin Bileşenleri"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t1",
+            "name": "2.1. Ekosistemler › 2.1.2. Komünitelerde ve Popülasyonlarda Görülen Etkileşimler ve Değişimler"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t2",
+            "name": "2.1. Ekosistemler › 2.1.3. Ekosistemdeki Madde ve Enerji Akışı"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t3",
+            "name": "2.1. Ekosistemler › 2.1.4. Madde Döngüleri"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t4",
+            "name": "2.2. Ekolojik Sürdürülebilirlik › 2.2.1. Ekolojik Sürdürülebilirliğin Önemi"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t5",
+            "name": "2.2. Ekolojik Sürdürülebilirlik › 2.2.2. Ekolojik Sürdürülebilirliği Kısıtlayan Durumlar"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t6",
+            "name": "2.2. Ekolojik Sürdürülebilirlik › 2.2.3. Ekolojik Ayak İzinin Küçültülmesi"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t7",
+            "name": "2.2. Ekolojik Sürdürülebilirlik › 2.2.4. Doğal Kaynakların ve Biyoçeşitliliğin Korunması"
+          },
+          {
+            "id": "maarif10-biyoloji-u1-t8",
+            "name": "2.2. Ekolojik Sürdürülebilirlik › 2.2.5. Atık Yönetimi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif10-ingilizce",
+    "name": "10. Sınıf İngilizce",
+    "units": [
+      {
+        "unit": null,
+        "topics": [
+          {
+            "id": "maarif10-ingilizce-u0-t0",
+            "name": "Theme 1: School Life & Education"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t1",
+            "name": "Theme 2: Classroom Life & Learning"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t2",
+            "name": "Theme 3: Personal Life & Well-Being"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t3",
+            "name": "Theme 4: Family Life & Home"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t4",
+            "name": "Theme 5: Life in the Neighbourhood, City & Social Life"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t5",
+            "name": "Theme 6: Life in the World & Culture"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t6",
+            "name": "Theme 7: Life in Nature & Global Problems"
+          },
+          {
+            "id": "maarif10-ingilizce-u0-t7",
+            "name": "Theme 8: Life in the Universe & The Future"
+          }
+        ]
+      }
+    ]
+  }
+]
