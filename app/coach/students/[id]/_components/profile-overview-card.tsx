@@ -32,7 +32,15 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 // "system info" fields -- see EditableProfileFields in actions.ts). Local
 // state mirrors the KaynakTakibiTab pattern so the card reflects a save
 // immediately without waiting on the page's server-side revalidation.
-export function ProfileOverviewCard({ studentId, profile: initialProfile }: { studentId: string; profile: StudentProfile }) {
+export function ProfileOverviewCard({
+  studentId,
+  profile: initialProfile,
+  remainingSessions,
+}: {
+  studentId: string;
+  profile: StudentProfile;
+  remainingSessions: number;
+}) {
   const [profile, setProfile] = useState(initialProfile);
   const [dialogOpen, setDialogOpen] = useState(false);
   const isLgs = profile.exam_type === "LGS";
@@ -52,7 +60,7 @@ export function ProfileOverviewCard({ studentId, profile: initialProfile }: { st
           <p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">Sistem Bilgileri</p>
           <Field label="Koçluğa Başlama Tarihi" value={formatDate(profile.coaching_start_date)} />
           <Field label="Belirlenen Görüşme Günü" value={profile.assigned_meeting_day || "Henüz belirlenmedi"} />
-          <Field label="Kalan Görüşme" value={profile.remaining_sessions} />
+          <Field label="Kalan Görüşme" value={remainingSessions} />
         </section>
 
         <section>

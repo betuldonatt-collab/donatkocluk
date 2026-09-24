@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
 import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
@@ -605,7 +606,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <ProfileOverviewCard studentId={id} profile={detail.profile} />
+                <ProfileOverviewCard studentId={id} profile={detail.profile} remainingSessions={sessionBalance(detail.sessions).remaining} />
                 <TargetsCompletionCard
                   studentId={id}
                   profile={detail.profile}

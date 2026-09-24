@@ -3,7 +3,17 @@ import { cn } from "@/lib/utils";
 // completed/remaining are already scoped to the student's current quota
 // cycle by the caller (app/parent/page.tsx) -- this component just renders
 // whatever numbers it's given.
-export function SessionQuotaStats({ completed, total, remaining }: { completed: number; total: number; remaining: number }) {
+export function SessionQuotaStats({
+  completed,
+  total,
+  remaining,
+  unpaidCompleted = 0,
+}: {
+  completed: number;
+  total: number;
+  remaining: number;
+  unpaidCompleted?: number;
+}) {
   const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
 
   return (
@@ -26,6 +36,12 @@ export function SessionQuotaStats({ completed, total, remaining }: { completed: 
         </span>
         <span className="text-muted-foreground text-xs font-medium">Kalan Görüşme Hakkı</span>
       </div>
+
+      {unpaidCompleted > 0 && (
+        <p className="text-muted-foreground basis-full text-xs">
+          {unpaidCompleted} tamamlanan görüşmenin ödemesi henüz kaydedilmedi; bu yüzden kalan hak eksiye düşebilir.
+        </p>
+      )}
 
       {total > 0 && (
         <div className="flex min-w-28 flex-1 basis-32 items-center gap-2">

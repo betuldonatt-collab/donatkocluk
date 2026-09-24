@@ -8,6 +8,7 @@ import { completionCounts, completionPercent } from "@/lib/completion";
 import { mondayOf } from "@/lib/date";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
+import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
 import { getViewContext } from "@/lib/impersonation";
 
 type StudentRow = {
@@ -33,14 +34,21 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 
   // This week's lock per student: where each one's completion starts counting.
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: profiles }, { data: taskRows }, { data: lockRows }] = await Promise.all([
+  const [{ data: profiles }, { data: taskRows }, { data: lockRows }, { data: sessionRows }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
     supabase.from("student_tasks").select("student_id, status, task_date").in("student_id", studentIds),
     supabase.from("week_locks").select("student_id, locked_at").in("student_id", studentIds).eq("week_start_date", mondayOf(today)),
+    supabase.from("coaching_sessions").select("student_id, is_paid, outcome").in("student_id", studentIds),
   ]);
+  const sessionsByStudent = new Map<string, SessionBalanceRow[]>();
+  for (const s of sessionRows ?? []) {
+    const list = sessionsByStudent.get(s.student_id) ?? [];
+    list.push({ is_paid: s.is_paid, outcome: s.outcome });
+    sessionsByStudent.set(s.student_id, list);
+  }
 
   // Only tasks from the lock day (Monday if not locked) up to today count (lib/completion.ts).
   const lockedAtByStudent = new Map((lockRows ?? []).map((r) => [r.student_id, r.locked_at as string]));
@@ -53,6 +61,8 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 
   return (profiles ?? []).map((p) => ({
     ...p,
+    // Derived balance (paid - completed), not the stale profiles column.
+    remaining_sessions: sessionBalance(sessionsByStudent.get(p.id) ?? []).remaining,
     completionPct: completionPercent(completionCounts(tasksByStudent.get(p.id) ?? [], today, lockedAtByStudent.get(p.id))),
   }));
 }

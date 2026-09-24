@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
+import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
 import { mondayOf } from "@/lib/date";
 import { reconcileStaleFocusSessions } from "./actions";
 import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
@@ -189,9 +190,7 @@ async function fetchHomeData(userId: string) {
       };
     });
 
-  const paidSessionCount = (sessionBalanceRows ?? []).filter((r) => r.is_paid).length;
-  const completedSessionCount = (sessionBalanceRows ?? []).filter((r) => r.outcome === "completed").length;
-  const remainingSessions = paidSessionCount - completedSessionCount;
+  const remainingSessions = sessionBalance((sessionBalanceRows ?? []) as SessionBalanceRow[]).remaining;
 
   return {
     today,

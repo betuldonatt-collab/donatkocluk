@@ -3,6 +3,7 @@ import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
+import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent, weekCompletionCounts } from "@/lib/completion";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
@@ -186,7 +187,12 @@ async function fetchDashboardData() {
     student: profile,
     totalQuota: profile.total_session_quota,
     completedCount,
-    remaining: Math.max(0, profile.total_session_quota - completedCount),
+    // Paid minus completed, negative allowed (same rule as the student
+    // panel, lib/session-balance.ts) -- a completed session the coach
+    // logged always lowers this by one, even when it was never marked
+    // paid, instead of being clamped away at 0.
+    remaining: sessionBalance(sessions).remaining,
+    unpaidCompleted: sessionBalance(sessions).unpaidCompleted,
     sessions,
     currentWeek: {
       start,
@@ -226,6 +232,7 @@ export default async function ParentPage() {
     totalQuota,
     completedCount,
     remaining,
+    unpaidCompleted,
     sessions,
     currentWeek,
     previousWeek,
@@ -242,7 +249,7 @@ export default async function ParentPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>
-          <SessionQuotaStats completed={completedCount} total={totalQuota} remaining={remaining} />
+          <SessionQuotaStats completed={completedCount} total={totalQuota} remaining={remaining} unpaidCompleted={unpaidCompleted} />
         </div>
         <div className="flex items-center gap-3">
           <span
