@@ -19,6 +19,8 @@ const TRACK_OPTIONS: { value: string; label: string }[] = [
   { value: "yks_sozel", label: "YKS-Sözel" },
   { value: "yks_ydt", label: "YKS-YDT" },
   { value: "lgs_ortaokul", label: "LGS/Ortaokul" },
+  // Needs migration 0098 (academic_track is the coach_specialization enum).
+  { value: "maarif9", label: "9. Sınıf" },
 ];
 
 const selectClass =
