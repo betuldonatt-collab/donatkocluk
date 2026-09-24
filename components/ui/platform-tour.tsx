@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { resolveTourSteps, type TourNavItem } from "@/lib/tour-steps";
 import { useTourCompleted } from "@/lib/use-tour-completed";
+import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
 import { cn } from "@/lib/utils";
 
 export type TourStep = {
@@ -111,8 +113,8 @@ function computeBubblePlacement(rect: Rect): BubblePlacement {
 
   const left =
     side === "right"
-      ? Math.min(rect.right + 16, vw - GROUP_WIDTH_ESTIMATE - VIEWPORT_MARGIN)
-      : Math.max(rect.left - GROUP_WIDTH_ESTIMATE - 16, VIEWPORT_MARGIN);
+      ? Math.max(Math.min(rect.right + 16, vw - GROUP_WIDTH_ESTIMATE - VIEWPORT_MARGIN), VIEWPORT_MARGIN)
+      : Math.min(Math.max(rect.left - GROUP_WIDTH_ESTIMATE - 16, VIEWPORT_MARGIN), Math.max(vw - GROUP_WIDTH_ESTIMATE - VIEWPORT_MARGIN, VIEWPORT_MARGIN));
 
   const idealTop = rect.top + rect.height / 2 - GROUP_HEIGHT_ESTIMATE / 2;
   const top = Math.min(Math.max(idealTop, VIEWPORT_MARGIN), vh - GROUP_HEIGHT_ESTIMATE - VIEWPORT_MARGIN);
@@ -223,7 +225,11 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
     else setIndex((i) => i + 1);
   }
 
-  const hole = rect
+  const isNarrow = viewportWidth < NARROW_VIEWPORT_BREAKPOINT;
+  // On a phone the sidebar targets sit in an off-canvas drawer, so a
+  // cutout would spotlight an invisible/hidden element -- skip it and
+  // show the tour as a bottom sheet instead.
+  const hole = rect && !isNarrow
     ? {
         top: Math.max(rect.top - SPOTLIGHT_PADDING, 0),
         left: Math.max(rect.left - SPOTLIGHT_PADDING, 0),
@@ -232,7 +238,6 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
       }
     : null;
 
-  const isNarrow = viewportWidth < NARROW_VIEWPORT_BREAKPOINT;
   const bubble = rect && !isNarrow ? computeBubblePlacement(rect) : null;
   const mascotFlipped = bubble?.side === "right";
 
@@ -266,7 +271,9 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
         // NARROW_VIEWPORT_BREAKPOINT anyway (see `bubble` above), so this
         // never needs to coexist with a mascot squeezed in beside it on a
         // screen too small for that.
-        "border-border bg-card text-foreground relative w-[340px] max-w-[min(340px,calc(100vw-7rem))] rounded-2xl border p-4 shadow-xl transition-all duration-300 outline-none",
+        isNarrow
+          ? "border-border bg-card text-foreground relative max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl outline-none"
+          : "border-border bg-card text-foreground relative w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border p-4 shadow-xl transition-all duration-300 outline-none",
       )}
     >
       {/* Speech-bubble tail. Centered/bottom when there's no target
@@ -275,7 +282,9 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
       <span
         className={cn(
           "bg-card border-border absolute size-4 rotate-45 border-r border-b",
-          bubble
+          isNarrow
+            ? "hidden"
+            : bubble
             ? cn("top-1/2 -translate-y-1/2", mascotFlipped ? "-left-2 rotate-[135deg]" : "-right-2 rotate-[-45deg]")
             : "-bottom-2 left-6",
         )}
@@ -286,7 +295,7 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
         type="button"
         onClick={onFinish}
         aria-label="Turu kapat"
-        className="border-border bg-card text-muted-foreground hover:text-foreground absolute -top-3 -right-3 z-10 flex size-7 items-center justify-center rounded-full border shadow-sm transition-colors"
+        className={cn("border-border bg-card text-muted-foreground hover:text-foreground absolute z-10 flex size-7 items-center justify-center rounded-full border shadow-sm transition-colors", isNarrow ? "top-3 right-3" : "-top-3 -right-3")}
       >
         <X className="size-4" />
       </button>
@@ -344,8 +353,8 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 z-50">
+  const overlay = (
+    <div className="fixed inset-0 z-[60]">
       {hole ? (
         <>
           <div className={panelClass} style={{ top: 0, left: 0, width: "100%", height: hole.top }} />
@@ -375,6 +384,8 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
           {card}
           {mascot}
         </div>
+      ) : isNarrow ? (
+        <div className="absolute inset-x-0 bottom-0">{card}</div>
       ) : (
         <div className="flex h-full items-center justify-center p-4">
           <div className="flex items-end gap-3">
@@ -385,11 +396,17 @@ function PlatformTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => 
       )}
     </div>
   );
+
+  // Portaled to <body>: this overlay is mounted from inside the sidebar
+  // <aside>, whose translate transform makes it the containing block for
+  // position:fixed descendants -- without the portal, "fixed inset-0"
+  // was sized/offset relative to the sidebar (the off-screen bug).
+  return createPortal(overlay, document.body);
 }
 
 // The tour trigger, resolves this panel's currently-relevant steps from
 // the route (see resolveTourSteps in lib/tour-steps.ts) and owns the
-// auto-open-on-first-visit + open/close lifecycle. Mounted once inside
+// opt-in open/close lifecycle (never auto-opens). Mounted once inside
 // that panel's sidebar (as a footer row, not the old header "?" button)
 // so it's present on every page of the panel; `collapsed` swaps it
 // between the full "Rehberi Başlat" row and an icon-only version, but the
@@ -409,19 +426,12 @@ export function TourTrigger({
   collapsed: boolean;
 }) {
   const pathname = usePathname();
-  const { completed, markCompleted } = useTourCompleted(role);
+  const { markCompleted } = useTourCompleted(role);
+  const { setOpen: setMobileNavOpen } = useMobileNavOpen();
   const [open, setOpen] = useState(false);
-  const autoOpenedRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const steps = useMemo(() => resolveTourSteps({ welcome, items, landingPath, pathname }), [welcome, items, landingPath, pathname]);
-
-  useEffect(() => {
-    if (!completed && !autoOpenedRef.current) {
-      autoOpenedRef.current = true;
-      setOpen(true);
-    }
-  }, [completed]);
 
   function handleFinish() {
     setOpen(false);
@@ -438,7 +448,10 @@ export function TourTrigger({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setMobileNavOpen(false);
+          setOpen(true);
+        }}
         aria-label="Rehberi Başlat"
         title="Rehberi Başlat"
         className={cn(
