@@ -41,6 +41,8 @@ const TYPO_FIXES = new Map([
   ["3.Ünite: İslam'Da İbadetler", "3.Ünite: İslam'da İbadetler"],
   ["4.Ünite: İslam'Da Ahlak İlkeleri", "4.Ünite: İslam'da Ahlak İlkeleri"],
   ["5.Ünite: Kur'An'A Göre Hz. Muhammed", "5.Ünite: Kur'an'a Göre Hz. Muhammed"],
+  // Approved manual completion of a cell that is cut off in the workbook.
+  ["Metal, Alaşım ve Metal Nanoparçacıkların Çevre", "Metal, Alaşım ve Metal Nanoparçacıkların Çevreye Etkisi"],
 ]);
 const applied = [];
 const seenApplied = new Set();
@@ -106,6 +108,45 @@ function toUnits(subjectNode) {
   return units;
 }
 
+// Approved manual overrides for anomalies in the workbook itself, applied to
+// the finished topic lists (by exact topic name, so a missing target fails
+// loudly instead of silently doing nothing).
+const BIYO_ENZYME_DUPLICATE = "2.4. Enzim Aktivitesini Etkileyen Koşullar"; // keep the one under 2.2
+const BIYO_VITAMINS = "2.2. Organik Moleküller › Vitaminler";
+function applyOverrides(id, units) {
+  const take = (name) => {
+    let hit = 0;
+    for (const u of units) {
+      const before = u.topics.length;
+      u.topics = u.topics.filter((t) => t !== name);
+      hit += before - u.topics.length;
+    }
+    if (hit !== 1) throw new Error(`override target "${name}" matched ${hit} times in ${id}`);
+  };
+  if (id === "maarif9-biyoloji" || id === "maarif9-gd-biyoloji") {
+    take(BIYO_ENZYME_DUPLICATE);
+    // "Vitaminler" + the two vitamin kinds sit at the same level in the sheet;
+    // the kinds belong under "Vitaminler", so the bare parent is replaced by
+    // its two children.
+    for (const u of units) {
+      const i = u.topics.indexOf(BIYO_VITAMINS);
+      if (i === -1) continue;
+      const kinds = ["Yağda Çözünen Vitaminler", "Suda Çözünen Vitaminler"];
+      for (const k of kinds) take(`2.2. Organik Moleküller › ${k}`);
+      u.topics.splice(i, 1, ...kinds.map((k) => `${BIYO_VITAMINS} › ${k}`));
+    }
+  }
+  if (id === "maarif9-gd-turk-dili-ve-edebiyati") {
+    // "Paragrafta Anlam" is listed twice; keep the first, drop the second.
+    for (const u of units) {
+      const first = u.topics.indexOf("Paragrafta Anlam");
+      const second = u.topics.indexOf("Paragrafta Anlam", first + 1);
+      if (second !== -1) u.topics.splice(second, 1);
+    }
+  }
+  return units;
+}
+
 const withIds = (prefix, units) =>
   units.map((u, ui) => ({ unit: u.unit, topics: u.topics.map((name, ti) => ({ id: `${prefix}-u${ui}-t${ti}`, name })) }));
 
@@ -124,7 +165,7 @@ function parseKaynakTakibi() {
       const tree = buildTree(current.cells);
       const subject = current.name.replace(/^9\.\s*Sınıf:?\s*/i, "");
       const id = `maarif9-${slugify(subject)}`;
-      courses.push({ id, name: current.name, units: withIds(id, toUnits(tree)) });
+      courses.push({ id, name: current.name, units: withIds(id, applyOverrides(id, toUnits(tree))) });
       current = null;
     };
     rows.forEach((row) => {
@@ -160,7 +201,7 @@ function parseGenelDeneme() {
   const flush = () => {
     if (!current) return;
     const id = `maarif9-gd-${slugify(current.name)}`;
-    subjects.push({ id, group: current.group, name: current.name, units: withIds(id, toUnits(buildTree(current.cells))) });
+    subjects.push({ id, group: current.group, name: current.name, units: withIds(id, applyOverrides(id, toUnits(buildTree(current.cells)))) });
     current = null;
   };
   for (const row of rows) {
