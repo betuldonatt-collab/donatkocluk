@@ -188,16 +188,25 @@ export async function submitSignupRequest(
   // Only a student request carries a cohort -- parent/coach requests leave
   // this null regardless of what the form sent.
   const isMaarif9 = role === "student" && examTypeRaw === "MAARIF9";
-  // "9. Sınıf (Maarif)" is not an exam_type: those students stay on the YKS default
-  // and are marked by profiles.is_maarif9 (carried as signup_requests.is_maarif9).
-  const examType = role === "student" ? (isMaarif9 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
+  const isMaarif10 = role === "student" && examTypeRaw === "MAARIF10";
+  // "9./10. Sınıf (Maarif)" are not exam_types: those students stay on the YKS
+  // default and are marked by profiles.is_maarif9 / is_maarif10 (carried as
+  // signup_requests.is_maarif9 / is_maarif10). The two are mutually exclusive.
+  const examType = role === "student" ? (isMaarif9 || isMaarif10 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("signup_requests")
-    // is_maarif9 is only sent when true, so every other signup keeps working
-    // exactly as before even if migration 0097 has not been applied yet.
-    .insert({ full_name: fullName, phone, requested_role: role, exam_type: examType, ...(isMaarif9 ? { is_maarif9: true } : {}) });
+    // The Maarif flags are only sent when true, so every other signup keeps
+    // working exactly as before even if migrations 0097/0099 are not applied yet.
+    .insert({
+      full_name: fullName,
+      phone,
+      requested_role: role,
+      exam_type: examType,
+      ...(isMaarif9 ? { is_maarif9: true } : {}),
+      ...(isMaarif10 ? { is_maarif10: true } : {}),
+    });
 
   if (error) {
     // dbError logs the full raw Postgres error (message/code/details/hint)

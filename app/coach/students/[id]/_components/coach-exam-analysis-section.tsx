@@ -1,7 +1,7 @@
 "use client";
 
-import { useIsMaarif9 } from "@/components/maarif9-context";
-import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { MAARIF_GRADES } from "@/lib/maarif-grade";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -19,9 +19,7 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_SUBJECT_GROUPS,
-  MAARIF9_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
-  coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
@@ -38,8 +36,9 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // Mirrors buildGeneralExamTitle/parseGeneralExamTitle's own convention --
 // duplicated per call site across this app, not imported.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
+  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
@@ -99,7 +98,9 @@ export function CoachExamAnalysisSection({
   courseResourceData: CourseResourceData;
   examType?: ExamType;
 }) {
-  const isMaarif9 = useIsMaarif9();
+  const maarifGrade = useMaarifGrade();
+  const gradeCfg = maarifGrade !== null ? MAARIF_GRADES[maarifGrade] : null;
+  const isMaarif9 = gradeCfg !== null;
   const isLgs = examType === "LGS";
   // One flat cohort list (no TYT/AYT split) for LGS and for 9th graders.
   const isFlat = isLgs || isMaarif9;
@@ -112,10 +113,10 @@ export function CoachExamAnalysisSection({
   const [mainTrack, setMainTrack] = useState<"tyt" | "ayt">("tyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
   const [branchCourseId, setBranchCourseId] = useState<string>(
-    isMaarif9 ? MAARIF9_KAYNAK_COURSES[0].id : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
+    gradeCfg ? gradeCfg.courses[0].id : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
   );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    isMaarif9 ? MAARIF9_EXAM_SUBJECTS[0].key : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    gradeCfg ? gradeCfg.examSubjects[0].key : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
@@ -136,23 +137,23 @@ export function CoachExamAnalysisSection({
   // independently assign/review either "Fizik" or "TYT Fen" as a branch exam.
   // LGS has no TYT/AYT split or macro subjects: one flat course list and the
   // two real sessions (Sözel / Sayısal) as the Genel Deneme groups.
-  const branchCourses = isMaarif9
-    ? MAARIF9_KAYNAK_COURSES
+  const branchCourses = gradeCfg
+    ? gradeCfg.courses
     : isLgs
     ? LGS_COURSES
     : mainTrack === "tyt"
       ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
       : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytSubTrack], ...AYT_COURSES_BY_TRACK[aytSubTrack]];
-  const genelGroups = isMaarif9
-    ? MAARIF9_EXAM_SUBJECTS
+  const genelGroups = gradeCfg
+    ? gradeCfg.examSubjects
     : isLgs
     ? LGS_SUBJECT_GROUPS
     : mainTrack === "tyt"
       ? TYT_SUBJECT_GROUPS
       : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
-  const genelCoursesInGroup = isMaarif9
-    ? coursesForMaarif9ExamSubject(genelGroupKey)
+  const genelCoursesInGroup = gradeCfg
+    ? gradeCfg.coursesForExamSubject(genelGroupKey)
     : isLgs
     ? coursesForLgsGroup(genelGroupKey)
     : mainTrack === "tyt" ? coursesForGroup(genelGroupKey as (typeof TYT_SUBJECT_GROUPS)[number]["key"]) : coursesForAytGroup(aytSubTrack, genelGroupKey);
@@ -175,8 +176,8 @@ export function CoachExamAnalysisSection({
     .filter(
       (e) =>
         e.task_type === "general_exam" &&
-        (isMaarif9
-          ? parseGeneralExamTrack(e.title) === "m9"
+        (gradeCfg
+          ? parseGeneralExamTrack(e.title) === gradeCfg.track
           : isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"
           : parseGeneralExamTrack(e.title) === mainTrack &&

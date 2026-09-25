@@ -18,8 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CourseChips, CourseTabs } from "@/components/course-tabs";
-import { useIsMaarif9 } from "@/components/maarif9-context";
-import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
 import type { Course } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import { addResource } from "./actions";
@@ -37,7 +37,7 @@ export function KaynakKutuphanesiClient({
   examType: ExamType;
 }) {
   const [resources, setResources] = useState(initialResources);
-  const isMaarif9 = useIsMaarif9();
+  const maarifGrade = useMaarifGrade();
 
   function addToState(rows: LibraryResource[]) {
     setResources((prev) => [...prev, ...rows]);
@@ -53,8 +53,8 @@ export function KaynakKutuphanesiClient({
         </p>
       </header>
 
-      {isMaarif9 ? (
-        <Maarif9Library resources={resources} onAdded={addToState} />
+      {maarifGrade !== null ? (
+        <MaarifLibrary grade={maarifGrade} resources={resources} onAdded={addToState} />
       ) : (
         <CourseTabs
           examType={examType}
@@ -69,19 +69,22 @@ export function KaynakKutuphanesiClient({
 
 // 9th graders: one chip row of the 9th-grade subjects (no TYT/AYT split), same
 // per-course library panel as everyone else.
-function Maarif9Library({
+function MaarifLibrary({
+  grade,
   resources,
   onAdded,
 }: {
+  grade: MaarifGrade;
   resources: LibraryResource[];
   onAdded: (rows: LibraryResource[]) => void;
 }) {
-  const [courseId, setCourseId] = useState(MAARIF9_KAYNAK_COURSES[0].id);
-  const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === courseId) ?? MAARIF9_KAYNAK_COURSES[0];
+  const gradeCourses = MAARIF_GRADES[grade].courses;
+  const [courseId, setCourseId] = useState(gradeCourses[0].id);
+  const course = gradeCourses.find((c) => c.id === courseId) ?? gradeCourses[0];
   return (
     <div className="space-y-4">
       <CourseChips
-        courses={MAARIF9_KAYNAK_COURSES.map((c) => ({ ...c, name: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }))}
+        courses={gradeCourses.map((c) => ({ ...c, name: stripGradePrefix(c.name) }))}
         selectedId={course.id}
         onSelect={setCourseId}
       />

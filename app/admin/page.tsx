@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
 import { AnnouncementsAdmin } from "./announcements-admin";
 import { CoachAlerts } from "./_components/coach-alerts";
 import { RenewalRadar } from "./_components/renewal-radar";
@@ -116,14 +117,10 @@ export default async function AdminPage() {
       .limit(200),
   ]);
 
-  // 9th-grade signup flag (migration 0097), read separately and tolerant of the
-  // column not existing yet.
-  const requestIds = (signupRequests ?? []).map((r) => r.id);
-  const { data: maarif9RequestRows, error: maarif9RequestError } = requestIds.length
-    ? await supabase.from("signup_requests").select("id").eq("is_maarif9", true).in("id", requestIds)
-    : { data: [], error: null };
-  const maarif9RequestIds = new Set(maarif9RequestError ? [] : (maarif9RequestRows ?? []).map((r) => r.id));
-  const signupRequestsWithGrade = (signupRequests ?? []).map((r) => ({ ...r, is_maarif9: maarif9RequestIds.has(r.id) }));
+  // Maarif grade of each pending request (migrations 0097 / 0099), read separately
+  // and tolerant of the columns not existing yet.
+  const maarifGradeByRequest = await fetchMaarifGradesByIds(supabase, "signup_requests", (signupRequests ?? []).map((r) => r.id));
+  const signupRequestsWithGrade = (signupRequests ?? []).map((r) => ({ ...r, maarif_grade: maarifGradeByRequest.get(r.id) ?? null }));
 
   const peopleById = new Map(
     [...(students ?? []), ...(coaches ?? [])].map((p) => [p.id, { id: p.id, full_name: p.full_name }]),

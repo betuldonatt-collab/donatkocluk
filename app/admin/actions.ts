@@ -1,5 +1,6 @@
 "use server";
 
+import { fetchRequestedMaarifGrade } from "@/lib/maarif-grade";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -234,14 +235,20 @@ export async function updateAcademicTrack(studentId: string, track: string | nul
   revalidatePath("/admin/students");
 }
 
-// 9th-grade (Maarif) flag, profiles.is_maarif9 (migration 0096). Admin-only;
-// the profiles guard trigger rejects anyone else's attempt at the DB level.
-export async function updateMaarif9Flag(studentId: string, value: boolean) {
+// Maarif grade of a student: profiles.is_maarif9 (0096) / is_maarif10 (0099),
+// mutually exclusive -- both columns are always written together so a student
+// can never end up with both. null = ordinary YKS/LGS student. Admin-only; the
+// profiles guard trigger rejects anyone else's attempt at the DB level.
+export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | null) {
   await requireAdmin();
   const studentIdV = parseInput(uuidSchema, studentId);
-  const valueV = parseInput(z.boolean(), value);
+  const gradeV = parseInput(z.union([z.literal(9), z.literal(10)]).nullable(), grade);
   const supabase = await createClient();
-  const { error } = await supabase.from("profiles").update({ is_maarif9: valueV }).eq("id", studentIdV).eq("role", "student");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_maarif9: gradeV === 9, is_maarif10: gradeV === 10 })
+    .eq("id", studentIdV)
+    .eq("role", "student");
   if (error) throw dbError(error);
 
   revalidatePath("/admin/students");
@@ -494,14 +501,9 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
   if (fetchError) throw dbError(fetchError);
   if (request.status !== "pending") throw new Error("Bu istek zaten işlenmiş.");
 
-  // 9th-grade flag (migration 0097), read separately and tolerant of the column
-  // not existing yet -- any error just means "not a 9th grader".
-  const { data: maarif9Row, error: maarif9Error } = await supabase
-    .from("signup_requests")
-    .select("is_maarif9")
-    .eq("id", requestIdV)
-    .maybeSingle();
-  const requestedMaarif9 = !maarif9Error && (maarif9Row as { is_maarif9?: boolean } | null)?.is_maarif9 === true;
+  // Maarif grade of the request (migrations 0097 / 0099), read separately and
+  // tolerant of columns not existing yet -- any error just means "ordinary".
+  const requestedGrade = await fetchRequestedMaarifGrade(supabase, requestIdV);
 
   const tempPassword = generateTempPassword();
   const adminClient = createAdminClient();
@@ -537,7 +539,9 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
       // student requests carry a value here at all (see
       // submitSignupRequest, app/login/actions.ts).
       ...(request.requested_role === "student" && request.exam_type ? { exam_type: request.exam_type } : {}),
-      ...(request.requested_role === "student" && requestedMaarif9 ? { is_maarif9: true } : {}),
+      ...(request.requested_role === "student" && requestedGrade !== null
+        ? { is_maarif9: requestedGrade === 9, is_maarif10: requestedGrade === 10 }
+        : {}),
     })
     .eq("id", createData.user.id);
   if (roleFixError) throw dbError(roleFixError);

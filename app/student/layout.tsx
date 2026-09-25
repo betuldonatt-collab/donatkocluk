@@ -2,8 +2,8 @@ import { requireViewContext } from "@/lib/impersonation";
 import { fetchStudentAnnouncements } from "@/lib/announcements";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { Maarif9Provider } from "@/components/maarif9-context";
-import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
+import { MaarifGradeProvider } from "@/components/maarif-grade-context";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { ImpersonationLockStyles } from "@/components/impersonation-lock-styles";
 import { getDailyStopwatchRanking, type DailyStopwatchRanking } from "./actions";
@@ -58,7 +58,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
     ),
   ]);
   const fullName = profile?.full_name ?? null;
-  const isMaarif9 = await createClient().then((supabase) => fetchIsMaarif9(supabase, view.effectiveUserId));
+  const maarifGrade = await createClient().then((supabase) => fetchMaarifGrade(supabase, view.effectiveUserId));
   const examType = profile?.exam_type ?? "YKS";
   const announcements = isImpersonating ? [] : await fetchStudentAnnouncements(view.effectiveUserId);
   // get_daily_stopwatch_ranking() resolves auth.uid() from the real
@@ -70,7 +70,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
   const ranking = isImpersonating ? EMPTY_RANKING : await getDailyStopwatchRanking();
 
   return (
-    <Maarif9Provider value={isMaarif9}>
+    <MaarifGradeProvider value={maarifGrade}>
     <div className="flex flex-1 flex-col">
       {isImpersonating && (
         <>
@@ -78,7 +78,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={isMaarif9} />}>
+      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={maarifGrade !== null} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />
@@ -88,6 +88,6 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           to the student, and an admin must never drive their timer). */}
       {!isImpersonating && <ActiveFocusSessionWidget />}
     </div>
-    </Maarif9Provider>
+    </MaarifGradeProvider>
   );
 }

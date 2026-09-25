@@ -162,8 +162,9 @@ export type KarneGeneralExam = { task_date: string; title: string; subject_score
 
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention every panel already parses it with.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
+  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }

@@ -12,7 +12,7 @@ type SignupRequest = {
   requested_role: "student" | "parent" | "coach";
   // Only student requests carry a cohort (copied onto the profile on approval).
   exam_type?: "YKS" | "LGS" | null;
-  is_maarif9?: boolean;
+  maarif_grade?: 9 | 10 | null;
 };
 
 const ROLE_LABELS: Record<SignupRequest["requested_role"], string> = {
@@ -68,7 +68,7 @@ export function PendingSignupRequests({ requests }: { requests: SignupRequest[] 
                       : "bg-secondary rounded px-1.5 py-0.5 text-[10px] font-medium"
                   }
                 >
-                  {request.is_maarif9 ? "9. Sınıf" : request.exam_type}
+                  {request.maarif_grade ? `${request.maarif_grade}. Sınıf` : request.exam_type}
                 </span>
               )}
               <span className="text-foreground text-sm font-medium">{request.full_name}</span>

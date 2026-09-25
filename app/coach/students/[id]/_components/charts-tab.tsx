@@ -23,9 +23,10 @@ import type { DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention buildGeneralExamTitle/parseGeneralExamTitle
 // use coach-side when creating the task.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
   const t = title.toUpperCase();
   if (/^9\.\s*SINIF\b/.test(t)) return "m9";
+  if (/^10\.\s*SINIF\b/.test(t)) return "m10";
   if (t.startsWith("LGS")) return "lgs";
   return t.startsWith("AYT") ? "ayt" : "tyt";
 }

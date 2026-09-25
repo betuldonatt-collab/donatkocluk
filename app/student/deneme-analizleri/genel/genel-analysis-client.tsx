@@ -11,9 +11,7 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_SUBJECT_GROUPS,
-  MAARIF9_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
-  coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
@@ -21,7 +19,8 @@ import {
   type SubjectGroupKey,
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
-import { useIsMaarif9 } from "@/components/maarif9-context";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { MAARIF_GRADES } from "@/lib/maarif-grade";
 import { LineChart } from "../../_components/charts/line-chart";
 import { getMoreGenelExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -33,8 +32,9 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // General-exam tasks have no course_id -- the TYT/AYT/LGS track lives only in
 // the title text, same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
+  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
@@ -74,8 +74,9 @@ export function GenelAnalysisClient({
   const [aytTrack, setAytTrack] = useState<Track>("sayisal");
   const [lgsGroupKey, setLgsGroupKey] = useState<string>(LGS_SUBJECT_GROUPS[0].key);
   const [aytGroupKey, setAytGroupKey] = useState(AYT_SUBJECT_GROUPS_BY_TRACK.sayisal[0].key as string);
-  const isMaarif9 = useIsMaarif9();
-  const [m9SubjectKey, setM9SubjectKey] = useState<string>(MAARIF9_EXAM_SUBJECTS[0].key);
+  const maarifGrade = useMaarifGrade();
+  const gradeCfg = maarifGrade !== null ? MAARIF_GRADES[maarifGrade] : null;
+  const [m9SubjectKey, setM9SubjectKey] = useState<string>("");
 
   const [activeTask, setActiveTask] = useState<StudentTask | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -164,18 +165,19 @@ export function GenelAnalysisClient({
 
   // 9th grade: the 120-question Genel Deneme (per subject, 4 yanlış 1 doğruyu
   // götürür like TYT) -- no TYT/AYT tabs or charts.
-  if (isMaarif9 && examType !== "LGS") {
+  if (gradeCfg && examType !== "LGS") {
     const m9Exams = exams
-      .filter((e) => parseGeneralExamTrack(e.title) === "m9")
+      .filter((e) => parseGeneralExamTrack(e.title) === gradeCfg.track)
       .sort((a, b) => b.task_date.localeCompare(a.task_date));
     const m9NetChartData = netChartFor(m9Exams);
-    const m9Courses = coursesForMaarif9ExamSubject(m9SubjectKey);
+    const activeSubjectKey = m9SubjectKey || gradeCfg.examSubjects[0].key;
+    const m9Courses = gradeCfg.coursesForExamSubject(activeSubjectKey);
     return (
       <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Genel Net Gelişimi</CardTitle>
-            <CardDescription>Tüm derslerin toplamı üzerinden 9. sınıf genel deneme (120 soru) net değişimi</CardDescription>
+            <CardDescription>Tüm derslerin toplamı üzerinden {gradeCfg.label.toLowerCase()} genel deneme (120 soru) net değişimi</CardDescription>
           </CardHeader>
           <CardContent>
             <LineChart data={m9NetChartData} />
@@ -183,14 +185,14 @@ export function GenelAnalysisClient({
         </Card>
 
         <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1">
-          {MAARIF9_EXAM_SUBJECTS.map((s) => (
+          {gradeCfg.examSubjects.map((s) => (
             <button
               key={s.key}
               type="button"
               onClick={() => setM9SubjectKey(s.key)}
               className={cn(
                 "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-                m9SubjectKey === s.key
+                activeSubjectKey === s.key
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}

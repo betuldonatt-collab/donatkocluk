@@ -21,8 +21,8 @@ import {
   type Course,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
-import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
-import { useIsMaarif9 } from "@/components/maarif9-context";
+import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
 import type { DetailTask } from "../../types";
@@ -92,7 +92,7 @@ export type TaskFormValue = {
   // these two live only in form state and get folded into the saved
   // title string (buildGeneralExamTitle in actions.ts), never persisted
   // as their own columns.
-  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9";
+  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10";
   generalExamPublisher: string;
   // "Branş Denemesi" only -- same "lives only in the title, never its own
   // column" convention as generalExamPublisher above.
@@ -115,10 +115,11 @@ function emptyResourceRow(): TaskFormResource {
 export function courseOptionsFor(
   examType: ExamType,
   isBranchExam: boolean,
-  isMaarif9 = false,
+  maarifGrade: MaarifGrade | null = null,
 ): { id: string; label: string; group?: string }[] {
-  // 9th graders (profiles.is_maarif9) are offered ONLY the 9th-grade courses.
-  if (isMaarif9) return MAARIF9_KAYNAK_COURSES.map((c) => ({ id: c.id, label: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }));
+  // A Maarif student is offered ONLY their own grade's courses (9th and 10th
+  // grade never mix).
+  if (maarifGrade !== null) return MAARIF_GRADES[maarifGrade].courses.map((c) => ({ id: c.id, label: stripGradePrefix(c.name) }));
   if (examType === "LGS") {
     return [
       ...lgsCourseOptions(),
@@ -131,21 +132,21 @@ export function courseOptionsFor(
   return (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomic] : atomic).map((c) => ({ id: c.id, label: courseLabel(c) }));
 }
 
-export function firstCourseIdFor(examType: ExamType, isMaarif9 = false): string {
-  if (isMaarif9) return MAARIF9_KAYNAK_COURSES[0].id;
+export function firstCourseIdFor(examType: ExamType, maarifGrade: MaarifGrade | null = null): string {
+  if (maarifGrade !== null) return MAARIF_GRADES[maarifGrade].courses[0].id;
   return examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id;
 }
 
-export function defaultTaskFormValue(examType: ExamType = "YKS", isMaarif9 = false): TaskFormValue {
+export function defaultTaskFormValue(examType: ExamType = "YKS", maarifGrade: MaarifGrade | null = null): TaskFormValue {
   return {
     taskType: "question_bank",
-    courseId: firstCourseIdFor(examType, isMaarif9),
+    courseId: firstCourseIdFor(examType, maarifGrade),
     topicId: "",
     resources: [],
     totalCount: "",
     durationMinutes: "",
     videoLinks: [],
-    generalExamTrack: isMaarif9 ? "m9" : examType === "LGS" ? "lgs" : "tyt",
+    generalExamTrack: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].track : examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     branchExamPublisher: "",
     bookTitle: "",
@@ -155,11 +156,11 @@ export function defaultTaskFormValue(examType: ExamType = "YKS", isMaarif9 = fal
 // Reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
 // editing an existing general-exam task pre-fills the track/publisher
 // fields instead of showing them blank.
-function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt" | "lgs" | "m9"; publisher: string } {
-  const match = title.match(/^(TYT|AYT|LGS|9\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
+function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt" | "lgs" | "m9" | "m10"; publisher: string } {
+  const match = title.match(/^(TYT|AYT|LGS|9\.\s*SINIF|10\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
   const track = match?.[1].toLowerCase();
   return {
-    track: track === "ayt" ? "ayt" : track === "lgs" ? "lgs" : track?.startsWith("9") ? "m9" : "tyt",
+    track: track === "ayt" ? "ayt" : track === "lgs" ? "lgs" : track?.startsWith("10") ? "m10" : track?.startsWith("9") ? "m9" : "tyt",
     publisher: match?.[2]?.trim() ?? "",
   };
 }
@@ -206,7 +207,7 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
     addToLibrary: true,
   }));
-  const generalExam: { track: "tyt" | "ayt" | "lgs" | "m9"; publisher: string } =
+  const generalExam: { track: "tyt" | "ayt" | "lgs" | "m9" | "m10"; publisher: string } =
     taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt", publisher: "" };
   const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
   // An older branch exam task saved before this field merged into Kaynak
@@ -375,13 +376,14 @@ export function TaskFormFields({
   examType?: ExamType;
 }) {
   const isLgs = examType === "LGS";
-  const isMaarif9 = useIsMaarif9();
+  const maarifGrade = useMaarifGrade();
+  const isMaarif9 = maarifGrade !== null;
   // Like LGS, a 9th-grade Genel Deneme has exactly one format -- no TYT/AYT choice.
   const singleGeneralExamFormat = isLgs || isMaarif9;
   const course =
     ALL_COURSES.find((c) => c.id === value.courseId) ??
     findCourseById(value.courseId) ??
-    ALL_COURSES.find((c) => c.id === firstCourseIdFor(examType, isMaarif9)) ??
+    ALL_COURSES.find((c) => c.id === firstCourseIdFor(examType, maarifGrade)) ??
     ALL_COURSES[0];
   const topicOptions = topicOptionsForCourse(course);
   const isGeneralExam = value.taskType === "general_exam";
@@ -393,7 +395,7 @@ export function TaskFormFields({
   // happens only here, in the branch_exam-only display list (see
   // courseOptionsFor). LGS has no macro subjects -- its branş denemeleri
   // are per single subject.
-  const courseOptions = courseOptionsFor(examType, isBranchExam, isMaarif9);
+  const courseOptions = courseOptionsFor(examType, isBranchExam, maarifGrade);
   // A course's resources are split by kind (0044) -- branch_exam tasks
   // only ever offer that course's branch-trial inventory, question_bank
   // tasks only ever offer its plain study resources. The two pools are

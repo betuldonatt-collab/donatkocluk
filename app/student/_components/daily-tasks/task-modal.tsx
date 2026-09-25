@@ -23,6 +23,8 @@ import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
   MAARIF9_EXAM_SUBJECTS,
+  MAARIF10_EXAM_SUBJECTS,
+  coursesForMaarif10ExamSubject,
   TYT_SUBJECT_GROUPS,
   coursesForMaarif9ExamSubject,
   coursesForAytGroup,
@@ -229,26 +231,29 @@ function toNumberOrNull(v: string) {
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."), the
 // same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
+  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
 
 function subjectGroupsFor(
-  examTrack: "tyt" | "ayt" | "lgs" | "m9",
+  examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10",
   aytTrack: Track | null,
 ): { key: string; label: string; courseIds: string[]; section?: string; questions: number }[] {
   if (examTrack === "lgs") return LGS_EXAM_SUBJECTS;
   if (examTrack === "m9") return MAARIF9_EXAM_SUBJECTS;
+  if (examTrack === "m10") return MAARIF10_EXAM_SUBJECTS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
   if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
   return [];
 }
 
-function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs" | "m9", aytTrack: Track | null, key: string): Course[] {
+function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10", aytTrack: Track | null, key: string): Course[] {
   if (examTrack === "lgs") return coursesForLgsExamSubject(key);
   if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
+  if (examTrack === "m10") return coursesForMaarif10ExamSubject(key);
   if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
   if (aytTrack) return coursesForAytGroup(aytTrack, key);
   return [];

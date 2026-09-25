@@ -4,6 +4,7 @@
 // key-sets below is present in a given exam's subject_scores -- see
 // inferAytTrackFromScores.
 import { MAARIF9_GENEL_DENEME_COURSES } from "./maarif9";
+import { MAARIF10_GENEL_DENEME_COURSES } from "./maarif10";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES, type Course, type Track } from "./index";
 
 // LGS's real exam is two sessions: Sözel (Türkçe 20, İnkılap 10, Din
@@ -206,4 +207,28 @@ export function coursesForMaarif9ExamSubject(key: string): Course[] {
   const subject = MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key);
   if (!subject) return [];
   return subject.courseIds.map((id) => MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
+}
+
+// 10th-grade (Maarif) Genel Deneme: 120 questions, scored per subject. Keys are
+// `m10_`-prefixed (never colliding with TYT's or the 9th grade's `m9_`).
+// `courseIds` point at the "10. Sınıf Genel Deneme Analizi" sheet's own
+// subject list (MAARIF10_GENEL_DENEME_COURSES) used for topic analysis.
+export const MAARIF10_EXAM_SUBJECTS: { key: string; label: string; section: string; courseIds: string[]; questions: number }[] = [
+  { key: "m10_turkce", label: "Türk Dili ve Edebiyatı", section: "TÜRKÇE", courseIds: ["maarif10-gd-turk-dili-ve-edebiyati"], questions: 30 },
+  { key: "m10_tarih", label: "Tarih", section: "SOSYAL BİLİMLER", courseIds: ["maarif10-gd-tarih"], questions: 10 },
+  { key: "m10_cografya", label: "Coğrafya", section: "SOSYAL BİLİMLER", courseIds: ["maarif10-gd-cografya"], questions: 10 },
+  { key: "m10_felsefe", label: "Felsefe", section: "SOSYAL BİLİMLER", courseIds: ["maarif10-gd-felsefe"], questions: 5 },
+  { key: "m10_din", label: "Din Kültürü ve Ahlak Bilgisi", section: "SOSYAL BİLİMLER", courseIds: ["maarif10-gd-din-kulturu-ve-ahlak-bilgisi"], questions: 5 },
+  { key: "m10_matematik", label: "Matematik", section: "MATEMATİK", courseIds: ["maarif10-gd-matematik"], questions: 30 },
+  { key: "m10_fizik", label: "Fizik", section: "FEN BİLİMLERİ", courseIds: ["maarif10-gd-fizik"], questions: 10 },
+  { key: "m10_kimya", label: "Kimya", section: "FEN BİLİMLERİ", courseIds: ["maarif10-gd-kimya"], questions: 10 },
+  { key: "m10_biyoloji", label: "Biyoloji", section: "FEN BİLİMLERİ", courseIds: ["maarif10-gd-biyoloji"], questions: 10 },
+];
+
+export const MAARIF10_EXAM_QUESTION_TOTAL = MAARIF10_EXAM_SUBJECTS.reduce((sum, s) => sum + s.questions, 0); // 120
+
+export function coursesForMaarif10ExamSubject(key: string): Course[] {
+  const subject = MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key);
+  if (!subject) return [];
+  return subject.courseIds.map((id) => MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }

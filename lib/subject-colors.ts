@@ -132,6 +132,26 @@ const COURSE_FAMILY: Record<string, SubjectFamily> = {
   "maarif9-gd-tarih": "tarih",
   "maarif9-gd-cografya": "cografya",
   "maarif9-gd-din-kulturu": "din",
+  // 10th grade (Maarif): same families again.
+  "maarif10-turk-dili-ve-edebiyati": "turkce",
+  "maarif10-matematik": "matematik",
+  "maarif10-fizik": "fizik",
+  "maarif10-kimya": "kimya",
+  "maarif10-biyoloji": "biyoloji",
+  "maarif10-tarih": "tarih",
+  "maarif10-cografya": "cografya",
+  "maarif10-felsefe": "felsefe",
+  "maarif10-din-kulturu-ve-ahlak-bilgisi": "din",
+  "maarif10-ingilizce": "ingilizce",
+  "maarif10-gd-turk-dili-ve-edebiyati": "turkce",
+  "maarif10-gd-matematik": "matematik",
+  "maarif10-gd-fizik": "fizik",
+  "maarif10-gd-kimya": "kimya",
+  "maarif10-gd-biyoloji": "biyoloji",
+  "maarif10-gd-tarih": "tarih",
+  "maarif10-gd-cografya": "cografya",
+  "maarif10-gd-felsefe": "felsefe",
+  "maarif10-gd-din-kulturu-ve-ahlak-bilgisi": "din",
 };
 
 // Branch-exam "macro" course ids (lib/curriculum's BRANCH_EXAM_MACRO_COURSES)

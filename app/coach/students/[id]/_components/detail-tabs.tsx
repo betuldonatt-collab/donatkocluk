@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsMaarif9 } from "@/components/maarif9-context";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import type { DetailSession, DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
@@ -84,7 +84,7 @@ export function DetailTabs({
 }) {
   // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
   // hidden; Program and Görüşmeler remain.
-  const isMaarif9 = useIsMaarif9();
+  const isMaarif9 = useMaarifGrade() !== null;
   const hiddenTabs = isMaarif9 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS;
   const [activeTab, setActiveTab] = useState(hiddenTabs.has(initialTab) ? "program" : initialTab);
   // One shared filter for Analiz / Gelişim Haritası / Grafikler -- lifted

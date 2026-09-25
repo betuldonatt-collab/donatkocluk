@@ -5,12 +5,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes, updateMaarif9Flag } from "../../actions";
+import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes, updateMaarifGrade } from "../../actions";
 import { ResetPasswordButton } from "../../_components/reset-password-button";
 import { SendToPoolButton } from "../../_components/send-to-pool-button";
 
 type Person = { id: string; full_name: string | null };
-type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; is_maarif9?: boolean };
+type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | null };
 type PoolCoach = Person & { activeCount: number; maxStudents: number };
 
 const TRACK_OPTIONS: { value: string; label: string }[] = [
@@ -21,6 +21,7 @@ const TRACK_OPTIONS: { value: string; label: string }[] = [
   { value: "lgs_ortaokul", label: "LGS/Ortaokul" },
   // Needs migration 0098 (academic_track is the coach_specialization enum).
   { value: "maarif9", label: "9. Sınıf" },
+  { value: "maarif10", label: "10. Sınıf" },
 ];
 
 const selectClass =
@@ -64,23 +65,25 @@ function AdminNotesField({ studentId, initialNotes }: { studentId: string; initi
   );
 }
 
-// 9. Sınıf (Maarif) flag -- switches the student's panel and the coach's forms to the
-// 9th-grade curriculum (no YKS countdown / TYT-AYT tabs).
-function Maarif9Field({ studentId, initial }: { studentId: string; initial: boolean }) {
-  const [checked, setChecked] = useState(initial);
+// Maarif grade -- switches the student's panel and the coach's forms to that grade's
+// curriculum (no YKS countdown / TYT-AYT tabs). 9th and 10th grade are mutually
+// exclusive (one select; the database also enforces it).
+function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 9 | 10 | null }) {
+  const [grade, setGrade] = useState<9 | 10 | null>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleChange(next: boolean) {
-    const previous = checked;
-    setChecked(next);
+  async function handleChange(raw: string) {
+    const next = raw === "9" ? 9 : raw === "10" ? 10 : null;
+    const previous = grade;
+    setGrade(next);
     setSaving(true);
     setError(null);
     try {
-      await updateMaarif9Flag(studentId, next);
+      await updateMaarifGrade(studentId, next);
     } catch {
-      setChecked(previous);
-      setError("Kaydedilemedi. Migration 0096 uygulandı mı?");
+      setGrade(previous);
+      setError("Kaydedilemedi. Migration 0099 uygulandı mı?");
     } finally {
       setSaving(false);
     }
@@ -88,11 +91,13 @@ function Maarif9Field({ studentId, initial }: { studentId: string; initial: bool
 
   return (
     <div className="space-y-1.5">
-      <label className="text-foreground flex items-center gap-2 text-sm font-medium">
-        <input type="checkbox" checked={checked} disabled={saving} onChange={(e) => handleChange(e.target.checked)} className="size-4" />
-        9. Sınıf (Maarif) öğrencisi
-      </label>
-      <p className="text-muted-foreground text-xs">İşaretlenince öğrenci ve koç 9. sınıf müfredatını görür; YKS geri sayımı ve TYT/AYT sekmeleri gizlenir.</p>
+      <label className="text-foreground text-sm font-medium">Maarif Sınıfı</label>
+      <select value={grade === null ? "" : String(grade)} onChange={(e) => handleChange(e.target.value)} disabled={saving} className={selectClass}>
+        <option value="">Yok (YKS / LGS)</option>
+        <option value="9">9. Sınıf (Maarif)</option>
+        <option value="10">10. Sınıf (Maarif)</option>
+      </select>
+      <p className="text-muted-foreground text-xs">Seçilen sınıfın müfredatı görünür; YKS geri sayımı ve TYT/AYT sekmeleri gizlenir.</p>
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
@@ -177,7 +182,7 @@ export function AssignStudentModal({
           <ResetPasswordButton userId={student.id} />
 
           <AcademicTrackField studentId={student.id} initialTrack={student.academic_track} />
-          <Maarif9Field studentId={student.id} initial={student.is_maarif9 === true} />
+          <MaarifGradeField studentId={student.id} initial={student.maarif_grade ?? null} />
           <AdminNotesField studentId={student.id} initialNotes={student.admin_notes} />
 
           <div className="border-border space-y-4 border-t pt-4">

@@ -1,5 +1,5 @@
-import { Maarif9Provider } from "@/components/maarif9-context";
-import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
+import { MaarifGradeProvider } from "@/components/maarif-grade-context";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -147,10 +147,10 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
   const weekDays = getWeekDays(referenceDate);
   const [data, rowHeights] = await Promise.all([fetchScheduleData(id, weekDays), fetchCoachRowHeights()]);
   const studentName = data.profile?.full_name ?? "Öğrenci";
-  const isMaarif9 = await fetchIsMaarif9(await createClient(), id);
+  const maarifGrade = await fetchMaarifGrade(await createClient(), id);
 
   return (
-    <Maarif9Provider value={isMaarif9}>
+    <MaarifGradeProvider value={maarifGrade}>
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href={`/coach/students/${id}`}
@@ -180,7 +180,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
           examType={data.profile?.exam_type ?? "YKS"}
         />
       </div>
-    </Maarif9Provider>
+    </MaarifGradeProvider>
   );
 }
 

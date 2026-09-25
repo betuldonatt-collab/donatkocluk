@@ -19,8 +19,8 @@ import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
 import type { StudentTask } from "./types";
-import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
-import { useIsMaarif9 } from "@/components/maarif9-context";
+import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 
 // Atomic TYT/AYT courses only -- deliberately NOT Paragraf/Problem's
 // routine pseudo-courses (which already have their own dedicated page).
@@ -80,7 +80,7 @@ type FormState = {
   // defaults to) rather than guessing "yes" just because it's the first
   // type selected.
   isCompleted: boolean;
-  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9";
+  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10";
   generalExamPublisher: string;
   freeTitle: string;
   freeDescription: string;
@@ -89,10 +89,10 @@ type FormState = {
   bookTitle: string;
 };
 
-function initialFormState(examType: ExamType, isMaarif9 = false): FormState {
+function initialFormState(examType: ExamType, maarifGrade: MaarifGrade | null = null): FormState {
   return {
     taskType: "question_bank",
-    courseId: isMaarif9 ? MAARIF9_KAYNAK_COURSES[0].id : examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
+    courseId: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses[0].id : examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
     topicId: "",
     resources: [],
     totalCount: "",
@@ -101,7 +101,7 @@ function initialFormState(examType: ExamType, isMaarif9 = false): FormState {
     emptyCount: "",
     durationMinutes: "",
     isCompleted: false,
-    generalExamTrack: isMaarif9 ? "m9" : examType === "LGS" ? "lgs" : "tyt",
+    generalExamTrack: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].track : examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     freeTitle: "",
     freeDescription: "",
@@ -182,9 +182,11 @@ export function AddCustomTaskDialog({
   const isLgs = examType === "LGS";
   // A 9th grader (profiles.is_maarif9) sees ONLY the 9th-grade courses here;
   // everyone else is unchanged.
-  const isMaarif9 = useIsMaarif9();
+  const maarifGrade = useMaarifGrade();
+  const isMaarif9 = maarifGrade !== null;
+  const gradeCourses = maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : [];
   const singleGeneralExamFormat = isLgs || isMaarif9;
-  const [value, setValue] = useState<FormState>(() => initialFormState(examType, isMaarif9));
+  const [value, setValue] = useState<FormState>(() => initialFormState(examType, maarifGrade));
   const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,14 +225,14 @@ export function AddCustomTaskDialog({
   // LGS has no macro subjects (its branş denemeleri are per single subject)
   // and its own six-course list, offered SÖZEL first then SAYISAL.
   const courseList: Course[] = isMaarif9
-    ? MAARIF9_KAYNAK_COURSES
+    ? gradeCourses
     : isLgs
       ? LGS_COURSES
       : isBranchExam
         ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES]
         : ALL_COURSES;
   const courseOptions: { id: string; label: string; group?: string }[] = isMaarif9
-    ? courseList.map((c) => ({ id: c.id, label: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }))
+    ? courseList.map((c) => ({ id: c.id, label: stripGradePrefix(c.name) }))
     : isLgs
       ? lgsCourseOptions()
       : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));
@@ -424,7 +426,7 @@ export function AddCustomTaskDialog({
       // repeating it as a "Kaynak: X" line would just be a duplicate.
       const resourceNames = isBranchExam ? [] : resolvedResources.map((r) => r.name).filter(Boolean);
       onCreated({ ...task, resource_names: resourceNames } as StudentTask);
-      setValue(initialFormState(examType, isMaarif9));
+      setValue(initialFormState(examType, maarifGrade));
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bir hata oluştu.");
@@ -435,7 +437,7 @@ export function AddCustomTaskDialog({
 
   function handleOpenChange(next: boolean) {
     if (next) {
-      setValue(initialFormState(examType, isMaarif9));
+      setValue(initialFormState(examType, maarifGrade));
       setError(null);
     }
     setOpen(next);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
-import { useIsMaarif9 } from "@/components/maarif9-context";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 
 const TABS = [
   { href: "/student/deneme-analizleri/brans", label: "Branş Denemesi Analizi" },
@@ -17,7 +17,7 @@ export default function DenemeAnalizleriLayout({ children }: { children: React.R
   const pathname = usePathname();
   // 9th graders: Branş and Genel Deneme analysis only (Gelişim Haritası and
   // Karnelerim are TYT/AYT-based).
-  const isMaarif9 = useIsMaarif9();
+  const isMaarif9 = useMaarifGrade() !== null;
   const tabs = isMaarif9 ? TABS.filter((t) => t.href.endsWith("/brans") || t.href.endsWith("/genel")) : TABS;
 
   return (

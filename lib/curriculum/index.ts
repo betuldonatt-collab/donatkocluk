@@ -11,6 +11,7 @@ import aytSozelJson from "./ayt-sozel.json";
 import lgsJson from "./lgs.json";
 
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
+import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
 // `konu` is LGS's middle hierarchy level (Ünite -> Konu -> Alt Konu):
@@ -172,7 +173,15 @@ const ALL_COURSES: Course[] = [
 // deliberately NOT part of ALL_COURSES, so no existing YKS/LGS list or picker
 // that iterates ALL_COURSES can ever pick them up.
 function findMaarif9Course(courseId: string): Course | null {
-  return MAARIF9_KAYNAK_COURSES.find((c) => c.id === courseId) ?? MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ?? null;
+  // Lookup by id only (so any stored task resolves); WHICH grade's courses a
+  // picker offers is decided by lib/maarif-grade.ts, never here.
+  return (
+    MAARIF9_KAYNAK_COURSES.find((c) => c.id === courseId) ??
+    MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
+    MAARIF10_KAYNAK_COURSES.find((c) => c.id === courseId) ??
+    MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
+    null
+  );
 }
 
 export function findCourseById(courseId: string | null | undefined): Course | null {

@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
 import { LGS_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import type { ExamType } from "@/lib/exam-type";
-import { useIsMaarif9 } from "@/components/maarif9-context";
-import { MAARIF9_KAYNAK_COURSES } from "@/lib/curriculum/maarif9";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { MAARIF_GRADES, stripGradePrefix } from "@/lib/maarif-grade";
 
 export function CourseChips({
   courses,
@@ -68,17 +68,18 @@ export function CourseTabs({
   const [track, setTrack] = useState<Track>("sayisal");
   const [aytCourseId, setAytCourseId] = useState(aytCoursesFor("sayisal")[0].id);
   const [lgsCourseId, setLgsCourseId] = useState(lgsCourses[0].id);
-  const isMaarif9 = useIsMaarif9();
-  const [m9CourseId, setM9CourseId] = useState(MAARIF9_KAYNAK_COURSES[0].id);
+  const maarifGrade = useMaarifGrade();
+  const [m9CourseId, setM9CourseId] = useState("");
 
   // 9th graders (profiles.is_maarif9): one chip row of the 9th-grade subjects,
   // no TYT/AYT split -- every page built on this component adapts at once.
-  if (isMaarif9 && examType !== "LGS") {
-    const selected = MAARIF9_KAYNAK_COURSES.find((c) => c.id === m9CourseId) ?? MAARIF9_KAYNAK_COURSES[0];
+  if (maarifGrade !== null && examType !== "LGS") {
+    const gradeCourses = MAARIF_GRADES[maarifGrade].courses;
+    const selected = gradeCourses.find((c) => c.id === m9CourseId) ?? gradeCourses[0];
     return (
       <div className="space-y-4">
         <CourseChips
-          courses={MAARIF9_KAYNAK_COURSES.map((c) => ({ ...c, name: c.name.replace(/^9\.\s*Sınıf:?\s*/i, "") }))}
+          courses={gradeCourses.map((c) => ({ ...c, name: stripGradePrefix(c.name) }))}
           selectedId={selected.id}
           onSelect={setM9CourseId}
         />

@@ -967,7 +967,7 @@ const createRichCustomTaskSchema = z
     // mı?". Ignored for every other task type (each already has its own
     // always-pending or always-full-results shape).
     isCompleted: z.boolean().nullable().optional(),
-    generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9"]).nullable().optional(),
+    generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9", "m10"]).nullable().optional(),
     generalExamPublisher: z.string().trim().max(200).nullable().optional(),
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
     freeTitle: z.string().trim().max(200).nullable().optional(),
@@ -1001,7 +1001,7 @@ export type CreateRichTaskInput = {
   emptyCount?: number | null;
   durationMinutes?: number | null;
   isCompleted?: boolean | null;
-  generalExamTrack?: "tyt" | "ayt" | "lgs" | "m9" | null;
+  generalExamTrack?: "tyt" | "ayt" | "lgs" | "m9" | "m10" | null;
   generalExamPublisher?: string | null;
   branchExamPublisher?: string | null;
   freeTitle?: string | null;
@@ -1021,7 +1021,7 @@ function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): stri
   if (v.taskType === "reading") return v.bookTitle?.trim() || "Kitap Okuma";
 
   if (v.taskType === "general_exam") {
-    const prefix = v.generalExamTrack === "ayt" ? "AYT" : v.generalExamTrack === "lgs" ? "LGS" : v.generalExamTrack === "m9" ? "9. SINIF" : "TYT";
+    const prefix = v.generalExamTrack === "ayt" ? "AYT" : v.generalExamTrack === "lgs" ? "LGS" : v.generalExamTrack === "m9" ? "9. SINIF" : v.generalExamTrack === "m10" ? "10. SINIF" : "TYT";
     const pub = v.generalExamPublisher?.trim();
     return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
   }

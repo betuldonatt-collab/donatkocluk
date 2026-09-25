@@ -1,5 +1,5 @@
-import { Maarif9Provider } from "@/components/maarif9-context";
-import { fetchIsMaarif9 } from "@/lib/maarif9-flag";
+import { MaarifGradeProvider } from "@/components/maarif-grade-context";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -580,7 +580,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const searchParams = await props.searchParams;
   const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
   const detail = await fetchStudentDetail(id);
-  const isMaarif9 = detail ? await fetchIsMaarif9(await createClient(), id) : false;
+  const maarifGrade = detail ? await fetchMaarifGrade(await createClient(), id) : null;
   // This student's Süre Tut sessions over 6 hours, waiting for the coach's
   // decision (best-effort: [] on failure). Only asked for once the student
   // resolved, i.e. is actually on this coach's roster.
@@ -589,7 +589,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const initialTab = DETAIL_TABS.find((t) => t === tabParam) ?? "analiz";
 
   return (
-    <Maarif9Provider value={isMaarif9}>
+    <MaarifGradeProvider value={maarifGrade}>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href="/coach/students"
@@ -661,6 +661,6 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
           </>
         )}
       </div>
-    </Maarif9Provider>
+    </MaarifGradeProvider>
   );
 }
