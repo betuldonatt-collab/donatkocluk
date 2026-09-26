@@ -1148,11 +1148,12 @@ function TaskModalBody({
           </div>
         )}
 
-        {(examType === "LGS" || (task.evidence_image_paths?.length ?? 0) > 0) && (
+        {examType === "LGS" && (
           <EvidenceUploader
             taskId={task.id}
             paths={task.evidence_image_paths ?? []}
             reviewStatus={task.evidence_review_status ?? "none"}
+            rejectionNote={task.evidence_review_status === "rejected" ? task.rejection_reason : null}
             photoStatus={task.evidence_photo_status ?? {}}
             onChange={(next) =>
               onSaved({

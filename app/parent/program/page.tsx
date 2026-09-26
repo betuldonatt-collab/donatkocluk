@@ -72,8 +72,20 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
       .order("start_time", { ascending: true }),
   ]);
 
-  const taskList = (taskRows ?? []) as (Omit<ParentProgramTask, "resource_names" | "photo_urls"> & { evidence_image_paths: string[] | null })[];
+  const taskList = (taskRows ?? []) as (Omit<ParentProgramTask, "resource_names" | "photo_urls" | "evidence_review_note"> & { evidence_image_paths: string[] | null })[];
   const taskIds = taskList.map((t) => t.id);
+
+  // The coach's optional rejection note (migration 0101), read separately and
+  // tolerant of the column not existing yet -- any error just means "no notes".
+  const noteByTask = new Map<string, string>();
+  if (taskIds.length > 0) {
+    const { data: noteRows, error: noteError } = await supabase.from("student_tasks").select("id, evidence_review_note").in("id", taskIds);
+    if (!noteError) {
+      for (const row of (noteRows ?? []) as { id: string; evidence_review_note: string | null }[]) {
+        if (row.evidence_review_note) noteByTask.set(row.id, row.evidence_review_note);
+      }
+    }
+  }
 
   // Resource names (which book a task was assigned from) -- one query, grouped.
   const resourceNamesByTask = new Map<string, string[]>();
@@ -113,6 +125,7 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
   const tasks: ParentProgramTask[] = taskList.map((t) => ({
     ...t,
     evidence_image_paths: t.evidence_image_paths ?? [],
+    evidence_review_note: noteByTask.get(t.id) ?? null,
     resource_names: resourceNamesByTask.get(t.id) ?? [],
     photo_urls: photoUrlsByTask.get(t.id) ?? {},
   }));

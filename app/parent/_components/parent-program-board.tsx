@@ -36,6 +36,8 @@ export type ParentProgramTask = {
   evidence_photo_status: Record<string, "approved" | "rejected"> | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  // The coach's optional note on a rejection (migration 0101); null when none.
+  evidence_review_note: string | null;
   resource_names: string[];
   // storage path -> short-lived signed URL
   photo_urls: Record<string, string>;
@@ -185,8 +187,8 @@ function TaskCard({ task }: { task: ParentProgramTask }) {
             Süre Tut: {formatDuration(task.tracked_duration_seconds)}
           </p>
         )}
-        {(task.rejected_at || task.evidence_review_status === "rejected") && task.rejection_reason && (
-          <p className="text-xs text-rose-700">Koçun notu: {task.rejection_reason}</p>
+        {(task.rejected_at || task.evidence_review_status === "rejected") && (task.evidence_review_note ?? (task.rejected_at ? task.rejection_reason : null)) && (
+          <p className="text-xs text-rose-700">Koçun notu: {task.evidence_review_note ?? task.rejection_reason}</p>
         )}
       </div>
 

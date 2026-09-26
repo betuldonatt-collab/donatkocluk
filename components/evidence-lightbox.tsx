@@ -31,6 +31,9 @@ export type EvidenceReviewControls = {
   busy: boolean;
   // Shown above the buttons, e.g. when the task is not waiting for review yet.
   note?: string;
+  // OPTIONAL reason for a rejection -- sent along with any rejecting verdict.
+  rejectNote?: string;
+  onRejectNoteChange?: (value: string) => void;
 };
 
 export const REJECTED_PHOTO_TEXT = "Koçun bu fotoğrafı onaylamadı";
@@ -206,6 +209,17 @@ export function EvidenceLightbox({
           <DialogFooter className="flex-col gap-2 sm:flex-col sm:items-stretch">
             {review.note && <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">{review.note}</p>}
             <p className="text-muted-foreground text-xs">Bir fotoğraf bile reddedilirse görev öğrenciye geri gönderilir.</p>
+            {review.onRejectNoteChange && (
+              <textarea
+                value={review.rejectNote ?? ""}
+                onChange={(e) => review.onRejectNoteChange?.(e.target.value)}
+                maxLength={500}
+                rows={2}
+                placeholder="Reddetme nedeni (opsiyonel) -- öğrenci ve veli görür"
+                aria-label="Reddetme nedeni (opsiyonel)"
+                className="border-input bg-background focus-visible:ring-ring/50 w-full resize-none rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+              />
+            )}
             <div className="flex flex-wrap gap-2 sm:justify-end">
               <Button type="button" variant="outline" size="sm" disabled={review.busy} onClick={review.onApproveAll}>
                 Tümünü Onayla

@@ -77,7 +77,6 @@ function buildCoachAlerts(
     empty_count: number | null;
     subject_scores: MissingExamAlert["subjectScores"];
   }[],
-  currentWeekTaskRows: { student_id: string }[],
   pendingReportCardRows: { id: string; student_id: string; cycle_number: number; generated_at: string }[],
   rsvpDeclineRows: { id: string; student_id: string; decline_reason: string | null; announcements: { title: string } | { title: string }[] | null }[],
 ): CoachAlerts {
@@ -127,9 +126,6 @@ function buildCoachAlerts(
     }))
     .filter((a): a is MissingExamAlert => !!a.student);
 
-  const weekActiveIds = new Set(currentWeekTaskRows.map((r) => r.student_id));
-  const emptyPrograms = roster.filter((s) => !weekActiveIds.has(s.id)).map((student) => ({ student }));
-
   const pendingReportCards = pendingReportCardRows
     .map((r) => ({
       student: rosterById.get(r.student_id),
@@ -151,7 +147,7 @@ function buildCoachAlerts(
     })
     .filter((a): a is RsvpDeclineAlert => !!a.student);
 
-  return { inactive, lowPerformance, missingExams, emptyPrograms, pendingReportCards, rsvpDeclines };
+  return { inactive, lowPerformance, missingExams, pendingReportCards, rsvpDeclines };
 }
 
 async function fetchDashboardData(
@@ -227,7 +223,6 @@ async function fetchDashboardData(
     { data: recentActivityRows },
     { data: prevWeekTaskRows },
     { data: missingExamRows },
-    { data: currentWeekTaskRows },
     { data: rsvpDeclineRows },
   ] =
     studentIds.length > 0
@@ -259,19 +254,13 @@ async function fetchDashboardData(
             .eq("analysis_pending", true)
             .order("task_date", { ascending: true }),
           supabase
-            .from("student_tasks")
-            .select("student_id")
-            .in("student_id", studentIds)
-            .gte("task_date", todayWeek[0].date)
-            .lte("task_date", todayWeek[6].date),
-          supabase
             .from("announcement_rsvps")
             .select("id, student_id, decline_reason, announcements!inner(title, is_active)")
             .in("student_id", studentIds)
             .eq("response", "not_attending")
             .eq("announcements.is_active", true),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const roster = (profiles ?? []) as RosterStudent[];
   const alerts = buildCoachAlerts(
@@ -279,7 +268,6 @@ async function fetchDashboardData(
     recentActivityRows ?? [],
     prevWeekTaskRows ?? [],
     missingExamRows ?? [],
-    currentWeekTaskRows ?? [],
     pendingReportCardRows ?? [],
     rsvpDeclineRows ?? [],
   );
@@ -323,7 +311,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
       weekSessions: [],
       weekBlocks: [],
       weekTasks: [],
-      alerts: { inactive: [], lowPerformance: [], missingExams: [], emptyPrograms: [], pendingReportCards: [], rsvpDeclines: [] },
+      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], rsvpDeclines: [] },
     },
     [],
     [],

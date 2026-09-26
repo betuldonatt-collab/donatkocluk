@@ -66,7 +66,6 @@ export type MissingExamAlert = {
   emptyCount: number | null;
   subjectScores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
 };
-export type EmptyProgramAlert = { student: RosterStudent };
 export type PendingReportCardAlert = {
   student: RosterStudent;
   reportCardId: string;
@@ -84,7 +83,6 @@ export type CoachAlerts = {
   inactive: InactiveAlert[];
   lowPerformance: LowPerformanceAlert[];
   missingExams: MissingExamAlert[];
-  emptyPrograms: EmptyProgramAlert[];
   pendingReportCards: PendingReportCardAlert[];
   rsvpDeclines: RsvpDeclineAlert[];
 };

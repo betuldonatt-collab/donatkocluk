@@ -17,7 +17,8 @@ const state: {
   removed: string[][];
   updateError: unknown;
   rpcError: unknown;
-} = { task: {}, updates: [], uploadError: null, removed: [], updateError: null, rpcError: null };
+  examType: "LGS" | "YKS";
+} = { task: {}, updates: [], uploadError: null, removed: [], updateError: null, rpcError: null, examType: "LGS" };
 
 function baseTask(overrides: Row = {}): Row {
   return {
@@ -48,6 +49,8 @@ function builder(table: string) {
   let payload: Row = {};
   const rows = (single: boolean) => {
     if (table === "coach_students") return { data: { student_id: USER }, error: null };
+    // The student's cohort: photo evidence and its mandatory rules are LGS-only.
+    if (table === "profiles") return { data: { exam_type: state.examType }, error: null };
     if (table === "student_tasks") {
       if (op === "update" && state.updateError) return { data: null, error: state.updateError };
       const row = op === "update" ? { ...state.task, ...payload } : state.task;
@@ -106,6 +109,7 @@ beforeEach(() => {
   state.removed = [];
   state.updateError = null;
   state.rpcError = null;
+  state.examType = "LGS";
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -180,6 +184,7 @@ describe("uploadTaskEvidence", () => {
 
 describe("student completes a task", () => {
   it("HOLDS a photo-backed completion for the coach instead of marking it done", async () => {
+    state.task = baseTask({ correct_count: 18, wrong_count: 2, empty_count: 0 });
     await updateTaskProgress(TASK, { status: "done", completed: true });
     expect(taskUpdate()).toMatchObject({
       status: "pending",
@@ -190,6 +195,7 @@ describe("student completes a task", () => {
   });
 
   it("remembers a half-done claim too", async () => {
+    state.task = baseTask({ correct_count: 18, wrong_count: 2, empty_count: 0 });
     await updateTaskProgress(TASK, { status: "half_done" });
     expect(taskUpdate()).toMatchObject({ status: "pending", evidence_review_status: "pending", evidence_pending_status: "half_done" });
   });
@@ -199,7 +205,8 @@ describe("student completes a task", () => {
     expect(taskUpdate()).toMatchObject({ status: "pending", evidence_review_status: "pending", evidence_pending_status: "done" });
   });
 
-  it("completes normally without photos", async () => {
+  it("completes normally without photos (YKS / 9th / 10th grade)", async () => {
+    state.examType = "YKS";
     state.task = baseTask({ evidence_image_paths: [] });
     await updateTaskProgress(TASK, { status: "done", completed: true });
     expect(taskUpdate()).toMatchObject({ status: "done", completed: true });
@@ -207,14 +214,14 @@ describe("student completes a task", () => {
   });
 
   it("does not ask twice once the coach approved the photos", async () => {
-    state.task = baseTask({ evidence_review_status: "approved" });
+    state.task = baseTask({ evidence_review_status: "approved", correct_count: 18, wrong_count: 2, empty_count: 0 });
     await updateTaskProgress(TASK, { status: "done", completed: true });
     expect(taskUpdate()).toMatchObject({ status: "done" });
     expect(taskUpdate()).not.toHaveProperty("evidence_review_status");
   });
 
   it("leaves an unapproved self-created task to the existing extra-task approval", async () => {
-    state.task = baseTask({ is_coach_assigned: false, is_approved_by_coach: false });
+    state.task = baseTask({ is_coach_assigned: false, is_approved_by_coach: false, correct_count: 18, wrong_count: 2, empty_count: 0 });
     await updateTaskProgress(TASK, { status: "done", completed: true });
     expect(taskUpdate()).toMatchObject({ status: "done" });
     expect(taskUpdate()).not.toHaveProperty("evidence_review_status");
@@ -405,6 +412,9 @@ describe("student side of per-photo review", () => {
   it("resubmitting clears the rejected verdicts (up for review again) and keeps the approved ones", async () => {
     state.task = baseTask({
       evidence_review_status: "rejected",
+      correct_count: 18,
+      wrong_count: 2,
+      empty_count: 0,
       evidence_photo_status: { [A]: "rejected", [B]: "approved" },
     });
     await updateTaskProgress(TASK, { status: "done", completed: true });
@@ -426,5 +436,93 @@ describe("student side of per-photo review", () => {
     state.task = baseTask({ evidence_image_paths: [B], evidence_photo_status: { [B]: "approved" }, status: "pending" });
     const result = await uploadTaskEvidence(photoForm());
     expect(result.ok && result.photoStatus).toEqual({ [B]: "approved" });
+  });
+});
+
+describe("LGS mandatory rules", () => {
+  it("refuses an explicit completion without any photo, saying why", async () => {
+    state.task = baseTask({ evidence_image_paths: [], correct_count: 18, wrong_count: 2, empty_count: 0 });
+    const result = await updateTaskProgress(TASK, { status: "done", completed: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/kanıt fotoğrafı/);
+    expect(state.updates.filter((u) => u.table === "student_tasks")).toHaveLength(0);
+  });
+
+  it("applies to every task type: even a video needs a photo", async () => {
+    state.task = baseTask({ task_type: "video", evidence_image_paths: [] });
+    const result = await updateTaskProgress(TASK, { status: "done", completed: true });
+    expect(result.ok).toBe(false);
+  });
+
+  it("refuses a Soru Çözümü completion with the Doğru/Yanlış/Boş left blank", async () => {
+    const result = await updateTaskProgress(TASK, { status: "done", completed: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/doğru, yanlış ve boş/);
+  });
+
+  it("lets a video be completed with just a photo (held for the coach)", async () => {
+    state.task = baseTask({ task_type: "video" });
+    await updateTaskProgress(TASK, { status: "done", completed: true });
+    expect(taskUpdate()).toMatchObject({ status: "pending", evidence_review_status: "pending", evidence_pending_status: "done" });
+  });
+
+  it("saves counts typed in before the photo exists but keeps the task pending", async () => {
+    state.task = baseTask({ evidence_image_paths: [] });
+    const result = await updateTaskProgress(TASK, { correct_count: 18, wrong_count: 2, empty_count: 0 });
+    expect(result.ok).toBe(true);
+    expect(taskUpdate()).toMatchObject({ correct_count: 18, wrong_count: 2, empty_count: 0, status: "pending" });
+    expect(taskUpdate()).not.toHaveProperty("evidence_review_status");
+  });
+
+  it("removing the last photo of a waiting task sends it back to pending, never to a photo-less done", async () => {
+    state.task = baseTask({
+      evidence_image_paths: [`${USER}/${TASK}/a.jpg`],
+      evidence_review_status: "pending",
+      evidence_pending_status: "done",
+    });
+    await removeTaskEvidence(TASK, `${USER}/${TASK}/a.jpg`);
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "none", status: "pending", completed: false });
+  });
+
+  it("only LGS students can upload photos", async () => {
+    state.examType = "YKS";
+    state.task = baseTask({ evidence_image_paths: [], status: "pending" });
+    const result = await uploadTaskEvidence(photoForm());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/yalnızca LGS/);
+    expect(state.updates.filter((u) => u.table === "student_tasks")).toHaveLength(0);
+  });
+});
+
+describe("optional rejection note", () => {
+  beforeEach(() => {
+    state.task = baseTask({ evidence_review_status: "pending", evidence_pending_status: "done" });
+  });
+
+  it("stores the coach's reason when one is given", async () => {
+    await reviewEvidencePhotos(TASK, [{ path: `${USER}/${TASK}/a.jpg`, decision: "rejected" }, { path: `${USER}/${TASK}/b.jpg`, decision: "approved" }], "  Fotoğraf bulanık  ");
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected", evidence_review_note: "Fotoğraf bulanık", rejection_reason: "Fotoğraf bulanık" });
+  });
+
+  it("is never required: a blank note keeps the default reason and stores no note", async () => {
+    await reviewEvidencePhotos(TASK, [{ path: `${USER}/${TASK}/a.jpg`, decision: "rejected" }], "   ");
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected", evidence_review_note: null });
+    expect(taskUpdate().rejection_reason).toBe("Koç kanıt fotoğrafını onaylamadı.");
+  });
+
+  it("Reddet without a note works exactly as before", async () => {
+    const result = await rejectStudentTask(TASK);
+    expect(result.success).toBe(true);
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected", evidence_review_note: null });
+  });
+
+  it("Reddet carries the note through", async () => {
+    await rejectStudentTask(TASK, "Eksik sayfa var");
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "rejected", evidence_review_note: "Eksik sayfa var" });
+  });
+
+  it("an approval clears any earlier note", async () => {
+    await approveStudentTask(TASK);
+    expect(taskUpdate()).toMatchObject({ evidence_review_status: "approved", evidence_review_note: null });
   });
 });

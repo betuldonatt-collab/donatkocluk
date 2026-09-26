@@ -1602,6 +1602,8 @@ export type PendingStudentTask = {
   // coach approves it here. Same list, same Onayla / Reddet.
   kind: "extra" | "evidence";
   evidenceCount: number;
+  // The student's cohort, so the dashboard can split LGS / YKS approvals.
+  studentExamType?: "YKS" | "LGS";
   // What the student reported for an "evidence" task (applied on approval).
   claimedStatus: "done" | "half_done" | null;
 };
@@ -1638,10 +1640,11 @@ export async function getPendingStudentTasks(): Promise<(PendingStudentTask & { 
       .in("student_id", studentIds)
       .eq("evidence_review_status", "pending")
       .order("task_date", { ascending: false }),
-    supabase.from("profiles").select("id, full_name").in("id", studentIds),
+    supabase.from("profiles").select("id, full_name, exam_type").in("id", studentIds),
   ]);
 
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+  const examTypeById = new Map((profiles ?? []).map((p) => [p.id, p.exam_type === "LGS" ? ("LGS" as const) : ("YKS" as const)]));
   const toPending = (t: NonNullable<typeof extraTasks>[number], kind: "extra" | "evidence") => {
     const { evidence_image_paths, evidence_pending_status, ...rest } = t;
     return {
@@ -1651,6 +1654,7 @@ export async function getPendingStudentTasks(): Promise<(PendingStudentTask & { 
       claimedStatus: (evidence_pending_status ?? null) as "done" | "half_done" | null,
       studentId: t.student_id,
       studentName: nameById.get(t.student_id) ?? null,
+      studentExamType: examTypeById.get(t.student_id) ?? ("YKS" as const),
     };
   };
   const seen = new Set<string>();
@@ -1759,6 +1763,7 @@ async function applyEvidenceDecisions(
   coachId: string,
   taskId: string,
   decide: { all: PhotoDecision } | { list: { path: string; decision: PhotoDecision }[] },
+  note: string | null = null,
 ): Promise<ReviewEvidenceResult> {
   const { data: task, error: fetchError } = await supabase
     .from("student_tasks")
@@ -1801,6 +1806,7 @@ async function applyEvidenceDecisions(
       ...base,
       evidence_review_status: "approved",
       evidence_pending_status: null,
+      evidence_review_note: null,
       ...(wasPending ? { status: claimed, completed: claimed === "done" } : {}),
     };
     statusChanged = wasPending;
@@ -1809,7 +1815,9 @@ async function applyEvidenceDecisions(
       ...base,
       evidence_review_status: "rejected",
       evidence_pending_status: null,
-      rejection_reason: "Koç kanıt fotoğrafını onaylamadı.",
+      // The coach's reason is OPTIONAL: with none, the fixed default text stays.
+      rejection_reason: note ?? "Koç kanıt fotoğrafını onaylamadı.",
+      evidence_review_note: note,
       ...(wasPending || wasCompleted ? { status: "pending", completed: false } : {}),
     };
     statusChanged = wasCompleted;
@@ -1846,9 +1854,19 @@ async function applyEvidenceDecisions(
 // Runs a review and reports ANY failure (view mode, roster check, validation, a
 // database step) as an ERROR result carrying its message, so the browser shows
 // what happened instead of the production-stripped "Server Components render" error.
+const rejectionNoteSchema = z.string().trim().max(500);
+
+// The optional rejection note: blank / missing -> null.
+function cleanRejectionNote(note: string | null | undefined): string | null {
+  if (!note) return null;
+  const trimmed = parseInput(rejectionNoteSchema, note);
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 async function runEvidenceReview(
   taskId: string,
   decide: { all: PhotoDecision } | { list: { path: string; decision: PhotoDecision }[] },
+  note: string | null = null,
 ): Promise<ReviewEvidenceResult> {
   try {
     await assertNotImpersonating();
@@ -1856,7 +1874,7 @@ async function runEvidenceReview(
     const decideV = "list" in decide ? { list: parseInput(evidenceDecisionsSchema, decide.list) } : decide;
     const supabase = await createClient();
     const user = await requireUser(supabase);
-    return await applyEvidenceDecisions(supabase, user.id, taskIdV, decideV);
+    return await applyEvidenceDecisions(supabase, user.id, taskIdV, decideV, cleanRejectionNote(note));
   } catch (e) {
     console.error("[evidence review] failed:", e);
     return { success: false, code: "ERROR", message: e instanceof Error ? e.message : GENERIC_DB_ERROR };
@@ -1868,8 +1886,9 @@ async function runEvidenceReview(
 export async function reviewEvidencePhotos(
   taskId: string,
   decisions: { path: string; decision: PhotoDecision }[],
+  note: string | null = null,
 ): Promise<ReviewEvidenceResult> {
-  return runEvidenceReview(taskId, { list: decisions });
+  return runEvidenceReview(taskId, { list: decisions }, note);
 }
 
 export async function approveStudentTask(taskId: string): Promise<ApprovalActionResult<Record<string, unknown>>> {
@@ -1951,7 +1970,7 @@ export async function approveStudentTask(taskId: string): Promise<ApprovalAction
 // Guarded against ever touching a coach-assigned or already-approved
 // task even if a stale/forged id is passed in, since those are no longer
 // "pending" by definition and this is a destructive action.
-export async function rejectStudentTask(taskId: string): Promise<ApprovalActionResult<{ id: string }>> {
+export async function rejectStudentTask(taskId: string, note: string | null = null): Promise<ApprovalActionResult<{ id: string }>> {
   await assertNotImpersonating();
   const taskIdV = parseInput(uuidSchema, taskId);
   const supabase = await createClient();
@@ -1971,7 +1990,7 @@ export async function rejectStudentTask(taskId: string): Promise<ApprovalActionR
   // stay, and the student can fix them and mark it done again, which puts it
   // back in this queue.
   if (existing.evidence_review_status === "pending") {
-    const result = await runEvidenceReview(taskIdV, { all: "rejected" });
+    const result = await runEvidenceReview(taskIdV, { all: "rejected" }, note);
     return result.success ? { success: true, data: { id: taskIdV } } : result;
   }
 
@@ -2004,7 +2023,8 @@ export async function rejectStudentTask(taskId: string): Promise<ApprovalActionR
     .from("student_tasks")
     .update({
       rejected_at: new Date().toISOString(),
-      rejection_reason: "Koçun bu kaydı incelemedi ve kaldırdı.",
+      // Optional coach reason; the fixed text is the default.
+      rejection_reason: cleanRejectionNote(note) ?? "Koçun bu kaydı incelemedi ve kaldırdı.",
       coach_id: user.id,
     })
     .eq("id", taskIdV)

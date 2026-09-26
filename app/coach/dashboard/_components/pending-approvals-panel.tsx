@@ -107,7 +107,7 @@ function EvidencePhotos({ task, onResolved }: { task: PendingTask; onResolved: (
 // either by clicking the card or its own "Detaylı İncele" button, so the
 // coach always has the full picture before acting rather than approving
 // off a truncated one-line summary.
-export function PendingApprovalsPanel({ tasks: initialTasks }: { tasks: PendingTask[] }) {
+export function PendingApprovalsPanel({ tasks: initialTasks, title = "Onay Bekleyen Görevler" }: { tasks: PendingTask[]; title?: string }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [open, setOpen] = useState(false);
   const groups = groupByStudent(tasks);
@@ -138,7 +138,9 @@ export function PendingApprovalsPanel({ tasks: initialTasks }: { tasks: PendingT
       >
         <CardHeader className="flex-row items-center gap-2 space-y-0">
           <ClipboardCheck className="text-muted-foreground size-4" />
-          <CardTitle className="text-sm">Onay Bekleyen Görevler ({tasks.length})</CardTitle>
+          <CardTitle className="text-sm">
+            {title} ({tasks.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {groups.length === 0 ? (
@@ -165,18 +167,20 @@ export function PendingApprovalsPanel({ tasks: initialTasks }: { tasks: PendingT
         </CardContent>
       </Card>
 
-      <ApprovalsDialog open={open} onOpenChange={setOpen} groups={groups} onRemove={removeTask} onRestore={restoreTask} />
+      <ApprovalsDialog title={title} open={open} onOpenChange={setOpen} groups={groups} onRemove={removeTask} onRestore={restoreTask} />
     </>
   );
 }
 
 function ApprovalsDialog({
+  title,
   open,
   onOpenChange,
   groups,
   onRemove,
   onRestore,
 }: {
+  title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groups: StudentGroup[];
@@ -196,6 +200,9 @@ function ApprovalsDialog({
   // tasks aren't rendered at all until the coach opens it, not just
   // visually clipped behind a scroll container.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Which row is asking for its optional rejection reason, and what was typed.
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
 
   function toggleExpanded(studentId: string) {
     setExpanded((prev) => {
@@ -217,14 +224,15 @@ function ApprovalsDialog({
   function runAction(
     task: PendingTask,
     type: "approve" | "reject",
-    action: (id: string) => Promise<ApprovalActionResult<unknown>>,
+    action: (id: string, note?: string | null) => Promise<ApprovalActionResult<unknown>>,
+    note: string | null = null,
   ) {
     setActingId(task.id);
     setActingType(type);
     onRemove(task.id);
     startTransition(async () => {
       try {
-        const result = await action(task.id);
+        const result = await action(task.id, note);
         if (!result.success) {
           if (result.code === "ERROR") {
             // Not processed: put the row back and say what went wrong.
@@ -246,13 +254,14 @@ function ApprovalsDialog({
   }
 
   const handleApprove = (task: PendingTask) => runAction(task, "approve", approveStudentTask);
-  const handleReject = (task: PendingTask) => runAction(task, "reject", rejectStudentTask);
+  // Reddet asks for an OPTIONAL reason first (see the inline box on the row).
+  const handleReject = (task: PendingTask, note: string | null) => runAction(task, "reject", rejectStudentTask, note);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Onay Bekleyen Görevler</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         {groups.length === 0 ? (
@@ -326,12 +335,47 @@ function ApprovalsDialog({
                                 variant="outline"
                                 className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/40 gap-1"
                                 disabled={isActing}
-                                onClick={() => handleReject(task)}
+                                onClick={() => {
+                                  setRejectingId(task.id);
+                                  setRejectNote("");
+                                }}
                               >
                                 <X className="size-3.5" />
                                 {isActing && actingType === "reject" ? "Reddediliyor..." : "Reddet"}
                               </Button>
                             </div>
+                            {rejectingId === task.id && (
+                              <div className="w-full space-y-2">
+                                <textarea
+                                  value={rejectNote}
+                                  onChange={(e) => setRejectNote(e.target.value)}
+                                  maxLength={500}
+                                  rows={2}
+                                  autoFocus
+                                  placeholder="Reddetme nedeni (opsiyonel) -- öğrenci ve veli görür"
+                                  aria-label="Reddetme nedeni (opsiyonel)"
+                                  className="border-input bg-background focus-visible:ring-ring/50 w-full resize-none rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button type="button" size="sm" variant="ghost" onClick={() => setRejectingId(null)}>
+                                    Vazgeç
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={isActing}
+                                    onClick={() => {
+                                      const note = rejectNote.trim() || null;
+                                      setRejectingId(null);
+                                      handleReject(task, note);
+                                    }}
+                                  >
+                                    Reddet
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

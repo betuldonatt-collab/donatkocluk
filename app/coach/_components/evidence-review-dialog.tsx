@@ -40,6 +40,8 @@ export function EvidenceReviewDialog({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Optional reason, sent with any rejecting verdict.
+  const [rejectNote, setRejectNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +64,7 @@ export function EvidenceReviewDialog({
   async function submit(list: { path: string; decision: PhotoVerdict }[]) {
     setBusy(true);
     try {
-      const result = await reviewEvidencePhotos(taskId, list);
+      const result = await reviewEvidencePhotos(taskId, list, list.some((d) => d.decision === "rejected") ? rejectNote.trim() || null : null);
       if (!result.success) {
         if (result.code === "ERROR") {
           // Stay open so the coach can retry; say exactly what failed.
@@ -111,6 +113,8 @@ export function EvidenceReviewDialog({
                 reviewStatus === "pending"
                   ? undefined
                   : "Öğrenci bu görevi henüz onaya göndermedi (ya da daha önce karara bağlandı). Vereceğin kararlar fotoğraflara işlenir; reddedersen öğrenci kırmızı çerçeveyle görür.",
+              rejectNote,
+              onRejectNoteChange: setRejectNote,
               onDecide: (i, decision) => setDecisions((prev) => prev.map((d, idx) => (idx === i ? decision : d))),
               onApproveAll: () => void submit(all("approved")),
               onRejectAll: () => void submit(all("rejected")),

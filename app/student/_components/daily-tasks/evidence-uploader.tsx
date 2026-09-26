@@ -55,11 +55,14 @@ export function EvidenceUploader({
   paths,
   reviewStatus,
   photoStatus,
+  rejectionNote = null,
   onChange,
 }: {
   taskId: string;
   paths: string[];
   reviewStatus: ReviewStatus;
+  // The coach's optional reason for the rejection, shown under the message.
+  rejectionNote?: string | null;
   // The coach's verdict per photo (a path that is not here has not been reviewed).
   photoStatus: PhotoStatus;
   // Called with the task's new photo paths, review state, per-photo verdicts and
@@ -191,7 +194,7 @@ export function EvidenceUploader({
 
   return (
     <div className="space-y-2">
-      <Label>Çözdüğün testlerin fotoğrafını buraya yükleyebilirsin.</Label>
+      <Label>Kanıt fotoğrafı (zorunlu): bu görevi tamamlamak için çalışmanın en az bir fotoğrafını yüklemelisin.</Label>
 
       {reviewStatus === "pending" && (
         <div className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
@@ -202,7 +205,10 @@ export function EvidenceUploader({
       {reviewStatus === "rejected" && (
         <div className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-3 py-2 text-xs">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-          Koç bu görevi geri gönderdi. Kırmızı çerçeveli fotoğrafları silip yenisini ekle, sonra görevi tekrar tamamlandı olarak işaretle.
+          <span>
+            Koç bu görevi geri gönderdi. Kırmızı çerçeveli fotoğrafları silip yenisini ekle, sonra görevi tekrar tamamlandı olarak işaretle.
+            {rejectionNote && <span className="mt-1 block font-medium">Koçun notu: {rejectionNote}</span>}
+          </span>
         </div>
       )}
       {reviewStatus === "approved" && paths.length > 0 && (

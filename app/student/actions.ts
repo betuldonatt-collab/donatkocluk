@@ -1,5 +1,6 @@
 "use server";
 
+import { lgsCompletionProblem } from "@/lib/lgs-completion";
 import { revalidatePath } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
@@ -145,6 +146,12 @@ const taskProgressPatchSchema = z.object({
 // returned) -- callers cast it to their own StudentTask type, same as before.
 export type UpdateTaskProgressResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
 
+// LGS is the only cohort with the mandatory-photo / coach-approval workflow.
+async function isLgsStudent(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await supabase.from("profiles").select("exam_type").eq("id", userId).maybeSingle();
+  return data?.exam_type === "LGS";
+}
+
 export async function updateTaskProgress(taskId: string, patch: TaskProgressPatch): Promise<UpdateTaskProgressResult> {
   try {
     const data = await updateTaskProgressInternal(taskId, patch);
@@ -169,7 +176,7 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
     .select(
-      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count",
+      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count, subject_scores",
     )
     .eq("id", taskIdV)
     .maybeSingle();
@@ -268,6 +275,10 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   // with no counts touched (a single-part task's status button, or a dual
   // task's manual pick with the counts left untouched this save) is left
   // as-is either way.
+  // Whether the caller itself asked for done / half done (as opposed to a status
+  // derived from the counts just below) -- decides how an LGS task that is not
+  // ready yet is handled.
+  const explicitStatusRequested = "status" in patchV;
   const touchesCounts = "correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV;
   if (touchesCounts) {
     const correct = ("correct_count" in patchV ? patchV.correct_count : existing.correct_count) ?? 0;
@@ -290,6 +301,27 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
     evidence_pending_status: "done" | "half_done";
     evidence_photo_status: PhotoStatusMap;
   } | null = null;
+  // LGS: completing ANY task needs a photo; Soru Çözümü / Branş Denemesi / Genel
+  // Deneme also need their Doğru/Yanlış/Boş. An explicit "Tamamlandı" that is not
+  // ready is refused with the reason. A completion merely DERIVED from the counts
+  // (the student is still typing them in, the photo not uploaded yet) is not an
+  // error: the counts are saved and the task simply stays pending.
+  if ((patchV.status === "done" || patchV.status === "half_done") && (await isLgsStudent(supabase, user.id))) {
+    const problem = lgsCompletionProblem({
+      taskType: existing.task_type,
+      title: existing.title,
+      photoCount: ((existing.evidence_image_paths ?? []) as string[]).length,
+      correct: "correct_count" in patchV ? patchV.correct_count : existing.correct_count,
+      wrong: "wrong_count" in patchV ? patchV.wrong_count : existing.wrong_count,
+      empty: "empty_count" in patchV ? patchV.empty_count : existing.empty_count,
+      subjectScores: "subject_scores" in patchV ? patchV.subject_scores : (existing.subject_scores as never),
+    });
+    if (problem) {
+      if (explicitStatusRequested && (patchV.status === "done" || patchV.status === "half_done") && !touchesCounts) throw new Error(problem);
+      patchV.status = existing.status === "done" || existing.status === "half_done" ? "pending" : (existing.status as typeof patchV.status);
+      patchV.completed = false;
+    }
+  }
   const claimedStatus = patchV.status;
   if (
     (claimedStatus === "done" || claimedStatus === "half_done") &&
@@ -1668,6 +1700,8 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
 
     const supabase = await createClient();
     const user = await requireUser(supabase);
+    // Photo evidence exists only for LGS students (YKS / 9th / 10th grade cannot upload).
+    if (!(await isLgsStudent(supabase, user.id))) return { ok: false, error: "Kanıt fotoğrafı yalnızca LGS öğrencileri için." };
     const task = await loadOwnEvidence(supabase, user.id, taskId);
 
     const path = evidencePath(user.id, taskId, crypto.randomUUID(), file.type);
@@ -1764,7 +1798,10 @@ export async function removeTaskEvidence(taskId: string, path: string): Promise<
     // the coach goes back to the outcome the student had claimed (no photos, no
     // proof to review); a rejected one simply clears the rejection.
     const release = paths.length === 0 && (task.evidence_review_status === "pending" || task.evidence_review_status === "rejected");
-    const restoredStatus = task.evidence_review_status === "pending" ? (task.evidence_pending_status ?? "done") : task.status;
+    // For LGS a photo is mandatory for completion, so without photos the task goes
+    // back to pending instead of the outcome the student had claimed.
+    const lgs = await isLgsStudent(supabase, user.id);
+    const restoredStatus = task.evidence_review_status === "pending" ? (lgs ? "pending" : (task.evidence_pending_status ?? "done")) : task.status;
     // The photo's verdict goes with it.
     const photoStatus = release ? {} : withoutPath(task.photoStatus, path);
     const update = release

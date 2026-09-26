@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarX, ClipboardCheck, MessageSquareX, TrendingDown } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, MessageSquareX, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
@@ -62,7 +62,6 @@ export function AlertPanel({
     alerts.inactive.length +
     alerts.lowPerformance.length +
     alerts.missingExams.length +
-    alerts.emptyPrograms.length +
     alerts.pendingReportCards.length +
     alerts.rsvpDeclines.length +
     pendingApprovals.length +
@@ -99,15 +98,7 @@ export function AlertPanel({
         }))}
       />
       <MissingExamAnalysisPanel alerts={alerts.missingExams} />
-      <AlertCard
-        icon={CalendarX}
-        title="Boş Program"
-        items={alerts.emptyPrograms.map((a) => ({
-          key: a.student.id,
-          studentId: a.student.id,
-          label: a.student.full_name ?? "İsimsiz Öğrenci",
-        }))}
-      />
+      <PendingFocusReviewsPanel reviews={focusReviews} />
       <AlertCard
         icon={ClipboardCheck}
         title="Onay Bekleyen Karneler"
@@ -127,8 +118,8 @@ export function AlertPanel({
           label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.announcementTitle}${a.declineReason ? `: ${a.declineReason}` : ""}`,
         }))}
       />
-      <PendingApprovalsPanel tasks={pendingApprovals} />
-      <PendingFocusReviewsPanel reviews={focusReviews} />
+      <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS")} />
+      <PendingApprovalsPanel title="LGS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType === "LGS")} />
     </div>
   );
 }
