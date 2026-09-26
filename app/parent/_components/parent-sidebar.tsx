@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { href: "/parent/settings", label: "Ayarlar", icon: Settings },
 ];
 
-const PROGRAM_NAV_ITEM = { href: "/parent/program", label: "Program", icon: CalendarDays };
+const PROGRAM_NAV_ITEM = { href: "/parent/program", label: "Haftalık Program", icon: CalendarDays };
 
 export function ParentSidebar({ fullName = null, showProgram = false }: { fullName?: string | null; showProgram?: boolean }) {
   const pathname = usePathname();

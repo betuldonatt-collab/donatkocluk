@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { CheckCircle2, Clock, Lock, Timer, XCircle } from "lucide-react";
 
 import { TaskDescription } from "@/components/task-description";
@@ -109,6 +112,18 @@ function dayLabel(iso: string) {
   });
 }
 
+function shortDayName(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", { weekday: "short", timeZone: "UTC" });
+}
+
+function dayNumber(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).getUTCDate();
+}
+
+function shortMonth(iso: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", { month: "short", timeZone: "UTC" });
+}
+
 function dayOfWeekOf(iso: string) {
   return (new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7;
 }
@@ -147,7 +162,7 @@ function TaskCard({ task }: { task: ParentProgramTask }) {
   const photos = task.evidence_image_paths.filter((p) => task.photo_urls[p]);
 
   return (
-    <div className={cn("border-border rounded-lg border p-3", subjectBackgroundClass(task.course_id, task.task_type))}>
+    <div className={cn("border-border rounded-lg border p-2.5", subjectBackgroundClass(task.course_id, task.task_type))}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
         <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", status.className)}>
@@ -159,7 +174,7 @@ function TaskCard({ task }: { task: ParentProgramTask }) {
       </div>
       <p className="text-muted-foreground mt-0.5 text-xs">{typeLabel}</p>
 
-      <TaskDescription text={task.description} lines="all" className="mt-1" />
+      <TaskDescription text={task.description} lines={3} className="mt-1" />
       {task.resource_names.length > 0 && <p className="text-muted-foreground mt-1 text-xs break-words">{task.resource_names.join(" + ")}</p>}
 
       <div className="mt-2 space-y-1">
@@ -186,7 +201,7 @@ function TaskCard({ task }: { task: ParentProgramTask }) {
                 target="_blank"
                 rel="noreferrer"
                 className={cn(
-                  "block size-16 overflow-hidden rounded-md border-2",
+                  "block size-14 overflow-hidden rounded-md border-2",
                   verdict === "approved" ? "border-emerald-500" : verdict === "rejected" ? "border-rose-500" : "border-border",
                 )}
                 title={verdict === "approved" ? "Onaylandı" : verdict === "rejected" ? "Reddedildi" : "Kanıt fotoğrafı"}
@@ -213,83 +228,114 @@ export function ParentProgramBoard({
   tasks: ParentProgramTask[];
   fixedTasks: ParentFixedTask[];
 }) {
+  // Day tabs: today when it is inside the shown week, otherwise the first day.
+  const [selected, setSelected] = useState(() => (days.includes(today) ? today : days[0]));
+  const date = days.includes(selected) ? selected : days[0];
+
+  const dayTasks = tasks.filter((t) => t.task_date === date);
+  const routines = dayTasks.filter((t) => isRoutineCourseId(t.course_id));
+  const regular = dayTasks.filter((t) => !isRoutineCourseId(t.course_id));
+  const fixed = fixedTasks.filter((f) => f.day_of_week === dayOfWeekOf(date));
+  const pct = completionPercent(weightedDayCounts(dayTasks, date));
+
   return (
     <div className="space-y-4">
-      {days.map((date) => {
-        const dayTasks = tasks.filter((t) => t.task_date === date);
-        const routines = dayTasks.filter((t) => isRoutineCourseId(t.course_id));
-        const regular = dayTasks.filter((t) => !isRoutineCourseId(t.course_id));
-        const fixed = fixedTasks.filter((f) => f.day_of_week === dayOfWeekOf(date));
-        const pct = completionPercent(weightedDayCounts(dayTasks, date));
-        const isToday = date === today;
+      {/* Günlük Sekmeler: every tab carries the day name AND the date, so a
+          parent picks a day at a glance instead of scrolling a long list. */}
+      <div role="tablist" aria-label="Haftanın günleri" className="bg-secondary grid grid-cols-7 gap-1 rounded-xl p-1">
+        {days.map((d) => {
+          const active = d === date;
+          const count = tasks.filter((t) => t.task_date === d).length;
+          return (
+            <button
+              key={d}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSelected(d)}
+              className={cn(
+                "flex min-w-0 flex-col items-center rounded-lg px-1 py-1.5 text-center transition-colors",
+                active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <span className="text-[11px] font-medium">{shortDayName(d)}</span>
+              <span className="text-base leading-tight font-semibold tabular-nums">{dayNumber(d)}</span>
+              <span className={cn("text-[10px] leading-tight", active ? "text-primary-foreground/80" : "text-muted-foreground")}>{shortMonth(d)}</span>
+              <span
+                aria-hidden
+                className={cn("mt-0.5 size-1 rounded-full", d === today ? (active ? "bg-primary-foreground" : "bg-primary") : count > 0 ? (active ? "bg-primary-foreground/50" : "bg-muted-foreground/40") : "bg-transparent")}
+              />
+            </button>
+          );
+        })}
+      </div>
 
-        return (
-          <section key={date} className={cn("rounded-xl border p-4", isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card")}>
-            <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className={cn("text-base font-semibold capitalize", isToday ? "text-primary" : "text-foreground")}>
-                {dayLabel(date)}
-                {isToday && <span className="text-primary/70 ml-2 text-xs font-normal normal-case">Bugün</span>}
-              </h2>
-              <span className="text-muted-foreground text-sm tabular-nums">
-                {pct === null ? "—" : `%${pct}`}
-                {dayTasks.length > 0 && (
-                  <span className="ml-1.5 text-xs">
-                    {dayTasks.filter((t) => t.status === "done").length}/{dayTasks.length}
-                  </span>
-                )}
+      <section role="tabpanel" className="space-y-3">
+        <header className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className={cn("text-base font-semibold capitalize", date === today ? "text-primary" : "text-foreground")}>
+            {dayLabel(date)}
+            {date === today && <span className="text-primary/70 ml-2 text-xs font-normal normal-case">Bugün</span>}
+          </h2>
+          <span className="text-muted-foreground text-sm tabular-nums">
+            {pct === null ? "—" : `%${pct}`}
+            {dayTasks.length > 0 && (
+              <span className="ml-1.5 text-xs">
+                {dayTasks.filter((t) => t.status === "done").length}/{dayTasks.length}
               </span>
-            </header>
-
-            {fixed.length > 0 && (
-              <div className="mb-3">
-                <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</p>
-                <div className="space-y-1.5">
-                  {fixed.map((f) => (
-                    <div key={f.id} className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2.5 py-1.5 text-xs">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 font-medium">
-                          <Lock className="size-3" />
-                          {f.title}
-                        </span>
-                        <span className="tabular-nums">
-                          {formatTime(f.start_time)}–{formatTime(f.end_time)}
-                        </span>
-                      </div>
-                      <TaskDescription text={f.description} lines="all" className="mt-1 pl-[18px] text-[11px]" />
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
+          </span>
+        </header>
 
-            {routines.length > 0 && (
-              <div className="mb-3">
-                <p className="text-primary mb-1.5 text-[10px] font-semibold tracking-wide uppercase">Rutinler</p>
-                <div className="space-y-2">
-                  {routines.map((t) => (
-                    <TaskCard key={t.id} task={t} />
-                  ))}
+        {fixed.length > 0 && (
+          <div>
+            <p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide uppercase">Sabit Görevler</p>
+            <div className="space-y-1.5">
+              {fixed.map((f) => (
+                <div key={f.id} className="border-border/70 bg-muted/50 text-muted-foreground rounded-md border border-dashed px-2.5 py-1.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 font-medium">
+                      <Lock className="size-3" />
+                      {f.title}
+                    </span>
+                    <span className="tabular-nums">
+                      {formatTime(f.start_time)}–{formatTime(f.end_time)}
+                    </span>
+                  </div>
+                  <TaskDescription text={f.description} lines="all" className="mt-1 pl-[18px] text-[11px]" />
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+        )}
 
-            {regular.length > 0 && (
-              <div>
-                {(routines.length > 0 || fixed.length > 0) && (
-                  <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-wide uppercase">Görevler</p>
-                )}
-                <div className="space-y-2">
-                  {regular.map((t) => (
-                    <TaskCard key={t.id} task={t} />
-                  ))}
-                </div>
-              </div>
-            )}
+        {routines.length > 0 && (
+          <div>
+            <p className="text-primary mb-1 text-[10px] font-semibold tracking-wide uppercase">Rutinler</p>
+            <div className="space-y-1.5">
+              {routines.map((t) => (
+                <TaskCard key={t.id} task={t} />
+              ))}
+            </div>
+          </div>
+        )}
 
-            {dayTasks.length === 0 && fixed.length === 0 && <p className="text-muted-foreground text-sm">Bu gün için program yok.</p>}
-          </section>
-        );
-      })}
+        {regular.length > 0 && (
+          <div>
+            {(routines.length > 0 || fixed.length > 0) && (
+              <p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide uppercase">Görevler</p>
+            )}
+            <div className="space-y-1.5">
+              {regular.map((t) => (
+                <TaskCard key={t.id} task={t} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {dayTasks.length === 0 && fixed.length === 0 && (
+          <p className="text-muted-foreground border-border rounded-lg border border-dashed p-4 text-center text-sm">Bu gün için program yok.</p>
+        )}
+      </section>
     </div>
   );
 }

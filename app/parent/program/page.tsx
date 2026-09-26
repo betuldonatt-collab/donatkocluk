@@ -124,8 +124,8 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Tam Program</h1>
-          <p className="text-muted-foreground text-sm">{profile.full_name ?? "Öğrenci"} -- salt okunur haftalık program</p>
+          <h1 className="text-2xl font-semibold text-foreground">Haftalık Program</h1>
+          <p className="text-muted-foreground text-sm">{profile.full_name ?? "Öğrenci"} -- salt okunur</p>
         </div>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="icon" aria-label="Önceki hafta">

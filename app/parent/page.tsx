@@ -1,7 +1,3 @@
-import Link from "next/link";
-import { CalendarDays } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +8,8 @@ import { completionPercent } from "@/lib/completion";
 import { weightedWeekCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
 import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
 import { isLgsParentView } from "@/lib/parent-lgs";
+import { isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
@@ -195,8 +193,12 @@ async function fetchDashboardData() {
   const exams = (examRows ?? []) as GeneralExam[];
   const tytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "tyt"));
   const aytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "ayt"));
+  // Only exams with a complete, valid result set (every subject's Doğru/Yanlış/Boş)
+  // reach the chart -- a half-entered exam never plots a misleading net.
   const lgsNetChartData = netChartFor(
-    exams.filter((e) => parseGeneralExamTrack(e.title) === "lgs"),
+    exams.filter(
+      (e) => parseGeneralExamTrack(e.title) === "lgs" && !isGeneralExamScoresIncomplete(e.title, e.subject_scores as never),
+    ),
     computeLgsNet,
   );
 
@@ -280,6 +282,7 @@ export default async function ParentPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      {isLgsParentView(examType) && <AutoRefresh />}
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>
@@ -295,7 +298,7 @@ export default async function ParentPage() {
           >
             {student.is_active ? "Aktif" : "Pasif"}
           </span>
-          <WeeklyProgramSheet tasks={programTasks} />
+          {!isLgsParentView(examType) && <WeeklyProgramSheet tasks={programTasks} />}
         </div>
       </header>
 
@@ -310,15 +313,7 @@ export default async function ParentPage() {
         </Card>
 
         {isLgsParentView(examType) && (
-          <>
-            <DailyProgressCard tasks={dailyRows} today={todayIso} />
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-              <Link href="/parent/program">
-                <CalendarDays className="size-4" />
-                Tam Programı Gör
-              </Link>
-            </Button>
-          </>
+          <DailyProgressCard tasks={dailyRows} today={todayIso} />
         )}
 
         <Card>
