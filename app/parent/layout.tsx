@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireViewContext } from "@/lib/impersonation";
 import { fetchParentAnnouncements } from "@/lib/announcements";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
+import { isLgsParentView } from "@/lib/parent-lgs";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { AnnouncementCenter } from "./_components/announcement-center";
 import { ParentSidebar } from "./_components/parent-sidebar";
@@ -16,10 +17,17 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
   ]);
   const fullName = profile?.full_name ?? null;
   const announcements = await fetchParentAnnouncements(activeStudentId);
+  // The "Program" sidebar link exists only for a parent of an LGS student.
+  const showProgram = activeStudentId
+    ? isLgsParentView(
+        (await createClient().then((supabase) => supabase.from("profiles").select("exam_type").eq("id", activeStudentId).maybeSingle())).data
+          ?.exam_type,
+      )
+    : false;
 
   return (
     <div className="flex flex-1 flex-col">
-      <DashboardShell sidebar={<ParentSidebar fullName={fullName} />}>
+      <DashboardShell sidebar={<ParentSidebar fullName={fullName} showProgram={showProgram} />}>
         <div className="flex flex-1 flex-col">
           {students.length > 1 && activeStudentId && (
             <StudentSwitcher students={students} activeStudentId={activeStudentId} />

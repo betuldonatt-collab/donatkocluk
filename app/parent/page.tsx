@@ -1,3 +1,7 @@
+import Link from "next/link";
+import { CalendarDays } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +10,8 @@ import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent } from "@/lib/completion";
 import { weightedWeekCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
+import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
+import { isLgsParentView } from "@/lib/parent-lgs";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
 import { SessionCalendar, type ParentSession } from "./_components/session-calendar";
@@ -194,7 +200,22 @@ async function fetchDashboardData() {
     computeLgsNet,
   );
 
+  // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
+  // Nothing extra is fetched for any other cohort.
+  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type)
+    ? (((
+        await supabase
+          .from("student_tasks")
+          .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
+          .eq("student_id", studentId)
+          .gte("task_date", addDays(today, -1))
+          .lte("task_date", addDays(today, 1))
+      ).data ?? []) as DailyProgressTask[])
+    : [];
+
   return {
+    today,
+    dailyRows,
     student: profile,
     totalQuota: profile.total_session_quota,
     completedCount,
@@ -239,6 +260,8 @@ export default async function ParentPage() {
   }
 
   const {
+    today: todayIso,
+    dailyRows,
     student,
     totalQuota,
     completedCount,
@@ -285,6 +308,18 @@ export default async function ParentPage() {
             <WeeklyProgressCard previous={previousWeek} current={currentWeek} />
           </CardContent>
         </Card>
+
+        {isLgsParentView(examType) && (
+          <>
+            <DailyProgressCard tasks={dailyRows} today={todayIso} />
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/parent/program">
+                <CalendarDays className="size-4" />
+                Tam Programı Gör
+              </Link>
+            </Button>
+          </>
+        )}
 
         <Card>
           <CardHeader>

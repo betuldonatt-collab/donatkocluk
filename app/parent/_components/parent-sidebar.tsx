@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, FileText, Home, MessageSquare, Settings } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, Home, MessageSquare, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -20,7 +20,9 @@ const NAV_ITEMS = [
   { href: "/parent/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function ParentSidebar({ fullName = null }: { fullName?: string | null }) {
+const PROGRAM_NAV_ITEM = { href: "/parent/program", label: "Program", icon: CalendarDays };
+
+export function ParentSidebar({ fullName = null, showProgram = false }: { fullName?: string | null; showProgram?: boolean }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
@@ -40,7 +42,7 @@ export function ParentSidebar({ fullName = null }: { fullName?: string | null })
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
       <nav className="flex flex-col gap-1 px-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {(showProgram ? [NAV_ITEMS[0], PROGRAM_NAV_ITEM, ...NAV_ITEMS.slice(1)] : NAV_ITEMS).map(({ href, label, icon: Icon }) => {
           const active = href === "/parent" ? pathname === "/parent" : pathname.startsWith(href);
           return (
             <Link
