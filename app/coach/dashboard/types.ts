@@ -72,7 +72,10 @@ export type PendingReportCardAlert = {
   cycleNumber: number;
   generatedAt: string;
 };
-export type RsvpDeclineAlert = {
+// One student's RSVP to one announcement -- used for both the "Katılacaklar"
+// and "Katılmayacaklar" columns of the dashboard's "Duyuru Katılım Durumu"
+// card; declineReason is only ever set on a "not_attending" response.
+export type RsvpResponseAlert = {
   student: RosterStudent;
   rsvpId: string;
   announcementTitle: string;
@@ -84,7 +87,8 @@ export type CoachAlerts = {
   lowPerformance: LowPerformanceAlert[];
   missingExams: MissingExamAlert[];
   pendingReportCards: PendingReportCardAlert[];
-  rsvpDeclines: RsvpDeclineAlert[];
+  rsvpAttending: RsvpResponseAlert[];
+  rsvpNotAttending: RsvpResponseAlert[];
 };
 
 export const COACH_TASK_STATUS_LABELS: Record<CoachTaskStatus, string> = {

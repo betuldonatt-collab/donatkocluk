@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ClipboardCheck, MessageSquareX, TrendingDown } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Megaphone, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
@@ -49,6 +49,59 @@ function AlertCard({
   );
 }
 
+// One column of the RSVP status card below -- own header, own "Yok" empty
+// state, same 6-item cap + overflow count as every other AlertCard list.
+function RsvpColumn({ heading, items }: { heading: string; items: Item[] }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wide uppercase">
+        {heading} ({items.length})
+      </p>
+      {items.length === 0 ? (
+        <p className="text-muted-foreground text-xs">Yok</p>
+      ) : (
+        <div className="space-y-1">
+          {items.slice(0, 6).map((item) => (
+            <Link
+              key={item.key}
+              href={item.href ?? `/coach/students/${item.studentId}`}
+              className="hover:bg-accent/40 block truncate rounded px-1.5 py-1 text-xs"
+            >
+              {item.label}
+            </Link>
+          ))}
+          {items.length > 6 && <p className="text-muted-foreground px-1.5 text-xs">+{items.length - 6} daha</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A student's RSVP status across every active announcement, split into two
+// side-by-side columns -- Katılacaklar (attending) and Katılmayacaklar (not
+// attending) -- rather than a single "who declined" list, so a coach can see
+// the whole participation picture for one announcement at a glance.
+function RsvpStatusCard({ attending, notAttending }: { attending: Item[]; notAttending: Item[] }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center gap-2 space-y-0">
+        <Megaphone className="text-muted-foreground size-4" />
+        <CardTitle className="text-sm">Duyuru Katılım Durumu</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {attending.length === 0 && notAttending.length === 0 ? (
+          <p className="text-muted-foreground text-xs">Yok</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <RsvpColumn heading="Katılacaklar" items={attending} />
+            <RsvpColumn heading="Katılmayacaklar" items={notAttending} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AlertPanel({
   alerts,
   pendingApprovals,
@@ -63,7 +116,8 @@ export function AlertPanel({
     alerts.lowPerformance.length +
     alerts.missingExams.length +
     alerts.pendingReportCards.length +
-    alerts.rsvpDeclines.length +
+    alerts.rsvpAttending.length +
+    alerts.rsvpNotAttending.length +
     pendingApprovals.length +
     focusReviews.length;
 
@@ -109,10 +163,13 @@ export function AlertPanel({
           href: `/coach/students/${a.student.id}?tab=karneler`,
         }))}
       />
-      <AlertCard
-        icon={MessageSquareX}
-        title="Katılmayacak Öğrenciler"
-        items={alerts.rsvpDeclines.map((a) => ({
+      <RsvpStatusCard
+        attending={alerts.rsvpAttending.map((a) => ({
+          key: a.rsvpId,
+          studentId: a.student.id,
+          label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.announcementTitle}`,
+        }))}
+        notAttending={alerts.rsvpNotAttending.map((a) => ({
           key: a.rsvpId,
           studentId: a.student.id,
           label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.announcementTitle}${a.declineReason ? `: ${a.declineReason}` : ""}`,

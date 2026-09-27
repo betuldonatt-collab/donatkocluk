@@ -18,7 +18,7 @@ import type {
   MissingExamAlert,
   PendingReportCardAlert,
   RosterStudent,
-  RsvpDeclineAlert,
+  RsvpResponseAlert,
 } from "./types";
 
 const DAY_LABELS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
@@ -78,7 +78,13 @@ function buildCoachAlerts(
     subject_scores: MissingExamAlert["subjectScores"];
   }[],
   pendingReportCardRows: { id: string; student_id: string; cycle_number: number; generated_at: string }[],
-  rsvpDeclineRows: { id: string; student_id: string; decline_reason: string | null; announcements: { title: string } | { title: string }[] | null }[],
+  rsvpRows: {
+    id: string;
+    student_id: string;
+    response: "attending" | "not_attending";
+    decline_reason: string | null;
+    announcements: { title: string } | { title: string }[] | null;
+  }[],
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
@@ -135,7 +141,7 @@ function buildCoachAlerts(
     }))
     .filter((a): a is PendingReportCardAlert => !!a.student);
 
-  const rsvpDeclines = rsvpDeclineRows
+  const rsvpAlerts = rsvpRows
     .map((r) => {
       const announcement = Array.isArray(r.announcements) ? r.announcements[0] : r.announcements;
       return {
@@ -143,11 +149,14 @@ function buildCoachAlerts(
         rsvpId: r.id,
         announcementTitle: announcement?.title ?? "Duyuru",
         declineReason: r.decline_reason,
+        response: r.response,
       };
     })
-    .filter((a): a is RsvpDeclineAlert => !!a.student);
+    .filter((a): a is RsvpResponseAlert & { response: "attending" | "not_attending" } => !!a.student);
+  const rsvpAttending = rsvpAlerts.filter((a) => a.response === "attending");
+  const rsvpNotAttending = rsvpAlerts.filter((a) => a.response === "not_attending");
 
-  return { inactive, lowPerformance, missingExams, pendingReportCards, rsvpDeclines };
+  return { inactive, lowPerformance, missingExams, pendingReportCards, rsvpAttending, rsvpNotAttending };
 }
 
 async function fetchDashboardData(
@@ -223,7 +232,7 @@ async function fetchDashboardData(
     { data: recentActivityRows },
     { data: prevWeekTaskRows },
     { data: missingExamRows },
-    { data: rsvpDeclineRows },
+    { data: rsvpRows },
   ] =
     studentIds.length > 0
       ? await Promise.all([
@@ -253,11 +262,13 @@ async function fetchDashboardData(
             .in("task_type", ["general_exam", "branch_exam"])
             .eq("analysis_pending", true)
             .order("task_date", { ascending: true }),
+          // Every response now, not just declines -- the dashboard's "Duyuru
+          // Katılım Durumu" card shows Katılacaklar/Katılmayacaklar side by
+          // side (see buildCoachAlerts' rsvpAttending/rsvpNotAttending split).
           supabase
             .from("announcement_rsvps")
-            .select("id, student_id, decline_reason, announcements!inner(title, is_active)")
+            .select("id, student_id, response, decline_reason, announcements!inner(title, is_active)")
             .in("student_id", studentIds)
-            .eq("response", "not_attending")
             .eq("announcements.is_active", true),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
@@ -269,7 +280,7 @@ async function fetchDashboardData(
     prevWeekTaskRows ?? [],
     missingExamRows ?? [],
     pendingReportCardRows ?? [],
-    rsvpDeclineRows ?? [],
+    rsvpRows ?? [],
   );
 
   return {
@@ -311,7 +322,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
       weekSessions: [],
       weekBlocks: [],
       weekTasks: [],
-      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], rsvpDeclines: [] },
+      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], rsvpAttending: [], rsvpNotAttending: [] },
     },
     [],
     [],
