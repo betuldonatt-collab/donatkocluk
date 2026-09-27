@@ -2,7 +2,7 @@
 
 import { UsernameCard } from "@/components/username-card";
 import { useState } from "react";
-import { AlertTriangle, Download } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +18,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TASK_TYPE_LABELS, subjectTintClass, type StudentTask } from "../_components/daily-tasks/types";
 import { isRoutineCourseId } from "@/lib/curriculum";
+import { mondayOf, weekDates } from "@/lib/date";
+import { Input } from "@/components/ui/input";
+import { getTasksForWeek } from "../actions";
 import { cn } from "@/lib/utils";
 import { submitCancellationRequest } from "./actions";
 import { PasswordForm } from "./_components/password-form";
 import { ThemeToggle } from "./theme-toggle";
+
+// Monday..Sunday of the week containing `dateIso`, labelled like the rest of the app.
+function buildWeek(dateIso: string): { date: string; label: string }[] {
+  return weekDates(dateIso).map((date) => ({
+    date,
+    label: new Date(`${date}T00:00:00Z`).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }),
+  }));
+}
+
+function shiftDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 export function SettingsClient({
   weekDays,
@@ -35,6 +52,32 @@ export function SettingsClient({
   username: string | null;
 }) {
   const [cancelOpen, setCancelOpen] = useState(false);
+  // Which week gets printed: starts as the current week (already loaded by the
+  // page) and can be moved to any past or future week. Only a change of week asks
+  // the server for that one week's tasks; printing itself stays purely client-side.
+  const currentMonday = weekDays[0].date;
+  const [printDays, setPrintDays] = useState(weekDays);
+  const [printTasks, setPrintTasks] = useState(weekTasks);
+  const [weekLoading, setWeekLoading] = useState(false);
+  const [weekError, setWeekError] = useState<string | null>(null);
+
+  async function selectWeek(dateIso: string) {
+    if (!dateIso) return;
+    const monday = mondayOf(dateIso);
+    if (monday === printDays[0].date) return;
+    setWeekLoading(true);
+    setWeekError(null);
+    try {
+      const days = buildWeek(monday);
+      const { tasks } = await getTasksForWeek(days[0].date, days[6].date);
+      setPrintTasks(tasks as unknown as StudentTask[]);
+      setPrintDays(days);
+    } catch {
+      setWeekError("Bu haftanın programı yüklenemedi. Tekrar dene.");
+    } finally {
+      setWeekLoading(false);
+    }
+  }
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [requestedAt, setRequestedAt] = useState(initialRequestedAt);
@@ -79,12 +122,37 @@ export function SettingsClient({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Çevrimdışı Kullanım</CardTitle>
-          <CardDescription>Bu haftaki programını yazdır veya PDF olarak kaydet</CardDescription>
+          <CardDescription>Yazdırmak veya PDF olarak kaydetmek istediğin haftayı seç</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button type="button" variant="outline" onClick={() => window.print()}>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="icon" aria-label="Önceki hafta" disabled={weekLoading} onClick={() => void selectWeek(shiftDays(printDays[0].date, -7))}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="text-foreground min-w-0 flex-1 text-center text-sm font-medium sm:flex-none sm:min-w-56">
+              {printDays[0].label} – {printDays[6].label}
+            </span>
+            <Button type="button" variant="outline" size="icon" aria-label="Sonraki hafta" disabled={weekLoading} onClick={() => void selectWeek(shiftDays(printDays[0].date, 7))}>
+              <ChevronRight className="size-4" />
+            </Button>
+            <Input
+              type="date"
+              aria-label="Belirli bir tarihin haftasını seç"
+              value={printDays[0].date}
+              disabled={weekLoading}
+              onChange={(e) => void selectWeek(e.target.value)}
+              className="w-auto"
+            />
+            {printDays[0].date !== currentMonday && (
+              <Button type="button" variant="ghost" size="sm" disabled={weekLoading} onClick={() => void selectWeek(currentMonday)}>
+                Bu Hafta
+              </Button>
+            )}
+          </div>
+          {weekError && <p className="text-destructive text-sm">{weekError}</p>}
+          <Button type="button" variant="outline" disabled={weekLoading} onClick={() => window.print()}>
             <Download className="size-4" />
-            Haftalık Programımı İndir
+            {weekLoading ? "Hafta yükleniyor..." : "Haftalık Programımı İndir"}
           </Button>
         </CardContent>
       </Card>
@@ -146,7 +214,7 @@ export function SettingsClient({
 
     {/* Outside the print:hidden wrapper: it used to sit INSIDE it, so the printed
         page was the hidden wrapper's empty shell (a blank page). */}
-    <PrintableWeeklySchedule weekDays={weekDays} weekTasks={weekTasks} />
+    <PrintableWeeklySchedule weekDays={printDays} weekTasks={printTasks} />
     </>
   );
 }

@@ -199,6 +199,24 @@
   .weekly-print {
     page: weekly;
     color-scheme: light;
+    break-after: avoid;
+    break-before: avoid;
+  }
+
+  /* No trailing blank page: every ancestor of the printed sheet (html, body, the
+     app shell, the page wrapper with its py-8 padding, the flex/min-height
+     containers) is flattened -- no padding, margin or minimum height -- so the
+     only thing left in the flow is the sheet itself. Leftover wrapper padding
+     used to land on a second, portrait "default" page after the landscape one. */
+  :has(> .weekly-print):not(.weekly-print),
+  :has(.weekly-print):not(.weekly-print) {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-width: none !important;
+    border: 0 !important;
   }
 }
 
