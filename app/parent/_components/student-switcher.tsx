@@ -4,6 +4,8 @@ import { useOptimistic, useTransition } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { pauseAutoRefresh, resumeAutoRefresh } from "@/components/auto-refresh";
+import { startPerf } from "@/lib/perf-log";
 import { setActiveStudent } from "@/lib/parent-context";
 import type { LinkedStudent } from "@/lib/parent-context";
 
@@ -40,10 +42,19 @@ export function StudentSwitcher({ students, activeStudentId }: { students: Linke
 
   function handleSelect(studentId: string) {
     if (studentId === optimisticActiveId) return;
+    // Keep the 20 s auto-refresh out of the way while the switch is in flight, and
+    // time the whole thing in the browser (compare with the server's "[perf]" logs).
+    pauseAutoRefresh();
+    const clientStart = startPerf();
     startTransition(async () => {
       setOptimisticActiveId(studentId);
       // The action revalidates the parent tree itself (lib/parent-context.ts).
-      await setActiveStudent(studentId);
+      try {
+        await setActiveStudent(studentId);
+      } finally {
+        resumeAutoRefresh();
+        console.log(`[perf] student switch (browser, click -> new page ready) ${Math.round(startPerf() - clientStart)}ms`);
+      }
     });
   }
 

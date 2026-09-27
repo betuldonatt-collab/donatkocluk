@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logPerf, startPerf } from "@/lib/perf-log";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
@@ -84,6 +85,7 @@ function sumWeekStats(rows: { total: number }[]): WeekStat {
 }
 
 async function fetchDashboardData() {
+  const perfStart = startPerf();
   const supabase = await createClient();
   const {
     data: { user },
@@ -189,6 +191,7 @@ async function fetchDashboardData() {
         : Promise.resolve({ data: [] as DailyProgressTask[] }),
     ]);
 
+  logPerf("parent home data batch", perfStart);
   if (!profile) return { student: null };
 
   const sessions = (sessionRows ?? []) as ParentSession[];

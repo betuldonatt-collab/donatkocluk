@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logPerf, startPerf } from "@/lib/perf-log";
 import { requireViewContext } from "@/lib/impersonation";
 import { fetchParentAnnouncements } from "@/lib/announcements";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
@@ -9,6 +10,7 @@ import { ParentSidebar } from "./_components/parent-sidebar";
 import { StudentSwitcher } from "./_components/student-switcher";
 
 export default async function ParentLayout({ children }: LayoutProps<"/parent">) {
+  const perfStart = startPerf();
   const view = await requireViewContext("parent");
   const [students, activeStudentId, { data: profile }] = await Promise.all([
     getLinkedStudents(),
@@ -21,6 +23,7 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
   // no extra round trip.
   const showProgram = isLgsParentView(students.find((s) => s.id === activeStudentId)?.exam_type);
   const announcements = await fetchParentAnnouncements(activeStudentId);
+  logPerf("parent layout data", perfStart);
 
   return (
     <div className="flex flex-1 flex-col">

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { perfFetch } from "@/lib/perf-log";
 import { applyRememberMeCookieOptions, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
 
 const ROLE_HOME: Record<string, string> = {
@@ -29,6 +30,8 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // TEMPORARY: logs slow Supabase calls as "[perf] ..." (lib/perf-log.ts).
+      global: { fetch: perfFetch },
       cookies: {
         getAll() {
           return request.cookies.getAll();

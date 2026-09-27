@@ -3,6 +3,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { logPerf, startPerf } from "@/lib/perf-log";
 
 import { createClient } from "@/lib/supabase/server";
 import { parseInput, uuidSchema } from "@/lib/validation";
@@ -66,6 +67,7 @@ export const getActiveStudentId = cache(async (): Promise<string | null> => {
 // Called from the client-side switcher. Re-validates against the parent's
 // own links (not trusted from the client) before persisting.
 export async function setActiveStudent(studentId: string) {
+  const perfStart = startPerf();
   const studentIdV = parseInput(uuidSchema, studentId);
   const students = await getLinkedStudents();
   if (!students.some((s) => s.id === studentIdV)) {
@@ -83,4 +85,5 @@ export async function setActiveStudent(studentId: string) {
   // call the action and then router.refresh() -- two sequential round trips, the
   // second one doing the whole server render. Now it is one.
   revalidatePath("/parent", "layout");
+  logPerf("setActiveStudent action", perfStart);
 }
