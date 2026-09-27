@@ -3681,3 +3681,60 @@ export async function getTaskEvidenceForCoach(
     return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }
 }
+
+// =============================================================================
+// TEMPORARY -- "Geçmiş Görüşmeler" backfill. Delete this whole block, plus
+// app/coach/sessions/_components/backfill-past-sessions.tsx and the two lines
+// that mount it in app/coach/sessions/page.tsx, once the historical session
+// entry is done. Nothing else in the app calls this action or that component --
+// removing them is a clean, self-contained delete, no other file needs editing.
+//
+// Deliberately a DIRECT insert with outcome already 'completed', NOT a call to
+// evaluateSessionCompleted (above): that action creates an "Ara Görüşme"
+// follow-up coach_task 3 days later as a side effect of completing a session
+// (and a "Veli Görüşmesi" task every 4th one) -- exactly right for a real, live
+// completion, but it would flood the coach's own task list with ~100 fake
+// follow-ups tied to backdated sessions if reused here for bulk historical
+// entry. student_rating/student_feedback/rated_at are left null -- honest
+// (nobody actually rated a backfilled entry) -- which also keeps the real
+// average-rating numbers elsewhere (admin coach page, coach stats) uncorrupted.
+// is_paid is set directly, the same column the Parent Panel's payment status
+// already reads, so no other wiring is needed for a parent to see it correctly.
+const backfillDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Geçersiz tarih.");
+const backfillTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Geçersiz saat.");
+
+export async function backfillPastSession(input: { studentId: string; date: string; time: string; isPaid: boolean }) {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, input.studentId);
+  const dateV = parseInput(backfillDateSchema, input.date);
+  const timeV = parseInput(backfillTimeSchema, input.time);
+  const isPaidV = parseInput(z.boolean(), input.isPaid);
+
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+
+  // Turkey is UTC+3 year-round (no DST since 2016) -- an explicit offset so
+  // "18:00" typed in the form means 18:00 in Turkey, not UTC.
+  const scheduledAt = new Date(`${dateV}T${timeV}:00+03:00`);
+  if (Number.isNaN(scheduledAt.getTime())) throw new Error("Geçersiz tarih/saat.");
+
+  const { data, error } = await supabase
+    .from("coaching_sessions")
+    .insert({
+      student_id: studentIdV,
+      coach_id: user.id,
+      scheduled_at: scheduledAt.toISOString(),
+      outcome: "completed",
+      is_paid: isPaidV,
+      evaluation_notes: "Geçmiş görüşme (manuel olarak sisteme işlendi).",
+    })
+    .select("id, student_id, scheduled_at")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath("/coach/sessions");
+  revalidatePath(`/coach/students/${studentIdV}`);
+  revalidatePath("/parent");
+  return data;
+}
