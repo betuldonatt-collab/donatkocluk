@@ -46,3 +46,7 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Temporary session-backfill data (real phone numbers) -- see scripts/backfill-sessions.mjs.
+# Never commit this: use scripts/backfill-sessions.example.json as the template instead.
+scripts/backfill-sessions.data.json
