@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/supabase/session";
 import { logPerf, startPerf } from "@/lib/perf-log";
 import { requireViewContext } from "@/lib/impersonation";
 import { fetchParentAnnouncements } from "@/lib/announcements";
@@ -11,12 +11,10 @@ import { StudentSwitcher } from "./_components/student-switcher";
 
 export default async function ParentLayout({ children }: LayoutProps<"/parent">) {
   const perfStart = startPerf();
-  const view = await requireViewContext("parent");
-  const [students, activeStudentId, { data: profile }] = await Promise.all([
-    getLinkedStudents(),
-    getActiveStudentId(),
-    createClient().then((supabase) => supabase.from("profiles").select("full_name").eq("id", view.effectiveUserId).maybeSingle()),
-  ]);
+  await requireViewContext("parent");
+  // The parent's own profile comes from the request-level cache (the guard above
+  // already read it): no extra query.
+  const [students, activeStudentId, profile] = await Promise.all([getLinkedStudents(), getActiveStudentId(), getMyProfile()]);
   const fullName = profile?.full_name ?? null;
   // The "Haftalık Program" sidebar link exists only for a parent of an LGS student;
   // the cohort comes with the linked-students query that already ran (cached), so
@@ -30,7 +28,7 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
       <DashboardShell sidebar={<ParentSidebar fullName={fullName} showProgram={showProgram} />}>
         <div className="flex flex-1 flex-col">
           {students.length > 1 && activeStudentId && (
-            <StudentSwitcher students={students} activeStudentId={activeStudentId} />
+            <StudentSwitcher students={students.map((s) => ({ id: s.id, full_name: s.full_name }))} activeStudentId={activeStudentId} />
           )}
           <div className="flex-1">{children}</div>
         </div>

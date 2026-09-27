@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { pauseAutoRefresh, resumeAutoRefresh } from "@/components/auto-refresh";
 import { startPerf } from "@/lib/perf-log";
 import { setActiveStudent } from "@/lib/parent-context";
-import type { LinkedStudent } from "@/lib/parent-context";
 
 // First + last initial, same convention as the coach panel's own student
 // directory avatars (app/admin/students/page.tsx) -- there's no photo to
@@ -29,7 +28,7 @@ function initialsOf(name: string | null): string {
 // shape as the TYT/AYT track toggles elsewhere -- e.g. charts-tab.tsx's
 // own TrackToggle), not a dropdown: every student is a directly clickable
 // tab, no open-then-select step.
-export function StudentSwitcher({ students, activeStudentId }: { students: LinkedStudent[]; activeStudentId: string }) {
+export function StudentSwitcher({ students, activeStudentId }: { students: { id: string; full_name: string | null }[]; activeStudentId: string }) {
   const [, startTransition] = useTransition();
   // Instant visual switch: the clicked tab highlights the moment it's
   // clicked, independent of how long the setActiveStudent cookie write and

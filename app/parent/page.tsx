@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { logPerf, startPerf } from "@/lib/perf-log";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
+import { getAuthUser } from "@/lib/supabase/session";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
@@ -86,11 +87,10 @@ function sumWeekStats(rows: { total: number }[]): WeekStat {
 
 async function fetchDashboardData() {
   const perfStart = startPerf();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // One auth call per render (request-level cache, lib/supabase/session.ts).
+  const user = await getAuthUser();
   if (!user) return null;
+  const supabase = await createClient();
 
   const studentId = await getActiveStudentId();
   if (!studentId) return { student: null };
@@ -99,57 +99,39 @@ async function fetchDashboardData() {
   const { start, end } = getWeekRange(today);
   const prevStart = addDays(start, -7);
   const prevEnd = addDays(start, -1);
-  // Known from the (cached) linked-students query, so the LGS-only daily rows can
-  // run in the SAME concurrent batch as everything else instead of after it.
-  const linked = await getLinkedStudents();
-  const isLgsStudent = isLgsParentView(linked.find((s) => s.id === studentId)?.exam_type);
+  // The student's own profile row rides along with the (cached) linked-students
+  // lookup the layout already ran -- no second profiles read here.
+  const profile = (await getLinkedStudents()).find((s) => s.id === studentId) ?? null;
+  const isLgsStudent = isLgsParentView(profile?.exam_type);
 
-  const [
-    { data: profile },
-    { data: sessionRows },
-    { data: weekTaskRows },
-    { data: dailyStatsRows },
-    { data: examRows },
-    { data: weekLockRow },
-    { data: weightTaskRows },
-    { data: prevTaskRows },
-    { data: prevLockRow },
-    { data: dailyRowData },
-  ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, full_name, is_active, total_session_quota, quota_cycle_start_at, exam_type")
-        .eq("id", studentId)
-        .maybeSingle(),
+  // student_tasks is read ONCE for the whole window (last week -> the day after
+  // this week) and sliced in memory below; it used to be four separate queries
+  // (program, weighted week, previous week, LGS daily rows). Same for the two
+  // week_locks rows.
+  const tasksFrom = prevStart;
+  const tasksTo = addDays(end, 1);
+
+  const [{ data: sessionRows }, { data: taskWindowRows }, { data: dailyStatsRows }, { data: examRows }, { data: lockRows }] =
+    await Promise.all([
       supabase
         .from("coaching_sessions")
         .select("id, scheduled_at, outcome, is_paid")
         .eq("student_id", studentId)
         .order("scheduled_at", { ascending: false }),
-      // Security audit finding: total_count/correct_count/wrong_count used
-      // to be selected here too, even though neither consumer below
-      // (computeWeeklyCompletionPct only reads status; WeeklyProgramSheet
-      // only reads title/task_type/course_id/status) ever displays them.
-      // WeeklyProgramSheet is a "use client" component -- Next.js must
-      // serialize every prop crossing that boundary, so the raw per-task
-      // scores were reaching the parent's browser in the page's RSC
-      // payload regardless of what the component's own JSX rendered,
-      // inspectable via devtools even with the UI showing only a status
-      // badge. Selecting only what's actually used closes that at the
-      // source instead of fetching-then-hiding it.
+      // Security note: the rows below are sliced server-side. Only the slim
+      // program fields ever cross into the client component (WeeklyProgramSheet);
+      // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
+      // effort-weighted percentages.
       supabase
         .from("student_tasks")
-        .select("id, title, task_type, course_id, task_date, status, order_index")
+        .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes")
         .eq("student_id", studentId)
-        .gte("task_date", start)
-        .lte("task_date", end)
+        .gte("task_date", tasksFrom)
+        .lte("task_date", tasksTo)
         .order("task_date", { ascending: true })
         .order("order_index", { ascending: true }),
-      // Softened per product decision: the parent view only ever shows a
-      // "Toplam Çözülen Soru" total now, never the Doğru/Yanlış/Boş
-      // breakdown (see WeeklyStatsSummary) -- correct/wrong/empty aren't
-      // selected here at all anymore, for the same "don't fetch what you
-      // don't render" reasoning as the student_tasks query above.
+      // The parent view only ever shows a "Toplam Çözülen Soru" total, never the
+      // Doğru/Yanlış/Boş breakdown (see WeeklyStatsSummary).
       supabase
         .from("student_daily_stats")
         .select("total_count")
@@ -162,40 +144,35 @@ async function fetchDashboardData() {
         .eq("student_id", studentId)
         .eq("task_type", "general_exam")
         .order("task_date", { ascending: false }),
-      // When this week's schedule was locked: where the weekly completion starts counting.
-      supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", start).maybeSingle(),
-      // Server-only rows for the effort weighting -- only the resulting
-      // percentage ever leaves the server, never these counts.
-      supabase
-        .from("student_tasks")
-        .select("task_date, status, task_type, course_id, title, total_count, duration_minutes")
-        .eq("student_id", studentId)
-        .gte("task_date", start)
-        .lte("task_date", end),
-      // Last full week: a finished baseline shown next to the ongoing one.
-      supabase
-        .from("student_tasks")
-        .select("task_date, status, task_type, course_id, title, total_count, duration_minutes")
-        .eq("student_id", studentId)
-        .gte("task_date", prevStart)
-        .lte("task_date", prevEnd),
-      supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", prevStart).maybeSingle(),
-      // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
-      isLgsStudent
-        ? supabase
-            .from("student_tasks")
-            .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
-            .eq("student_id", studentId)
-            .gte("task_date", addDays(today, -1))
-            .lte("task_date", addDays(today, 1))
-        : Promise.resolve({ data: [] as DailyProgressTask[] }),
+      // When each week's schedule was locked: where its completion starts counting.
+      supabase.from("week_locks").select("week_start_date, locked_at").eq("student_id", studentId).in("week_start_date", [start, prevStart]),
     ]);
 
   logPerf("parent home data batch", perfStart);
   if (!profile) return { student: null };
 
+  type WindowRow = WeightableTask & { id: string; title: string; order_index: number };
+  const windowRows = (taskWindowRows ?? []) as unknown as WindowRow[];
+  const inRange = (from: string, to: string) => windowRows.filter((t) => t.task_date >= from && t.task_date <= to);
+  const weekRows = inRange(start, end);
+  const prevRows = inRange(prevStart, prevEnd);
+  const lockAt = (weekStart: string) => ((lockRows ?? []).find((r) => r.week_start_date === weekStart)?.locked_at ?? null) as string | null;
+
+  // Slim, client-safe rows for the program sheet (no counts).
+  const weekTaskRows = weekRows.map((t) => ({
+    id: t.id,
+    title: t.title,
+    task_type: t.task_type,
+    course_id: t.course_id,
+    task_date: t.task_date,
+    status: t.status,
+    order_index: t.order_index,
+  }));
+  // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
+  const dailyRowData = isLgsStudent ? inRange(addDays(today, -1), addDays(today, 1)) : [];
+
   const sessions = (sessionRows ?? []) as ParentSession[];
-  const programTasks = (weekTaskRows ?? []) as ProgramTask[];
+  const programTasks = weekTaskRows as unknown as ProgramTask[];
   // Scoped to the current quota cycle, same reset point + condition
   // (outcome = 'completed' and scheduled_at >= quota_cycle_start_at) as
   // auto_unassign_on_quota_completion (0035_audit_fixes.sql) -- otherwise
@@ -220,7 +197,7 @@ async function fetchDashboardData() {
   );
 
   // Only ever populated for an LGS student (see the batch above).
-  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type) ? ((dailyRowData ?? []) as DailyProgressTask[]) : [];
+  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type) ? (dailyRowData as unknown as DailyProgressTask[]) : [];
 
   return {
     today,
@@ -238,12 +215,12 @@ async function fetchDashboardData() {
     currentWeek: {
       start,
       end,
-      pct: computeWeeklyCompletionPct((weightTaskRows ?? []) as WeightableTask[], today, (weekLockRow?.locked_at ?? null) as string | null),
+      pct: computeWeeklyCompletionPct(weekRows, today, lockAt(start)),
     },
     previousWeek: {
       start: prevStart,
       end: prevEnd,
-      pct: computeWeeklyCompletionPct((prevTaskRows ?? []) as WeightableTask[], prevStart, (prevLockRow?.locked_at ?? null) as string | null),
+      pct: computeWeeklyCompletionPct(prevRows, prevStart, lockAt(prevStart)),
     },
     weekStat,
     programTasks,

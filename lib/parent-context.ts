@@ -6,11 +6,21 @@ import { revalidatePath } from "next/cache";
 import { logPerf, startPerf } from "@/lib/perf-log";
 
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/session";
 import { parseInput, uuidSchema } from "@/lib/validation";
 
 const COOKIE_NAME = "parent_active_student";
 
-export type LinkedStudent = { id: string; full_name: string | null; exam_type: string | null };
+// Everything the parent home needs about the student's own profile rides along with
+// the linked-students lookup, so the page does not read profiles again.
+export type LinkedStudent = {
+  id: string;
+  full_name: string | null;
+  exam_type: string | null;
+  is_active: boolean | null;
+  total_session_quota: number;
+  quota_cycle_start_at: string;
+};
 
 // Every linked child, name-sorted. Most parents have exactly one -- the
 // switcher UI (student-switcher.tsx) only renders when this has more than
@@ -27,22 +37,24 @@ export type LinkedStudent = { id: string; full_name: string | null; exam_type: s
 // call sites still reads naturally as "just fetch the list" while only
 // the first call actually hits the database.
 export const getLinkedStudents = cache(async (): Promise<LinkedStudent[]> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return [];
 
-  const { data: links } = await supabase.from("parent_students").select("student_id").eq("parent_id", user.id);
-  const ids = (links ?? []).map((l) => l.student_id);
-  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  // ONE query (parent_students joined to the student's profile) instead of two
+  // sequential ones; the profile is readable to a linked parent through
+  // profiles_select_by_parent (0026).
+  const { data: links } = await supabase
+    .from("parent_students")
+    .select("profiles!student_id(id, full_name, exam_type, is_active, total_session_quota, quota_cycle_start_at)")
+    .eq("parent_id", user.id);
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, full_name, exam_type")
-    .in("id", ids)
-    .order("full_name", { ascending: true });
-  return (profiles ?? []) as LinkedStudent[];
+  const students: LinkedStudent[] = [];
+  for (const link of (links ?? []) as unknown as { profiles: LinkedStudent | LinkedStudent[] | null }[]) {
+    const p = Array.isArray(link.profiles) ? link.profiles[0] : link.profiles;
+    if (p) students.push(p);
+  }
+  return students.sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "", "tr"));
 });
 
 // The student every parent page should read/act on. A single-child parent

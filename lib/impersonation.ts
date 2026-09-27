@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { getAuthUser, getMyProfile } from "@/lib/supabase/session";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -107,13 +108,13 @@ export type ViewContext = {
 // pass only -- it can never leak a result across separate requests, so
 // this is purely a latency fix, not a staleness or security change.
 export const getViewContext = cache(async (routeRole: AppRole): Promise<ViewContext | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // The user and their own profile come from the request-level cache
+  // (lib/supabase/session.ts): the layout, the page and every helper share ONE
+  // auth call and ONE profile read per render.
+  const user = await getAuthUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();
+  const profile = await getMyProfile();
   const actualRole = profile?.role as AppRole | undefined;
 
   // A deactivated account (Pasife Al -- see admin/actions.ts setUserActive)
