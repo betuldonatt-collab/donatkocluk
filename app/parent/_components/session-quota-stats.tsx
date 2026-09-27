@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
-// completed/remaining are already scoped to the student's current quota
-// cycle by the caller (app/parent/page.tsx) -- this component just renders
-// whatever numbers it's given.
+// completed/remaining are both all-time counts, computed by the caller
+// (app/parent/page.tsx) -- this component just renders whatever numbers
+// it's given.
 export function SessionQuotaStats({
   completed,
   total,

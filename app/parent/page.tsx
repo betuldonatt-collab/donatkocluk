@@ -173,14 +173,18 @@ async function fetchDashboardData() {
 
   const sessions = (sessionRows ?? []) as ParentSession[];
   const programTasks = weekTaskRows as unknown as ProgramTask[];
-  // Scoped to the current quota cycle, same reset point + condition
-  // (outcome = 'completed' and scheduled_at >= quota_cycle_start_at) as
-  // auto_unassign_on_quota_completion (0035_audit_fixes.sql) -- otherwise
-  // this reads as an all-time historical total instead of "how many of
-  // THIS assigned quota are done", diverging from what actually drives
-  // the auto-unassign behavior.
-  const cycleStart = profile.quota_cycle_start_at as string;
-  const completedCount = sessions.filter((s) => s.outcome === "completed" && s.scheduled_at >= cycleStart).length;
+  // All-time count of every outcome='completed' session, no date/cycle filter --
+  // this used to stop at quota_cycle_start_at (the point of the student's last
+  // quota renewal), which was correct for driving the old
+  // auto_unassign_on_quota_completion trigger, but that trigger was DROPPED in
+  // 0084 (coaching_sessions.is_paid), and nothing else in this app still needs
+  // "completed since the last renewal" specifically. Cycle-scoping it also
+  // silently hid any session backdated before quota_cycle_start_at (e.g. a
+  // coach backfilling historical sessions predating their quota cycle) from
+  // this count -- a parent reading "2 tamamlandı" for a student with 11 real
+  // completed sessions. This now matches remaining/sessionBalance below, which
+  // was already all-time.
+  const completedCount = sessions.filter((s) => s.outcome === "completed").length;
 
   const weekStat = sumWeekStats((dailyStatsRows ?? []).map((r) => ({ total: r.total_count })));
 
