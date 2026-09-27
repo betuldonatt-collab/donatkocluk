@@ -132,10 +132,9 @@
        Hafta week grid) set their own overflow-x-auto and are completely
        unaffected -- overflow is a per-element property, not inherited. */
     @apply overflow-x-hidden;
-    /* No pull-to-refresh / rubber-band bounce past the top or bottom of
-       the page -- standalone/PWA apps don't have that, and it's one of
-       the biggest "this feels like a website, not an app" tells. */
-    overscroll-behavior-y: none;
+    /* NO overscroll-behavior here on purpose: setting it on html/body turns
+       off the browser's native pull-to-refresh on mobile. Scope it to a specific
+       scroll container instead, never the page. */
   }
   body {
     @apply bg-background text-foreground overflow-x-hidden;
