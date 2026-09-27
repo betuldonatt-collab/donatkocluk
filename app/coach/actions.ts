@@ -3702,39 +3702,53 @@ export async function getTaskEvidenceForCoach(
 // already reads, so no other wiring is needed for a parent to see it correctly.
 const backfillDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Geçersiz tarih.");
 const backfillTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Geçersiz saat.");
+// Time is OPTIONAL in the bulk form (the exact hour rarely matters for a
+// historical entry) -- a blank row falls back to this fixed time server-side.
+const BACKFILL_DEFAULT_TIME = "12:00";
 
-export async function backfillPastSession(input: { studentId: string; date: string; time: string; isPaid: boolean }) {
+const backfillRowSchema = z.object({
+  date: backfillDateSchema,
+  time: backfillTimeSchema.nullable().optional(),
+  isPaid: z.boolean(),
+});
+const backfillRowsSchema = z.array(backfillRowSchema).min(1).max(200);
+
+// One student, many rows in a single insert() call -- a multi-row INSERT is one
+// atomic statement in Postgres, so this is genuinely one round trip / one
+// transaction, not N sequential calls the way N clicks of the old single-row
+// form were.
+export async function backfillPastSessions(
+  studentId: string,
+  rows: { date: string; time?: string | null; isPaid: boolean }[],
+): Promise<{ inserted: number }> {
   await assertNotImpersonating();
-  const studentIdV = parseInput(uuidSchema, input.studentId);
-  const dateV = parseInput(backfillDateSchema, input.date);
-  const timeV = parseInput(backfillTimeSchema, input.time);
-  const isPaidV = parseInput(z.boolean(), input.isPaid);
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const rowsV = parseInput(backfillRowsSchema, rows);
 
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  // Turkey is UTC+3 year-round (no DST since 2016) -- an explicit offset so
-  // "18:00" typed in the form means 18:00 in Turkey, not UTC.
-  const scheduledAt = new Date(`${dateV}T${timeV}:00+03:00`);
-  if (Number.isNaN(scheduledAt.getTime())) throw new Error("Geçersiz tarih/saat.");
-
-  const { data, error } = await supabase
-    .from("coaching_sessions")
-    .insert({
+  // Turkey is UTC+3 year-round (no DST since 2016) -- an explicit offset so a
+  // typed time means that hour in Turkey, not UTC.
+  const payload = rowsV.map((row) => {
+    const scheduledAt = new Date(`${row.date}T${row.time || BACKFILL_DEFAULT_TIME}:00+03:00`);
+    if (Number.isNaN(scheduledAt.getTime())) throw new Error(`Geçersiz tarih/saat: ${row.date} ${row.time ?? ""}`);
+    return {
       student_id: studentIdV,
       coach_id: user.id,
       scheduled_at: scheduledAt.toISOString(),
-      outcome: "completed",
-      is_paid: isPaidV,
+      outcome: "completed" as const,
+      is_paid: row.isPaid,
       evaluation_notes: "Geçmiş görüşme (manuel olarak sisteme işlendi).",
-    })
-    .select("id, student_id, scheduled_at")
-    .single();
+    };
+  });
+
+  const { data, error } = await supabase.from("coaching_sessions").insert(payload).select("id");
   if (error) throw dbError(error);
 
   revalidatePath("/coach/sessions");
   revalidatePath(`/coach/students/${studentIdV}`);
   revalidatePath("/parent");
-  return data;
+  return { inserted: data?.length ?? 0 };
 }
