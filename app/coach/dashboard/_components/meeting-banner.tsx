@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Video, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -59,22 +59,40 @@ export function MeetingBanner({
 
   if (!isPast) {
     return (
-      <Link
-        href={`/coach/students/${session.student_id}`}
-        className="border-border from-primary/10 via-primary/5 hover:bg-accent/20 flex flex-col gap-4 rounded-xl border bg-gradient-to-r to-transparent px-5 py-4 transition-colors sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="flex items-center gap-3">
+      // A plain div, not a Link, now that there are two separate actions in
+      // here (go to the student's page, or join the meeting) -- an anchor
+      // can't contain another anchor/button without breaking, so each gets
+      // its own clickable element instead of the whole banner being one link.
+      <div className="border-border from-primary/10 via-primary/5 flex flex-col gap-4 rounded-xl border bg-gradient-to-r to-transparent px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <Link
+          href={`/coach/students/${session.student_id}`}
+          className="hover:opacity-80 flex min-w-0 items-center gap-3 transition-opacity"
+        >
           <div className="bg-primary/15 flex size-11 shrink-0 items-center justify-center rounded-full">
             <Calendar className="text-primary size-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Sıradaki Görüşme</p>
-            <p className="text-foreground text-sm font-medium">
+            <p className="text-foreground truncate text-sm font-medium">
               {studentName} — {formattedDate}
             </p>
           </div>
-        </div>
-      </Link>
+        </Link>
+
+        {session.meeting_url ? (
+          <Button asChild className="shrink-0 sm:ml-auto">
+            <a href={session.meeting_url} target="_blank" rel="noopener noreferrer">
+              <Video className="size-4" />
+              Görüşmeye Katıl
+            </a>
+          </Button>
+        ) : (
+          <Button disabled className="shrink-0 sm:ml-auto">
+            <Video className="size-4" />
+            Görüşmeye Katıl
+          </Button>
+        )}
+      </div>
     );
   }
 

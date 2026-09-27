@@ -67,27 +67,26 @@ export function NextSessionCard({
             Yaklaşan Koçluk Seansı
           </p>
           <p className="text-foreground text-sm font-medium">{formattedDate}</p>
+          <p className="text-foreground text-lg font-semibold tabular-nums">{formatCountdown(diff)}</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="text-foreground text-xl font-semibold tabular-nums sm:text-2xl">
-          {formatCountdown(diff)}
-        </div>
-        {canJoin ? (
-          <Button asChild>
-            <a href={meetingUrl!} target="_blank" rel="noopener noreferrer">
-              <Video className="size-4" />
-              Görüşmeye Katıl
-            </a>
-          </Button>
-        ) : (
-          <Button disabled>
+      {/* Right-aligned to match the Coach panel's own "Sıradaki Görüşme"
+          banner: date/time (and here, the countdown) on the left, the join
+          action as the sole element on the right. */}
+      {canJoin ? (
+        <Button asChild className="shrink-0 sm:ml-auto">
+          <a href={meetingUrl!} target="_blank" rel="noopener noreferrer">
             <Video className="size-4" />
             Görüşmeye Katıl
-          </Button>
-        )}
-      </div>
+          </a>
+        </Button>
+      ) : (
+        <Button disabled className="shrink-0 sm:ml-auto">
+          <Video className="size-4" />
+          Görüşmeye Katıl
+        </Button>
+      )}
     </div>
   );
 }
