@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
-import { linkParent, unlinkParent } from "../actions";
+import { Input } from "@/components/ui/input";
+import { linkParent, unlinkParent, updateProfileFullName } from "../actions";
 import { ResetPasswordButton } from "../_components/reset-password-button";
 
 type Person = { id: string; full_name: string | null };
@@ -134,6 +135,48 @@ function StudentParentAssignments({
   );
 }
 
+// One parent's name, editable in place -- a typo caught after approval (the
+// account already exists) doesn't need the login phone or password touched at
+// all, just profiles.full_name (updateProfileFullName, ../actions.ts).
+function ParentNameField({ parent }: { parent: Person }) {
+  const [value, setValue] = useState(parent.full_name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const dirty = value.trim() !== "" && value !== (parent.full_name ?? "");
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await updateProfileFullName(parent.id, value.trim());
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setSaved(false);
+        }}
+        disabled={saving}
+        aria-label="Ad Soyad"
+        className="h-8 max-w-44 text-sm font-medium"
+      />
+      {dirty && (
+        <button type="button" onClick={handleSave} disabled={saving} className="text-primary text-xs font-medium underline disabled:opacity-50">
+          {saving ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      )}
+      {saved && !dirty && <span className="text-muted-foreground text-xs">Kaydedildi</span>}
+    </div>
+  );
+}
+
 // Plain roster with just a name + "Şifreyi Sıfırla" -- the one thing a
 // parent CHIP above (repeated once per linked student) has no natural
 // place for, so it lives here once per parent instead.
@@ -145,7 +188,7 @@ function ParentRoster({ parents }: { parents: Person[] }) {
     <div className="flex flex-wrap gap-3">
       {parents.map((parent) => (
         <div key={parent.id} className="border-border flex items-center gap-2 rounded-lg border px-3 py-2">
-          <span className="text-foreground text-sm font-medium">{parent.full_name ?? "(İsimsiz)"}</span>
+          <ParentNameField parent={parent} />
           <ResetPasswordButton userId={parent.id} />
         </div>
       ))}

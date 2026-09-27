@@ -254,6 +254,46 @@ export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | null)
   revalidatePath("/admin/students");
 }
 
+// A typo'd Ad Soyadı, caught either before or after approval -- neither the
+// login phone nor the password is touched, so no auth call, no lockout to clear.
+
+// Pending request: fixed directly on the request row (before it becomes an
+// account), so the admin doesn't have to reject a correct phone number over a
+// name typo and make the person resubmit. Scoped to status = 'pending' so an
+// already-approved/rejected request can't be edited after the fact.
+export async function updateSignupRequestName(requestId: string, fullName: string) {
+  await requireAdmin();
+  const requestIdV = parseInput(uuidSchema, requestId);
+  const fullNameV = parseInput(nonEmptyText(120, "Ad soyad"), fullName);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("signup_requests")
+    .update({ full_name: fullNameV })
+    .eq("id", requestIdV)
+    .eq("status", "pending");
+  if (error) throw dbError(error);
+
+  revalidatePath("/admin");
+}
+
+// Already-approved account: profiles.full_name is an ordinary field with no
+// tamper-guard trigger on it, and profiles_admin_update (0021) already lets any
+// admin write any profiles row -- this is a normal RLS-scoped update through the
+// admin's own session, not a service-role/Admin-API call (unlike a phone or
+// password change, this never touches auth.users at all).
+export async function updateProfileFullName(userId: string, fullName: string) {
+  await requireAdmin();
+  const userIdV = parseInput(uuidSchema, userId);
+  const fullNameV = parseInput(nonEmptyText(120, "Ad soyad"), fullName);
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ full_name: fullNameV }).eq("id", userIdV);
+  if (error) throw dbError(error);
+
+  revalidatePath("/admin/parent-connections");
+  revalidatePath("/admin/coach-connections");
+  revalidatePath("/admin/students");
+}
+
 // --- Announcements ---------------------------------------------------------
 
 const timeStringSchema = z

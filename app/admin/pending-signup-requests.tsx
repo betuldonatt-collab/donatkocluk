@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { approveSignupRequest, rejectSignupRequest } from "./actions";
+import { Input } from "@/components/ui/input";
+import { approveSignupRequest, rejectSignupRequest, updateSignupRequestName } from "./actions";
 
 type SignupRequest = {
   id: string;
@@ -24,6 +25,28 @@ const ROLE_LABELS: Record<SignupRequest["requested_role"], string> = {
 export function PendingSignupRequests({ requests }: { requests: SignupRequest[] }) {
   const [items, setItems] = useState(requests);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  // Ad Soyadı typo fix, per request: local edit buffer + which row is
+  // mid-save. Editing is only offered before approval -- see
+  // updateSignupRequestName's own status='pending' scope.
+  const [nameEdits, setNameEdits] = useState<Record<string, string>>({});
+  const [savingNameId, setSavingNameId] = useState<string | null>(null);
+
+  async function handleSaveName(id: string) {
+    const next = (nameEdits[id] ?? "").trim();
+    if (!next) return;
+    setSavingNameId(id);
+    try {
+      await updateSignupRequestName(id, next);
+      setItems((prev) => prev.map((r) => (r.id === id ? { ...r, full_name: next } : r)));
+      setNameEdits((prev) => {
+        const rest = { ...prev };
+        delete rest[id];
+        return rest;
+      });
+    } finally {
+      setSavingNameId(null);
+    }
+  }
   const [approved, setApproved] = useState<Record<string, { phone: string; tempPassword: string }>>({});
 
   async function handleApprove(id: string) {
@@ -71,8 +94,24 @@ export function PendingSignupRequests({ requests }: { requests: SignupRequest[] 
                   {request.maarif_grade ? `${request.maarif_grade}. Sınıf` : request.exam_type}
                 </span>
               )}
-              <span className="text-foreground text-sm font-medium">{request.full_name}</span>
               <span className="text-muted-foreground">{request.phone}</span>
+            </div>
+
+            {/* Ad Soyadı: editable while still pending, so a typo doesn't force a
+                reject-and-resubmit over an otherwise-correct request. */}
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <Input
+                value={nameEdits[request.id] ?? request.full_name}
+                onChange={(e) => setNameEdits((prev) => ({ ...prev, [request.id]: e.target.value }))}
+                disabled={savingNameId === request.id}
+                aria-label="Ad Soyad"
+                className="h-8 max-w-56 text-sm"
+              />
+              {nameEdits[request.id] !== undefined && nameEdits[request.id] !== request.full_name && (
+                <Button type="button" size="sm" variant="outline" disabled={savingNameId === request.id} onClick={() => handleSaveName(request.id)}>
+                  {savingNameId === request.id ? "Kaydediliyor..." : "Kaydet"}
+                </Button>
+              )}
             </div>
 
             {result ? (
