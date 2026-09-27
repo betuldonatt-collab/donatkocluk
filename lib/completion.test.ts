@@ -6,14 +6,14 @@ const WED = "2026-09-23";
 const task = (task_date: string, status: string) => ({ task_date, status });
 
 describe("resolveCycles", () => {
-  it("starts the day after the last lock, and the previous cycle is exactly what that lock closed", () => {
+  it("starts ON the last lock's own day (a same-day session plus new same-day tasks must land in the new cycle), and the previous cycle ends the day before", () => {
     const { currentStart, previousCycle } = resolveCycles({ period_start: "2026-09-08", locked_at: "2026-09-22T08:30:00Z" }, null);
-    expect(currentStart).toBe("2026-09-23");
-    expect(previousCycle).toEqual({ start: "2026-09-08", end: "2026-09-22" });
+    expect(currentStart).toBe("2026-09-22");
+    expect(previousCycle).toEqual({ start: "2026-09-08", end: "2026-09-21" });
   });
 
   it("uses only the date part of the lock timestamp", () => {
-    expect(resolveCycles({ period_start: "2026-09-01", locked_at: "2026-09-23T23:59:59Z" }, null).currentStart).toBe("2026-09-24");
+    expect(resolveCycles({ period_start: "2026-09-01", locked_at: "2026-09-23T23:59:59Z" }, null).currentStart).toBe("2026-09-23");
   });
 
   it("falls back to the first completed session when there is no lock yet", () => {
@@ -24,6 +24,15 @@ describe("resolveCycles", () => {
 
   it("has no window at all when there is neither a lock nor a completed session", () => {
     expect(resolveCycles(null, null)).toEqual({ currentStart: null, previousCycle: null });
+  });
+
+  it("a same-day session: a task the coach assigns for today, right after locking, counts in the NEW cycle", () => {
+    // Coach locks at 10:00 on the 23rd (closing the cycle that started the
+    // 15th) and, in the same sitting, assigns a fresh task for the 23rd.
+    const { currentStart, previousCycle } = resolveCycles({ period_start: "2026-09-15", locked_at: "2026-09-23T10:00:00Z" }, null);
+    const newTaskAssignedRightAfterLocking = task("2026-09-23", "pending");
+    expect(completionCounts([newTaskAssignedRightAfterLocking], WED, currentStart).total).toBe(1);
+    expect(previousCycle && newTaskAssignedRightAfterLocking.task_date > previousCycle.end).toBe(true);
   });
 });
 

@@ -761,30 +761,37 @@ export async function lockCurrentCycle(studentId: string) {
   await requireCoachAccess(supabase, user.id, studentIdV);
 
   const { lastLock, firstCompletedSessionAt } = await fetchCycleInputs(supabase, studentIdV);
+  const today = new Date().toISOString().slice(0, 10);
+  // The lock day itself always belongs to the NEW cycle (lib/completion.ts),
+  // so a second lock the same day would close an empty/inverted range --
+  // block it explicitly rather than let it silently produce a meaningless
+  // previous-cycle row.
+  if (lastLock && lastLock.locked_at.slice(0, 10) === today) throw new Error("Program bugün zaten kilitlendi.");
+
   const { currentStart } = resolveCycles(lastLock, firstCompletedSessionAt);
   if (!currentStart) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
-
-  const today = new Date().toISOString().slice(0, 10);
-  if (currentStart > today) throw new Error("Kilitlenecek bir dönem yok, program zaten bugüne kadar kilitli.");
 
   const { error } = await supabase
     .from("progress_locks")
     .insert({ student_id: studentIdV, period_start: currentStart, locked_by: user.id });
   if (error) throw dbError(error);
 
-  // "Kilitle / Değerlendir" also finalizes the cycle: any task still sitting
-  // untouched ("pending", i.e. the student never checked it at all) gets
-  // force-resolved to "Yapılmadı" so nothing is left in limbo once it can no
-  // longer be edited. A task the student actually acted on (half_done/done)
-  // is left exactly as they left it -- only the never-touched ones count as
-  // "unchecked" here.
+  // "Kilitle / Değerlendir" also finalizes the cycle being closed: any task
+  // still sitting untouched ("pending", i.e. the student never checked it at
+  // all) STRICTLY BEFORE today gets force-resolved to "Yapılmadı" so nothing
+  // is left in limbo once it can no longer be edited. Today's own tasks are
+  // deliberately excluded -- they belong to the new, still-open cycle (a
+  // same-day session plus newly assigned same-day tasks must land there, not
+  // get swept into the cycle just closed). A task the student actually acted
+  // on (half_done/done) is left exactly as they left it either way.
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   const { data: resolvedRows, error: resolveError } = await supabase
     .from("student_tasks")
     .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
     .eq("student_id", studentIdV)
     .eq("status", "pending")
     .gte("task_date", currentStart)
-    .lte("task_date", today)
+    .lte("task_date", yesterday)
     .select("course_id, topic_id");
   if (resolveError) throw dbError(resolveError);
 

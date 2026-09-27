@@ -157,8 +157,9 @@ async function fetchHomeData(userId: string) {
     lastLock,
     (firstCompletedSessionRow?.scheduled_at ?? null) as string | null,
   );
-  // A task is frozen once its date falls at or before the latest lock --
-  // same boundary the RLS policies enforce (migration 0103).
+  // A task is frozen once its date falls STRICTLY BEFORE the latest lock day
+  // -- the lock day itself belongs to the new, still-open cycle -- same
+  // boundary the RLS policies enforce (migration 0103).
   const lockedThroughDate = lastLock ? lastLock.locked_at.slice(0, 10) : null;
 
   // Slim rows for the progress cards: the earlier of the previous cycle's
@@ -188,7 +189,7 @@ async function fetchHomeData(userId: string) {
   // so merge them in (dedup not needed — the date ranges don't overlap).
   const tasks = [...(weekTaskRows ?? []), ...(pendingTaskRows ?? [])].map((t) => ({
     ...t,
-    week_locked: lockedThroughDate !== null && t.task_date <= lockedThroughDate,
+    week_locked: lockedThroughDate !== null && t.task_date < lockedThroughDate,
     resource_names: resourceNamesByTask.get(t.id) ?? [],
   })) as StudentTask[];
 
@@ -235,7 +236,7 @@ async function fetchHomeData(userId: string) {
     remainingSessions,
     focusReviews,
     examType: (profileRow?.exam_type ?? "YKS") as ExamType,
-    todayLocked: lockedThroughDate !== null && today <= lockedThroughDate,
+    todayLocked: lockedThroughDate !== null && today < lockedThroughDate,
     // Where the student's progress bar currently starts counting, and the
     // most recently closed cycle's fixed range (lib/completion.ts).
     progressCycleStart,

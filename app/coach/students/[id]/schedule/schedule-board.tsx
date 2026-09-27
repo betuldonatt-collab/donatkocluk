@@ -286,10 +286,12 @@ export function ScheduleBoard({
   // window's first day arrived yet."
   const isPastOrCurrentWeek = weekDays[0].date <= today;
   // The week on screen counts as "locked" only once it falls ENTIRELY
-  // inside the frozen range -- locking is a single cycle-wide action now
-  // (lib/completion.ts), not a per-week flag, so a week straddling the
-  // boundary shows individual frozen task cards instead of this banner.
-  const weekLocked = lockedThroughDate !== null && weekDays[6].date <= lockedThroughDate;
+  // STRICTLY BEFORE the frozen boundary -- the lock day itself is never
+  // frozen (it belongs to the new, still-open cycle). Locking is a single
+  // cycle-wide action now (lib/completion.ts), not a per-week flag, so a
+  // week straddling the boundary shows individual frozen task cards instead
+  // of this banner.
+  const weekLocked = lockedThroughDate !== null && weekDays[6].date < lockedThroughDate;
 
   // Locking is no longer per-week -- it's a single "lock the student's
   // current open cycle up to today" action, so this only needs to run once
