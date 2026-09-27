@@ -31,14 +31,14 @@ import {
   deleteStudentEvent,
   duplicateAssignedTask,
   getPastWeeksForStudent,
+  getProgressLockStatus,
   getStudentEventsForWeek,
   getStudentTasksForWeek,
-  isWeekLocked,
-  lockWeek,
+  lockCurrentCycle,
   moveAssignedTask,
   setEventLocked,
   setTaskLocked,
-  unlockWeek,
+  unlockLatestCycle,
   updateAssignedTaskOrder,
   updateAssignedTaskStatus,
   updateStudentEvent,
@@ -220,7 +220,11 @@ export function ScheduleBoard({
   // dragging down a populated day instead of staying lit for the whole
   // column the way a coach actually needs to see it.
   const [overDay, setOverDay] = useState<string | null>(null);
-  const [weekLocked, setWeekLocked] = useState(false);
+  // Where the student's progress is currently locked through (null = never
+  // locked) -- fetched once per student; NOT per displayed week, since
+  // locking is a single cycle-wide action now (lib/completion.ts). Whether
+  // the WEEK ON SCREEN counts as "locked" is derived from this below.
+  const [lockedThroughDate, setLockedThroughDate] = useState<string | null>(null);
   const [lockBusy, setLockBusy] = useState(false);
   // Independent per-row height for each lane -- a strict, Excel-like grid
   // across the WHOLE board: dragging any card's or event's resize handle
@@ -281,29 +285,38 @@ export function ScheduleBoard({
   // compare against under the rolling model, so this is just "has the
   // window's first day arrived yet."
   const isPastOrCurrentWeek = weekDays[0].date <= today;
+  // The week on screen counts as "locked" only once it falls ENTIRELY
+  // inside the frozen range -- locking is a single cycle-wide action now
+  // (lib/completion.ts), not a per-week flag, so a week straddling the
+  // boundary shows individual frozen task cards instead of this banner.
+  const weekLocked = lockedThroughDate !== null && weekDays[6].date <= lockedThroughDate;
 
+  // Locking is no longer per-week -- it's a single "lock the student's
+  // current open cycle up to today" action, so this only needs to run once
+  // per student, not per displayed week.
   useEffect(() => {
     let cancelled = false;
-    isWeekLocked(studentId, weekDays[0].date).then((locked) => {
-      if (!cancelled) setWeekLocked(locked);
+    getProgressLockStatus(studentId).then(({ lockedThroughDate: locked }) => {
+      if (!cancelled) setLockedThroughDate(locked);
     });
     return () => {
       cancelled = true;
     };
-  }, [studentId, weekDays]);
+  }, [studentId]);
 
   async function handleToggleLock() {
     const next = !weekLocked;
     const message = next
-      ? "Bu haftayı kilitlemek istediğine emin misin? Öğrenci bu haftanın görevlerini artık düzenleyemez."
-      : "Bu haftanın kilidini açmak istediğine emin misin? Öğrenci tekrar düzenleyebilecek.";
+      ? "Programı bugüne kadar kilitlemek istediğine emin misin? Öğrenci bu döneme ait görevleri artık düzenleyemez."
+      : "Son kilitlemeyi geri almak istediğine emin misin? Öğrenci tekrar düzenleyebilecek.";
     if (!confirm(message)) return;
 
     setLockBusy(true);
     try {
-      if (next) await lockWeek(studentId, weekDays[0].date);
-      else await unlockWeek(studentId, weekDays[0].date);
-      setWeekLocked(next);
+      if (next) await lockCurrentCycle(studentId);
+      else await unlockLatestCycle(studentId);
+      const { lockedThroughDate: locked } = await getProgressLockStatus(studentId);
+      setLockedThroughDate(locked);
     } finally {
       setLockBusy(false);
     }
@@ -709,7 +722,7 @@ export function ScheduleBoard({
             disabled={lockBusy}
           >
             {weekLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
-            {lockBusy ? "İşleniyor..." : weekLocked ? "Kilidi Aç" : "Haftayı Kilitle / Değerlendir"}
+            {lockBusy ? "İşleniyor..." : weekLocked ? "Kilidi Aç" : "Programı Kilitle / Değerlendir"}
           </Button>
         )}
 

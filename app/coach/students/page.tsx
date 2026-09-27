@@ -4,9 +4,8 @@ import { BookOpen, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { completionPercent } from "@/lib/completion";
+import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
 import { weightedCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
-import { mondayOf } from "@/lib/date";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
@@ -33,7 +32,6 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
   const studentIds = (links ?? []).map((l) => l.student_id);
   if (studentIds.length === 0) return [];
 
-  // This week's lock per student: where each one's completion starts counting.
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: profiles }, { data: taskRows }, { data: lockRows }, { data: sessionRows }] = await Promise.all([
     supabase
@@ -41,18 +39,36 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
     supabase.from("student_tasks").select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes").in("student_id", studentIds),
-    supabase.from("week_locks").select("student_id, locked_at").in("student_id", studentIds).eq("week_start_date", mondayOf(today)),
-    supabase.from("coaching_sessions").select("student_id, is_paid, outcome").in("student_id", studentIds),
+    // Every student's own most recent lock -- ordered so the FIRST row seen
+    // per student below is their latest one (see lastLockByStudent).
+    supabase.from("progress_locks").select("student_id, period_start, locked_at").in("student_id", studentIds).order("locked_at", { ascending: false }),
+    supabase.from("coaching_sessions").select("student_id, scheduled_at, is_paid, outcome").in("student_id", studentIds).order("scheduled_at", { ascending: true }),
   ]);
   const sessionsByStudent = new Map<string, SessionBalanceRow[]>();
+  const firstCompletedSessionByStudent = new Map<string, string>();
   for (const s of sessionRows ?? []) {
     const list = sessionsByStudent.get(s.student_id) ?? [];
     list.push({ is_paid: s.is_paid, outcome: s.outcome });
     sessionsByStudent.set(s.student_id, list);
+    // Rows are ordered ascending, so the first 'completed' one seen per
+    // student is their earliest.
+    if (s.outcome === "completed" && !firstCompletedSessionByStudent.has(s.student_id)) {
+      firstCompletedSessionByStudent.set(s.student_id, s.scheduled_at);
+    }
   }
 
-  // Only tasks from the lock day (Monday if not locked) up to today count (lib/completion.ts).
-  const lockedAtByStudent = new Map((lockRows ?? []).map((r) => [r.student_id, r.locked_at as string]));
+  // Rows are ordered by locked_at desc, so the first one seen per student is
+  // their latest lock -- where completion currently starts counting (no lock
+  // yet -> that student's first completed session, lib/completion.ts).
+  const lastLockByStudent = new Map<string, ProgressLock>();
+  for (const r of lockRows ?? []) {
+    if (!lastLockByStudent.has(r.student_id)) lastLockByStudent.set(r.student_id, { period_start: r.period_start, locked_at: r.locked_at });
+  }
+  const cycleStartByStudent = new Map<string, string | null>();
+  for (const id of studentIds) {
+    cycleStartByStudent.set(id, resolveCycles(lastLockByStudent.get(id) ?? null, firstCompletedSessionByStudent.get(id) ?? null).currentStart);
+  }
+
   const tasksByStudent = new Map<string, WeightableTask[]>();
   for (const t of taskRows ?? []) {
     const list = tasksByStudent.get(t.student_id) ?? [];
@@ -72,7 +88,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
     ...p,
     // Derived balance (paid - completed), not the stale profiles column.
     remaining_sessions: sessionBalance(sessionsByStudent.get(p.id) ?? []).remaining,
-    completionPct: completionPercent(weightedCompletionCounts(tasksByStudent.get(p.id) ?? [], today, lockedAtByStudent.get(p.id))),
+    completionPct: completionPercent(weightedCompletionCounts(tasksByStudent.get(p.id) ?? [], today, cycleStartByStudent.get(p.id) ?? null)),
   }));
 }
 

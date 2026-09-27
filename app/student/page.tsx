@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
-import { mondayOf } from "@/lib/date";
+import { resolveCycles, type ProgressLock } from "@/lib/completion";
 import { reconcileStaleFocusSessions } from "./actions";
 import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
 import { NextSessionCard } from "./_components/next-session-card";
@@ -52,7 +52,6 @@ async function fetchHomeData(userId: string) {
   const weekStart = weekDays[0].date;
   const weekEnd = weekDays[6].date;
   const yesterdayIso = new Date(new Date(`${weekStart}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10);
-  const prevWeekStart = new Date(new Date(`${weekStart}T00:00:00Z`).getTime() - 7 * 86400000).toISOString().slice(0, 10);
   const dayAfterWeek = new Date(new Date(`${weekEnd}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
@@ -62,13 +61,13 @@ async function fetchHomeData(userId: string) {
     { data: weekTaskRows },
     { data: pendingTaskRows },
     { data: ratingSessionRows },
-    { data: lockRows },
+    { data: lastLockRow },
+    { data: firstCompletedSessionRow },
     { data: profileRow },
     { data: taskResourceRows },
     { data: fixedTaskRows },
     { data: allTaskDurationRows },
     { data: sessionBalanceRows },
-    { data: progressExtraRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -103,10 +102,25 @@ async function fetchHomeData(userId: string) {
         .is("student_rating", null)
         .order("scheduled_at", { ascending: false })
         .limit(1),
-      // Every locked week for this student, not just the current one --
-      // an older pending-analysis task (pendingTaskRows, above) can belong
-      // to a week the coach has since locked.
-      supabase.from("week_locks").select("week_start_date, locked_at").eq("student_id", userId),
+      // The single most recent progress lock -- where the completion
+      // percentages currently start counting (lib/completion.ts), and the
+      // frozen boundary for `week_locked` below. No lock yet -> resolved
+      // from the first completed session (next query).
+      supabase
+        .from("progress_locks")
+        .select("period_start, locked_at")
+        .eq("student_id", userId)
+        .order("locked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("coaching_sessions")
+        .select("scheduled_at")
+        .eq("student_id", userId)
+        .eq("outcome", "completed")
+        .order("scheduled_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
       supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px, exam_type").eq("id", userId).maybeSingle(),
       // Which book/kaynak (if any) a coach linked to each task -- mirrors
       // the coach panel's own task_resources join (schedule/page.tsx)
@@ -136,18 +150,30 @@ async function fetchHomeData(userId: string) {
       // is_paid=true only: a completed-but-unpaid session must still count
       // against the balance for the negative number to ever appear.
       supabase.from("coaching_sessions").select("is_paid, outcome").eq("student_id", userId),
-      // Slim rows for the progress cards: last week (Geçen Hafta) plus the
-      // day after this week (Yarın on a Sunday). Dün on a Monday is inside
-      // the same range.
-      supabase
-        .from("student_tasks")
-        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
-        .eq("student_id", userId)
-        .gte("task_date", prevWeekStart)
-        .lte("task_date", dayAfterWeek),
     ]);
 
-  const lockedWeeks = new Set((lockRows ?? []).map((r) => r.week_start_date));
+  const lastLock = lastLockRow as ProgressLock | null;
+  const { currentStart: progressCycleStart, previousCycle } = resolveCycles(
+    lastLock,
+    (firstCompletedSessionRow?.scheduled_at ?? null) as string | null,
+  );
+  // A task is frozen once its date falls at or before the latest lock --
+  // same boundary the RLS policies enforce (migration 0103).
+  const lockedThroughDate = lastLock ? lastLock.locked_at.slice(0, 10) : null;
+
+  // Slim rows for the progress cards: the earlier of the previous cycle's
+  // start / the current cycle's start (whichever reaches further back)
+  // through the day after this week (Yarın on a Sunday). Resolved AFTER the
+  // lock lookup above, since how far back this needs to go depends on it.
+  const progressTasksFrom = [previousCycle?.start, progressCycleStart, weekStart]
+    .filter((d): d is string => d !== null && d !== undefined)
+    .sort()[0];
+  const { data: progressExtraRows } = await supabase
+    .from("student_tasks")
+    .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
+    .eq("student_id", userId)
+    .gte("task_date", progressTasksFrom)
+    .lte("task_date", dayAfterWeek);
 
   const resourceNamesByTask = new Map<string, string[]>();
   for (const row of taskResourceRows ?? []) {
@@ -162,7 +188,7 @@ async function fetchHomeData(userId: string) {
   // so merge them in (dedup not needed — the date ranges don't overlap).
   const tasks = [...(weekTaskRows ?? []), ...(pendingTaskRows ?? [])].map((t) => ({
     ...t,
-    week_locked: lockedWeeks.has(mondayOf(t.task_date)),
+    week_locked: lockedThroughDate !== null && t.task_date <= lockedThroughDate,
     resource_names: resourceNamesByTask.get(t.id) ?? [],
   })) as StudentTask[];
 
@@ -209,12 +235,12 @@ async function fetchHomeData(userId: string) {
     remainingSessions,
     focusReviews,
     examType: (profileRow?.exam_type ?? "YKS") as ExamType,
-    todayLocked: lockedWeeks.has(mondayOf(today)),
-    // When the coach locked THIS week's schedule: where the student's
-    // progress bar starts counting (lib/completion.ts).
-    progressLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === mondayOf(today))?.locked_at ?? null) as string | null,
+    todayLocked: lockedThroughDate !== null && today <= lockedThroughDate,
+    // Where the student's progress bar currently starts counting, and the
+    // most recently closed cycle's fixed range (lib/completion.ts).
+    progressCycleStart,
     progressExtraTasks: (progressExtraRows ?? []) as ProgressTask[],
-    previousLockedAt: ((lockRows ?? []).find((r) => r.week_start_date === prevWeekStart)?.locked_at ?? null) as string | null,
+    previousCycle,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],
   };
@@ -235,9 +261,9 @@ export default async function StudentHomePage() {
     focusReviews,
     examType,
     todayLocked,
-    progressLockedAt,
+    progressCycleStart,
     progressExtraTasks,
-    previousLockedAt,
+    previousCycle,
     routineRowHeights,
     taskRowHeights,
   } = view
@@ -254,9 +280,9 @@ export default async function StudentHomePage() {
         focusReviews: [] as StudentFocusReview[],
         examType: "YKS" as ExamType,
         todayLocked: false,
-        progressLockedAt: null as string | null,
+        progressCycleStart: null as string | null,
         progressExtraTasks: [] as ProgressTask[],
-        previousLockedAt: null as string | null,
+        previousCycle: null as { start: string; end: string } | null,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
       };
@@ -295,9 +321,9 @@ export default async function StudentHomePage() {
         fixedTasks={fixedTasks}
         allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
-        progressLockedAt={progressLockedAt}
+        progressCycleStart={progressCycleStart}
         progressExtraTasks={progressExtraTasks}
-        previousLockedAt={previousLockedAt}
+        previousCycle={previousCycle}
         examType={examType}
         initialRoutineRowHeights={routineRowHeights}
         initialTaskRowHeights={taskRowHeights}

@@ -782,7 +782,7 @@ export async function getTasksForWeek(weekStart: string, weekEnd: string) {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
-  const [{ data: taskRows, error }, { data: lockRow }, { data: taskResourceRows }] = await Promise.all([
+  const [{ data: taskRows, error }, { data: lastLockRow }, { data: taskResourceRows }] = await Promise.all([
     supabase
       .from("student_tasks")
       .select("*")
@@ -790,7 +790,10 @@ export async function getTasksForWeek(weekStart: string, weekEnd: string) {
       .gte("task_date", weekStartV)
       .lte("task_date", weekEndV)
       .order("created_at", { ascending: true }),
-    supabase.from("week_locks").select("id").eq("student_id", user.id).eq("week_start_date", weekStartV).maybeSingle(),
+    // The single most recent progress lock -- a task is frozen once its own
+    // date falls at or before it (same boundary the RLS policies enforce,
+    // migration 0103), so this is computed per task below, not per week.
+    supabase.from("progress_locks").select("locked_at").eq("student_id", user.id).order("locked_at", { ascending: false }).limit(1).maybeSingle(),
     // Mirrors fetchHomeData's own task_resources join (app/student/page.tsx)
     // exactly -- this is the OTHER path a task can reach the client
     // through (navigating "Bu Hafta" to a different week), so it needs
@@ -815,11 +818,12 @@ export async function getTasksForWeek(weekStart: string, weekEnd: string) {
     resourceNamesByTask.set(row.task_id, list);
   }
 
-  const weekLocked = lockRow !== null;
+  const lockedThroughDate = lastLockRow ? lastLockRow.locked_at.slice(0, 10) : null;
+  const weekLocked = lockedThroughDate !== null && weekEndV <= lockedThroughDate;
   return {
     tasks: (taskRows ?? []).map((t) => ({
       ...t,
-      week_locked: weekLocked,
+      week_locked: lockedThroughDate !== null && t.task_date <= lockedThroughDate,
       resource_names: resourceNamesByTask.get(t.id) ?? [],
     })),
     weekLocked,

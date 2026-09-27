@@ -14,10 +14,10 @@ function barColorClass(pct: number | null): string {
   return pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-rose-500";
 }
 
-// Shows the current week's figure and the all-time one side by side (the
-// coach's own requested "Haftalık: %80 | Genel: %65" format), each with its
+// Shows the current cycle's figure and the all-time one side by side (the
+// coach's own requested "Dönem: %80 | Genel: %65" format), each with its
 // own thin bar underneath -- one label, two numbers, two bars, so a coach
-// can tell at a glance whether a student caught up this week or has been
+// can tell at a glance whether a student caught up this cycle or has been
 // steady all along without those two stories blending into one average.
 function DualCompletionBar({ label, weekly, allTime }: { label: string; weekly: number | null; allTime: number | null }) {
   return (
@@ -25,12 +25,12 @@ function DualCompletionBar({ label, weekly, allTime }: { label: string; weekly: 
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground min-w-0 flex-1 truncate">{label}</span>
         <span className="text-foreground shrink-0 font-semibold tabular-nums">
-          Haftalık {weekly === null ? "—" : `%${weekly}`} <span className="text-muted-foreground font-normal">·</span> Genel{" "}
+          Dönem {weekly === null ? "—" : `%${weekly}`} <span className="text-muted-foreground font-normal">·</span> Genel{" "}
           {allTime === null ? "—" : `%${allTime}`}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
-        <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full" title="Haftalık">
+        <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full" title="Dönem">
           <div className={cn("h-full rounded-full transition-all", barColorClass(weekly))} style={{ width: `${weekly ?? 0}%` }} />
         </div>
         <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full" title="Genel">
@@ -109,9 +109,9 @@ export function TargetsCompletionCard({
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
           <p className="text-muted-foreground -mt-2 text-xs">
-            Haftalık:{" "}
+            Güncel Dönem:{" "}
             {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
-            {progressFromLock ? " (programın kilitlendiği gün)" : " (haftanın başı)"} ile bugün arası. Genel: bugüne kadar atanmış tüm
+            {progressFromLock ? " (son kilitlemeden sonraki gün)" : " (ilk görüşme günü)"} ile bugün arası. Genel: bugüne kadar atanmış tüm
             görevler. İkisinde de sonraki günler sayılmaz.
           </p>
           {/* Row label "Toplam" (not "Genel") -- this row is TYT+AYT combined,

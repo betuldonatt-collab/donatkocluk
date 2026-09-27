@@ -152,9 +152,9 @@ export function TaskBoard({
   fixedTasks,
   allTimeTrackedMinutes,
   todayLocked,
-  progressLockedAt,
+  progressCycleStart,
   progressExtraTasks,
-  previousLockedAt,
+  previousCycle,
   initialRoutineRowHeights,
   initialTaskRowHeights,
   examType = "YKS",
@@ -167,19 +167,22 @@ export function TaskBoard({
   // coach, on the Program tab.
   fixedTasks: StudentFixedTask[];
   // All-time sum of tracked_duration_seconds across every task this
-  // student has ever had -- unlike the Günlük/Haftalık totals below
+  // student has ever had -- unlike the Günlük/Dönemlik totals below
   // (DybTotalCard), this doesn't depend on `tasks` (only the current
   // week/today is ever loaded client-side) so it's computed once,
   // server-side, and passed straight through rather than derived here.
   allTimeTrackedMinutes: number;
   todayLocked: boolean;
-  // When the coach locked the current week's schedule (null = not locked):
-  // where the progress bar starts counting.
-  progressLockedAt: string | null;
-  // Slim last-week / next-day rows + last week's lock time, for the
-  // Geçen Hafta bar and Dün/Yarın (see ProgressOverview).
+  // Where the student's current (still open) coaching cycle starts (null =
+  // no lock and no completed session yet) -- see lib/completion.ts.
+  progressCycleStart: string | null;
+  // Slim rows spanning back to whichever is earlier (the current cycle's
+  // start or the previous cycle's), plus the day after this week, for the
+  // Önceki Dönem bar and Dün/Yarın (see ProgressOverview).
   progressExtraTasks: ProgressTask[];
-  previousLockedAt: string | null;
+  // The most recently closed cycle's fixed [start, end] range, or null if
+  // the student has never been locked yet.
+  previousCycle: { start: string; end: string } | null;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
   // app/student/page.tsx so the very first render already matches their
@@ -194,13 +197,13 @@ export function TaskBoard({
   examType?: ExamType;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
-  // The progress bar is always about the CURRENT week, however far the grid below
-  // is browsed (loadWeek swaps `tasks` for the browsed week's) -- so it reads its
-  // own copy, kept in step with every save/create/delete.
+  // The progress bar is always about the CURRENT cycle, however far the grid
+  // below is browsed (loadWeek swaps `tasks` for the browsed week's) -- so it
+  // reads its own copy, kept in step with every save/create/delete.
   const [progressTasks, setProgressTasks] = useState(initialTasks);
-  // Last-week / next-day rows (Geçen Hafta, Yarın on a Sunday) live in their
-  // own list -- kept in step with edits/deletes too, or completing such a
-  // task would not move its bar until a reload.
+  // Rows reaching back to the previous cycle plus next-day (Yarın on a
+  // Sunday) live in their own list -- kept in step with edits/deletes too, or
+  // completing such a task would not move its bar until a reload.
   const [extraProgressTasks, setExtraProgressTasks] = useState(progressExtraTasks);
   const [weekDays, setWeekDays] = useState(initialWeekDays);
   // The initial week IS the current week, so its lock state is exactly
@@ -381,15 +384,15 @@ export function TaskBoard({
     <div className="space-y-6">
       <PendingAnalysisAlert tasks={tasks} onOpenTask={(t) => openTask(t, "analysis")} />
 
-      {/* Weekly (Geçen Hafta vs Bu Hafta) + daily (Dün/Bugün/Yarın) progress.
-          Always about the real current week/day, not whichever tab or
+      {/* Cycle (Önceki Dönem vs Mevcut Dönem) + daily (Dün/Bugün/Yarın) progress.
+          Always about the real current cycle/day, not whichever tab or
           browsed week is showing below. */}
       <ProgressOverview
         liveTasks={progressTasks}
         extraTasks={extraProgressTasks}
         today={today}
-        lockedAt={progressLockedAt}
-        previousLockedAt={previousLockedAt}
+        cycleStart={progressCycleStart}
+        previousCycle={previousCycle}
       />
 
       {/* Always visible regardless of Bugün/Bu Hafta -- unlike Günlük/

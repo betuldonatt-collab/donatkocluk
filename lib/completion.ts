@@ -1,62 +1,73 @@
-import { mondayOf, weekDates } from "./date";
-
-// Program completion ("Tamamlama %") is time-aware: it only counts tasks the
-// student can already have done -- from the day the coach LOCKED the current
-// weekly schedule up to and including today. A task scheduled for tomorrow or
-// later is in neither the numerator nor the denominator, so a student who has
-// finished everything due so far shows 100% instead of a discouraging number that
-// only "fills up" as the week goes by.
+// Program completion ("Tamamlama %") is scoped to the student's own coaching
+// cycle -- the stretch between two coach "kilitle" (lock) actions -- not a
+// fixed Monday-Sunday calendar week. The window for what's currently due is
+// [the day after the last lock, today]; a student who has never been locked
+// yet uses the day of their first completed coaching session as day one
+// instead (there is nothing to lock before a first session happens). A
+// student with neither a lock nor a completed session has no window at all
+// -- nothing is due, and every surface shows "—" until their first session.
 //
-// The start is the lock day itself (week_locks.locked_at), not Monday. A week
-// that has not been locked yet has no lock day, so it falls back to the week's
-// Monday -- the schedule is still being worked, and the percentage has to mean
-// something in the meantime. (A lock that predates the week, e.g. locked the
-// Sunday before, still starts at Monday: tasks cannot be due before their week.)
-//
-// One rule shared by every surface that shows the percentage (student board,
-// coach student page, coach roster, parent weekly card) so they never disagree.
+// One rule shared by every surface that shows the percentage (student
+// board, coach student page, coach roster, parent panel) so they never
+// disagree. See migration 0103_session_progress_locks.sql for the DB side
+// (progress_locks replaces week_locks; the RLS freeze on student edits keys
+// off the same "at or before the last lock" boundary, not an ISO week).
 
 export type CompletionTask = { task_date: string; status: string };
+export type CompletionCounts = { done: number; total: number };
+
+// The two columns of the single most recent progress_locks row for a
+// student -- everything resolveCycles needs, and everything a caller has to
+// fetch to compute it (see app/coach/actions.ts's lockCurrentCycle, which
+// writes exactly this shape).
+export type ProgressLock = { period_start: string; locked_at: string };
 
 // Dates are UTC calendar days, like every "today" in this app.
 function dayOf(timestampOrDate: string): string {
   return timestampOrDate.slice(0, 10);
 }
 
-// The first day that counts. `lockedAt` is the current week's week_locks.locked_at
-// (a timestamp or a date), or null/undefined when the week is not locked.
-export function completionStart(todayIso: string, lockedAt?: string | null): string {
-  const weekStart = mondayOf(todayIso);
-  if (!lockedAt) return weekStart;
-  const lockDay = dayOf(lockedAt);
-  return lockDay > weekStart ? lockDay : weekStart;
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
-// The tasks counted right now: from the start above through today.
-export function tasksDueSoFar<T extends { task_date: string }>(tasks: T[], todayIso: string, lockedAt?: string | null): T[] {
-  const start = completionStart(todayIso, lockedAt);
-  return tasks.filter((t) => t.task_date >= start && t.task_date <= todayIso);
+// Where the student's CURRENT (still open) cycle starts, and the fixed
+// [start, end] range of their most recently CLOSED cycle, if any -- both
+// derived from the same single latest lock row so every caller agrees.
+export function resolveCycles(
+  lastLock: ProgressLock | null,
+  firstCompletedSessionAt: string | null,
+): { currentStart: string | null; previousCycle: { start: string; end: string } | null } {
+  if (lastLock) {
+    return {
+      currentStart: addDaysISO(dayOf(lastLock.locked_at), 1),
+      previousCycle: { start: lastLock.period_start, end: dayOf(lastLock.locked_at) },
+    };
+  }
+  return {
+    currentStart: firstCompletedSessionAt ? dayOf(firstCompletedSessionAt) : null,
+    previousCycle: null,
+  };
 }
 
-export type CompletionCounts = { done: number; total: number };
+// The tasks counted right now: from the current cycle's start through today.
+export function tasksDueSoFar<T extends { task_date: string }>(tasks: T[], todayIso: string, cycleStart: string | null): T[] {
+  if (!cycleStart) return [];
+  return tasks.filter((t) => t.task_date >= cycleStart && t.task_date <= todayIso);
+}
 
-export function completionCounts(tasks: CompletionTask[], todayIso: string, lockedAt?: string | null): CompletionCounts {
-  const due = tasksDueSoFar(tasks, todayIso, lockedAt);
+export function completionCounts(tasks: CompletionTask[], todayIso: string, cycleStart: string | null): CompletionCounts {
+  const due = tasksDueSoFar(tasks, todayIso, cycleStart);
   return { done: due.filter((t) => t.status === "done").length, total: due.length };
 }
 
-// Whole-week ("macro") completion: same start rule as completionCounts
-// above (locked_at, or Monday until locked) but counts through the END of
-// the 7-day cycle instead of stopping at today -- so a not-yet-arrived
-// day's tasks count against the denominator from day one, and the total
-// never grows as the week goes by; it only ever climbs toward 100% as
-// tasks get marked done. Used by the student board's "Bu Hafta" tab
-// specifically (WeekProgressBar's "week" variant) -- the "Bugün" tab
-// keeps using completionCounts above, the today-capped ("micro") view.
-export function weekCompletionCounts(tasks: CompletionTask[], todayIso: string, lockedAt?: string | null): CompletionCounts {
-  const start = completionStart(todayIso, lockedAt);
-  const weekEnd = weekDates(todayIso)[6];
-  const due = tasks.filter((t) => t.task_date >= start && t.task_date <= weekEnd);
+// Fixed-range counts for a cycle that has ALREADY been closed by a lock --
+// both bounds are already in the past, so every task in [start, end] counts,
+// no "due so far" capping needed. Used for the previous-cycle comparison bar.
+export function closedCycleCounts(tasks: CompletionTask[], start: string, end: string): CompletionCounts {
+  const due = tasks.filter((t) => t.task_date >= start && t.task_date <= end);
   return { done: due.filter((t) => t.status === "done").length, total: due.length };
 }
 

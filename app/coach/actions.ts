@@ -23,7 +23,8 @@ import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
-import { mondayOf, stopwatchLogicalDateIso, weekDates } from "@/lib/date";
+import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
+import { resolveCycles, type ProgressLock } from "@/lib/completion";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
   computeAylikKarne,
@@ -705,55 +706,85 @@ export async function deleteCoachTask(taskId: string) {
   revalidatePath("/coach/dashboard");
 }
 
-// --- Student detail: Week Lock (Group 1 -- "Haftayı Kilitle") ------------
-
 const weekStartSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Geçersiz tarih.");
 
-// One row per (student, week) -- see migration 0037. RLS already scopes
-// week_locks writes to the coach's own roster (week_locks_coach_all), so
-// no extra roster check is needed here beyond what the insert/delete
-// itself will reject.
-export async function isWeekLocked(studentId: string, weekStart: string): Promise<boolean> {
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const weekStartV = parseInput(weekStartSchema, weekStart);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("week_locks")
-    .select("id")
-    .eq("student_id", studentIdV)
-    .eq("week_start_date", weekStartV)
-    .maybeSingle();
-  if (error) throw dbError(error);
-  return data !== null;
+// --- Student detail: Progress Lock (Group 1 -- "Kilitle / Değerlendir") ---
+//
+// A student's progress no longer tracks a fixed Monday-Sunday week -- it
+// tracks the stretch between coach lock actions, which naturally line up
+// with coaching sessions (see lib/completion.ts's header comment and
+// migration 0103_session_progress_locks). Only the single most recent
+// progress_locks row per student matters at read time; the functions below
+// are the only place that ever needs the FULL two-input resolution
+// (previous lock + first completed session).
+
+async function fetchCycleInputs(supabase: SupabaseClient, studentId: string): Promise<{ lastLock: ProgressLock | null; firstCompletedSessionAt: string | null }> {
+  const [{ data: lastLockRow }, { data: firstSessionRow }] = await Promise.all([
+    supabase
+      .from("progress_locks")
+      .select("period_start, locked_at")
+      .eq("student_id", studentId)
+      .order("locked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("coaching_sessions")
+      .select("scheduled_at")
+      .eq("student_id", studentId)
+      .eq("outcome", "completed")
+      .order("scheduled_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  return {
+    lastLock: lastLockRow as ProgressLock | null,
+    firstCompletedSessionAt: (firstSessionRow?.scheduled_at ?? null) as string | null,
+  };
 }
 
-export async function lockWeek(studentId: string, weekStart: string) {
+// The date the student's progress is currently locked through (null = never
+// locked) -- lets the client work out, per displayed week, whether that
+// week falls entirely inside the frozen range, without exposing the
+// underlying lock row itself.
+export async function getProgressLockStatus(studentId: string): Promise<{ lockedThroughDate: string | null }> {
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const supabase = await createClient();
+  const { lastLock } = await fetchCycleInputs(supabase, studentIdV);
+  return { lockedThroughDate: lastLock ? lastLock.locked_at.slice(0, 10) : null };
+}
+
+export async function lockCurrentCycle(studentId: string) {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
-  const weekStartV = parseInput(weekStartSchema, weekStart);
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
+  const { lastLock, firstCompletedSessionAt } = await fetchCycleInputs(supabase, studentIdV);
+  const { currentStart } = resolveCycles(lastLock, firstCompletedSessionAt);
+  if (!currentStart) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (currentStart > today) throw new Error("Kilitlenecek bir dönem yok, program zaten bugüne kadar kilitli.");
+
   const { error } = await supabase
-    .from("week_locks")
-    .upsert({ student_id: studentIdV, week_start_date: weekStartV }, { onConflict: "student_id,week_start_date" });
+    .from("progress_locks")
+    .insert({ student_id: studentIdV, period_start: currentStart, locked_by: user.id });
   if (error) throw dbError(error);
 
-  // "Kilitle / Değerlendir" -- locking a week also finalizes it: any task
-  // still sitting untouched ("pending", i.e. the student never checked it
-  // at all) gets force-resolved to "Yapılmadı" so nothing is left in limbo
-  // once the week can no longer be edited. A task the student actually
-  // acted on (half_done/done) is left exactly as they left it -- only the
-  // never-touched ones count as "unchecked" here.
-  const weekEndV = weekDates(weekStartV)[6];
+  // "Kilitle / Değerlendir" also finalizes the cycle: any task still sitting
+  // untouched ("pending", i.e. the student never checked it at all) gets
+  // force-resolved to "Yapılmadı" so nothing is left in limbo once it can no
+  // longer be edited. A task the student actually acted on (half_done/done)
+  // is left exactly as they left it -- only the never-touched ones count as
+  // "unchecked" here.
   const { data: resolvedRows, error: resolveError } = await supabase
     .from("student_tasks")
     .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
     .eq("student_id", studentIdV)
     .eq("status", "pending")
-    .gte("task_date", weekStartV)
-    .lte("task_date", weekEndV)
+    .gte("task_date", currentStart)
+    .lte("task_date", today)
     .select("course_id, topic_id");
   if (resolveError) throw dbError(resolveError);
 
@@ -781,19 +812,27 @@ export async function lockWeek(studentId: string, weekStart: string) {
   revalidatePath("/student");
 }
 
-export async function unlockWeek(studentId: string, weekStart: string) {
+// Undoes the most recent lock only -- there is no "unlock an arbitrary past
+// cycle" concept anymore (see the file header comment); this mirrors how the
+// toggle in the UI is only ever used right after locking by mistake.
+export async function unlockLatestCycle(studentId: string) {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
-  const weekStartV = parseInput(weekStartSchema, weekStart);
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const { error } = await supabase
-    .from("week_locks")
-    .delete()
+  const { data: lastLockRow, error: fetchError } = await supabase
+    .from("progress_locks")
+    .select("id")
     .eq("student_id", studentIdV)
-    .eq("week_start_date", weekStartV);
+    .order("locked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fetchError) throw dbError(fetchError);
+  if (!lastLockRow) return;
+
+  const { error } = await supabase.from("progress_locks").delete().eq("id", lastLockRow.id);
   if (error) throw dbError(error);
 
   revalidatePath(`/coach/students/${studentIdV}`);

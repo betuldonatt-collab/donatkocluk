@@ -75,12 +75,12 @@ export type StudentTask = {
   // vanishing with no explanation.
   rejected_at: string | null;
   rejection_reason: string | null;
-  // Not a DB column -- computed server-side per task from the week_locks
-  // table (migration 0037) and attached wherever student_tasks is
-  // fetched for the student's own views. RLS is the real enforcement (a
-  // locked task's UPDATE/INSERT/DELETE is rejected outright); this flag
-  // only drives the read-only rendering so the UI doesn't just fail
-  // silently when the student tries to interact with it.
+  // Not a DB column -- computed server-side per task from the student's
+  // latest progress_locks row (migration 0103) and attached wherever
+  // student_tasks is fetched for the student's own views. RLS is the real
+  // enforcement (a locked task's UPDATE/INSERT/DELETE is rejected
+  // outright); this flag only drives the read-only rendering so the UI
+  // doesn't just fail silently when the student tries to interact with it.
   week_locked: boolean;
 };
 

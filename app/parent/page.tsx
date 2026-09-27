@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
-import { completionPercent } from "@/lib/completion";
-import { weightedWeekCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
+import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
+import { weightedClosedCycleCounts, weightedCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
 import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
 import { isLgsParentView } from "@/lib/parent-lgs";
 import { isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
@@ -63,15 +63,6 @@ function getWeekRange(referenceIso: string) {
 }
 
 
-// Whole-week (macro) completion, same rule as the student's "Bu Hafta" bar.
-// Counts only what is due so far this week (from the day the schedule was locked,
-// Monday if not locked, up to today): tomorrow's tasks are in neither the numerator
-// nor the denominator (lib/completion.ts).
-// Effort-weighted (lib/effort-weight.ts): heavier tasks move the bar further.
-function computeWeeklyCompletionPct(tasks: WeightableTask[], today: string, lockedAt: string | null) {
-  return completionPercent(weightedWeekCompletionCounts(tasks, today, lockedAt));
-}
-
 function addDays(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -97,66 +88,80 @@ async function fetchDashboardData() {
 
   const today = todayISO();
   const { start, end } = getWeekRange(today);
-  const prevStart = addDays(start, -7);
-  const prevEnd = addDays(start, -1);
   // The student's own profile row rides along with the (cached) linked-students
   // lookup the layout already ran -- no second profiles read here.
   const profile = (await getLinkedStudents()).find((s) => s.id === studentId) ?? null;
   const isLgsStudent = isLgsParentView(profile?.exam_type);
 
-  // student_tasks is read ONCE for the whole window (last week -> the day after
-  // this week) and sliced in memory below; it used to be four separate queries
-  // (program, weighted week, previous week, LGS daily rows). Same for the two
-  // week_locks rows.
-  const tasksFrom = prevStart;
+  // Phase 1: sessions (needed both for the session list AND to resolve the
+  // student's cycle bounds below) + everything else independent of the task
+  // window's date range.
+  const [{ data: sessionRows }, { data: lockRow }, { data: dailyStatsRows }, { data: examRows }] = await Promise.all([
+    supabase
+      .from("coaching_sessions")
+      .select("id, scheduled_at, outcome, is_paid")
+      .eq("student_id", studentId)
+      .order("scheduled_at", { ascending: false }),
+    // The single most recent progress lock -- where completion currently
+    // starts counting (lib/completion.ts). No lock yet -> resolved below
+    // from the student's first completed session.
+    supabase
+      .from("progress_locks")
+      .select("period_start, locked_at")
+      .eq("student_id", studentId)
+      .order("locked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // The parent view only ever shows a "Toplam Çözülen Soru" total, never the
+    // Doğru/Yanlış/Boş breakdown (see WeeklyStatsSummary).
+    supabase
+      .from("student_daily_stats")
+      .select("total_count")
+      .eq("student_id", studentId)
+      .gte("entry_date", start)
+      .lte("entry_date", end),
+    supabase
+      .from("student_tasks")
+      .select("id, title, task_date, subject_scores")
+      .eq("student_id", studentId)
+      .eq("task_type", "general_exam")
+      .order("task_date", { ascending: false }),
+  ]);
+
+  if (!profile) return { student: null };
+
+  const sessions = (sessionRows ?? []) as ParentSession[];
+  const firstCompletedSessionAt = sessions
+    .filter((s) => s.outcome === "completed")
+    .reduce<string | null>((earliest, s) => (earliest === null || s.scheduled_at < earliest ? s.scheduled_at : earliest), null);
+  const { currentStart: progressCycleStart, previousCycle } = resolveCycles(lockRow as ProgressLock | null, firstCompletedSessionAt);
+
+  // student_tasks is read ONCE for the whole window this render needs (the
+  // program sheet's calendar week, plus however far back the current/previous
+  // cycle actually reaches -- not always the same 7 days) and sliced in
+  // memory below.
+  const tasksFrom = [start, progressCycleStart, previousCycle?.start].filter((d): d is string => d !== null && d !== undefined).sort()[0];
   const tasksTo = addDays(end, 1);
 
-  const [{ data: sessionRows }, { data: taskWindowRows }, { data: dailyStatsRows }, { data: examRows }, { data: lockRows }] =
-    await Promise.all([
-      supabase
-        .from("coaching_sessions")
-        .select("id, scheduled_at, outcome, is_paid")
-        .eq("student_id", studentId)
-        .order("scheduled_at", { ascending: false }),
-      // Security note: the rows below are sliced server-side. Only the slim
-      // program fields ever cross into the client component (WeeklyProgramSheet);
-      // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
-      // effort-weighted percentages.
-      supabase
-        .from("student_tasks")
-        .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes")
-        .eq("student_id", studentId)
-        .gte("task_date", tasksFrom)
-        .lte("task_date", tasksTo)
-        .order("task_date", { ascending: true })
-        .order("order_index", { ascending: true }),
-      // The parent view only ever shows a "Toplam Çözülen Soru" total, never the
-      // Doğru/Yanlış/Boş breakdown (see WeeklyStatsSummary).
-      supabase
-        .from("student_daily_stats")
-        .select("total_count")
-        .eq("student_id", studentId)
-        .gte("entry_date", start)
-        .lte("entry_date", end),
-      supabase
-        .from("student_tasks")
-        .select("id, title, task_date, subject_scores")
-        .eq("student_id", studentId)
-        .eq("task_type", "general_exam")
-        .order("task_date", { ascending: false }),
-      // When each week's schedule was locked: where its completion starts counting.
-      supabase.from("week_locks").select("week_start_date, locked_at").eq("student_id", studentId).in("week_start_date", [start, prevStart]),
-    ]);
+  const { data: taskWindowRows } = await supabase
+    // Security note: the rows below are sliced server-side. Only the slim
+    // program fields ever cross into the client component (WeeklyProgramSheet);
+    // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
+    // effort-weighted percentages.
+    .from("student_tasks")
+    .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes")
+    .eq("student_id", studentId)
+    .gte("task_date", tasksFrom)
+    .lte("task_date", tasksTo)
+    .order("task_date", { ascending: true })
+    .order("order_index", { ascending: true });
 
   logPerf("parent home data batch", perfStart);
-  if (!profile) return { student: null };
 
   type WindowRow = WeightableTask & { id: string; title: string; order_index: number };
   const windowRows = (taskWindowRows ?? []) as unknown as WindowRow[];
   const inRange = (from: string, to: string) => windowRows.filter((t) => t.task_date >= from && t.task_date <= to);
   const weekRows = inRange(start, end);
-  const prevRows = inRange(prevStart, prevEnd);
-  const lockAt = (weekStart: string) => ((lockRows ?? []).find((r) => r.week_start_date === weekStart)?.locked_at ?? null) as string | null;
 
   // Slim, client-safe rows for the program sheet (no counts).
   const weekTaskRows = weekRows.map((t) => ({
@@ -171,7 +176,6 @@ async function fetchDashboardData() {
   // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
   const dailyRowData = isLgsStudent ? inRange(addDays(today, -1), addDays(today, 1)) : [];
 
-  const sessions = (sessionRows ?? []) as ParentSession[];
   const programTasks = weekTaskRows as unknown as ProgramTask[];
   // All-time count of every outcome='completed' session, no date/cycle filter --
   // this used to stop at quota_cycle_start_at (the point of the student's last
@@ -216,16 +220,17 @@ async function fetchDashboardData() {
     remaining: sessionBalance(sessions).remaining,
     unpaidCompleted: sessionBalance(sessions).unpaidCompleted,
     sessions,
+    // The student's own coaching cycle (see lib/completion.ts), not this
+    // calendar week -- "currentWeek"/"previousWeek" name what they feed
+    // (WeeklyProgressCard's two rows), not a Monday-Sunday range.
     currentWeek: {
-      start,
-      end,
-      pct: computeWeeklyCompletionPct(weekRows, today, lockAt(start)),
+      start: progressCycleStart ?? today,
+      end: today,
+      pct: completionPercent(weightedCompletionCounts(windowRows, today, progressCycleStart)),
     },
-    previousWeek: {
-      start: prevStart,
-      end: prevEnd,
-      pct: computeWeeklyCompletionPct(prevRows, prevStart, lockAt(prevStart)),
-    },
+    previousWeek: previousCycle
+      ? { start: previousCycle.start, end: previousCycle.end, pct: completionPercent(weightedClosedCycleCounts(windowRows, previousCycle.start, previousCycle.end)) }
+      : { start: today, end: today, pct: null },
     weekStat,
     programTasks,
     tytNetChartData,

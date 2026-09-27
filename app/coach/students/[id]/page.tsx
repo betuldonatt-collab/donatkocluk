@@ -22,7 +22,7 @@ import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
-import { completionStart, tasksDueSoFar } from "@/lib/completion";
+import { resolveCycles, tasksDueSoFar, type ProgressLock } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import type { TopicPerformanceRow } from "./_components/topic-performance-map";
 import type { WeakTopicRow } from "./weak-topic-map";
@@ -94,9 +94,9 @@ function bucketCompletionStats(tasks: DetailTask[]): CompletionStats {
   return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
-function computeDualCompletionStats(allTasks: DetailTask[], today: string, lockedAt: string | null): DualCompletionStats {
+function computeDualCompletionStats(allTasks: DetailTask[], today: string, cycleStart: string | null): DualCompletionStats {
   return {
-    weekly: bucketCompletionStats(tasksDueSoFar(allTasks, today, lockedAt)),
+    weekly: bucketCompletionStats(tasksDueSoFar(allTasks, today, cycleStart)),
     allTime: bucketCompletionStats(allTasks.filter((t) => t.task_date <= today)),
   };
 }
@@ -126,8 +126,8 @@ function courseLabelFor(courseId: string): string {
 // course touched in EITHER scope -- a course only worked on in a prior
 // week still shows its all-time figure with "—" for this week's, and vice
 // versa for a course picked up for the first time this week.
-function computeSubjectCompletion(allTasks: DetailTask[], today: string, lockedAt: string | null): SubjectCompletion[] {
-  const weekly = bucketSubjectCompletion(tasksDueSoFar(allTasks, today, lockedAt));
+function computeSubjectCompletion(allTasks: DetailTask[], today: string, cycleStart: string | null): SubjectCompletion[] {
+  const weekly = bucketSubjectCompletion(tasksDueSoFar(allTasks, today, cycleStart));
   const allTime = bucketSubjectCompletion(allTasks.filter((t) => t.task_date <= today));
   const courseIds = new Set([...weekly.keys(), ...allTime.keys()]);
   const toBucket = (b: { done: number; total: number } | undefined) =>
@@ -155,19 +155,11 @@ async function fetchStudentDetail(studentId: string) {
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
-  // When this week's schedule was locked: where the completion percentages start
-  // counting (lib/completion.ts). No lock yet -> the week's Monday.
-  const { data: weekLockRow } = await supabase
-    .from("week_locks")
-    .select("locked_at")
-    .eq("student_id", studentId)
-    .eq("week_start_date", weekDays[0].date)
-    .maybeSingle();
-  const progressLockedAt = (weekLockRow?.locked_at ?? null) as string | null;
 
   const [
     { data: allTasks },
     { data: sessionRows },
+    { data: lastLockRow },
     { data: paragrafRows },
     { data: weekTaskRows },
     { data: resourceRows },
@@ -189,6 +181,16 @@ async function fetchStudentDetail(studentId: string) {
         .select("*")
         .eq("student_id", studentId)
         .order("scheduled_at", { ascending: false }),
+      // The single most recent progress lock -- where the completion
+      // percentages currently start counting (lib/completion.ts). No lock
+      // yet -> resolved below from the student's first completed session.
+      supabase
+        .from("progress_locks")
+        .select("period_start, locked_at")
+        .eq("student_id", studentId)
+        .order("locked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       supabase
         .from("paragraf_problem_entries")
         .select("*")
@@ -318,6 +320,12 @@ async function fetchStudentDetail(studentId: string) {
   // state.
   const isCompletedTask = (t: DetailTask) => t.status === "done" || t.status === "half_done";
   const sessions = (sessionRows ?? []) as DetailSession[];
+  // No lock yet -> the student's first completed session is day one of
+  // their first cycle (lib/completion.ts's resolveCycles).
+  const firstCompletedSessionAt = sessions
+    .filter((s) => s.outcome === "completed")
+    .reduce<string | null>((earliest, s) => (earliest === null || s.scheduled_at < earliest ? s.scheduled_at : earliest), null);
+  const { currentStart: progressCycleStart } = resolveCycles(lastLockRow as ProgressLock | null, firstCompletedSessionAt);
   const paragrafEntries = (paragrafRows ?? []) as ParagrafProblemEntry[];
   const notes = (noteRows ?? []) as DetailCoachNote[];
 
@@ -535,10 +543,10 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
-    completion: computeDualCompletionStats(tasks, today, progressLockedAt),
-    subjectCompletion: computeSubjectCompletion(tasks, today, progressLockedAt),
-    progressFrom: completionStart(today, progressLockedAt),
-    progressFromLock: progressLockedAt !== null,
+    completion: computeDualCompletionStats(tasks, today, progressCycleStart),
+    subjectCompletion: computeSubjectCompletion(tasks, today, progressCycleStart),
+    progressFrom: progressCycleStart ?? today,
+    progressFromLock: lastLockRow !== null,
     topicPerformance: topicPerformanceWithQuestions,
     curriculumCourseIds,
     sessions,

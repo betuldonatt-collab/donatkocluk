@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { completionPercent } from "./completion";
-import { impactPercent, subjectCoefficient, taskWeight, weightedCompletionCounts, weightedWeekCompletionCounts } from "./effort-weight";
+import { impactPercent, subjectCoefficient, taskWeight, weightedClosedCycleCounts, weightedCompletionCounts } from "./effort-weight";
 
 describe("subjectCoefficient", () => {
   it("maps subjects to 1 / 1.5 / 2", () => {
@@ -81,13 +81,17 @@ describe("weighted completion", () => {
   ];
 
   it("counts effort, not tasks, through today", () => {
-    const c = weightedCompletionCounts(tasks, WED);
+    const c = weightedCompletionCounts(tasks, WED, "2026-09-22");
     expect(c).toEqual({ done: 1000, total: 1200 });
     expect(completionPercent(c)).toBe(83);
   });
 
-  it("uses the whole week for the macro view", () => {
-    const c = weightedWeekCompletionCounts(tasks, WED);
+  it("is zero when there is no cycle start yet", () => {
+    expect(weightedCompletionCounts(tasks, WED, null)).toEqual({ done: 0, total: 0 });
+  });
+
+  it("counts every task in a closed cycle's fixed range, future days included", () => {
+    const c = weightedClosedCycleCounts(tasks, "2026-09-22", "2026-09-25");
     expect(c.total).toBe(1350);
     expect(completionPercent(c)).toBe(74);
   });
