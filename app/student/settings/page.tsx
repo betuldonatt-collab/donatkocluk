@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getLoginName } from "@/lib/login-name";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
 import type { StudentTask } from "../_components/daily-tasks/types";
@@ -52,6 +53,8 @@ async function fetchSettingsData(userId: string) {
 
 export default async function SettingsPage() {
   const view = await getViewContext("student");
+  // Hidden while an admin views the student's panel (it would be the admin's own name).
+  const username = view?.isImpersonating ? null : await getLoginName();
 
   const { weekDays, weekTasks, existingRequest } = view
     ? await fetchSettingsData(view.effectiveUserId)
@@ -63,7 +66,12 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-semibold text-foreground">Ayarlar</h1>
       </header>
 
-      <SettingsClient weekDays={weekDays} weekTasks={weekTasks} initialRequestedAt={existingRequest?.created_at ?? null} />
+      <SettingsClient
+        weekDays={weekDays}
+        weekTasks={weekTasks}
+        initialRequestedAt={existingRequest?.created_at ?? null}
+        username={username}
+      />
     </div>
   );
 }

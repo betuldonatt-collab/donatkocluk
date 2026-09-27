@@ -1,4 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UsernameCard } from "@/components/username-card";
+import { formatLoginName } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import { PROFILE_TERMS, formatPercentile } from "@/lib/profile-terms";
@@ -26,11 +28,12 @@ async function fetchSettingsData() {
         .maybeSingle()
     : { data: null };
 
-  return { parentPhone: parentProfile?.phone ?? null, student };
+  return { parentPhone: parentProfile?.phone ?? null, student, username: formatLoginName(user.phone) };
 }
 
 export default async function ParentSettingsPage() {
   const data = await fetchSettingsData();
+  const username = data?.username ?? null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -101,6 +104,8 @@ export default async function ParentSettingsPage() {
             <PhoneForm initialPhone={data?.parentPhone ?? null} />
           </CardContent>
         </Card>
+
+        <UsernameCard username={username} />
 
         <Card>
           <CardHeader>

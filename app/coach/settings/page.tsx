@@ -1,4 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UsernameCard } from "@/components/username-card";
+import { getLoginName } from "@/lib/login-name";
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { PasswordForm } from "./_components/password-form";
@@ -14,6 +16,8 @@ const DEFAULT_SETTINGS = {
 export default async function CoachSettingsPage() {
   const view = await getViewContext("coach");
   const supabase = await createClient();
+  // The login name of the person actually signed in; hidden while an admin views this panel as the coach.
+  const username = view?.isImpersonating ? null : await getLoginName();
 
   const { data: settingsRow } = view
     ? await supabase
@@ -42,6 +46,8 @@ export default async function CoachSettingsPage() {
             <ThemeToggle />
           </CardContent>
         </Card>
+
+        <UsernameCard username={username} />
 
         <Card>
           <CardHeader>

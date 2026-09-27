@@ -1,8 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UsernameCard } from "@/components/username-card";
+import { getLoginName } from "@/lib/login-name";
 import { PasswordForm } from "./_components/password-form";
 import { ThemeToggle } from "./_components/theme-toggle";
 
-export default function AdminSettingsPage() {
+export default async function AdminSettingsPage() {
+  const username = await getLoginName();
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6">
@@ -19,6 +22,8 @@ export default function AdminSettingsPage() {
             <ThemeToggle />
           </CardContent>
         </Card>
+
+        <UsernameCard username={username} />
 
         <Card>
           <CardHeader>

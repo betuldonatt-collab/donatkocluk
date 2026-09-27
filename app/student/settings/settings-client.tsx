@@ -1,5 +1,6 @@
 "use client";
 
+import { UsernameCard } from "@/components/username-card";
 import { useState } from "react";
 import { AlertTriangle, Download, Printer } from "lucide-react";
 
@@ -24,10 +25,12 @@ export function SettingsClient({
   weekDays,
   weekTasks,
   initialRequestedAt,
+  username,
 }: {
   weekDays: { date: string; label: string }[];
   weekTasks: StudentTask[];
   initialRequestedAt: string | null;
+  username: string | null;
 }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -58,6 +61,8 @@ export function SettingsClient({
           <ThemeToggle />
         </CardContent>
       </Card>
+
+      <UsernameCard username={username} />
 
       <Card>
         <CardHeader>
