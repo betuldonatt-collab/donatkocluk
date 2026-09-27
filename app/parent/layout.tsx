@@ -16,14 +16,11 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
     createClient().then((supabase) => supabase.from("profiles").select("full_name").eq("id", view.effectiveUserId).maybeSingle()),
   ]);
   const fullName = profile?.full_name ?? null;
+  // The "Haftalık Program" sidebar link exists only for a parent of an LGS student;
+  // the cohort comes with the linked-students query that already ran (cached), so
+  // no extra round trip.
+  const showProgram = isLgsParentView(students.find((s) => s.id === activeStudentId)?.exam_type);
   const announcements = await fetchParentAnnouncements(activeStudentId);
-  // The "Program" sidebar link exists only for a parent of an LGS student.
-  const showProgram = activeStudentId
-    ? isLgsParentView(
-        (await createClient().then((supabase) => supabase.from("profiles").select("exam_type").eq("id", activeStudentId).maybeSingle())).data
-          ?.exam_type,
-      )
-    : false;
 
   return (
     <div className="flex flex-1 flex-col">

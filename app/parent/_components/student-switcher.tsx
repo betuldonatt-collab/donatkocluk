@@ -1,7 +1,6 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -29,7 +28,6 @@ function initialsOf(name: string | null): string {
 // own TrackToggle), not a dropdown: every student is a directly clickable
 // tab, no open-then-select step.
 export function StudentSwitcher({ students, activeStudentId }: { students: LinkedStudent[]; activeStudentId: string }) {
-  const router = useRouter();
   const [, startTransition] = useTransition();
   // Instant visual switch: the clicked tab highlights the moment it's
   // clicked, independent of how long the setActiveStudent cookie write and
@@ -44,8 +42,8 @@ export function StudentSwitcher({ students, activeStudentId }: { students: Linke
     if (studentId === optimisticActiveId) return;
     startTransition(async () => {
       setOptimisticActiveId(studentId);
+      // The action revalidates the parent tree itself (lib/parent-context.ts).
       await setActiveStudent(studentId);
-      router.refresh();
     });
   }
 

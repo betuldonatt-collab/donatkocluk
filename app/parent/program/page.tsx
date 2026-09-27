@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { getActiveStudentId } from "@/lib/parent-context";
+import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
 import { isLgsParentView } from "@/lib/parent-lgs";
 import { mondayOf, weekDates } from "@/lib/date";
 import { EVIDENCE_BUCKET, isEvidencePathFor } from "@/lib/task-evidence";
@@ -46,8 +46,10 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
   if (!studentId) redirect("/parent");
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("profiles").select("full_name, exam_type").eq("id", studentId).maybeSingle();
-  if (!profile || !isLgsParentView(profile.exam_type)) redirect("/parent");
+  // Name and cohort come with the linked-students query (cached -- the layout
+  // already ran it), so there is no extra profile round trip here.
+  const student = (await getLinkedStudents()).find((s) => s.id === studentId);
+  if (!student || !isLgsParentView(student.exam_type)) redirect("/parent");
 
   const today = todayISO();
   const start = mondayOf(weekParam ?? today);
@@ -75,52 +77,51 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
   const taskList = (taskRows ?? []) as (Omit<ParentProgramTask, "resource_names" | "photo_urls" | "evidence_review_note"> & { evidence_image_paths: string[] | null })[];
   const taskIds = taskList.map((t) => t.id);
 
-  // The coach's optional rejection note (migration 0101), read separately and
-  // tolerant of the column not existing yet -- any error just means "no notes".
-  const noteByTask = new Map<string, string>();
-  if (taskIds.length > 0) {
-    const { data: noteRows, error: noteError } = await supabase.from("student_tasks").select("id, evidence_review_note").in("id", taskIds);
-    if (!noteError) {
-      for (const row of (noteRows ?? []) as { id: string; evidence_review_note: string | null }[]) {
-        if (row.evidence_review_note) noteByTask.set(row.id, row.evidence_review_note);
-      }
-    }
-  }
-
-  // Resource names (which book a task was assigned from) -- one query, grouped.
-  const resourceNamesByTask = new Map<string, string[]>();
-  if (taskIds.length > 0) {
-    const { data: resourceRows } = await supabase
-      .from("task_resources")
-      .select("task_id, order_index, student_resources(name)")
-      .in("task_id", taskIds)
-      .order("order_index", { ascending: true });
-    for (const row of resourceRows ?? []) {
-      const rel = (row as unknown as { student_resources: { name: string } | { name: string }[] | null }).student_resources;
-      const name = Array.isArray(rel) ? rel[0]?.name : rel?.name;
-      if (!name) continue;
-      const list = resourceNamesByTask.get(row.task_id) ?? [];
-      list.push(name);
-      resourceNamesByTask.set(row.task_id, list);
-    }
-  }
-
-  // Evidence photos: the bucket is private, so each path becomes a short-lived
-  // signed URL (allowed to this parent by the 0100 storage policy). Only paths
-  // that really belong to this student's task folder are ever signed.
-  const photoUrlsByTask = new Map<string, Record<string, string>>();
-  await Promise.all(
-    taskList.map(async (t) => {
-      const paths = (t.evidence_image_paths ?? []).filter((p) => isEvidencePathFor(p, studentId, t.id));
-      if (paths.length === 0) return;
-      const { data } = await supabase.storage.from(EVIDENCE_BUCKET).createSignedUrls(paths, 3600);
-      const map: Record<string, string> = {};
-      for (const entry of data ?? []) {
-        if (entry.path && entry.signedUrl) map[entry.path] = entry.signedUrl;
-      }
-      photoUrlsByTask.set(t.id, map);
-    }),
+  // Only paths that really belong to this student's task folder are ever signed.
+  const photoPathsByTask = new Map<string, string[]>(
+    taskList.map((t) => [t.id, (t.evidence_image_paths ?? []).filter((p) => isEvidencePathFor(p, studentId, t.id))]),
   );
+  const allPhotoPaths = [...photoPathsByTask.values()].flat();
+
+  // Everything that only needs the task list runs CONCURRENTLY -- the coach's
+  // notes (migration 0101, tolerant of the column not existing yet), the resource
+  // names, and ONE bulk call that signs every photo of the week (the bucket is
+  // private; the 0100 storage policy lets this parent read them) -- instead of
+  // one round trip after another.
+  const [noteResult, resourceResult, signedResult] = await Promise.all([
+    taskIds.length > 0 ? supabase.from("student_tasks").select("id, evidence_review_note").in("id", taskIds) : Promise.resolve(null),
+    taskIds.length > 0
+      ? supabase.from("task_resources").select("task_id, order_index, student_resources(name)").in("task_id", taskIds).order("order_index", { ascending: true })
+      : Promise.resolve(null),
+    allPhotoPaths.length > 0 ? supabase.storage.from(EVIDENCE_BUCKET).createSignedUrls(allPhotoPaths, 3600) : Promise.resolve(null),
+  ]);
+
+  const noteByTask = new Map<string, string>();
+  if (noteResult && !noteResult.error) {
+    for (const row of (noteResult.data ?? []) as { id: string; evidence_review_note: string | null }[]) {
+      if (row.evidence_review_note) noteByTask.set(row.id, row.evidence_review_note);
+    }
+  }
+
+  const resourceNamesByTask = new Map<string, string[]>();
+  for (const row of resourceResult?.data ?? []) {
+    const rel = (row as unknown as { student_resources: { name: string } | { name: string }[] | null }).student_resources;
+    const name = Array.isArray(rel) ? rel[0]?.name : rel?.name;
+    if (!name) continue;
+    const list = resourceNamesByTask.get(row.task_id) ?? [];
+    list.push(name);
+    resourceNamesByTask.set(row.task_id, list);
+  }
+
+  const signedByPath = new Map<string, string>();
+  for (const entry of signedResult?.data ?? []) {
+    if (entry.path && entry.signedUrl) signedByPath.set(entry.path, entry.signedUrl);
+  }
+  const photoUrlsByTask = new Map<string, Record<string, string>>();
+  for (const [taskId, paths] of photoPathsByTask) {
+    if (paths.length === 0) continue;
+    photoUrlsByTask.set(taskId, Object.fromEntries(paths.filter((path) => signedByPath.has(path)).map((path) => [path, signedByPath.get(path)!])));
+  }
 
   const tasks: ParentProgramTask[] = taskList.map((t) => ({
     ...t,
@@ -138,7 +139,7 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Haftalık Program</h1>
-          <p className="text-muted-foreground text-sm">{profile.full_name ?? "Öğrenci"} -- salt okunur</p>
+          <p className="text-muted-foreground text-sm">{student.full_name ?? "Öğrenci"} -- salt okunur</p>
         </div>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="icon" aria-label="Önceki hafta">

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getActiveStudentId } from "@/lib/parent-context";
+import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { mondayOf } from "@/lib/date";
@@ -97,6 +97,10 @@ async function fetchDashboardData() {
   const { start, end } = getWeekRange(today);
   const prevStart = addDays(start, -7);
   const prevEnd = addDays(start, -1);
+  // Known from the (cached) linked-students query, so the LGS-only daily rows can
+  // run in the SAME concurrent batch as everything else instead of after it.
+  const linked = await getLinkedStudents();
+  const isLgsStudent = isLgsParentView(linked.find((s) => s.id === studentId)?.exam_type);
 
   const [
     { data: profile },
@@ -108,6 +112,7 @@ async function fetchDashboardData() {
     { data: weightTaskRows },
     { data: prevTaskRows },
     { data: prevLockRow },
+    { data: dailyRowData },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -173,6 +178,15 @@ async function fetchDashboardData() {
         .gte("task_date", prevStart)
         .lte("task_date", prevEnd),
       supabase.from("week_locks").select("locked_at").eq("student_id", studentId).eq("week_start_date", prevStart).maybeSingle(),
+      // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
+      isLgsStudent
+        ? supabase
+            .from("student_tasks")
+            .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
+            .eq("student_id", studentId)
+            .gte("task_date", addDays(today, -1))
+            .lte("task_date", addDays(today, 1))
+        : Promise.resolve({ data: [] as DailyProgressTask[] }),
     ]);
 
   if (!profile) return { student: null };
@@ -202,18 +216,8 @@ async function fetchDashboardData() {
     computeLgsNet,
   );
 
-  // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
-  // Nothing extra is fetched for any other cohort.
-  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type)
-    ? (((
-        await supabase
-          .from("student_tasks")
-          .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
-          .eq("student_id", studentId)
-          .gte("task_date", addDays(today, -1))
-          .lte("task_date", addDays(today, 1))
-      ).data ?? []) as DailyProgressTask[])
-    : [];
+  // Only ever populated for an LGS student (see the batch above).
+  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type) ? ((dailyRowData ?? []) as DailyProgressTask[]) : [];
 
   return {
     today,

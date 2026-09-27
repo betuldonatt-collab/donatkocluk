@@ -2,13 +2,14 @@
 
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { parseInput, uuidSchema } from "@/lib/validation";
 
 const COOKIE_NAME = "parent_active_student";
 
-export type LinkedStudent = { id: string; full_name: string | null };
+export type LinkedStudent = { id: string; full_name: string | null; exam_type: string | null };
 
 // Every linked child, name-sorted. Most parents have exactly one -- the
 // switcher UI (student-switcher.tsx) only renders when this has more than
@@ -37,7 +38,7 @@ export const getLinkedStudents = cache(async (): Promise<LinkedStudent[]> => {
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, exam_type")
     .in("id", ids)
     .order("full_name", { ascending: true });
   return (profiles ?? []) as LinkedStudent[];
@@ -78,4 +79,8 @@ export async function setActiveStudent(studentId: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });
+  // Re-render the parent tree in THIS action's own response: the switcher used to
+  // call the action and then router.refresh() -- two sequential round trips, the
+  // second one doing the whole server render. Now it is one.
+  revalidatePath("/parent", "layout");
 }
