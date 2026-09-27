@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { updateSessionPaymentStatus } from "../../../actions";
+import { updateSessionPaymentStatus, updateSessionSchedule } from "../../../actions";
 import type { DetailSession } from "../types";
 import { AddSessionBatchDialog } from "./add-session-batch-dialog";
 
@@ -21,6 +22,15 @@ const OUTCOME_COLORS: Record<DetailSession["outcome"], string> = {
   completed: "bg-emerald-500/15 text-emerald-700",
   not_happened: "bg-rose-500/15 text-rose-700",
 };
+
+// The inverse of updateSessionSchedule's own `${date}T${time}:00+03:00` ->
+// toISOString() -- reading the stored instant back as Turkey wall-clock
+// date/time, regardless of the browser's own timezone, so re-saving an
+// untouched edit round-trips to the exact same scheduled_at.
+function turkeyDateTime(iso: string): { date: string; time: string } {
+  const d = new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
+  return { date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) };
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("tr-TR", {
@@ -39,6 +49,34 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
   const [sessions, setSessions] = useState(initialSessions);
   const [batchOpen, setBatchOpen] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  // Which session's date/time is being edited inline, and the form's own
+  // draft values -- independent of the session's real values until saved.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  function startEdit(session: DetailSession) {
+    const { date, time } = turkeyDateTime(session.scheduled_at);
+    setEditingId(session.id);
+    setEditDate(date);
+    setEditTime(time);
+  }
+
+  async function handleSaveEdit(sessionId: string) {
+    if (!editDate || !editTime) return;
+    setSavingEdit(true);
+    try {
+      const updated = await updateSessionSchedule(sessionId, editDate, editTime);
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, scheduled_at: (updated as { scheduled_at: string }).scheduled_at } : s)));
+      setEditingId(null);
+      toast.success("Görüşme tarihi güncellendi.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Tarih güncellenemedi, tekrar dene.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   const paidCount = sessions.filter((s) => s.is_paid).length;
   const completedCount = sessions.filter((s) => s.outcome === "completed").length;
@@ -88,36 +126,70 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
         <p className="text-muted-foreground text-sm">Henüz planlanmış bir görüşme yok.</p>
       ) : (
         <div className="border-border divide-border overflow-hidden rounded-lg border divide-y">
-          {sorted.map((s) => (
-            <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-foreground text-sm font-medium">{formatDate(s.scheduled_at)}</p>
-                <span className={cn("mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium", OUTCOME_COLORS[s.outcome])}>
-                  {OUTCOME_LABELS[s.outcome]}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span
-                  className={cn(
-                    "rounded px-1.5 py-0.5 text-xs font-medium",
-                    s.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
-                  )}
-                >
-                  {s.is_paid ? "Ödendi" : "Ödeme Bekliyor"}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-10"
-                  onClick={() => handleTogglePaid(s)}
-                  disabled={togglingId === s.id}
-                >
-                  {s.is_paid ? "Ödenmedi işaretle" : "Ödendi işaretle"}
+          {sorted.map((s) =>
+            editingId === s.id ? (
+              <div key={s.id} className="flex flex-wrap items-end gap-2 px-4 py-3">
+                <div className="space-y-1">
+                  <label htmlFor={`session-edit-date-${s.id}`} className="text-muted-foreground text-xs">
+                    Tarih
+                  </label>
+                  <Input id={`session-edit-date-${s.id}`} type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} disabled={savingEdit} />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor={`session-edit-time-${s.id}`} className="text-muted-foreground text-xs">
+                    Saat
+                  </label>
+                  <Input id={`session-edit-time-${s.id}`} type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} disabled={savingEdit} />
+                </div>
+                <Button type="button" size="sm" className="h-10" onClick={() => handleSaveEdit(s.id)} disabled={savingEdit || !editDate || !editTime}>
+                  {savingEdit ? "Kaydediliyor..." : "Kaydet"}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-10" onClick={() => setEditingId(null)} disabled={savingEdit}>
+                  Vazgeç
                 </Button>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-foreground text-sm font-medium">{formatDate(s.scheduled_at)}</p>
+                  <span className={cn("mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium", OUTCOME_COLORS[s.outcome])}>
+                    {OUTCOME_LABELS[s.outcome]}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-xs font-medium",
+                      s.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
+                    )}
+                  >
+                    {s.is_paid ? "Ödendi" : "Ödeme Bekliyor"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-10"
+                    onClick={() => startEdit(s)}
+                    aria-label="Tarihi düzenle"
+                    title="Tarihi düzenle"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10"
+                    onClick={() => handleTogglePaid(s)}
+                    disabled={togglingId === s.id}
+                  >
+                    {s.is_paid ? "Ödenmedi işaretle" : "Ödendi işaretle"}
+                  </Button>
+                </div>
+              </div>
+            ),
+          )}
         </div>
       )}
 

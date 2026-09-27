@@ -327,6 +327,42 @@ export async function updateSessionPaymentStatus(sessionId: string, isPaid: bool
   return data;
 }
 
+const sessionEditDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Geçersiz tarih.");
+const sessionEditTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Geçersiz saat.");
+
+// Corrects a session's date/time after the fact -- a typo in the original
+// scheduling, or a backfilled/completed session whose date needs fixing.
+// Deliberately narrow: only scheduled_at moves, outcome/is_paid/evaluation_notes
+// and everything else on the row are untouched, and this is a plain UPDATE (no
+// automation side effects the way evaluateSessionCompleted has -- no follow-up
+// task, no notification, nothing re-triggered by moving a date).
+export async function updateSessionSchedule(sessionId: string, date: string, time: string) {
+  await assertNotImpersonating();
+  const sessionIdV = parseInput(uuidSchema, sessionId);
+  const dateV = parseInput(sessionEditDateSchema, date);
+  const timeV = parseInput(sessionEditTimeSchema, time);
+
+  // Turkey is UTC+3 year-round (no DST since 2016) -- an explicit offset so
+  // "18:00" typed in the form means 18:00 in Turkey, not UTC.
+  const scheduledAt = new Date(`${dateV}T${timeV}:00+03:00`);
+  if (Number.isNaN(scheduledAt.getTime())) throw new Error("Geçersiz tarih/saat.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("coaching_sessions")
+    .update({ scheduled_at: scheduledAt.toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", sessionIdV)
+    .select("*")
+    .single();
+  if (error) throw dbError(error);
+
+  revalidatePath("/coach/dashboard");
+  revalidatePath("/coach/sessions");
+  revalidatePath(`/coach/students/${data.student_id}`);
+  revalidatePath("/parent");
+  return data;
+}
+
 // Schedules every date in one submit instead of repeating the
 // single-session dialog N times -- typically for "parent paid for N
 // sessions", but isPaid is an explicit per-batch choice, not hardcoded,
