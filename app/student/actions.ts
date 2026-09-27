@@ -751,6 +751,31 @@ export async function submitDailyStats(entryDate: string) {
 // policies do), the task board simply had no UI to ask for one. A locked
 // week is exactly where this matters most: without it, a student loses
 // all visibility into a program the moment their coach finalizes it.
+// The printable program (Ayarlar): the student's tasks inside an inclusive date
+// range, with ONLY the columns the sheet shows -- one query, no lock or resource
+// joins. The span is capped so a stray range can never pull a huge result.
+const PRINT_MAX_DAYS = 62;
+
+export async function getTasksForPrint(rangeStart: string, rangeEnd: string) {
+  const startV = parseInput(dateSchema, rangeStart);
+  const endV = parseInput(dateSchema, rangeEnd);
+  const days = Math.round((Date.parse(`${endV}T00:00:00Z`) - Date.parse(`${startV}T00:00:00Z`)) / 86_400_000) + 1;
+  if (!(days >= 1 && days <= PRINT_MAX_DAYS)) throw new Error(`Tarih aralığı 1 ile ${PRINT_MAX_DAYS} gün arasında olmalı.`);
+
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .select("id, task_date, task_type, title, course_id, status, order_index, total_count, duration_minutes")
+    .eq("student_id", user.id)
+    .gte("task_date", startV)
+    .lte("task_date", endV)
+    .order("task_date", { ascending: true })
+    .order("order_index", { ascending: true });
+  if (error) throw dbError(error);
+  return data ?? [];
+}
+
 export async function getTasksForWeek(weekStart: string, weekEnd: string) {
   const weekStartV = parseInput(dateSchema, weekStart);
   const weekEndV = parseInput(dateSchema, weekEnd);

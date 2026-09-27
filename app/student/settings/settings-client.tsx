@@ -2,7 +2,7 @@
 
 import { UsernameCard } from "@/components/username-card";
 import { useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { AlertTriangle, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,26 +18,38 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TASK_TYPE_LABELS, subjectTintClass, type StudentTask } from "../_components/daily-tasks/types";
 import { isRoutineCourseId } from "@/lib/curriculum";
-import { mondayOf, weekDates } from "@/lib/date";
 import { Input } from "@/components/ui/input";
-import { getTasksForWeek } from "../actions";
+import { getTasksForPrint } from "../actions";
 import { cn } from "@/lib/utils";
 import { submitCancellationRequest } from "./actions";
 import { PasswordForm } from "./_components/password-form";
 import { ThemeToggle } from "./theme-toggle";
 
-// Monday..Sunday of the week containing `dateIso`, labelled like the rest of the app.
-function buildWeek(dateIso: string): { date: string; label: string }[] {
-  return weekDates(dateIso).map((date) => ({
-    date,
-    label: new Date(`${date}T00:00:00Z`).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }),
-  }));
+const PRINT_MAX_DAYS = 62;
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function dayCount(start: string, end: string): number {
+  return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
 }
 
-function shiftDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+// Every day from `start` to `end` inclusive, labelled like the rest of the app.
+function buildRange(start: string, end: string): { date: string; label: string }[] {
+  const days: { date: string; label: string }[] = [];
+  for (let i = 0; i < dayCount(start, end); i++) {
+    const d = new Date(`${start}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    days.push({
+      date: d.toISOString().slice(0, 10),
+      label: d.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }),
+    });
+  }
+  return days;
+}
+
+// "21 Eylül 2026"
+function formatLongDate(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 export function SettingsClient({
@@ -52,32 +64,46 @@ export function SettingsClient({
   username: string | null;
 }) {
   const [cancelOpen, setCancelOpen] = useState(false);
-  // Which week gets printed: starts as the current week (already loaded by the
-  // page) and can be moved to any past or future week. Only a change of week asks
-  // the server for that one week's tasks; printing itself stays purely client-side.
-  const currentMonday = weekDays[0].date;
+  // The printed range: starts as the current week (already loaded by the page) and
+  // can be any custom start..end span (1 to ${PRINT_MAX_DAYS} days). Only a change of range
+  // asks the server, with one lean query for exactly that span; printing itself is
+  // purely client-side.
+  const [startInput, setStartInput] = useState(weekDays[0].date);
+  const [endInput, setEndInput] = useState(weekDays[6].date);
   const [printDays, setPrintDays] = useState(weekDays);
   const [printTasks, setPrintTasks] = useState(weekTasks);
-  const [weekLoading, setWeekLoading] = useState(false);
-  const [weekError, setWeekError] = useState<string | null>(null);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const currentStart = weekDays[0].date;
+  const currentEnd = weekDays[6].date;
 
-  async function selectWeek(dateIso: string) {
-    if (!dateIso) return;
-    const monday = mondayOf(dateIso);
-    if (monday === printDays[0].date) return;
-    setWeekLoading(true);
-    setWeekError(null);
+  async function applyRange(start: string, end: string) {
+    setStartInput(start);
+    setEndInput(end);
+    if (!DATE_RE.test(start) || !DATE_RE.test(end)) return; // still typing
+    const n = dayCount(start, end);
+    if (n < 1) {
+      setRangeError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      return;
+    }
+    if (n > PRINT_MAX_DAYS) {
+      setRangeError(`En fazla ${PRINT_MAX_DAYS} günlük bir aralık seçebilirsin.`);
+      return;
+    }
+    setRangeError(null);
+    if (start === printDays[0].date && end === printDays[printDays.length - 1].date) return;
+    setRangeLoading(true);
     try {
-      const days = buildWeek(monday);
-      const { tasks } = await getTasksForWeek(days[0].date, days[6].date);
-      setPrintTasks(tasks as unknown as StudentTask[]);
-      setPrintDays(days);
+      const rows = await getTasksForPrint(start, end);
+      setPrintTasks(rows as unknown as StudentTask[]);
+      setPrintDays(buildRange(start, end));
     } catch {
-      setWeekError("Bu haftanın programı yüklenemedi. Tekrar dene.");
+      setRangeError("Bu aralığın programı yüklenemedi. Tekrar dene.");
     } finally {
-      setWeekLoading(false);
+      setRangeLoading(false);
     }
   }
+
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [requestedAt, setRequestedAt] = useState(initialRequestedAt);
@@ -122,37 +148,31 @@ export function SettingsClient({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Çevrimdışı Kullanım</CardTitle>
-          <CardDescription>Yazdırmak veya PDF olarak kaydetmek istediğin haftayı seç</CardDescription>
+          <CardDescription>Yazdırmak veya PDF olarak kaydetmek istediğin tarih aralığını seç</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="icon" aria-label="Önceki hafta" disabled={weekLoading} onClick={() => void selectWeek(shiftDays(printDays[0].date, -7))}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-foreground min-w-0 flex-1 text-center text-sm font-medium sm:flex-none sm:min-w-56">
-              {printDays[0].label} – {printDays[6].label}
-            </span>
-            <Button type="button" variant="outline" size="icon" aria-label="Sonraki hafta" disabled={weekLoading} onClick={() => void selectWeek(shiftDays(printDays[0].date, 7))}>
-              <ChevronRight className="size-4" />
-            </Button>
-            <Input
-              type="date"
-              aria-label="Belirli bir tarihin haftasını seç"
-              value={printDays[0].date}
-              disabled={weekLoading}
-              onChange={(e) => void selectWeek(e.target.value)}
-              className="w-auto"
-            />
-            {printDays[0].date !== currentMonday && (
-              <Button type="button" variant="ghost" size="sm" disabled={weekLoading} onClick={() => void selectWeek(currentMonday)}>
-                Bu Hafta
-              </Button>
-            )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="print-start">Başlangıç Tarihi</Label>
+              <Input id="print-start" type="date" value={startInput} disabled={rangeLoading} onChange={(e) => void applyRange(e.target.value, endInput)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="print-end">Bitiş Tarihi</Label>
+              <Input id="print-end" type="date" value={endInput} min={startInput || undefined} disabled={rangeLoading} onChange={(e) => void applyRange(startInput, e.target.value)} />
+            </div>
           </div>
-          {weekError && <p className="text-destructive text-sm">{weekError}</p>}
-          <Button type="button" variant="outline" disabled={weekLoading} onClick={() => window.print()}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="ghost" size="sm" disabled={rangeLoading} onClick={() => void applyRange(currentStart, currentEnd)}>
+              Bu Hafta
+            </Button>
+            <span className="text-muted-foreground text-xs">
+              {printDays.length} gün · {formatLongDate(printDays[0].date)} — {formatLongDate(printDays[printDays.length - 1].date)}
+            </span>
+          </div>
+          {rangeError && <p className="text-destructive text-sm">{rangeError}</p>}
+          <Button type="button" variant="outline" disabled={rangeLoading || rangeError !== null} onClick={() => window.print()}>
             <Download className="size-4" />
-            {weekLoading ? "Hafta yükleniyor..." : "Haftalık Programımı İndir"}
+            {rangeLoading ? "Program yükleniyor..." : "Haftalık Programımı İndir"}
           </Button>
         </CardContent>
       </Card>
@@ -214,7 +234,7 @@ export function SettingsClient({
 
     {/* Outside the print:hidden wrapper: it used to sit INSIDE it, so the printed
         page was the hidden wrapper's empty shell (a blank page). */}
-    <PrintableWeeklySchedule weekDays={printDays} weekTasks={printTasks} />
+    <PrintableWeeklySchedule days={printDays} tasks={printTasks} />
     </>
   );
 }
@@ -262,72 +282,74 @@ function PrintTaskCell({ tasks }: { tasks: StudentTask[] }) {
   );
 }
 
-// The printed weekly program (Ayarlar > Haftalık Programımı İndir -> window.print()):
-// a landscape timetable -- one column per day, Rutinler and Görevler as rows --
-// with each task's subject colour, type, question/page target and status. It is
-// pure client-side HTML/CSS; the print stylesheet (globals.css) keeps the colours.
-function PrintableWeeklySchedule({
-  weekDays,
-  weekTasks,
-}: {
-  weekDays: { date: string; label: string }[];
-  weekTasks: StudentTask[];
-}) {
-  const byDay = (date: string) => weekTasks.filter((t) => t.task_date === date).sort((a, b) => a.order_index - b.order_index);
-  const routines = weekDays.map((d) => byDay(d.date).filter((t) => isRoutineCourseId(t.course_id)));
-  const regular = weekDays.map((d) => byDay(d.date).filter((t) => !isRoutineCourseId(t.course_id)));
-  const hasRoutines = routines.some((r) => r.length > 0);
+// The printed program (Ayarlar > Haftalık Programımı İndir -> window.print()): a
+// landscape timetable for ANY start..end range -- one column per day (in rows of up
+// to seven, so a 14-day span prints as two week-sized tables and a 3-day span as
+// one narrow one), Rutinler and Görevler as rows -- with each task's subject
+// colour, type, question/page target and status. Pure client-side HTML/CSS; the
+// print stylesheet (globals.css) keeps the colours.
+function PrintableWeeklySchedule({ days, tasks }: { days: { date: string; label: string }[]; tasks: StudentTask[] }) {
+  const byDay = (date: string) => tasks.filter((t) => t.task_date === date).sort((a, b) => a.order_index - b.order_index);
+  const chunks: { date: string; label: string }[][] = [];
+  for (let i = 0; i < days.length; i += 7) chunks.push(days.slice(i, i + 7));
 
   return (
     <div className="weekly-print hidden print:block">
       <div className="mb-2 flex items-baseline justify-between">
         <h1 className="text-lg font-bold text-black">Haftalık Programım</h1>
-        <p className="text-xs text-gray-600">
-          {weekDays[0]?.label} – {weekDays[6]?.label}
+        <p className="text-xs font-medium text-gray-700">
+          {formatLongDate(days[0].date)} — {formatLongDate(days[days.length - 1].date)}
         </p>
       </div>
 
-      <table className="w-full table-fixed border-collapse text-[9px]">
-        <thead>
-          <tr>
-            {weekDays.map((day) => (
-              <th key={day.date} className="border border-gray-500 bg-[#1e2a5a] px-1 py-1 text-center text-[10px] font-semibold text-white">
-                {day.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {hasRoutines && (
-            <>
+      {chunks.map((chunk) => {
+        const routines = chunk.map((d) => byDay(d.date).filter((t) => isRoutineCourseId(t.course_id)));
+        const regular = chunk.map((d) => byDay(d.date).filter((t) => !isRoutineCourseId(t.course_id)));
+        const hasRoutines = routines.some((r) => r.length > 0);
+        return (
+          <table key={chunk[0].date} className="mb-3 w-full table-fixed border-collapse text-[9px]">
+            <thead>
               <tr>
-                <td colSpan={7} className="border border-gray-500 bg-indigo-100 px-1 py-0.5 text-[9px] font-bold tracking-wide text-indigo-900 uppercase">
-                  Rutinler
+                {chunk.map((day) => (
+                  <th key={day.date} className="border border-gray-500 bg-[#1e2a5a] px-1 py-1 text-center text-[10px] font-semibold text-white">
+                    {day.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hasRoutines && (
+                <>
+                  <tr>
+                    <td colSpan={chunk.length} className="border border-gray-500 bg-indigo-100 px-1 py-0.5 text-[9px] font-bold tracking-wide text-indigo-900 uppercase">
+                      Rutinler
+                    </td>
+                  </tr>
+                  <tr>
+                    {routines.map((dayTasks, i) => (
+                      <td key={chunk[i].date} className="border border-gray-500 p-1 align-top">
+                        <PrintTaskCell tasks={dayTasks} />
+                      </td>
+                    ))}
+                  </tr>
+                </>
+              )}
+              <tr>
+                <td colSpan={chunk.length} className="border border-gray-500 bg-gray-200 px-1 py-0.5 text-[9px] font-bold tracking-wide text-gray-900 uppercase">
+                  Görevler
                 </td>
               </tr>
               <tr>
-                {routines.map((tasks, i) => (
-                  <td key={weekDays[i].date} className="border border-gray-500 p-1 align-top">
-                    <PrintTaskCell tasks={tasks} />
+                {regular.map((dayTasks, i) => (
+                  <td key={chunk[i].date} className="border border-gray-500 p-1 align-top">
+                    <PrintTaskCell tasks={dayTasks} />
                   </td>
                 ))}
               </tr>
-            </>
-          )}
-          <tr>
-            <td colSpan={7} className="border border-gray-500 bg-gray-200 px-1 py-0.5 text-[9px] font-bold tracking-wide text-gray-900 uppercase">
-              Görevler
-            </td>
-          </tr>
-          <tr>
-            {regular.map((tasks, i) => (
-              <td key={weekDays[i].date} className="border border-gray-500 p-1 align-top">
-                <PrintTaskCell tasks={tasks} />
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
+            </tbody>
+          </table>
+        );
+      })}
     </div>
   );
 }
