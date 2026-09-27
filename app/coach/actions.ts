@@ -3719,11 +3719,12 @@ export async function getTaskEvidenceForCoach(
 }
 
 // =============================================================================
-// TEMPORARY -- "Geçmiş Görüşmeler" backfill. Delete this whole block, plus
-// app/coach/sessions/_components/backfill-past-sessions.tsx and the two lines
-// that mount it in app/coach/sessions/page.tsx, once the historical session
-// entry is done. Nothing else in the app calls this action or that component --
-// removing them is a clean, self-contained delete, no other file needs editing.
+// "Geçmiş Görüşmeler" backfill -- lets a coach bulk-enter historical sessions
+// (e.g. ones that happened before they started using the scheduler, or a
+// missed entry noticed later) without going through the live "schedule then
+// complete" flow one row at a time. Paired with
+// app/coach/sessions/_components/backfill-past-sessions.tsx, mounted in
+// app/coach/sessions/page.tsx.
 //
 // Deliberately a DIRECT insert with outcome already 'completed', NOT a call to
 // evaluateSessionCompleted (above): that action creates an "Ara Görüşme"

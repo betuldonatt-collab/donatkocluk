@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { MonthNavigator } from "./_components/month-navigator";
 import { SessionsClient } from "./_components/sessions-client";
-// TEMPORARY -- see that file's own header comment for what to delete, and when.
 import { BackfillPastSessions } from "./_components/backfill-past-sessions";
 import type { CoachingSession, RosterStudent } from "../dashboard/types";
 
@@ -94,7 +93,6 @@ export default async function CoachSessionsPage(props: PageProps<"/coach/session
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <MonthNavigator month={month} isCurrentMonth={month === currentMonth} />
-        {/* TEMPORARY -- see backfill-past-sessions.tsx's own header comment. */}
         <BackfillPastSessions roster={roster} />
       </div>
 

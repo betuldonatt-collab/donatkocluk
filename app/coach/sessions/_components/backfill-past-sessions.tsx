@@ -1,13 +1,10 @@
 "use client";
 
 // =============================================================================
-// TEMPORARY -- "Geçmiş Görüşmeler" bulk quick-add, for entering historical
-// sessions that happened before this coach started using the scheduler. DELETE
-// THIS WHOLE FILE, plus backfillPastSessions in ../../actions.ts and the two
-// lines that mount <BackfillPastSessions /> in ../page.tsx, once the backfill
-// is done -- nothing else imports either, so removing all three is a clean,
-// self-contained delete. The sessions it created stay in the database exactly
-// as normal completed sessions; only this entry form goes away.
+// "Geçmiş Görüşmeler" bulk quick-add -- for entering historical sessions (ones
+// that happened before this coach started using the scheduler, a new student's
+// prior sessions, or a missed entry noticed later) without going through the
+// live "schedule then complete" flow one row at a time.
 //
 // One student picked once, then a spreadsheet-style list of date/time/ödendi
 // rows for THAT student, submitted together as one "Toplu Kaydet" -- one
@@ -90,7 +87,7 @@ export function BackfillPastSessions({ roster }: { roster: RosterStudent[] }) {
   }
 
   return (
-    <Card className="border-amber-500/40">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">Geçmiş Görüşme Ekle (Toplu)</CardTitle>
@@ -99,7 +96,7 @@ export function BackfillPastSessions({ roster }: { roster: RosterStudent[] }) {
           </Button>
         </div>
         <CardDescription>
-          Geçici araç: zaten yapılmış eski görüşmeleri hızlıca kaydeder. Tamamlandı olarak eklenir, öğrenciye
+          Zaten yapılmış eski görüşmeleri hızlıca kaydeder. Tamamlandı olarak eklenir, öğrenciye
           değerlendirme bildirimi veya &quot;Ara Görüşme&quot; görevi oluşturmaz. Saat boş bırakılırsa 12:00 kullanılır.
           {savedCount > 0 && <span className="text-foreground font-medium"> Bu oturumda eklenen: {savedCount}.</span>}
         </CardDescription>
