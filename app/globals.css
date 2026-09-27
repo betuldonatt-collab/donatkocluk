@@ -184,4 +184,25 @@
   .fixed {
     display: none !important;
   }
+
+  /* Keep the colours: browsers drop background colours and images when printing
+     unless told otherwise, which would turn the subject-coloured task cells,
+     status chips and header row into plain white boxes. */
+  .weekly-print,
+  .weekly-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* The weekly table prints landscape (named page, so no other print job is
+     affected). Browsers without named-page support simply print portrait. */
+  .weekly-print {
+    page: weekly;
+    color-scheme: light;
+  }
+}
+
+@page weekly {
+  size: A4 landscape;
+  margin: 8mm;
 }

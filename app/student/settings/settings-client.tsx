@@ -2,7 +2,7 @@
 
 import { UsernameCard } from "@/components/username-card";
 import { useState } from "react";
-import { AlertTriangle, Download, Printer } from "lucide-react";
+import { AlertTriangle, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { TASK_TYPE_LABELS, type StudentTask } from "../_components/daily-tasks/types";
+import { TASK_TYPE_LABELS, subjectTintClass, type StudentTask } from "../_components/daily-tasks/types";
+import { isRoutineCourseId } from "@/lib/curriculum";
+import { cn } from "@/lib/utils";
 import { submitCancellationRequest } from "./actions";
 import { PasswordForm } from "./_components/password-form";
 import { ThemeToggle } from "./theme-toggle";
@@ -149,6 +151,53 @@ export function SettingsClient({
   );
 }
 
+// One short line for what the task asks: the assigned target ("50 soru", "2 adet",
+// "120 sayfa") and/or the planned duration -- the numbers a student needs on paper.
+function printTarget(task: StudentTask): string {
+  const parts: string[] = [];
+  if (task.total_count !== null && task.total_count > 0) {
+    const unit = task.task_type === "branch_exam" ? "adet" : task.task_type === "reading" ? "sayfa" : "soru";
+    if (task.task_type !== "general_exam" && task.task_type !== "video") parts.push(`${task.total_count} ${unit}`);
+  }
+  if (task.duration_minutes !== null && task.duration_minutes > 0) parts.push(`${task.duration_minutes} dk`);
+  return parts.join(" · ");
+}
+
+const PRINT_STATUS: Record<StudentTask["status"], { label: string; className: string }> = {
+  pending: { label: "Bekliyor", className: "bg-gray-200 text-gray-700" },
+  done: { label: "Tamamlandı", className: "bg-emerald-200 text-emerald-800" },
+  half_done: { label: "Yarım", className: "bg-amber-200 text-amber-800" },
+  not_done: { label: "Yapılmadı", className: "bg-rose-200 text-rose-800" },
+};
+
+function PrintTaskCell({ tasks }: { tasks: StudentTask[] }) {
+  if (tasks.length === 0) return <span className="text-gray-400">—</span>;
+  return (
+    <div className="space-y-1">
+      {tasks.map((task) => {
+        const target = printTarget(task);
+        const status = PRINT_STATUS[task.status];
+        return (
+          <div key={task.id} className={cn("break-inside-avoid rounded border border-gray-400 p-1 leading-tight", subjectTintClass(task))}>
+            <p className="font-semibold break-words text-black">{task.title}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-gray-800">
+              <span className="rounded bg-white/70 px-1 font-medium">{TASK_TYPE_LABELS[task.task_type]}</span>
+              {target && <span className="font-semibold">{target}</span>}
+            </p>
+            <p className="mt-0.5">
+              <span className={cn("rounded px-1 font-medium", status.className)}>{status.label}</span>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// The printed weekly program (Ayarlar > Haftalık Programımı İndir -> window.print()):
+// a landscape timetable -- one column per day, Rutinler and Görevler as rows --
+// with each task's subject colour, type, question/page target and status. It is
+// pure client-side HTML/CSS; the print stylesheet (globals.css) keeps the colours.
 function PrintableWeeklySchedule({
   weekDays,
   weekTasks,
@@ -156,31 +205,61 @@ function PrintableWeeklySchedule({
   weekDays: { date: string; label: string }[];
   weekTasks: StudentTask[];
 }) {
+  const byDay = (date: string) => weekTasks.filter((t) => t.task_date === date).sort((a, b) => a.order_index - b.order_index);
+  const routines = weekDays.map((d) => byDay(d.date).filter((t) => isRoutineCourseId(t.course_id)));
+  const regular = weekDays.map((d) => byDay(d.date).filter((t) => !isRoutineCourseId(t.course_id)));
+  const hasRoutines = routines.some((r) => r.length > 0);
+
   return (
-    <div className="hidden print:block">
-      <h1 className="mb-4 text-xl font-semibold">
-        <Printer className="mr-2 inline size-5" />
-        Haftalık Programım
-      </h1>
-      {weekDays.map((day) => {
-        const dayTasks = weekTasks.filter((t) => t.task_date === day.date);
-        return (
-          <div key={day.date} className="mb-4 break-inside-avoid">
-            <h2 className="mb-1 border-b border-black pb-1 text-sm font-semibold">{day.label}</h2>
-            {dayTasks.length === 0 ? (
-              <p className="text-xs text-gray-500">Görev yok.</p>
-            ) : (
-              <ul className="text-xs">
-                {dayTasks.map((task) => (
-                  <li key={task.id} className="py-0.5">
-                    ☐ {task.title} — {TASK_TYPE_LABELS[task.task_type]}
-                  </li>
+    <div className="weekly-print hidden print:block">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h1 className="text-lg font-bold text-black">Haftalık Programım</h1>
+        <p className="text-xs text-gray-600">
+          {weekDays[0]?.label} – {weekDays[6]?.label}
+        </p>
+      </div>
+
+      <table className="w-full table-fixed border-collapse text-[9px]">
+        <thead>
+          <tr>
+            {weekDays.map((day) => (
+              <th key={day.date} className="border border-gray-500 bg-[#1e2a5a] px-1 py-1 text-center text-[10px] font-semibold text-white">
+                {day.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {hasRoutines && (
+            <>
+              <tr>
+                <td colSpan={7} className="border border-gray-500 bg-indigo-100 px-1 py-0.5 text-[9px] font-bold tracking-wide text-indigo-900 uppercase">
+                  Rutinler
+                </td>
+              </tr>
+              <tr>
+                {routines.map((tasks, i) => (
+                  <td key={weekDays[i].date} className="border border-gray-500 p-1 align-top">
+                    <PrintTaskCell tasks={tasks} />
+                  </td>
                 ))}
-              </ul>
-            )}
-          </div>
-        );
-      })}
+              </tr>
+            </>
+          )}
+          <tr>
+            <td colSpan={7} className="border border-gray-500 bg-gray-200 px-1 py-0.5 text-[9px] font-bold tracking-wide text-gray-900 uppercase">
+              Görevler
+            </td>
+          </tr>
+          <tr>
+            {regular.map((tasks, i) => (
+              <td key={weekDays[i].date} className="border border-gray-500 p-1 align-top">
+                <PrintTaskCell tasks={tasks} />
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
