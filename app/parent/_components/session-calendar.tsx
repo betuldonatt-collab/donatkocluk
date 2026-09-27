@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -33,17 +32,6 @@ function formatMonthHeading(key: string) {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
 }
 
-function formatCountdown(ms: number) {
-  if (ms <= 0) return "Şimdi";
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  if (days > 0) return `${days} gün ${pad(hours)} saat`;
-  return `${pad(hours)}:${pad(minutes)}`;
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("tr-TR", {
     weekday: "long",
@@ -55,13 +43,6 @@ function formatDate(iso: string) {
 }
 
 export function SessionCalendar({ sessions }: { sessions: ParentSession[] }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
   const upcoming = sessions
     .filter((s) => s.outcome === "pending")
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
@@ -81,28 +62,23 @@ export function SessionCalendar({ sessions }: { sessions: ParentSession[] }) {
   return (
     <div className="space-y-4">
       {upcoming ? (
-        <div className="border-border from-primary/10 via-primary/5 flex flex-col gap-3 rounded-xl border bg-gradient-to-r to-transparent px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/15 flex size-11 shrink-0 items-center justify-center rounded-full">
-              <Calendar className="text-primary size-5" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Yaklaşan Görüşme
-              </p>
-              <p className="text-foreground text-sm font-medium">{formatDate(upcoming.scheduled_at)}</p>
-              <span
-                className={cn(
-                  "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
-                  upcoming.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
-                )}
-              >
-                {upcoming.is_paid ? "Ödemesi Yapıldı" : "Ödeme Bekliyor"}
-              </span>
-            </div>
+        <div className="border-border from-primary/10 via-primary/5 flex items-center gap-3 rounded-xl border bg-gradient-to-r to-transparent px-5 py-4">
+          <div className="bg-primary/15 flex size-11 shrink-0 items-center justify-center rounded-full">
+            <Calendar className="text-primary size-5" />
           </div>
-          <div className="text-foreground text-xl font-semibold tabular-nums sm:text-2xl">
-            {formatCountdown(new Date(upcoming.scheduled_at).getTime() - now)}
+          <div>
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              Yaklaşan Görüşme
+            </p>
+            <p className="text-foreground text-sm font-medium">{formatDate(upcoming.scheduled_at)}</p>
+            <span
+              className={cn(
+                "mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
+                upcoming.is_paid ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700",
+              )}
+            >
+              {upcoming.is_paid ? "Ödemesi Yapıldı" : "Ödeme Bekliyor"}
+            </span>
           </div>
         </div>
       ) : (
