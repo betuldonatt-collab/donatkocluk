@@ -51,6 +51,7 @@ export function SettingsClient({
   }
 
   return (
+    <>
     <div className="space-y-6 print:hidden">
       <Card>
         <CardHeader>
@@ -139,8 +140,12 @@ export function SettingsClient({
         </DialogContent>
       </Dialog>
 
-      <PrintableWeeklySchedule weekDays={weekDays} weekTasks={weekTasks} />
     </div>
+
+    {/* Outside the print:hidden wrapper: it used to sit INSIDE it, so the printed
+        page was the hidden wrapper's empty shell (a blank page). */}
+    <PrintableWeeklySchedule weekDays={weekDays} weekTasks={weekTasks} />
+    </>
   );
 }
 

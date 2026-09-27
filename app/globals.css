@@ -168,3 +168,20 @@
     user-select: text;
   }
 }
+
+/* Printing (window.print(), e.g. Ayarlar > Haftalık Programımı İndir): let the page
+   flow across as many pages as it needs -- html/body overflow, the app's own
+   fixed-height flex shell, and floating widgets (timer, announcements, toasts)
+   must not clip or cover the printed sheet. Client-side only, no server work. */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  .fixed {
+    display: none !important;
+  }
+}
