@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
+import { fetchActiveRsvpRequiredAnnouncements } from "@/lib/announcements";
 import {
   getPendingFocusReviews,
   getPendingStudentTasks,
@@ -81,10 +82,12 @@ function buildCoachAlerts(
   rsvpRows: {
     id: string;
     student_id: string;
+    announcement_id: string;
     response: "attending" | "not_attending";
     decline_reason: string | null;
     announcements: { title: string } | { title: string }[] | null;
   }[],
+  rsvpRequiredAnnouncements: { id: string; title: string }[],
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
@@ -156,7 +159,18 @@ function buildCoachAlerts(
   const rsvpAttending = rsvpAlerts.filter((a) => a.response === "attending");
   const rsvpNotAttending = rsvpAlerts.filter((a) => a.response === "not_attending");
 
-  return { inactive, lowPerformance, missingExams, pendingReportCards, rsvpAttending, rsvpNotAttending };
+  // Cevap Bekleyenler: cross-reference every active RSVP-required announcement
+  // against the roster -- a student with no announcement_rsvps row at all for
+  // that announcement hasn't answered yet. One entry per (student,
+  // announcement) pair, same shape as the other two columns.
+  const respondedPairs = new Set(rsvpRows.map((r) => `${r.student_id}::${r.announcement_id}`));
+  const rsvpPending: RsvpResponseAlert[] = roster.flatMap((student) =>
+    rsvpRequiredAnnouncements
+      .filter((a) => !respondedPairs.has(`${student.id}::${a.id}`))
+      .map((a) => ({ student, rsvpId: `${a.id}:${student.id}`, announcementTitle: a.title, declineReason: null })),
+  );
+
+  return { inactive, lowPerformance, missingExams, pendingReportCards, rsvpAttending, rsvpNotAttending, rsvpPending };
 }
 
 async function fetchDashboardData(
@@ -228,50 +242,54 @@ async function fetchDashboardData(
   const prevWeekSunday = addDaysISO(todayWeek[0].date, -1);
 
   const [
-    { data: profiles },
-    { data: recentActivityRows },
-    { data: prevWeekTaskRows },
-    { data: missingExamRows },
-    { data: rsvpRows },
+    [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }, { data: rsvpRows }],
+    rsvpRequiredAnnouncements,
   ] =
     studentIds.length > 0
       ? await Promise.all([
-          supabase.from("profiles").select("id, full_name").in("id", studentIds),
-          supabase
-            .from("student_tasks")
-            .select("student_id, updated_at, created_at")
-            .in("student_id", studentIds)
-            .gte("updated_at", isoTimestampDaysAgo(3)),
-          supabase
-            .from("student_tasks")
-            .select("student_id, status")
-            .in("student_id", studentIds)
-            .gte("task_date", prevWeekMonday)
-            .lte("task_date", prevWeekSunday),
-          // analysis_pending is the exact same flag the student side sets
-          // (task-modal.tsx) and clears (only once the topic-mistake
-          // analysis step is actually completed, by the student OR now by
-          // the coach via saveCoachTrialResults) -- no date window here,
-          // matching the student's own unbounded "Analiz Bekliyor" list
-          // (app/student/page.tsx): a still-pending analysis stays
-          // reportable regardless of how long ago the exam was solved.
-          supabase
-            .from("student_tasks")
-            .select("id, student_id, task_type, task_date, title, course_id, total_count, correct_count, wrong_count, empty_count, subject_scores")
-            .in("student_id", studentIds)
-            .in("task_type", ["general_exam", "branch_exam"])
-            .eq("analysis_pending", true)
-            .order("task_date", { ascending: true }),
-          // Every response now, not just declines -- the dashboard's "Duyuru
-          // Katılım Durumu" card shows Katılacaklar/Katılmayacaklar side by
-          // side (see buildCoachAlerts' rsvpAttending/rsvpNotAttending split).
-          supabase
-            .from("announcement_rsvps")
-            .select("id, student_id, response, decline_reason, announcements!inner(title, is_active)")
-            .in("student_id", studentIds)
-            .eq("announcements.is_active", true),
+          Promise.all([
+            supabase.from("profiles").select("id, full_name").in("id", studentIds),
+            supabase
+              .from("student_tasks")
+              .select("student_id, updated_at, created_at")
+              .in("student_id", studentIds)
+              .gte("updated_at", isoTimestampDaysAgo(3)),
+            supabase
+              .from("student_tasks")
+              .select("student_id, status")
+              .in("student_id", studentIds)
+              .gte("task_date", prevWeekMonday)
+              .lte("task_date", prevWeekSunday),
+            // analysis_pending is the exact same flag the student side sets
+            // (task-modal.tsx) and clears (only once the topic-mistake
+            // analysis step is actually completed, by the student OR now by
+            // the coach via saveCoachTrialResults) -- no date window here,
+            // matching the student's own unbounded "Analiz Bekliyor" list
+            // (app/student/page.tsx): a still-pending analysis stays
+            // reportable regardless of how long ago the exam was solved.
+            supabase
+              .from("student_tasks")
+              .select("id, student_id, task_type, task_date, title, course_id, total_count, correct_count, wrong_count, empty_count, subject_scores")
+              .in("student_id", studentIds)
+              .in("task_type", ["general_exam", "branch_exam"])
+              .eq("analysis_pending", true)
+              .order("task_date", { ascending: true }),
+            // Every response now, not just declines -- the dashboard's "Duyuru
+            // Katılım Durumu" card shows Katılacaklar/Katılmayacaklar/Cevap
+            // Bekleyenler side by side (see buildCoachAlerts' rsvp* split).
+            supabase
+              .from("announcement_rsvps")
+              .select("id, student_id, announcement_id, response, decline_reason, announcements!inner(title, is_active)")
+              .in("student_id", studentIds)
+              .eq("announcements.is_active", true),
+          ]),
+          // Which active announcements a student could still be "waiting to
+          // respond to" -- a separate call (reuses the shared
+          // fetchActiveAnnouncementRows query rather than duplicating its
+          // date-window logic here), run in parallel with the batch above.
+          fetchActiveRsvpRequiredAnnouncements(),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+      : [[{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }], []];
 
   const roster = (profiles ?? []) as RosterStudent[];
   const alerts = buildCoachAlerts(
@@ -281,6 +299,7 @@ async function fetchDashboardData(
     missingExamRows ?? [],
     pendingReportCardRows ?? [],
     rsvpRows ?? [],
+    rsvpRequiredAnnouncements,
   );
 
   return {
@@ -322,7 +341,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
       weekSessions: [],
       weekBlocks: [],
       weekTasks: [],
-      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], rsvpAttending: [], rsvpNotAttending: [] },
+      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], rsvpAttending: [], rsvpNotAttending: [], rsvpPending: [] },
     },
     [],
     [],

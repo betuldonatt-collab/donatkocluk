@@ -89,6 +89,9 @@ export type CoachAlerts = {
   pendingReportCards: PendingReportCardAlert[];
   rsvpAttending: RsvpResponseAlert[];
   rsvpNotAttending: RsvpResponseAlert[];
+  // Roster students with no announcement_rsvps row at all yet for an active,
+  // RSVP-required announcement -- synthetic rsvpId (no real row exists).
+  rsvpPending: RsvpResponseAlert[];
 };
 
 export const COACH_TASK_STATUS_LABELS: Record<CoachTaskStatus, string> = {

@@ -50,7 +50,9 @@ function AlertCard({
 }
 
 // One column of the RSVP status card below -- own header, own "Yok" empty
-// state, same 6-item cap + overflow count as every other AlertCard list.
+// state. No item cap and no "+N daha" truncation: the list itself scrolls
+// (max-h-48 + thin-scrollbar, app/globals.css) once it outgrows the card, so
+// every name stays one scroll away instead of getting hidden behind a count.
 function RsvpColumn({ heading, items }: { heading: string; items: Item[] }) {
   return (
     <div className="min-w-0">
@@ -60,8 +62,8 @@ function RsvpColumn({ heading, items }: { heading: string; items: Item[] }) {
       {items.length === 0 ? (
         <p className="text-muted-foreground text-xs">Yok</p>
       ) : (
-        <div className="space-y-1">
-          {items.slice(0, 6).map((item) => (
+        <div className="thin-scrollbar max-h-48 space-y-1 overflow-y-auto pr-1">
+          {items.map((item) => (
             <Link
               key={item.key}
               href={item.href ?? `/coach/students/${item.studentId}`}
@@ -70,31 +72,34 @@ function RsvpColumn({ heading, items }: { heading: string; items: Item[] }) {
               {item.label}
             </Link>
           ))}
-          {items.length > 6 && <p className="text-muted-foreground px-1.5 text-xs">+{items.length - 6} daha</p>}
         </div>
       )}
     </div>
   );
 }
 
-// A student's RSVP status across every active announcement, split into two
-// side-by-side columns -- Katılacaklar (attending) and Katılmayacaklar (not
-// attending) -- rather than a single "who declined" list, so a coach can see
-// the whole participation picture for one announcement at a glance.
-function RsvpStatusCard({ attending, notAttending }: { attending: Item[]; notAttending: Item[] }) {
+// A student's RSVP status across every active announcement, split into three
+// side-by-side columns -- Katılacaklar (attending), Katılmayacaklar (not
+// attending), and Cevap Bekleyenler (no response yet) -- rather than a
+// single "who declined" list, so a coach can see the whole participation
+// picture for one announcement at a glance. Spans the full grid width (see
+// the className below) since three independently-scrollable name lists need
+// more room than a quarter-width alert card.
+function RsvpStatusCard({ attending, notAttending, pending }: { attending: Item[]; notAttending: Item[]; pending: Item[] }) {
   return (
-    <Card>
+    <Card className="sm:col-span-2 lg:col-span-4">
       <CardHeader className="flex-row items-center gap-2 space-y-0">
         <Megaphone className="text-muted-foreground size-4" />
         <CardTitle className="text-sm">Duyuru Katılım Durumu</CardTitle>
       </CardHeader>
       <CardContent>
-        {attending.length === 0 && notAttending.length === 0 ? (
+        {attending.length === 0 && notAttending.length === 0 && pending.length === 0 ? (
           <p className="text-muted-foreground text-xs">Yok</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <RsvpColumn heading="Katılacaklar" items={attending} />
             <RsvpColumn heading="Katılmayacaklar" items={notAttending} />
+            <RsvpColumn heading="Cevap Bekleyenler" items={pending} />
           </div>
         )}
       </CardContent>
@@ -118,6 +123,7 @@ export function AlertPanel({
     alerts.pendingReportCards.length +
     alerts.rsvpAttending.length +
     alerts.rsvpNotAttending.length +
+    alerts.rsvpPending.length +
     pendingApprovals.length +
     focusReviews.length;
 
@@ -173,6 +179,11 @@ export function AlertPanel({
           key: a.rsvpId,
           studentId: a.student.id,
           label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.announcementTitle}${a.declineReason ? `: ${a.declineReason}` : ""}`,
+        }))}
+        pending={alerts.rsvpPending.map((a) => ({
+          key: a.rsvpId,
+          studentId: a.student.id,
+          label: `${a.student.full_name ?? "İsimsiz Öğrenci"} — ${a.announcementTitle}`,
         }))}
       />
       <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS")} />

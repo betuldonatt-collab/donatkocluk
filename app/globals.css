@@ -220,6 +220,25 @@
   }
 }
 
+/* Thin, low-contrast scrollbar for a small scrollable list inside a card
+   (e.g. the coach dashboard's RSVP status columns) -- the browser default is
+   full-width and pulls focus in a tight space. Uses the same border/muted
+   tokens as everything else, so it stays correct in both themes for free. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
 @page weekly {
   size: A4 landscape;
   margin: 8mm;
