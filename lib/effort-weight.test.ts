@@ -11,7 +11,7 @@ describe("subjectCoefficient", () => {
     expect(subjectCoefficient("paragraf")).toBe(1);
     expect(subjectCoefficient(null)).toBe(1);
     expect(subjectCoefficient("tyt-fizik")).toBe(1.5);
-    expect(subjectCoefficient("ayt-biyoloji")).toBe(1.5);
+    expect(subjectCoefficient("ayt-biyoloji")).toBe(1); // weighed like verbal
     expect(subjectCoefficient("lgs-fen-bilimleri")).toBe(1.5);
     expect(subjectCoefficient("tyt-fen-macro")).toBe(1.5);
     expect(subjectCoefficient("tyt-matematik")).toBe(2);
@@ -54,7 +54,7 @@ describe("taskWeight", () => {
   });
 
   it("scales branch exams by question count and coefficient plus a small bonus", () => {
-    const bio6 = taskWeight({ task_type: "branch_exam", course_id: "tyt-biyoloji", total_count: 6 });
+    const bio6 = taskWeight({ task_type: "branch_exam", course_id: "tyt-fizik", total_count: 6 });
     const fen20 = taskWeight({ task_type: "branch_exam", course_id: "tyt-fen-macro", total_count: 20 });
     expect(bio6).toBe(6 * 15 + 20);
     expect(fen20).toBe(20 * 15 + 20);
@@ -98,5 +98,28 @@ describe("impactPercent", () => {
     const b = { task_date: "d", status: "pending", task_type: "question_bank", course_id: "tyt-turkce", total_count: 70 }; // 700
     expect(impactPercent(a, [a, b])).toBe(30);
     expect(impactPercent(a, [])).toBeNull();
+  });
+});
+
+describe("study-time rate by subject", () => {
+  it("verbal subjects earn 15 units per minute -- 1 minute equals 1 science question", () => {
+    expect(taskWeight({ task_type: "video", course_id: "tyt-turkce", duration_minutes: 40 })).toBe(600);
+    expect(taskWeight({ task_type: "topic_study", course_id: "tyt-tarih", duration_minutes: 20 })).toBe(300);
+    expect(taskWeight({ task_type: "video", course_id: "tyt-turkce", duration_minutes: 1 })).toBe(
+      taskWeight({ task_type: "question_bank", course_id: "tyt-fizik", total_count: 1 }),
+    );
+  });
+
+  it("biyoloji is verbal: 10 units per question and 15 per minute", () => {
+    expect(taskWeight({ task_type: "question_bank", course_id: "tyt-biyoloji", total_count: 20 })).toBe(200);
+    expect(taskWeight({ task_type: "video", course_id: "ayt-biyoloji", duration_minutes: 30 })).toBe(450);
+  });
+
+  it("math, fizik, kimya and subject-less work keep 5 units per minute", () => {
+    expect(taskWeight({ task_type: "video", course_id: "tyt-matematik", duration_minutes: 60 })).toBe(300);
+    expect(taskWeight({ task_type: "video", course_id: "tyt-fizik", duration_minutes: 60 })).toBe(300);
+    expect(taskWeight({ task_type: "video", course_id: "tyt-kimya", duration_minutes: 60 })).toBe(300);
+    expect(taskWeight({ task_type: "extra_custom", duration_minutes: 20 })).toBe(100);
+    expect(taskWeight({ task_type: "reading", course_id: "kitap-okuma", duration_minutes: 20 })).toBe(100);
   });
 });

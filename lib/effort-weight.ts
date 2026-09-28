@@ -7,11 +7,15 @@ import type { CompletionCounts, CycleWindow } from "./completion";
 // count as equal "one task each". Units are internal only -- the UI never
 // shows them, just the resulting percentage (see impactPercent).
 //
-//   Verbal / social / language ........ 1.0x  ->  10 units per question
-//   Science (fizik/kimya/biyoloji/fen)  1.5x  ->  15 units per question
+//   Verbal / social / language / biyoloji  1.0x  ->  10 units per question
+//   Science (fizik/kimya/fen) ......... 1.5x  ->  15 units per question
 //   Math / geometry / problem ......... 2.0x  ->  20 units per question
-//   Video / konu çalışması ............ 5 units per minute (coach's
-//                                       duration, else 30 min = 150)
+//   Video / konu çalışması / reading .. per MINUTE, by subject: verbal +
+//                                       biyoloji 15 units/min (so 1 minute
+//                                       = 1 science question); math, fizik,
+//                                       kimya, fen and anything with no
+//                                       subject 5 units/min. Duration is the
+//                                       coach's, else 30 min.
 //   Branş denemesi .................... questions x coefficient + a small
 //                                       format bonus
 //   Genel deneme ...................... fixed milestone (large)
@@ -21,6 +25,7 @@ import type { CompletionCounts, CycleWindow } from "./completion";
 
 export const UNITS_PER_QUESTION = 10;
 export const UNITS_PER_MINUTE = 5;
+export const VERBAL_UNITS_PER_MINUTE = 15;
 export const DEFAULT_DURATION_MINUTES = 30;
 export const DEFAULT_TASK_UNITS = DEFAULT_DURATION_MINUTES * UNITS_PER_MINUTE; // 150
 export const BRANCH_EXAM_FORMAT_BONUS = 20;
@@ -41,16 +46,26 @@ export type WeightableTask = {
 export function subjectCoefficient(courseId: string | null | undefined): 1 | 1.5 | 2 {
   const id = courseId ?? "";
   if (/matematik|geometri/.test(id) || id === "problem" || id === "yeni-nesil-mat-dozu") return 2;
-  if (/fizik|kimya|biyoloji|fen/.test(id)) return 1.5;
+  // Biyoloji is deliberately NOT here: it's weighed like a verbal subject.
+  if (/fizik|kimya|fen/.test(id)) return 1.5;
   return 1;
+}
+
+// Study-time rate: verbal subjects and biyoloji (multiplier 1.0) earn 15
+// units per minute; math/fizik/kimya/fen, and tasks with no subject at all
+// (free-title extra work), keep the flat 5. Kitap okuma is a reading habit,
+// not a subject, so it stays at 5 too.
+function unitsPerMinute(courseId: string | null | undefined): number {
+  if (!courseId || courseId === "kitap-okuma") return UNITS_PER_MINUTE;
+  return subjectCoefficient(courseId) === 1 ? VERBAL_UNITS_PER_MINUTE : UNITS_PER_MINUTE;
 }
 
 function positive(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n) && n > 0;
 }
 
-function minutesUnits(minutes: number | null | undefined): number {
-  return (positive(minutes) ? minutes : DEFAULT_DURATION_MINUTES) * UNITS_PER_MINUTE;
+function minutesUnits(minutes: number | null | undefined, courseId: string | null | undefined): number {
+  return (positive(minutes) ? minutes : DEFAULT_DURATION_MINUTES) * unitsPerMinute(courseId);
 }
 
 export function taskWeight(t: Partial<Omit<WeightableTask, "task_date" | "status">>): number {
@@ -68,17 +83,17 @@ export function taskWeight(t: Partial<Omit<WeightableTask, "task_date" | "status
       // (Toplam only, no duration) -- weigh that like questions, not like
       // the 30-minute default.
       if (!positive(t.duration_minutes) && positive(t.total_count)) return Math.round(t.total_count * UNITS_PER_QUESTION * coef);
-      return Math.round(minutesUnits(t.duration_minutes));
+      return Math.round(minutesUnits(t.duration_minutes, t.course_id));
     case "video":
     case "reading":
-      return Math.round(minutesUnits(t.duration_minutes));
+      return Math.round(minutesUnits(t.duration_minutes, t.course_id));
     default: {
       // question_bank, extra_custom and the routine tasks (paragraf,
       // problem, yeni nesil...): question count when there is one, else
       // a duration if the coach/student gave one, else the default.
-      if (t.course_id === "kitap-okuma") return Math.round(minutesUnits(t.duration_minutes));
+      if (t.course_id === "kitap-okuma") return Math.round(minutesUnits(t.duration_minutes, t.course_id));
       if (positive(t.total_count)) return Math.round(t.total_count * UNITS_PER_QUESTION * coef);
-      if (positive(t.duration_minutes)) return Math.round(t.duration_minutes * UNITS_PER_MINUTE);
+      if (positive(t.duration_minutes)) return Math.round(t.duration_minutes * unitsPerMinute(t.course_id));
       return DEFAULT_TASK_UNITS;
     }
   }
