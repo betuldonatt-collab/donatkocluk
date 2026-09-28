@@ -343,6 +343,24 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
     patchV.completed = false;
   }
 
+  // A student who pauses Süre Tut (Mola Ver) and then saves the task modal
+  // straight away -- without pressing Bitir first -- used to leave that
+  // paused session's time stranded: it only got credited up to 3 hours
+  // later, by reconcileStaleFocusSessions, or never, since a task the
+  // student just marked "Yapıldı" has no obvious reason to reopen Süre Tut
+  // on again. Banking a PAUSED session for this task here, right before the
+  // save, means that time is always folded into tracked_duration_seconds by
+  // the time Kaydet finishes -- whatever the resulting status. Deliberately
+  // NOT done for a still-RUNNING session: the modal can be opened/saved
+  // (e.g. to add a note) while Süre Tut keeps counting elsewhere, and ending
+  // that live timer as a side effect of an unrelated save would be a worse
+  // surprise than the bug this fixes -- running sessions keep their own
+  // handling (the floating widget, the 3-hour "still studying?" check-in).
+  const activeSession = await getOwnFocusSession(supabase, user.id, taskIdV);
+  if (activeSession && activeSession.status === "paused") {
+    await bankFocusSession(supabase, user.id, taskIdV, activeSession);
+  }
+
   const { data, error } = await supabase
     .from("student_tasks")
     .update({ ...patchV, ...(evidenceHold ?? {}), updated_at: new Date().toISOString() })
