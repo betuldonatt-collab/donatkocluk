@@ -163,16 +163,21 @@ export async function evaluateSessionCompleted(sessionId: string, notes: string)
   // added notes -- evaluation_notes (set below) stays too, untouched,
   // since the dashboard's read-only SessionDetailDialog still reads it
   // directly.
-  const { error: noteError } = await supabase.from("coach_notes").insert({
-    student_id: existing.student_id,
-    coach_id: user.id,
-    type: "main_session",
-    content: notesV,
-    // Every post-session note goes to the admin's approval queue first --
-    // it reaches the parent panel only after an admin approves it.
-    parent_share_status: "pending",
-  });
-  if (noteError) throw dbError(noteError);
+  //
+  // Blank note = no note: nothing is inserted (no empty record, no
+  // placeholder), so it can never reach the admin queue or the parent panel.
+  // A written note goes to the admin's approval queue first ('pending') and
+  // reaches the parent panel only after an admin approves it.
+  if (notesV !== "") {
+    const { error: noteError } = await supabase.from("coach_notes").insert({
+      student_id: existing.student_id,
+      coach_id: user.id,
+      type: "main_session",
+      content: notesV,
+      parent_share_status: "pending",
+    });
+    if (noteError) throw dbError(noteError);
+  }
 
   const sessionDate = existing.scheduled_at.slice(0, 10);
 

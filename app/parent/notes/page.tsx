@@ -39,6 +39,7 @@ async function fetchApprovedNotes() {
     .select("id, type, content, created_at")
     .eq("student_id", studentId)
     .eq("parent_share_status", "approved")
+    .neq("content", "")
     .order("created_at", { ascending: false });
   return data ?? [];
 }

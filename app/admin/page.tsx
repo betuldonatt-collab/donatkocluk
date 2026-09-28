@@ -92,6 +92,8 @@ export default async function AdminPage() {
       .from("coach_notes")
       .select("id, type, content, student_id, coach_id")
       .eq("parent_share_status", "pending")
+      // Never list a blank note (defensive: new blank notes aren't created).
+      .neq("content", "")
       .order("created_at", { ascending: true })
       .limit(200),
     supabase
