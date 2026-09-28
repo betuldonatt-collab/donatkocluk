@@ -56,6 +56,7 @@ async function fetchHomeData(userId: string) {
   // Grace window so a session that just started still shows as "next"
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const ratingCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const [
     { data: sessionRows },
     { data: weekTaskRows },
@@ -94,12 +95,18 @@ async function fetchHomeData(userId: string) {
         .eq("analysis_pending", true)
         .lt("task_date", yesterdayIso)
         .order("task_date", { ascending: false }),
+      // Evaluation prompt: only a session completed in the last 14 days that
+      // has never been rated (student_rating is set on submit, so a rated
+      // session can never come back). Anything older -- notably the
+      // bulk-imported historical sessions -- is ignored outright, never
+      // prompted.
       supabase
         .from("coaching_sessions")
         .select("id, scheduled_at")
         .eq("student_id", userId)
         .eq("outcome", "completed")
         .is("student_rating", null)
+        .gte("scheduled_at", ratingCutoff)
         .order("scheduled_at", { ascending: false })
         .limit(1),
       // The single most recent progress lock -- where the completion
