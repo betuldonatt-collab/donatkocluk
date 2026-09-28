@@ -1207,6 +1207,17 @@ function TaskModalBody({
               <ManualStatusButton status="done" onClick={() => handleMarkStatus("done")} disabled={saving} />
             </>
           )}
+          {/* Pure question-count tasks (Soru Çözümü, Branş/Genel Deneme,
+              a page-targeted Kitap Okuma) otherwise have no way to say
+              "I didn't do this" at all -- their status is always derived
+              from Doğru/Yanlış/Boş, which requires entering scores. This is
+              the same immediate mark-and-close as the single-part buttons
+              above, deliberately bypassing the score-completeness checks
+              Kaydet enforces below: declaring it wasn't done needs no
+              scores. It sits alongside Kaydet, not instead of it. */}
+          {isPureCountType && (
+            <ManualStatusButton status="not_done" onClick={() => handleMarkStatus("not_done")} disabled={saving} />
+          )}
         </div>
 
         {/* Pure question-count tasks and tasks needing the manual selector
