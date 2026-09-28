@@ -49,12 +49,22 @@ function AttendanceToggle({
     const prevValue = row.actualAttendance;
     onChanged(row.studentId, nextValue);
     startTransition(async () => {
+      // Both actions always resolve to a plain { success, error? } object --
+      // they never throw -- so failure is a normal value to check, not an
+      // exception to catch. The try/catch here is only a last-resort net for
+      // a genuine transport failure (e.g. the request never reaching the
+      // server at all), which the actions themselves have no way to return.
       try {
-        if (nextValue === null) await clearAnnouncementAttendance(announcementId, row.studentId);
-        else await upsertAnnouncementAttendance(announcementId, row.studentId, nextValue);
-      } catch (e) {
+        const result = nextValue === null
+          ? await clearAnnouncementAttendance(announcementId, row.studentId)
+          : await upsertAnnouncementAttendance(announcementId, row.studentId, nextValue);
+        if (!result.success) {
+          onChanged(row.studentId, prevValue);
+          toast.error(result.error);
+        }
+      } catch {
         onChanged(row.studentId, prevValue);
-        toast.error(e instanceof Error ? e.message : "Yoklama kaydedilemedi.");
+        toast.error("Yoklama kaydedilemedi, bağlantını kontrol edip tekrar dene.");
       }
     });
   }
