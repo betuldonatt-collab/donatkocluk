@@ -5,7 +5,6 @@ import { MessageSquareText, Plus, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -71,14 +70,12 @@ function AddNoteDialog({
   const [type, setType] = useState<CoachNoteType>("main_session");
   const [guardianDescriptor, setGuardianDescriptor] = useState("");
   const [content, setContent] = useState("");
-  const [shareWithParent, setShareWithParent] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function reset() {
     setType("main_session");
     setGuardianDescriptor("");
     setContent("");
-    setShareWithParent(false);
   }
 
   async function handleSave() {
@@ -90,7 +87,6 @@ function AddNoteDialog({
         type,
         content: content.trim(),
         guardianDescriptor: type === "parent_meeting" ? guardianDescriptor.trim() || null : null,
-        shareWithParent,
       });
       onSaved(note as DetailCoachNote);
       reset();
@@ -155,16 +151,9 @@ function AddNoteDialog({
           </div>
 
           {type !== "parent_meeting" && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="note-share"
-                checked={shareWithParent}
-                onCheckedChange={(v) => setShareWithParent(v === true)}
-              />
-              <Label htmlFor="note-share" className="text-sm font-normal">
-                Veli Paneli ile Paylaş
-              </Label>
-            </div>
+            <p className="text-muted-foreground text-xs">
+              Notun önce yönetici onayına gider; onaylandıktan sonra Veli Paneli&apos;nde görünür.
+            </p>
           )}
         </div>
 

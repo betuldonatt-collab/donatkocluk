@@ -168,6 +168,9 @@ export async function evaluateSessionCompleted(sessionId: string, notes: string)
     coach_id: user.id,
     type: "main_session",
     content: notesV,
+    // Every post-session note goes to the admin's approval queue first --
+    // it reaches the parent panel only after an admin approves it.
+    parent_share_status: "pending",
   });
   if (noteError) throw dbError(noteError);
 
@@ -417,7 +420,6 @@ const createCoachNoteSchema = z.object({
   type: z.enum(["main_session", "check_in", "parent_meeting"]),
   content: nonEmptyText(5000, "Not içeriği"),
   guardianDescriptor: z.string().trim().max(200).nullable(),
-  shareWithParent: z.boolean(),
 });
 
 export async function createCoachNote(input: {
@@ -425,7 +427,6 @@ export async function createCoachNote(input: {
   type: "main_session" | "check_in" | "parent_meeting";
   content: string;
   guardianDescriptor: string | null;
-  shareWithParent: boolean;
 }) {
   await assertNotImpersonating();
   const inputV = parseInput(createCoachNoteSchema, input);
@@ -441,7 +442,9 @@ export async function createCoachNote(input: {
       type: inputV.type,
       content: inputV.content,
       guardian_descriptor: inputV.type === "parent_meeting" ? inputV.guardianDescriptor : null,
-      parent_share_status: inputV.type !== "parent_meeting" && inputV.shareWithParent ? "pending" : "none",
+      // Not opt-in: every note except a Veli Görüşmesi (which can never be
+      // shared -- DB check constraint) enters the admin approval queue.
+      parent_share_status: inputV.type !== "parent_meeting" ? "pending" : "none",
     })
     .select("*")
     .single();
