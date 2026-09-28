@@ -34,10 +34,10 @@ export function ProgressOverview({
     return [...liveTasks, ...extraTasks.filter((t) => !liveIds.has(t.id))] as ProgressTask[];
   }, [liveTasks, extraTasks]);
 
-  const current = { start: cycleStart ?? today, end: today, pct: completionPercent(weightedCompletionCounts(all, today, cycleStart)) };
+  const current = { start: cycleStart, end: today, pct: completionPercent(weightedCompletionCounts(all, today, cycleStart)) };
   const previous = previousCycle
     ? { start: previousCycle.start, end: previousCycle.end, pct: completionPercent(weightedClosedCycleCounts(all, previousCycle.start, previousCycle.end)) }
-    : { start: today, end: today, pct: null };
+    : { start: null, end: null, pct: null };
 
   return (
     <div className="grid gap-4 md:grid-cols-2">

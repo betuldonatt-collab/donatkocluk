@@ -95,11 +95,11 @@ function sum(tasks: WeightableTask[]): CompletionCounts {
   return { done, total };
 }
 
-// Weighted twins of completion.ts's completionCounts / closedCycleCounts
-// (same cycle-window rules); done/total are effort units.
+// Weighted twin of completion.ts's completionCounts (same cycle-window
+// rules, including null cycleStart meaning "no lower bound", not "no
+// window" -- see that file's header comment); done/total are effort units.
 export function weightedCompletionCounts(tasks: WeightableTask[], todayIso: string, cycleStart: string | null): CompletionCounts {
-  if (!cycleStart) return { done: 0, total: 0 };
-  return sum(tasks.filter((t) => t.task_date >= cycleStart && t.task_date <= todayIso));
+  return sum(tasks.filter((t) => (cycleStart === null || t.task_date >= cycleStart) && t.task_date <= todayIso));
 }
 
 // A cycle already CLOSED by a lock -- both bounds are fixed, so every task

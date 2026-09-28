@@ -169,12 +169,20 @@ async function fetchHomeData(userId: string) {
   const progressTasksFrom = [previousCycle?.start, progressCycleStart, weekStart]
     .filter((d): d is string => d !== null && d !== undefined)
     .sort()[0];
-  const { data: progressExtraRows } = await supabase
+  // No real cycle anchor at all yet (progressCycleStart null AND no
+  // previousCycle -- see lib/completion.ts): the "current cycle" is the
+  // student's WHOLE history, so the fetch needs everything up to today, not
+  // just this week onward, or the percentage would silently ignore most of
+  // the very history it's now supposed to count.
+  let progressExtraQuery = supabase
     .from("student_tasks")
     .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
     .eq("student_id", userId)
-    .gte("task_date", progressTasksFrom)
     .lte("task_date", dayAfterWeek);
+  if (progressCycleStart !== null || previousCycle !== null) {
+    progressExtraQuery = progressExtraQuery.gte("task_date", progressTasksFrom);
+  }
+  const { data: progressExtraRows } = await progressExtraQuery;
 
   const resourceNamesByTask = new Map<string, string[]>();
   for (const row of taskResourceRows ?? []) {

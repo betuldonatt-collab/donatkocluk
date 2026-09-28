@@ -51,8 +51,9 @@ describe("tasksDueSoFar", () => {
     expect(tasksDueSoFar([task("2026-09-20", "done"), task("2026-09-14", "done")], WED, "2026-09-21")).toEqual([]);
   });
 
-  it("is always empty when there is no cycle start yet", () => {
-    expect(tasksDueSoFar([task("2026-09-23", "done")], WED, null)).toEqual([]);
+  it("counts the WHOLE history up to today when there is no cycle start yet -- unbounded, not empty", () => {
+    const tasks = [task("2025-01-05", "done"), task("2026-09-23", "pending"), task("2026-09-24", "pending")];
+    expect(tasksDueSoFar(tasks, WED, null).map((t) => t.task_date)).toEqual(["2025-01-05", "2026-09-23"]);
   });
 });
 
@@ -85,10 +86,15 @@ describe("completionCounts / completionPercent", () => {
     expect(completionPercent(completionCounts([task("2026-09-25", "pending")], WED, "2026-09-21"))).toBeNull();
   });
 
-  it("is null (never 0%/100%) when there is no cycle start at all", () => {
-    const counts = completionCounts([task("2026-09-23", "done")], WED, null);
-    expect(counts).toEqual({ done: 0, total: 0 });
-    expect(completionPercent(counts)).toBeNull();
+  it("counts the student's whole history when there is no cycle start at all -- a brand new appointment must never hide it", () => {
+    const tasks = [task("2025-01-05", "done"), task("2026-09-22", "not_done"), task("2026-09-23", "done")];
+    const counts = completionCounts(tasks, WED, null);
+    expect(counts).toEqual({ done: 2, total: 3 });
+    expect(completionPercent(counts)).toBe(67);
+  });
+
+  it("is still null with no cycle start when the student truly has no tasks at all", () => {
+    expect(completionPercent(completionCounts([], WED, null))).toBeNull();
   });
 
   it("starting on the lock day itself: only today's tasks are due", () => {

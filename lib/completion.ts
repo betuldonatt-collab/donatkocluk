@@ -6,10 +6,21 @@
 // that same day. Starting the new cycle the day after would silently drop
 // those same-day tasks into the cycle just closed instead of the one they
 // were actually assigned for. A student who has never been locked yet uses
-// the day of their first completed coaching session as day one instead
-// (there is nothing to lock before a first session happens). A student with
-// neither a lock nor a completed session has no window at all -- nothing is
-// due, and every surface shows "—" until their first session.
+// the day of their first COMPLETED coaching session as day one instead
+// (there is nothing to lock before a first session happens).
+//
+// A student with neither a lock nor a completed session yet -- e.g. their
+// very first appointment has just been scheduled but hasn't happened, or
+// they're brand new -- has no real anchor at all. In that case `currentStart`
+// is null, and every function here treats null as "no lower bound", not "no
+// window": the current cycle is simply their whole history to date, same as
+// the separately-computed all-time "Genel" figure. This was a deliberate
+// choice (over e.g. account-creation date or first-assigned-task date):
+// scheduling a student's first-ever session must never make their prior task
+// history disappear from the percentage the moment they're excited to start
+// tracking it, and it needs no extra data source to get right. The instant a
+// real anchor exists (a completed session or a lock), it takes over exactly
+// as before.
 //
 // One rule shared by every surface that shows the percentage (student
 // board, coach student page, coach roster, parent panel) so they never
@@ -61,9 +72,10 @@ export function resolveCycles(
 }
 
 // The tasks counted right now: from the current cycle's start through today.
+// No cycleStart at all (see the file header comment) means no lower bound --
+// every task up to today counts, not none of them.
 export function tasksDueSoFar<T extends { task_date: string }>(tasks: T[], todayIso: string, cycleStart: string | null): T[] {
-  if (!cycleStart) return [];
-  return tasks.filter((t) => t.task_date >= cycleStart && t.task_date <= todayIso);
+  return tasks.filter((t) => (cycleStart === null || t.task_date >= cycleStart) && t.task_date <= todayIso);
 }
 
 export function completionCounts(tasks: CompletionTask[], todayIso: string, cycleStart: string | null): CompletionCounts {

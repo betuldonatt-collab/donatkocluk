@@ -86,8 +86,8 @@ describe("weighted completion", () => {
     expect(completionPercent(c)).toBe(83);
   });
 
-  it("is zero when there is no cycle start yet", () => {
-    expect(weightedCompletionCounts(tasks, WED, null)).toEqual({ done: 0, total: 0 });
+  it("counts the whole history through today (unbounded, not zero) when there is no cycle start yet", () => {
+    expect(weightedCompletionCounts(tasks, WED, null)).toEqual({ done: 1000, total: 1200 });
   });
 
   it("counts every task in a closed cycle's fixed range, future days included", () => {

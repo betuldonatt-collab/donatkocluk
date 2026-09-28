@@ -545,8 +545,8 @@ async function fetchStudentDetail(studentId: string) {
     profile: profile as StudentProfile,
     completion: computeDualCompletionStats(tasks, today, progressCycleStart),
     subjectCompletion: computeSubjectCompletion(tasks, today, progressCycleStart),
-    progressFrom: progressCycleStart ?? today,
-    progressFromLock: lastLockRow !== null,
+    progressFrom: progressCycleStart,
+    progressFromKind: lastLockRow !== null ? ("lock" as const) : firstCompletedSessionAt !== null ? ("session" as const) : ("none" as const),
     topicPerformance: topicPerformanceWithQuestions,
     curriculumCourseIds,
     sessions,
@@ -625,7 +625,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                     completion={detail.completion}
                     subjectCompletion={detail.subjectCompletion}
                     progressFrom={detail.progressFrom}
-                    progressFromLock={detail.progressFromLock}
+                    progressFromKind={detail.progressFromKind}
                   />
                 </div>
 

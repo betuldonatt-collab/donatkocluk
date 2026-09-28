@@ -47,16 +47,19 @@ export function TargetsCompletionCard({
   completion,
   subjectCompletion,
   progressFrom,
-  progressFromLock,
+  progressFromKind,
 }: {
   studentId: string;
   profile: StudentProfile;
   completion: DualCompletionStats;
   subjectCompletion: SubjectCompletion[];
-  // The first day the percentages count, and whether that is the day the week was
-  // locked (otherwise the week's Monday).
-  progressFrom: string;
-  progressFromLock: boolean;
+  // The first day the percentages count -- null when the student has
+  // neither a lock nor a completed session yet, in which case there is no
+  // real anchor and "Güncel Dönem" counts the student's whole history
+  // (lib/completion.ts), same as "Genel".
+  progressFrom: string | null;
+  // Where progressFrom came from, for the explanatory sentence below.
+  progressFromKind: "lock" | "session" | "none";
 }) {
   return (
     <Card>
@@ -109,10 +112,16 @@ export function TargetsCompletionCard({
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
           <p className="text-muted-foreground -mt-2 text-xs">
-            Güncel Dönem:{" "}
-            {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
-            {progressFromLock ? " (son kilitlemeden sonraki gün)" : " (ilk görüşme günü)"} ile bugün arası. Genel: bugüne kadar atanmış tüm
-            görevler. İkisinde de sonraki günler sayılmaz.
+            {progressFrom ? (
+              <>
+                Güncel Dönem:{" "}
+                {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
+                {progressFromKind === "lock" ? " (son kilitlemeden sonraki gün)" : " (ilk görüşme günü)"} ile bugün arası.
+              </>
+            ) : (
+              "Güncel Dönem: henüz bir kilitleme veya tamamlanmış görüşme yok, bugüne kadarki tüm program sayılıyor."
+            )}{" "}
+            Genel: bugüne kadar atanmış tüm görevler. İkisinde de sonraki günler sayılmaz.
           </p>
           {/* Row label "Toplam" (not "Genel") -- this row is TYT+AYT combined,
               and "Genel" is already what each row's own all-time COLUMN is

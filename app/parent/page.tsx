@@ -142,8 +142,11 @@ async function fetchDashboardData() {
   // memory below.
   const tasksFrom = [start, progressCycleStart, previousCycle?.start].filter((d): d is string => d !== null && d !== undefined).sort()[0];
   const tasksTo = addDays(end, 1);
-
-  const { data: taskWindowRows } = await supabase
+  // No real cycle anchor at all yet (progressCycleStart null AND no
+  // previousCycle -- see lib/completion.ts): the current cycle is the
+  // student's WHOLE history, so this needs everything up to tasksTo, not
+  // just from this calendar week onward.
+  let taskWindowQuery = supabase
     // Security note: the rows below are sliced server-side. Only the slim
     // program fields ever cross into the client component (WeeklyProgramSheet);
     // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
@@ -151,10 +154,13 @@ async function fetchDashboardData() {
     .from("student_tasks")
     .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes")
     .eq("student_id", studentId)
-    .gte("task_date", tasksFrom)
     .lte("task_date", tasksTo)
     .order("task_date", { ascending: true })
     .order("order_index", { ascending: true });
+  if (progressCycleStart !== null || previousCycle !== null) {
+    taskWindowQuery = taskWindowQuery.gte("task_date", tasksFrom);
+  }
+  const { data: taskWindowRows } = await taskWindowQuery;
 
   logPerf("parent home data batch", perfStart);
 
@@ -224,13 +230,13 @@ async function fetchDashboardData() {
     // calendar week -- "currentWeek"/"previousWeek" name what they feed
     // (WeeklyProgressCard's two rows), not a Monday-Sunday range.
     currentWeek: {
-      start: progressCycleStart ?? today,
+      start: progressCycleStart,
       end: today,
       pct: completionPercent(weightedCompletionCounts(windowRows, today, progressCycleStart)),
     },
     previousWeek: previousCycle
       ? { start: previousCycle.start, end: previousCycle.end, pct: completionPercent(weightedClosedCycleCounts(windowRows, previousCycle.start, previousCycle.end)) }
-      : { start: today, end: today, pct: null },
+      : { start: null, end: null, pct: null },
     weekStat,
     programTasks,
     tytNetChartData,

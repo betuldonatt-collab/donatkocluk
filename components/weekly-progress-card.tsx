@@ -1,6 +1,11 @@
 import { cn } from "@/lib/utils";
 
-export type WeekProgress = { start: string; end: string; pct: number | null };
+// start (and, for "previous", end) is null when there is no real anchor yet
+// (lib/completion.ts's resolveCycles): no lock and no completed session --
+// the date range itself is unknowable then, not just the percentage, so the
+// component falls back to a plain label with no dates instead of showing
+// today twice as if the cycle "just started".
+export type WeekProgress = { start: string | null; end: string | null; pct: number | null };
 
 function fmt(iso: string) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -18,7 +23,7 @@ export function WeeklyProgressCard({ previous, current }: { previous: WeekProgre
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground font-medium">
-              Önceki Dönem: {fmt(previous.start)} - {fmt(previous.end)}
+              Önceki Dönem{previous.start && previous.end ? `: ${fmt(previous.start)} - ${fmt(previous.end)}` : ""}
             </span>
             <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">Tamamlandı</span>
           </div>
@@ -29,14 +34,18 @@ export function WeeklyProgressCard({ previous, current }: { previous: WeekProgre
         <div className="bg-muted h-2 overflow-hidden rounded-full">
           <div className="bg-muted-foreground/50 h-full rounded-full" style={{ width: `${previous.pct ?? 0}%` }} />
         </div>
-        {previous.pct === null && <p className="text-muted-foreground mt-1 text-xs">Bu dönem için program girilmemişti.</p>}
+        {previous.pct === null && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            {previous.start ? "Bu dönem için program girilmemişti." : "Henüz kilitlenmiş bir dönem yok."}
+          </p>
+        )}
       </div>
 
       <div className="border-primary/25 bg-primary/5 rounded-lg border p-3">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-foreground font-semibold">
-              Mevcut Dönem: {fmt(current.start)} - {fmt(current.end)}
+              Mevcut Dönem{current.start && current.end ? `: ${fmt(current.start)} - ${fmt(current.end)}` : ": Program başından itibaren"}
             </span>
             <span className="bg-primary/15 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
               <span className="bg-primary size-1.5 animate-pulse rounded-full motion-reduce:animate-none" />
