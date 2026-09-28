@@ -1,7 +1,12 @@
-import { CheckCircle2, Clock, Timer, XCircle } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { CheckCircle2, Clock, Timer, X, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatFocusDuration, type FocusReviewStatus } from "@/lib/focus-approval";
+import { dismissFocusReview } from "../../focus-review-actions";
 
 export type StudentFocusReview = {
   id: string;
@@ -49,8 +54,28 @@ function StatusBadge({ review }: { review: StudentFocusReview }) {
 // hours isn't counted until the coach approves it, so this is where the
 // student sees WHY their time / leaderboard rank hasn't moved. Rendered only
 // when there is at least one such session.
-export function FocusReviewsCard({ reviews }: { reviews: StudentFocusReview[] }) {
+export function FocusReviewsCard({ reviews: initialReviews }: { reviews: StudentFocusReview[] }) {
+  const [reviews, setReviews] = useState(initialReviews);
   const hasPending = reviews.some((r) => r.status === "pending");
+
+  // Optimistic: the row disappears immediately; it comes back only if the
+  // server says the dismiss failed.
+  async function handleDismiss(review: StudentFocusReview) {
+    setReviews((prev) => prev.filter((r) => r.id !== review.id));
+    try {
+      const result = await dismissFocusReview(review.id);
+      if (!result.success) {
+        setReviews((prev) => (prev.some((r) => r.id === review.id) ? prev : [...prev, review]));
+        toast.error(result.error);
+      }
+    } catch {
+      setReviews((prev) => (prev.some((r) => r.id === review.id) ? prev : [...prev, review]));
+      toast.error("Kayıt silinemedi, tekrar dene.");
+    }
+  }
+
+  if (reviews.length === 0) return null;
+
   return (
     <Card>
       <CardHeader className="space-y-1">
@@ -77,7 +102,20 @@ export function FocusReviewsCard({ reviews }: { reviews: StudentFocusReview[] })
                   {formatWhen(review.endedAt)} · {formatFocusDuration(review.seconds)}
                 </p>
               </div>
-              <StatusBadge review={review} />
+              <div className="flex items-center gap-2">
+                <StatusBadge review={review} />
+                {review.status === "rejected" && (
+                  <button
+                    type="button"
+                    onClick={() => handleDismiss(review)}
+                    aria-label="Kaydı sil"
+                    title="Sil"
+                    className="text-muted-foreground hover:text-foreground hover:bg-accent flex size-6 items-center justify-center rounded-full transition-colors"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

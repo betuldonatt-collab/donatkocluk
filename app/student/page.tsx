@@ -216,6 +216,9 @@ async function fetchHomeData(userId: string) {
     .from("focus_session_reviews")
     .select("id, seconds, status, approved_seconds, ended_at, reviewed_at, student_tasks(title)")
     .eq("student_id", userId)
+    // Records the student dismissed themselves (migration 0105) stay in the
+    // table for the coach's history but never come back here.
+    .is("student_dismissed_at", null)
     .order("ended_at", { ascending: false })
     .limit(15);
   const reviewCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
