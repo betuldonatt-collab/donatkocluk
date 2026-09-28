@@ -767,13 +767,17 @@ export async function lockCurrentCycle(studentId: string) {
   // block it explicitly rather than let it silently produce a meaningless
   // previous-cycle row.
   if (lastLock && lastLock.locked_at.slice(0, 10) === today) throw new Error("Program bugün zaten kilitlendi.");
+  // Locking requires a real cycle event to have already happened -- there's
+  // nothing to close before the student's first session. (Passing null for
+  // the upcoming-session input is safe: resolveCycles only consults it in
+  // the bootstrap branch, which this guard rules out.)
+  if (!lastLock && !firstCompletedSessionAt) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
 
-  const { currentStart } = resolveCycles(lastLock, firstCompletedSessionAt);
-  if (!currentStart) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
+  const { current } = resolveCycles(lastLock, firstCompletedSessionAt, null, today);
 
   const { error } = await supabase
     .from("progress_locks")
-    .insert({ student_id: studentIdV, period_start: currentStart, locked_by: user.id });
+    .insert({ student_id: studentIdV, period_start: current.start, locked_by: user.id });
   if (error) throw dbError(error);
 
   // "Kilitle / Değerlendir" also finalizes the cycle being closed: any task
@@ -790,7 +794,7 @@ export async function lockCurrentCycle(studentId: string) {
     .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
     .eq("student_id", studentIdV)
     .eq("status", "pending")
-    .gte("task_date", currentStart)
+    .gte("task_date", current.start)
     .lte("task_date", yesterday)
     .select("course_id, topic_id");
   if (resolveError) throw dbError(resolveError);

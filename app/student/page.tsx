@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
-import { resolveCycles, type ProgressLock } from "@/lib/completion";
+import { resolveCycles, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { reconcileStaleFocusSessions } from "./actions";
 import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
 import { NextSessionCard } from "./_components/next-session-card";
@@ -63,6 +63,7 @@ async function fetchHomeData(userId: string) {
     { data: ratingSessionRows },
     { data: lastLockRow },
     { data: firstCompletedSessionRow },
+    { data: upcomingSessionRow },
     { data: profileRow },
     { data: taskResourceRows },
     { data: fixedTaskRows },
@@ -121,6 +122,16 @@ async function fetchHomeData(userId: string) {
         .order("scheduled_at", { ascending: true })
         .limit(1)
         .maybeSingle(),
+      // No lock and no completed session either -> the soonest still-pending
+      // session anchors the bootstrap two-week window (lib/completion.ts).
+      supabase
+        .from("coaching_sessions")
+        .select("scheduled_at")
+        .eq("student_id", userId)
+        .eq("outcome", "pending")
+        .order("scheduled_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
       supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px, exam_type").eq("id", userId).maybeSingle(),
       // Which book/kaynak (if any) a coach linked to each task -- mirrors
       // the coach panel's own task_resources join (schedule/page.tsx)
@@ -153,36 +164,30 @@ async function fetchHomeData(userId: string) {
     ]);
 
   const lastLock = lastLockRow as ProgressLock | null;
-  const { currentStart: progressCycleStart, previousCycle } = resolveCycles(
+  const { current: currentCycle, previous: previousCycle } = resolveCycles(
     lastLock,
     (firstCompletedSessionRow?.scheduled_at ?? null) as string | null,
+    (upcomingSessionRow?.scheduled_at ?? null) as string | null,
+    today,
   );
   // A task is frozen once its date falls STRICTLY BEFORE the latest lock day
   // -- the lock day itself belongs to the new, still-open cycle -- same
   // boundary the RLS policies enforce (migration 0103).
   const lockedThroughDate = lastLock ? lastLock.locked_at.slice(0, 10) : null;
 
-  // Slim rows for the progress cards: the earlier of the previous cycle's
-  // start / the current cycle's start (whichever reaches further back)
-  // through the day after this week (Yarın on a Sunday). Resolved AFTER the
-  // lock lookup above, since how far back this needs to go depends on it.
-  const progressTasksFrom = [previousCycle?.start, progressCycleStart, weekStart]
-    .filter((d): d is string => d !== null && d !== undefined)
-    .sort()[0];
-  // No real cycle anchor at all yet (progressCycleStart null AND no
-  // previousCycle -- see lib/completion.ts): the "current cycle" is the
-  // student's WHOLE history, so the fetch needs everything up to today, not
-  // just this week onward, or the percentage would silently ignore most of
-  // the very history it's now supposed to count.
-  let progressExtraQuery = supabase
+  // Slim rows for the progress cards: covers whichever reaches furthest back
+  // (the previous cycle's start, the current cycle's start, or this week's
+  // Monday) through whichever reaches furthest forward (the current cycle's
+  // end -- not always "today", see lib/completion.ts -- or the day after
+  // this week, Yarın on a Sunday).
+  const progressTasksFrom = [previousCycle.start, currentCycle.start, weekStart].sort()[0];
+  const progressTasksTo = currentCycle.end > dayAfterWeek ? currentCycle.end : dayAfterWeek;
+  const { data: progressExtraRows } = await supabase
     .from("student_tasks")
     .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
     .eq("student_id", userId)
-    .lte("task_date", dayAfterWeek);
-  if (progressCycleStart !== null || previousCycle !== null) {
-    progressExtraQuery = progressExtraQuery.gte("task_date", progressTasksFrom);
-  }
-  const { data: progressExtraRows } = await progressExtraQuery;
+    .gte("task_date", progressTasksFrom)
+    .lte("task_date", progressTasksTo);
 
   const resourceNamesByTask = new Map<string, string[]>();
   for (const row of taskResourceRows ?? []) {
@@ -245,9 +250,10 @@ async function fetchHomeData(userId: string) {
     focusReviews,
     examType: (profileRow?.exam_type ?? "YKS") as ExamType,
     todayLocked: lockedThroughDate !== null && today < lockedThroughDate,
-    // Where the student's progress bar currently starts counting, and the
-    // most recently closed cycle's fixed range (lib/completion.ts).
-    progressCycleStart,
+    // The current (still open, or the bootstrap two-week window) and
+    // previous cycle's fixed date ranges (lib/completion.ts) -- always real,
+    // displayable ranges now, never null.
+    currentCycle,
     progressExtraTasks: (progressExtraRows ?? []) as ProgressTask[],
     previousCycle,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
@@ -270,7 +276,7 @@ export default async function StudentHomePage() {
     focusReviews,
     examType,
     todayLocked,
-    progressCycleStart,
+    currentCycle,
     progressExtraTasks,
     previousCycle,
     routineRowHeights,
@@ -289,9 +295,9 @@ export default async function StudentHomePage() {
         focusReviews: [] as StudentFocusReview[],
         examType: "YKS" as ExamType,
         todayLocked: false,
-        progressCycleStart: null as string | null,
+        currentCycle: { start: todayISO(), end: todayISO() } as CycleWindow,
         progressExtraTasks: [] as ProgressTask[],
-        previousCycle: null as { start: string; end: string } | null,
+        previousCycle: { start: todayISO(), end: todayISO() } as CycleWindow,
         routineRowHeights: [] as number[],
         taskRowHeights: [] as number[],
       };
@@ -330,7 +336,7 @@ export default async function StudentHomePage() {
         fixedTasks={fixedTasks}
         allTimeTrackedMinutes={allTimeTrackedMinutes}
         todayLocked={todayLocked}
-        progressCycleStart={progressCycleStart}
+        currentCycle={currentCycle}
         progressExtraTasks={progressExtraTasks}
         previousCycle={previousCycle}
         examType={examType}

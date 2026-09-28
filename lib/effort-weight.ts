@@ -1,4 +1,4 @@
-import type { CompletionCounts } from "./completion";
+import type { CompletionCounts, CycleWindow } from "./completion";
 
 // Effort-based task weighting behind every progress bar.
 //
@@ -95,17 +95,12 @@ function sum(tasks: WeightableTask[]): CompletionCounts {
   return { done, total };
 }
 
-// Weighted twin of completion.ts's completionCounts (same cycle-window
-// rules, including null cycleStart meaning "no lower bound", not "no
-// window" -- see that file's header comment); done/total are effort units.
-export function weightedCompletionCounts(tasks: WeightableTask[], todayIso: string, cycleStart: string | null): CompletionCounts {
-  return sum(tasks.filter((t) => (cycleStart === null || t.task_date >= cycleStart) && t.task_date <= todayIso));
-}
-
-// A cycle already CLOSED by a lock -- both bounds are fixed, so every task
-// in [start, end] counts. Used for the previous-cycle comparison bar.
-export function weightedClosedCycleCounts(tasks: WeightableTask[], start: string, end: string): CompletionCounts {
-  return sum(tasks.filter((t) => t.task_date >= start && t.task_date <= end));
+// Weighted twin of completion.ts's closedCycleCounts -- every task within a
+// fixed [start, end] window counts (current and previous alike; there's no
+// more "cap at today" special case, see that file's header comment for why).
+// done/total are effort units.
+export function weightedCycleCounts(tasks: WeightableTask[], window: CycleWindow): CompletionCounts {
+  return sum(tasks.filter((t) => t.task_date >= window.start && t.task_date <= window.end));
 }
 
 export function weightedDayCounts(tasks: WeightableTask[], dateIso: string): CompletionCounts {

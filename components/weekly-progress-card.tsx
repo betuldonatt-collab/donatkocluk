@@ -1,21 +1,20 @@
 import { cn } from "@/lib/utils";
 
-// start (and, for "previous", end) is null when there is no real anchor yet
-// (lib/completion.ts's resolveCycles): no lock and no completed session --
-// the date range itself is unknowable then, not just the percentage, so the
-// component falls back to a plain label with no dates instead of showing
-// today twice as if the cycle "just started".
-export type WeekProgress = { start: string | null; end: string | null; pct: number | null };
+// Both start and end are always real dates now (lib/completion.ts's
+// resolveCycles never leaves either unresolved -- a student with no lock or
+// completed session yet gets the two-week window leading up to their
+// upcoming session instead of an empty or unbounded one).
+export type WeekProgress = { start: string; end: string; pct: number | null };
 
 function fmt(iso: string) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 // Two stacked rows: the most recently closed coaching cycle as a finished,
-// muted record; the current, still-open cycle as the live, still-filling
-// metric. Deliberately no red/amber/green thresholds here -- an ongoing
-// cycle is naturally partial, and a red bar three days in is exactly the
-// parent/student friction this avoids.
+// muted record; the current cycle as the live metric. Deliberately no
+// red/amber/green thresholds here -- an ongoing cycle is naturally partial,
+// and a red bar three days in is exactly the parent/student friction this
+// avoids.
 export function WeeklyProgressCard({ previous, current }: { previous: WeekProgress; current: WeekProgress }) {
   return (
     <div className="space-y-5">
@@ -23,7 +22,7 @@ export function WeeklyProgressCard({ previous, current }: { previous: WeekProgre
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground font-medium">
-              Önceki Dönem{previous.start && previous.end ? `: ${fmt(previous.start)} - ${fmt(previous.end)}` : ""}
+              Önceki Dönem: {fmt(previous.start)} - {fmt(previous.end)}
             </span>
             <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">Tamamlandı</span>
           </div>
@@ -34,18 +33,14 @@ export function WeeklyProgressCard({ previous, current }: { previous: WeekProgre
         <div className="bg-muted h-2 overflow-hidden rounded-full">
           <div className="bg-muted-foreground/50 h-full rounded-full" style={{ width: `${previous.pct ?? 0}%` }} />
         </div>
-        {previous.pct === null && (
-          <p className="text-muted-foreground mt-1 text-xs">
-            {previous.start ? "Bu dönem için program girilmemişti." : "Henüz kilitlenmiş bir dönem yok."}
-          </p>
-        )}
+        {previous.pct === null && <p className="text-muted-foreground mt-1 text-xs">Bu dönem için program girilmemişti.</p>}
       </div>
 
       <div className="border-primary/25 bg-primary/5 rounded-lg border p-3">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-foreground font-semibold">
-              Mevcut Dönem{current.start && current.end ? `: ${fmt(current.start)} - ${fmt(current.end)}` : ": Program başından itibaren"}
+              Mevcut Dönem: {fmt(current.start)} - {fmt(current.end)}
             </span>
             <span className="bg-primary/15 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
               <span className="bg-primary size-1.5 animate-pulse rounded-full motion-reduce:animate-none" />

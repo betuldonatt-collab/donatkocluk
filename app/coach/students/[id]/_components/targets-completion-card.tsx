@@ -47,19 +47,18 @@ export function TargetsCompletionCard({
   completion,
   subjectCompletion,
   progressFrom,
-  progressFromKind,
+  progressTo,
 }: {
   studentId: string;
   profile: StudentProfile;
   completion: DualCompletionStats;
   subjectCompletion: SubjectCompletion[];
-  // The first day the percentages count -- null when the student has
-  // neither a lock nor a completed session yet, in which case there is no
-  // real anchor and "Güncel Dönem" counts the student's whole history
-  // (lib/completion.ts), same as "Genel".
-  progressFrom: string | null;
-  // Where progressFrom came from, for the explanatory sentence below.
-  progressFromKind: "lock" | "session" | "none";
+  // The current cycle's fixed [progressFrom, progressTo] range (always a
+  // real pair of dates -- see lib/completion.ts's resolveCycles). Not always
+  // "today" as the end: a student with no lock or completed session yet
+  // shows the two-week window leading up to their upcoming session instead.
+  progressFrom: string;
+  progressTo: string;
 }) {
   return (
     <Card>
@@ -112,16 +111,9 @@ export function TargetsCompletionCard({
         <section className="space-y-3">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Program Tamamlama</p>
           <p className="text-muted-foreground -mt-2 text-xs">
-            {progressFrom ? (
-              <>
-                Güncel Dönem:{" "}
-                {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}
-                {progressFromKind === "lock" ? " (son kilitlemeden sonraki gün)" : " (ilk görüşme günü)"} ile bugün arası.
-              </>
-            ) : (
-              "Güncel Dönem: henüz bir kilitleme veya tamamlanmış görüşme yok, bugüne kadarki tüm program sayılıyor."
-            )}{" "}
-            Genel: bugüne kadar atanmış tüm görevler. İkisinde de sonraki günler sayılmaz.
+            Güncel Dönem: {new Date(`${progressFrom}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })} -{" "}
+            {new Date(`${progressTo}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "UTC" })}. Genel: bugüne
+            kadar atanmış tüm görevler.
           </p>
           {/* Row label "Toplam" (not "Genel") -- this row is TYT+AYT combined,
               and "Genel" is already what each row's own all-time COLUMN is

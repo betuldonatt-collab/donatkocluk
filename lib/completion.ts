@@ -7,20 +7,20 @@
 // those same-day tasks into the cycle just closed instead of the one they
 // were actually assigned for. A student who has never been locked yet uses
 // the day of their first COMPLETED coaching session as day one instead
-// (there is nothing to lock before a first session happens).
+// (there is nothing to lock before a first session happens); its own
+// "previous" comparison window is the 14-to-7-days-before range immediately
+// preceding that first session, same formula as the bootstrap case below.
 //
 // A student with neither a lock nor a completed session yet -- e.g. their
-// very first appointment has just been scheduled but hasn't happened, or
-// they're brand new -- has no real anchor at all. In that case `currentStart`
-// is null, and every function here treats null as "no lower bound", not "no
-// window": the current cycle is simply their whole history to date, same as
-// the separately-computed all-time "Genel" figure. This was a deliberate
-// choice (over e.g. account-creation date or first-assigned-task date):
-// scheduling a student's first-ever session must never make their prior task
-// history disappear from the percentage the moment they're excited to start
-// tracking it, and it needs no extra data source to get right. The instant a
-// real anchor exists (a completed session or a lock), it takes over exactly
-// as before.
+// very first appointment has just been scheduled but hasn't happened -- has
+// no real cycle event to anchor on at all. Coaches evaluate a student every
+// ~4 weeks, so rather than either hiding everything (an empty window) or
+// pulling in their entire history (unbounded), this anchors on the date of
+// their upcoming (pending) session -- T -- and shows exactly the two
+// 7-day windows leading up to it: [T-7, T] as the current period, [T-14,
+// T-7] as the previous one. No pending session at all (a genuinely brand
+// new student) falls back to T = today. The instant a real cycle event
+// exists (a completed session or a lock), it takes over exactly as before.
 //
 // One rule shared by every surface that shows the percentage (student
 // board, coach student page, coach roster, parent panel) so they never
@@ -38,6 +38,10 @@ export type CompletionCounts = { done: number; total: number };
 // writes exactly this shape).
 export type ProgressLock = { period_start: string; locked_at: string };
 
+// A fixed [start, end] date range, both bounds inclusive -- what every
+// surface actually displays and counts against, current or previous alike.
+export type CycleWindow = { start: string; end: string };
+
 // Dates are UTC calendar days, like every "today" in this app.
 function dayOf(timestampOrDate: string): string {
   return timestampOrDate.slice(0, 10);
@@ -49,50 +53,52 @@ function addDaysISO(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Where the student's CURRENT (still open) cycle starts, and the fixed
-// [start, end] range of their most recently CLOSED cycle, if any -- both
-// derived from the same single latest lock row so every caller agrees. The
-// lock day itself belongs to the NEW cycle (see the file header comment),
-// so the closed cycle's end is the day BEFORE the lock, not the lock day.
+// The student's current (still open) cycle window and their previous
+// (already closed) one -- both always real, displayable date ranges; there
+// is no more "no window" or "unbounded" case. `upcomingSessionAt` is that
+// student's soonest still-pending coaching session, if any (only consulted
+// when there is neither a lock nor a completed session yet).
 export function resolveCycles(
   lastLock: ProgressLock | null,
   firstCompletedSessionAt: string | null,
-): { currentStart: string | null; previousCycle: { start: string; end: string } | null } {
+  upcomingSessionAt: string | null,
+  todayIso: string,
+): { current: CycleWindow; previous: CycleWindow } {
   if (lastLock) {
     const lockDay = dayOf(lastLock.locked_at);
     return {
-      currentStart: lockDay,
-      previousCycle: { start: lastLock.period_start, end: addDaysISO(lockDay, -1) },
+      current: { start: lockDay, end: todayIso },
+      previous: { start: lastLock.period_start, end: addDaysISO(lockDay, -1) },
     };
   }
+  if (firstCompletedSessionAt) {
+    const start = dayOf(firstCompletedSessionAt);
+    return {
+      current: { start, end: todayIso },
+      previous: { start: addDaysISO(start, -14), end: addDaysISO(start, -7) },
+    };
+  }
+  const anchor = upcomingSessionAt ? dayOf(upcomingSessionAt) : todayIso;
   return {
-    currentStart: firstCompletedSessionAt ? dayOf(firstCompletedSessionAt) : null,
-    previousCycle: null,
+    current: { start: addDaysISO(anchor, -7), end: anchor },
+    previous: { start: addDaysISO(anchor, -14), end: addDaysISO(anchor, -7) },
   };
 }
 
-// The tasks counted right now: from the current cycle's start through today.
-// No cycleStart at all (see the file header comment) means no lower bound --
-// every task up to today counts, not none of them.
-export function tasksDueSoFar<T extends { task_date: string }>(tasks: T[], todayIso: string, cycleStart: string | null): T[] {
-  return tasks.filter((t) => (cycleStart === null || t.task_date >= cycleStart) && t.task_date <= todayIso);
+// Every task within a fixed [start, end] window -- used both for the plain
+// done/total count (closedCycleCounts below) and for callers that need the
+// raw rows to bucket further (e.g. the coach's TYT/AYT/per-course splits).
+export function tasksInCycle<T extends { task_date: string }>(tasks: T[], window: CycleWindow): T[] {
+  return tasks.filter((t) => t.task_date >= window.start && t.task_date <= window.end);
 }
 
-export function completionCounts(tasks: CompletionTask[], todayIso: string, cycleStart: string | null): CompletionCounts {
-  const due = tasksDueSoFar(tasks, todayIso, cycleStart);
+export function closedCycleCounts(tasks: CompletionTask[], window: CycleWindow): CompletionCounts {
+  const due = tasksInCycle(tasks, window);
   return { done: due.filter((t) => t.status === "done").length, total: due.length };
 }
 
-// Fixed-range counts for a cycle that has ALREADY been closed by a lock --
-// both bounds are already in the past, so every task in [start, end] counts,
-// no "due so far" capping needed. Used for the previous-cycle comparison bar.
-export function closedCycleCounts(tasks: CompletionTask[], start: string, end: string): CompletionCounts {
-  const due = tasks.filter((t) => t.task_date >= start && t.task_date <= end);
-  return { done: due.filter((t) => t.status === "done").length, total: due.length };
-}
-
-// Whole-number percent, or null when nothing has been due yet (no tasks up to
-// today) -- shown as "—", never as 0% or 100%.
+// Whole-number percent, or null when nothing has been due yet (no tasks in
+// the window) -- shown as "—", never as 0% or 100%.
 export function completionPercent(counts: CompletionCounts): number | null {
   return counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : null;
 }

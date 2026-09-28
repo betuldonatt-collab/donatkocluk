@@ -22,7 +22,7 @@ import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
-import { resolveCycles, tasksDueSoFar, type ProgressLock } from "@/lib/completion";
+import { resolveCycles, tasksInCycle, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import type { TopicPerformanceRow } from "./_components/topic-performance-map";
 import type { WeakTopicRow } from "./weak-topic-map";
@@ -94,9 +94,9 @@ function bucketCompletionStats(tasks: DetailTask[]): CompletionStats {
   return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
-function computeDualCompletionStats(allTasks: DetailTask[], today: string, cycleStart: string | null): DualCompletionStats {
+function computeDualCompletionStats(allTasks: DetailTask[], today: string, currentCycle: CycleWindow): DualCompletionStats {
   return {
-    weekly: bucketCompletionStats(tasksDueSoFar(allTasks, today, cycleStart)),
+    weekly: bucketCompletionStats(tasksInCycle(allTasks, currentCycle)),
     allTime: bucketCompletionStats(allTasks.filter((t) => t.task_date <= today)),
   };
 }
@@ -126,8 +126,8 @@ function courseLabelFor(courseId: string): string {
 // course touched in EITHER scope -- a course only worked on in a prior
 // week still shows its all-time figure with "—" for this week's, and vice
 // versa for a course picked up for the first time this week.
-function computeSubjectCompletion(allTasks: DetailTask[], today: string, cycleStart: string | null): SubjectCompletion[] {
-  const weekly = bucketSubjectCompletion(tasksDueSoFar(allTasks, today, cycleStart));
+function computeSubjectCompletion(allTasks: DetailTask[], today: string, currentCycle: CycleWindow): SubjectCompletion[] {
+  const weekly = bucketSubjectCompletion(tasksInCycle(allTasks, currentCycle));
   const allTime = bucketSubjectCompletion(allTasks.filter((t) => t.task_date <= today));
   const courseIds = new Set([...weekly.keys(), ...allTime.keys()]);
   const toBucket = (b: { done: number; total: number } | undefined) =>
@@ -321,11 +321,16 @@ async function fetchStudentDetail(studentId: string) {
   const isCompletedTask = (t: DetailTask) => t.status === "done" || t.status === "half_done";
   const sessions = (sessionRows ?? []) as DetailSession[];
   // No lock yet -> the student's first completed session is day one of
-  // their first cycle (lib/completion.ts's resolveCycles).
+  // their first cycle (lib/completion.ts's resolveCycles). No completed
+  // session either -> their soonest still-pending one anchors the
+  // bootstrap two-week window instead.
   const firstCompletedSessionAt = sessions
     .filter((s) => s.outcome === "completed")
     .reduce<string | null>((earliest, s) => (earliest === null || s.scheduled_at < earliest ? s.scheduled_at : earliest), null);
-  const { currentStart: progressCycleStart } = resolveCycles(lastLockRow as ProgressLock | null, firstCompletedSessionAt);
+  const upcomingSessionAt = sessions
+    .filter((s) => s.outcome === "pending")
+    .reduce<string | null>((soonest, s) => (soonest === null || s.scheduled_at < soonest ? s.scheduled_at : soonest), null);
+  const { current: currentCycle } = resolveCycles(lastLockRow as ProgressLock | null, firstCompletedSessionAt, upcomingSessionAt, today);
   const paragrafEntries = (paragrafRows ?? []) as ParagrafProblemEntry[];
   const notes = (noteRows ?? []) as DetailCoachNote[];
 
@@ -543,10 +548,10 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
-    completion: computeDualCompletionStats(tasks, today, progressCycleStart),
-    subjectCompletion: computeSubjectCompletion(tasks, today, progressCycleStart),
-    progressFrom: progressCycleStart,
-    progressFromKind: lastLockRow !== null ? ("lock" as const) : firstCompletedSessionAt !== null ? ("session" as const) : ("none" as const),
+    completion: computeDualCompletionStats(tasks, today, currentCycle),
+    subjectCompletion: computeSubjectCompletion(tasks, today, currentCycle),
+    progressFrom: currentCycle.start,
+    progressTo: currentCycle.end,
     topicPerformance: topicPerformanceWithQuestions,
     curriculumCourseIds,
     sessions,
@@ -625,7 +630,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                     completion={detail.completion}
                     subjectCompletion={detail.subjectCompletion}
                     progressFrom={detail.progressFrom}
-                    progressFromKind={detail.progressFromKind}
+                    progressTo={detail.progressTo}
                   />
                 </div>
 

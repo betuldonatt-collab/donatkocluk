@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 
-import { completionPercent } from "@/lib/completion";
-import { weightedClosedCycleCounts, weightedCompletionCounts, type WeightableTask } from "@/lib/effort-weight";
+import { completionPercent, type CycleWindow } from "@/lib/completion";
+import { weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
 import { DailyProgressCard } from "@/components/daily-progress-card";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import type { StudentTask } from "./types";
@@ -20,24 +20,22 @@ export function ProgressOverview({
   liveTasks,
   extraTasks,
   today,
-  cycleStart,
+  currentCycle,
   previousCycle,
 }: {
   liveTasks: StudentTask[];
   extraTasks: ProgressTask[];
   today: string;
-  cycleStart: string | null;
-  previousCycle: { start: string; end: string } | null;
+  currentCycle: CycleWindow;
+  previousCycle: CycleWindow;
 }) {
   const all = useMemo(() => {
     const liveIds = new Set(liveTasks.map((t) => t.id));
     return [...liveTasks, ...extraTasks.filter((t) => !liveIds.has(t.id))] as ProgressTask[];
   }, [liveTasks, extraTasks]);
 
-  const current = { start: cycleStart, end: today, pct: completionPercent(weightedCompletionCounts(all, today, cycleStart)) };
-  const previous = previousCycle
-    ? { start: previousCycle.start, end: previousCycle.end, pct: completionPercent(weightedClosedCycleCounts(all, previousCycle.start, previousCycle.end)) }
-    : { start: null, end: null, pct: null };
+  const current = { ...currentCycle, pct: completionPercent(weightedCycleCounts(all, currentCycle)) };
+  const previous = { ...previousCycle, pct: completionPercent(weightedCycleCounts(all, previousCycle)) };
 
   return (
     <div className="grid gap-4 md:grid-cols-2">

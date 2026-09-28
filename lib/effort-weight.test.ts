@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { completionPercent } from "./completion";
-import { impactPercent, subjectCoefficient, taskWeight, weightedClosedCycleCounts, weightedCompletionCounts } from "./effort-weight";
+import { impactPercent, subjectCoefficient, taskWeight, weightedCycleCounts } from "./effort-weight";
 
 describe("subjectCoefficient", () => {
   it("maps subjects to 1 / 1.5 / 2", () => {
@@ -72,26 +72,21 @@ describe("taskWeight", () => {
   });
 });
 
-describe("weighted completion", () => {
-  const WED = "2026-09-23";
+describe("weightedCycleCounts", () => {
   const tasks = [
     { task_date: "2026-09-22", status: "done", task_type: "question_bank", course_id: "tyt-matematik", total_count: 50 }, // 1000
     { task_date: "2026-09-23", status: "pending", task_type: "question_bank", course_id: "paragraf", total_count: 20 }, // 200
     { task_date: "2026-09-25", status: "pending", task_type: "video", duration_minutes: 30 }, // 150
   ];
 
-  it("counts effort, not tasks, through today", () => {
-    const c = weightedCompletionCounts(tasks, WED, "2026-09-22");
+  it("counts effort, not tasks, within the window", () => {
+    const c = weightedCycleCounts(tasks, { start: "2026-09-22", end: "2026-09-23" });
     expect(c).toEqual({ done: 1000, total: 1200 });
     expect(completionPercent(c)).toBe(83);
   });
 
-  it("counts the whole history through today (unbounded, not zero) when there is no cycle start yet", () => {
-    expect(weightedCompletionCounts(tasks, WED, null)).toEqual({ done: 1000, total: 1200 });
-  });
-
-  it("counts every task in a closed cycle's fixed range, future days included", () => {
-    const c = weightedClosedCycleCounts(tasks, "2026-09-22", "2026-09-25");
+  it("counts every task in a fixed range, future-relative-to-another-window days included", () => {
+    const c = weightedCycleCounts(tasks, { start: "2026-09-22", end: "2026-09-25" });
     expect(c.total).toBe(1350);
     expect(completionPercent(c)).toBe(74);
   });

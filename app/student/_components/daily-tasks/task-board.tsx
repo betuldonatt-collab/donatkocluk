@@ -31,6 +31,7 @@ import { useRowHeights } from "@/lib/use-row-heights";
 import { useAutoRowHeights } from "@/lib/use-auto-row-heights";
 import { deleteCustomTask, getPastWeeksForStudent, getTasksForWeek, updateTaskOrder } from "../../actions";
 import type { ExamType } from "@/lib/exam-type";
+import type { CycleWindow } from "@/lib/completion";
 import { AddCustomTaskDialog } from "./add-custom-task-dialog";
 import { PendingAnalysisAlert } from "./pending-analysis-alert";
 import { SortableTaskCard } from "./sortable-task-card";
@@ -152,7 +153,7 @@ export function TaskBoard({
   fixedTasks,
   allTimeTrackedMinutes,
   todayLocked,
-  progressCycleStart,
+  currentCycle,
   progressExtraTasks,
   previousCycle,
   initialRoutineRowHeights,
@@ -173,16 +174,17 @@ export function TaskBoard({
   // server-side, and passed straight through rather than derived here.
   allTimeTrackedMinutes: number;
   todayLocked: boolean;
-  // Where the student's current (still open) coaching cycle starts (null =
-  // no lock and no completed session yet) -- see lib/completion.ts.
-  progressCycleStart: string | null;
+  // The student's current coaching cycle's fixed [start, end] range -- open
+  // and ending today once a lock or a completed session exists, or the
+  // bootstrap two-week window ending on their upcoming session otherwise
+  // (always a real range now, see lib/completion.ts).
+  currentCycle: CycleWindow;
   // Slim rows spanning back to whichever is earlier (the current cycle's
   // start or the previous cycle's), plus the day after this week, for the
   // Önceki Dönem bar and Dün/Yarın (see ProgressOverview).
   progressExtraTasks: ProgressTask[];
-  // The most recently closed cycle's fixed [start, end] range, or null if
-  // the student has never been locked yet.
-  previousCycle: { start: string; end: string } | null;
+  // The previous cycle's fixed [start, end] range (always real).
+  previousCycle: CycleWindow;
   // The student's own profiles.schedule_routine_row_heights_px /
   // schedule_task_row_heights_px, fetched server-side by
   // app/student/page.tsx so the very first render already matches their
@@ -391,7 +393,7 @@ export function TaskBoard({
         liveTasks={progressTasks}
         extraTasks={extraProgressTasks}
         today={today}
-        cycleStart={progressCycleStart}
+        currentCycle={currentCycle}
         previousCycle={previousCycle}
       />
 
