@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { clearAnnouncementAttendance, upsertAnnouncementAttendance } from "../../actions";
+import { clearAnnouncementAttendance, upsertAnnouncementAttendance } from "../actions";
 
 export type AttendanceStatus = "attended" | "not_attended";
 

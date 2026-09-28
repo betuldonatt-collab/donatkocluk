@@ -845,58 +845,11 @@ export async function unlockLatestCycle(studentId: string) {
   revalidatePath(`/coach/students/${studentIdV}`);
 }
 
-// --- Coach events: post-event attendance (Yoklama) -------------------------
-//
-// Separate from the student's own RSVP response (announcement_rsvps) -- see
-// migration 0104's header comment. A coach can mark ANY roster student for
-// ANY active announcement, regardless of what (if anything) that student
-// RSVP'd, since someone who declined can still show up and someone who never
-// answered still might.
-
-const attendanceStatusSchema = z.enum(["attended", "not_attended"]);
-
-export async function upsertAnnouncementAttendance(announcementId: string, studentId: string, status: "attended" | "not_attended") {
-  await assertNotImpersonating();
-  const announcementIdV = parseInput(uuidSchema, announcementId);
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const statusV = parseInput(attendanceStatusSchema, status);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  await requireCoachAccess(supabase, user.id, studentIdV);
-
-  const { error } = await supabase.from("announcement_attendance").upsert(
-    {
-      announcement_id: announcementIdV,
-      student_id: studentIdV,
-      status: statusV,
-      marked_by: user.id,
-      marked_at: new Date().toISOString(),
-    },
-    { onConflict: "announcement_id,student_id" },
-  );
-  if (error) throw dbError(error);
-  revalidatePath("/coach/events");
-}
-
-// Clicking the already-active Katıldı/Katılmadı button again clears it back
-// to "not yet marked" (a toggle, not a one-way switch) -- deleting the row
-// is simpler and cheaper than adding a third nullable enum state to update to.
-export async function clearAnnouncementAttendance(announcementId: string, studentId: string) {
-  await assertNotImpersonating();
-  const announcementIdV = parseInput(uuidSchema, announcementId);
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  await requireCoachAccess(supabase, user.id, studentIdV);
-
-  const { error } = await supabase
-    .from("announcement_attendance")
-    .delete()
-    .eq("announcement_id", announcementIdV)
-    .eq("student_id", studentIdV);
-  if (error) throw dbError(error);
-  revalidatePath("/coach/events");
-}
+// Coach events / attendance (Yoklama): moved to their own app/coach/events/
+// actions.ts, a small dedicated "use server" file -- see that file's header
+// comment for why (a Next.js production-only bug with unused-server-action
+// elimination when a client component imports only a couple of exports out
+// of this large shared file).
 
 // --- Student detail: Program tab week navigation --------------------------
 
