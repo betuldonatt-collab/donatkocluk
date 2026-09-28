@@ -7,38 +7,30 @@ const task = (task_date: string, status: string) => ({ task_date, status });
 
 describe("resolveCycles", () => {
   it("locked: starts ON the lock's own day (a same-day session plus new same-day tasks must land in the new cycle), previous ends the day before", () => {
-    const { current, previous } = resolveCycles({ period_start: "2026-09-08", locked_at: "2026-09-22T08:30:00Z" }, null, null, WED);
+    const { current, previous } = resolveCycles({ period_start: "2026-09-08", locked_at: "2026-09-22T08:30:00Z" }, null, WED);
     expect(current).toEqual({ start: "2026-09-22", end: WED });
     expect(previous).toEqual({ start: "2026-09-08", end: "2026-09-21" });
   });
 
   it("locked: uses only the date part of the lock timestamp", () => {
-    expect(resolveCycles({ period_start: "2026-09-01", locked_at: "2026-09-23T23:59:59Z" }, null, null, WED).current.start).toBe("2026-09-23");
+    expect(resolveCycles({ period_start: "2026-09-01", locked_at: "2026-09-23T23:59:59Z" }, null, WED).current.start).toBe("2026-09-23");
   });
 
-  it("first completed session, no lock yet: current starts there and stays open to today; previous is the 14-to-7 days before it", () => {
-    const { current, previous } = resolveCycles(null, "2026-09-10T12:00:00Z", null, WED);
-    expect(current).toEqual({ start: "2026-09-10", end: WED });
-    expect(previous).toEqual({ start: "2026-08-27", end: "2026-09-03" });
-  });
-
-  it("bootstrap (no lock, no completed session): anchors on the upcoming pending session, 7 and 14 days back", () => {
-    const { current, previous } = resolveCycles(null, null, "2026-09-23T10:00:00Z", WED);
+  it("no lock yet: anchors on the upcoming pending session, exactly 7 and 14 days back -- regardless of any completed session, task, or account date", () => {
+    const { current, previous } = resolveCycles(null, "2026-09-23T10:00:00Z", WED);
     expect(current).toEqual({ start: "2026-09-16", end: "2026-09-23" });
     expect(previous).toEqual({ start: "2026-09-09", end: "2026-09-16" });
   });
 
-  it("bootstrap: falls back to today when there is no pending session either", () => {
-    const { current, previous } = resolveCycles(null, null, null, WED);
+  it("no lock, no pending session either: falls back to today as the anchor", () => {
+    const { current, previous } = resolveCycles(null, null, WED);
     expect(current).toEqual({ start: "2026-09-16", end: WED });
     expect(previous).toEqual({ start: "2026-09-09", end: "2026-09-16" });
   });
 
-  it("bootstrap: a same-3rd-Wednesday example -- current is 2nd-to-3rd Wednesday, previous is 1st-to-2nd", () => {
-    // 1st/2nd/3rd Wednesdays of September 2026: the 2nd, 9th, 16th... wait,
-    // pick real Wednesdays: 2026-09-02, 09-09, 09-16, 09-23.
+  it("a same-3rd-Wednesday example -- current is 2nd-to-3rd Wednesday, previous is 1st-to-2nd", () => {
     const thirdWednesday = "2026-09-23";
-    const { current, previous } = resolveCycles(null, null, `${thirdWednesday}T09:00:00Z`, thirdWednesday);
+    const { current, previous } = resolveCycles(null, `${thirdWednesday}T09:00:00Z`, thirdWednesday);
     expect(current).toEqual({ start: "2026-09-16", end: "2026-09-23" }); // 2nd -> 3rd Wednesday
     expect(previous).toEqual({ start: "2026-09-09", end: "2026-09-16" }); // 1st -> 2nd Wednesday
   });
@@ -79,7 +71,7 @@ describe("tasksInCycle / closedCycleCounts / completionPercent", () => {
   it("a same-day session: a task the coach assigns for today, right after locking, lands in the NEW cycle, not the one just closed", () => {
     // Coach locks at 10:00 on the 23rd (closing the cycle that started the
     // 15th) and, in the same sitting, assigns a fresh task for the 23rd.
-    const { current, previous } = resolveCycles({ period_start: "2026-09-15", locked_at: "2026-09-23T10:00:00Z" }, null, null, WED);
+    const { current, previous } = resolveCycles({ period_start: "2026-09-15", locked_at: "2026-09-23T10:00:00Z" }, null, WED);
     const newTaskAssignedRightAfterLocking = task("2026-09-23", "pending");
     expect(closedCycleCounts([newTaskAssignedRightAfterLocking], current).total).toBe(1);
     expect(newTaskAssignedRightAfterLocking.task_date > previous.end).toBe(true);

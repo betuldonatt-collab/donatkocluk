@@ -320,17 +320,12 @@ async function fetchStudentDetail(studentId: string) {
   // state.
   const isCompletedTask = (t: DetailTask) => t.status === "done" || t.status === "half_done";
   const sessions = (sessionRows ?? []) as DetailSession[];
-  // No lock yet -> the student's first completed session is day one of
-  // their first cycle (lib/completion.ts's resolveCycles). No completed
-  // session either -> their soonest still-pending one anchors the
-  // bootstrap two-week window instead.
-  const firstCompletedSessionAt = sessions
-    .filter((s) => s.outcome === "completed")
-    .reduce<string | null>((earliest, s) => (earliest === null || s.scheduled_at < earliest ? s.scheduled_at : earliest), null);
+  // No lock yet -> the student's soonest still-pending session anchors the
+  // bootstrap two-week window instead (lib/completion.ts).
   const upcomingSessionAt = sessions
     .filter((s) => s.outcome === "pending")
     .reduce<string | null>((soonest, s) => (soonest === null || s.scheduled_at < soonest ? s.scheduled_at : soonest), null);
-  const { current: currentCycle } = resolveCycles(lastLockRow as ProgressLock | null, firstCompletedSessionAt, upcomingSessionAt, today);
+  const { current: currentCycle } = resolveCycles(lastLockRow as ProgressLock | null, upcomingSessionAt, today);
   const paragrafEntries = (paragrafRows ?? []) as ParagrafProblemEntry[];
   const notes = (noteRows ?? []) as DetailCoachNote[];
 

@@ -62,7 +62,6 @@ async function fetchHomeData(userId: string) {
     { data: pendingTaskRows },
     { data: ratingSessionRows },
     { data: lastLockRow },
-    { data: firstCompletedSessionRow },
     { data: upcomingSessionRow },
     { data: profileRow },
     { data: taskResourceRows },
@@ -106,7 +105,7 @@ async function fetchHomeData(userId: string) {
       // The single most recent progress lock -- where the completion
       // percentages currently start counting (lib/completion.ts), and the
       // frozen boundary for `week_locked` below. No lock yet -> resolved
-      // from the first completed session (next query).
+      // from the soonest still-pending session (next query).
       supabase
         .from("progress_locks")
         .select("period_start, locked_at")
@@ -114,16 +113,8 @@ async function fetchHomeData(userId: string) {
         .order("locked_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from("coaching_sessions")
-        .select("scheduled_at")
-        .eq("student_id", userId)
-        .eq("outcome", "completed")
-        .order("scheduled_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      // No lock and no completed session either -> the soonest still-pending
-      // session anchors the bootstrap two-week window (lib/completion.ts).
+      // No lock yet -> the soonest still-pending session anchors the
+      // bootstrap two-week window (lib/completion.ts).
       supabase
         .from("coaching_sessions")
         .select("scheduled_at")
@@ -166,7 +157,6 @@ async function fetchHomeData(userId: string) {
   const lastLock = lastLockRow as ProgressLock | null;
   const { current: currentCycle, previous: previousCycle } = resolveCycles(
     lastLock,
-    (firstCompletedSessionRow?.scheduled_at ?? null) as string | null,
     (upcomingSessionRow?.scheduled_at ?? null) as string | null,
     today,
   );

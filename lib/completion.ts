@@ -5,22 +5,17 @@
 // DURING a same-day session and, in that same sitting, assigns new tasks for
 // that same day. Starting the new cycle the day after would silently drop
 // those same-day tasks into the cycle just closed instead of the one they
-// were actually assigned for. A student who has never been locked yet uses
-// the day of their first COMPLETED coaching session as day one instead
-// (there is nothing to lock before a first session happens); its own
-// "previous" comparison window is the 14-to-7-days-before range immediately
-// preceding that first session, same formula as the bootstrap case below.
+// were actually assigned for.
 //
-// A student with neither a lock nor a completed session yet -- e.g. their
-// very first appointment has just been scheduled but hasn't happened -- has
-// no real cycle event to anchor on at all. Coaches evaluate a student every
-// ~4 weeks, so rather than either hiding everything (an empty window) or
-// pulling in their entire history (unbounded), this anchors on the date of
-// their upcoming (pending) session -- T -- and shows exactly the two
-// 7-day windows leading up to it: [T-7, T] as the current period, [T-14,
-// T-7] as the previous one. No pending session at all (a genuinely brand
-// new student) falls back to T = today. The instant a real cycle event
-// exists (a completed session or a lock), it takes over exactly as before.
+// A student who has never been locked yet -- regardless of whether they've
+// ever had a completed session -- uses STRICT calendar math anchored on T,
+// their soonest still-pending coaching session (or today, if none is
+// scheduled): current period = [T-7, T], previous period = [T-14, T-7].
+// Coaches evaluate a student every ~4 weeks, so this is exactly the two-week
+// stretch leading up to that session, computed by day-count alone -- NEVER
+// by looking at when a task was assigned, when a session was completed, when
+// the account was created, or anything else. The instant a real lock exists,
+// it takes over completely and this whole paragraph no longer applies.
 //
 // One rule shared by every surface that shows the percentage (student
 // board, coach student page, coach roster, parent panel) so they never
@@ -54,13 +49,12 @@ function addDaysISO(iso: string, days: number): string {
 }
 
 // The student's current (still open) cycle window and their previous
-// (already closed) one -- both always real, displayable date ranges; there
-// is no more "no window" or "unbounded" case. `upcomingSessionAt` is that
-// student's soonest still-pending coaching session, if any (only consulted
-// when there is neither a lock nor a completed session yet).
+// (already closed) one -- both always real, displayable date ranges.
+// `upcomingSessionAt` is that student's soonest still-pending coaching
+// session, if any; it is the ONLY input consulted when there is no lock yet
+// -- not a completed session's date, not a task's date, nothing else.
 export function resolveCycles(
   lastLock: ProgressLock | null,
-  firstCompletedSessionAt: string | null,
   upcomingSessionAt: string | null,
   todayIso: string,
 ): { current: CycleWindow; previous: CycleWindow } {
@@ -71,17 +65,12 @@ export function resolveCycles(
       previous: { start: lastLock.period_start, end: addDaysISO(lockDay, -1) },
     };
   }
-  if (firstCompletedSessionAt) {
-    const start = dayOf(firstCompletedSessionAt);
-    return {
-      current: { start, end: todayIso },
-      previous: { start: addDaysISO(start, -14), end: addDaysISO(start, -7) },
-    };
-  }
-  const anchor = upcomingSessionAt ? dayOf(upcomingSessionAt) : todayIso;
+  // No lock yet: strict T-7 / T-14 calendar math, T = the upcoming pending
+  // session's own day, or today if none is scheduled.
+  const T = upcomingSessionAt ? dayOf(upcomingSessionAt) : todayIso;
   return {
-    current: { start: addDaysISO(anchor, -7), end: anchor },
-    previous: { start: addDaysISO(anchor, -14), end: addDaysISO(anchor, -7) },
+    current: { start: addDaysISO(T, -7), end: T },
+    previous: { start: addDaysISO(T, -14), end: addDaysISO(T, -7) },
   };
 }
 

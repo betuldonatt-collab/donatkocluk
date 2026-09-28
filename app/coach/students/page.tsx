@@ -45,17 +45,13 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
     supabase.from("coaching_sessions").select("student_id, scheduled_at, is_paid, outcome").in("student_id", studentIds).order("scheduled_at", { ascending: true }),
   ]);
   const sessionsByStudent = new Map<string, SessionBalanceRow[]>();
-  const firstCompletedSessionByStudent = new Map<string, string>();
   const upcomingSessionByStudent = new Map<string, string>();
   for (const s of sessionRows ?? []) {
     const list = sessionsByStudent.get(s.student_id) ?? [];
     list.push({ is_paid: s.is_paid, outcome: s.outcome });
     sessionsByStudent.set(s.student_id, list);
-    // Rows are ordered ascending, so the first 'completed'/'pending' one
-    // seen per student is their earliest/soonest.
-    if (s.outcome === "completed" && !firstCompletedSessionByStudent.has(s.student_id)) {
-      firstCompletedSessionByStudent.set(s.student_id, s.scheduled_at);
-    }
+    // Rows are ordered ascending, so the first 'pending' one seen per
+    // student is their soonest upcoming session.
     if (s.outcome === "pending" && !upcomingSessionByStudent.has(s.student_id)) {
       upcomingSessionByStudent.set(s.student_id, s.scheduled_at);
     }
@@ -63,19 +59,15 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
 
   // Rows are ordered by locked_at desc, so the first one seen per student is
   // their latest lock -- where completion currently starts counting (no lock
-  // yet -> that student's first completed session, or -- failing that --
-  // the two-week window leading up to their upcoming session, lib/completion.ts).
+  // yet -> the two-week window leading up to their upcoming session,
+  // lib/completion.ts).
   const lastLockByStudent = new Map<string, ProgressLock>();
   for (const r of lockRows ?? []) {
     if (!lastLockByStudent.has(r.student_id)) lastLockByStudent.set(r.student_id, { period_start: r.period_start, locked_at: r.locked_at });
   }
   const currentCycleByStudent = new Map<string, CycleWindow>();
   for (const id of studentIds) {
-    currentCycleByStudent.set(
-      id,
-      resolveCycles(lastLockByStudent.get(id) ?? null, firstCompletedSessionByStudent.get(id) ?? null, upcomingSessionByStudent.get(id) ?? null, today)
-        .current,
-    );
+    currentCycleByStudent.set(id, resolveCycles(lastLockByStudent.get(id) ?? null, upcomingSessionByStudent.get(id) ?? null, today).current);
   }
 
   const tasksByStudent = new Map<string, WeightableTask[]>();

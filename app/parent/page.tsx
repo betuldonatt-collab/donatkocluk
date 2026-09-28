@@ -131,20 +131,12 @@ async function fetchDashboardData() {
   if (!profile) return { student: null };
 
   const sessions = (sessionRows ?? []) as ParentSession[];
-  const firstCompletedSessionAt = sessions
-    .filter((s) => s.outcome === "completed")
-    .reduce<string | null>((earliest, s) => (earliest === null || s.scheduled_at < earliest ? s.scheduled_at : earliest), null);
-  // No lock and no completed session either -> the soonest still-pending
-  // session anchors the bootstrap two-week window (lib/completion.ts).
+  // No lock yet -> the soonest still-pending session anchors the bootstrap
+  // two-week window (lib/completion.ts).
   const upcomingSessionAt = sessions
     .filter((s) => s.outcome === "pending")
     .reduce<string | null>((soonest, s) => (soonest === null || s.scheduled_at < soonest ? s.scheduled_at : soonest), null);
-  const { current: currentCycle, previous: previousCycle } = resolveCycles(
-    lockRow as ProgressLock | null,
-    firstCompletedSessionAt,
-    upcomingSessionAt,
-    today,
-  );
+  const { current: currentCycle, previous: previousCycle } = resolveCycles(lockRow as ProgressLock | null, upcomingSessionAt, today);
 
   // student_tasks is read ONCE for the whole window this render needs (the
   // program sheet's calendar week, plus however far the current/previous

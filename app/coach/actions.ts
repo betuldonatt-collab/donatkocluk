@@ -773,7 +773,7 @@ export async function lockCurrentCycle(studentId: string) {
   // the bootstrap branch, which this guard rules out.)
   if (!lastLock && !firstCompletedSessionAt) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
 
-  const { current } = resolveCycles(lastLock, firstCompletedSessionAt, null, today);
+  const { current } = resolveCycles(lastLock, null, today);
 
   const { error } = await supabase
     .from("progress_locks")
