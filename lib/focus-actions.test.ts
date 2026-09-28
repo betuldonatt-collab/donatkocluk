@@ -28,7 +28,10 @@ function builder(table: string) {
   const filters: Record<string, unknown> = {};
   const result = () => {
     if (table === "focus_sessions") {
-      if (filters.status === "running") return { data: state.runningRows, error: state.runningError };
+      // getRunningFocusSessions() filters .in("status", ["running", "paused"]);
+      // everything else that reads this table (getOwnFocusSession, etc.) reads
+      // a single row and never filters on status at all.
+      if (Array.isArray(filters.status)) return { data: state.runningRows, error: state.runningError };
       return { data: state.session, error: null };
     }
     if (table === "focus_session_reviews") return { data: state.reviews, error: null };
@@ -36,9 +39,13 @@ function builder(table: string) {
     return { data: null, error: null };
   };
   const b: Record<string, unknown> = {};
-  for (const m of ["select", "gte", "lt", "order", "limit", "update", "upsert", "in"]) b[m] = () => b;
+  for (const m of ["select", "gte", "lt", "order", "limit", "update", "upsert"]) b[m] = () => b;
   b.eq = (column: string, value: unknown) => {
     filters[column] = value;
+    return b;
+  };
+  b.in = (column: string, values: unknown[]) => {
+    filters[column] = values;
     return b;
   };
   b.maybeSingle = () => Promise.resolve(result());
@@ -139,8 +146,35 @@ describe("getRunningFocusSessions", () => {
     ];
     const rows = await getRunningFocusSessions();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ taskId: TASK, taskTitle: "TYT Türkçe", mode: "stopwatch", priorTrackedSeconds: 600 });
+    expect(rows[0]).toMatchObject({
+      taskId: TASK,
+      taskTitle: "TYT Türkçe",
+      mode: "stopwatch",
+      status: "running",
+      priorTrackedSeconds: 600,
+    });
     expect(rows[0].elapsedSeconds).toBeGreaterThanOrEqual(120);
+  });
+
+  it("also returns a PAUSED session (its own banked time never disappears from the widgets)", async () => {
+    const { getRunningFocusSessions } = await import("../app/student/actions");
+    state.runningRows = [
+      {
+        id: "s1",
+        mode: "stopwatch",
+        countdown_target_seconds: null,
+        status: "paused",
+        run_started_at: null,
+        accumulated_seconds: 1500,
+        last_heartbeat_at: new Date().toISOString(),
+        task_id: TASK,
+        student_tasks: { title: "AYT Kimya", tracked_duration_seconds: 0 },
+      },
+    ];
+    const rows = await getRunningFocusSessions();
+    expect(rows).toEqual([
+      { taskId: TASK, taskTitle: "AYT Kimya", mode: "stopwatch", countdownTargetSeconds: null, status: "paused", elapsedSeconds: 1500, priorTrackedSeconds: 0 },
+    ]);
   });
 
   it("returns [] on a read error but logs it, so an empty widget is diagnosable", async () => {

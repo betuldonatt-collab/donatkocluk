@@ -1,10 +1,31 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Crown, Timer, Trophy } from "lucide-react";
 
 import { useStopwatchWidgetCollapsed } from "@/lib/use-stopwatch-widget-collapsed";
-import type { DailyStopwatchRanking } from "../../actions";
+import { subscribeTick } from "@/lib/background-ticker";
+import { getRunningFocusSessions, type DailyStopwatchRanking, type RunningFocusSession } from "../../actions";
+
+// How often this widget re-reads the student's own running/paused sessions
+// while mounted -- independent of the floating focus-session widget's own
+// refresh triggers, so the daily total stays current even if that widget
+// isn't mounted for some reason. A paused session's contribution never
+// changes on its own, so polling (rather than reacting to every click) is
+// simple and "good enough": the total catches up within one interval of any
+// Süre Tut / Mola Ver / Bitir, on this tab or another.
+const POLL_INTERVAL_MS = 10_000;
+
+type LiveSession = RunningFocusSession & { fetchedAt: number };
+
+// Not-yet-banked seconds for one session, as of `nowMs` -- frozen for a
+// paused one (Mola Ver already banked its run through the moment it was
+// clicked), still climbing for a running one.
+function liveSeconds(session: LiveSession, nowMs: number): number {
+  if (session.status === "paused") return session.elapsedSeconds;
+  return session.elapsedSeconds + Math.max(0, (nowMs - session.fetchedAt) / 1000);
+}
 
 function formatMinutesLabel(totalMinutes: number): string {
   if (totalMinutes < 60) return `${totalMinutes} dk`;
@@ -35,8 +56,48 @@ function formatMinutesLabel(totalMinutes: number): string {
 export function StopwatchWidget({ ranking }: { ranking: DailyStopwatchRanking }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useStopwatchWidgetCollapsed();
+  const onStudentPage = pathname === "/student";
 
-  if (pathname !== "/student" || ranking.participantCount === 0) return null;
+  // Own running/paused sessions, polled independently of the floating
+  // focus-session widget -- what turns `ranking.myTotalMinutes` (the
+  // committed, server-aggregated figure) into a live number that already
+  // includes whatever hasn't been banked to student_tasks yet, so a Mola
+  // never makes today's total look like it went backwards or stalled.
+  const [sessions, setSessions] = useState<LiveSession[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!onStudentPage) return;
+    let cancelled = false;
+    function load() {
+      getRunningFocusSessions()
+        .then((rows) => {
+          if (cancelled) return;
+          const fetchedAt = Date.now();
+          setSessions(rows.map((s) => ({ ...s, fetchedAt })));
+        })
+        .catch(() => {});
+    }
+    load();
+    const id = setInterval(load, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [onStudentPage]);
+
+  // Ticks only while something is actually running -- a purely paused
+  // contribution is frozen, so there's nothing to animate for it.
+  const hasRunning = sessions.some((s) => s.status === "running");
+  useEffect(() => {
+    if (!hasRunning) return;
+    return subscribeTick(() => setNow(Date.now()));
+  }, [hasRunning]);
+
+  if (!onStudentPage || ranking.participantCount === 0) return null;
+
+  const liveExtraSeconds = sessions.reduce((sum, s) => sum + liveSeconds(s, now), 0);
+  const myTotalMinutes = (ranking.myTotalMinutes ?? 0) + Math.floor(liveExtraSeconds / 60);
 
   if (collapsed) {
     return (
@@ -114,10 +175,13 @@ export function StopwatchWidget({ ranking }: { ranking: DailyStopwatchRanking })
               {ranking.myRank !== null ? `#${ranking.myRank} / ${ranking.participantCount}` : "Yarışma dışısın"}
             </p>
           </div>
-          <p className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
-            {formatMinutesLabel(ranking.myTotalMinutes ?? 0)}
-          </p>
+          <p className="text-foreground shrink-0 text-sm font-semibold tabular-nums">{formatMinutesLabel(myTotalMinutes)}</p>
         </div>
+        {liveExtraSeconds >= 60 && (
+          <p className="text-muted-foreground px-1 text-[11px]">
+            Molada/devam eden süren dahil (henüz kaydedilmemiş {Math.floor(liveExtraSeconds / 60)} dk dahil edildi).
+          </p>
+        )}
       </div>
     </div>
   );

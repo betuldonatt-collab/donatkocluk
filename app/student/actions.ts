@@ -1277,16 +1277,19 @@ function liveElapsedSeconds(session: FocusSessionRow): number {
   return session.accumulated_seconds + Math.max(0, Math.round(ranMs / 1000));
 }
 
-// The student's currently RUNNING sessions, across every task -- what the
-// floating widget (active-focus-session-widget.tsx) shows so a timer that
-// is still counting stays visible and controllable after the student has
-// left the page that started it. Best-effort by design: it feeds a widget
-// in the layout, so a failure returns [] instead of breaking every page.
+// The student's currently RUNNING or PAUSED sessions, across every task --
+// what the floating widget (active-focus-session-widget.tsx) shows so a
+// timer stays visible and controllable after the student has left the page
+// that started it, and what the daily-total widget (stopwatch-widget.tsx)
+// adds on top of the committed total so a Mola never LOOKS like lost time.
+// Best-effort by design: it feeds widgets in the layout, so a failure
+// returns [] instead of breaking every page.
 export type RunningFocusSession = {
   taskId: string;
   taskTitle: string;
   mode: "stopwatch" | "countdown";
   countdownTargetSeconds: number | null;
+  status: "running" | "paused";
   elapsedSeconds: number;
   // Seconds already banked onto this task from EARLIER, already-ended
   // sessions -- separate from `elapsedSeconds` (this live, unbanked
@@ -1311,7 +1314,7 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
         "task_id, mode, countdown_target_seconds, status, run_started_at, accumulated_seconds, last_heartbeat_at, student_tasks(title, tracked_duration_seconds)",
       )
       .eq("student_id", user.id)
-      .eq("status", "running");
+      .in("status", ["running", "paused"]);
     if (error) {
       // Still best-effort (this feeds a widget in the layout and must never
       // break a page) -- but logged, so an empty widget is diagnosable.
@@ -1326,6 +1329,7 @@ export async function getRunningFocusSessions(): Promise<RunningFocusSession[]> 
         taskTitle: (task?.title as string | undefined) ?? "Çalışma",
         mode: row.mode as "stopwatch" | "countdown",
         countdownTargetSeconds: row.countdown_target_seconds as number | null,
+        status: row.status as "running" | "paused",
         elapsedSeconds: liveElapsedSeconds(row as unknown as FocusSessionRow),
         priorTrackedSeconds: (task?.tracked_duration_seconds as number | undefined) ?? 0,
       };

@@ -261,6 +261,7 @@ export function FocusTimerModal({
         taskTitle,
         mode,
         countdownTargetSeconds: mode === "countdown" ? countdownMinutes * 60 : null,
+        status: "running",
         elapsedSeconds,
         priorTrackedSeconds,
         fetchedAt: Date.now(),

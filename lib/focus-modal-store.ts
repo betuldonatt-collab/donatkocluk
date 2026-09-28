@@ -75,6 +75,9 @@ export type OptimisticFocusSession = {
   taskTitle: string;
   mode: "stopwatch" | "countdown";
   countdownTargetSeconds: number | null;
+  // Always "running": this is only ever set when the fullscreen timer closes
+  // WHILE running (see the comment below) -- a paused close never reaches here.
+  status: "running";
   elapsedSeconds: number;
   // Seconds already banked on this task from earlier, already-ended
   // sessions -- same field/purpose as RunningFocusSession's own, kept in

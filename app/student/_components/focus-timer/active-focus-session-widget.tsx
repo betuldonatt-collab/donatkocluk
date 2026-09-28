@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Pause, PictureInPicture2, Timer } from "lucide-react";
+import { Pause, PictureInPicture2, Play, Timer } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { subscribeTick } from "@/lib/background-ticker";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
 import { focusEndingStore, focusModalStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
@@ -17,6 +18,7 @@ import {
   getRunningFocusSessions,
   heartbeatFocusSession,
   pauseFocusSession,
+  resumeFocusSession,
   sendFocusHeartbeat,
   type RunningFocusSession,
 } from "../../actions";
@@ -29,7 +31,11 @@ const PIP_RESYNC_TICKS = 20;
 
 type LiveSession = RunningFocusSession & { fetchedAt: number };
 
+// A paused session's time is final (Mola Ver already banked the run
+// through the moment it was clicked) -- it must NOT keep ticking with the
+// wall clock, unlike a running one.
 function elapsedNow(session: LiveSession, now: number) {
+  if (session.status === "paused") return session.elapsedSeconds;
   return session.elapsedSeconds + Math.max(0, (now - session.fetchedAt) / 1000);
 }
 
@@ -47,6 +53,7 @@ function displaySeconds(session: LiveSession, now: number) {
 }
 
 function modeLabel(session: LiveSession, now: number) {
+  if (session.status === "paused") return "Molada — süren güvende";
   if (session.mode === "countdown" && session.countdownTargetSeconds !== null) {
     return displaySeconds(session, now) === 0 ? "Süre doldu" : "Geri sayım";
   }
@@ -180,7 +187,7 @@ export function ActiveFocusSessionWidget() {
       {!modalOpen && visibleSessions.length > 0 && (
         <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
           {visibleSessions.map((session, index) => (
-            <RunningSessionCard key={session.taskId} session={session} ownsTitle={index === 0} pipOpen={pipOpen} />
+            <RunningSessionCard key={session.taskId} session={session} ownsTitle={index === 0} pipOpen={pipOpen} onChanged={refresh} />
           ))}
         </div>
       )}
@@ -229,68 +236,100 @@ function RunningSessionCard({
   session,
   ownsTitle,
   pipOpen,
+  onChanged,
 }: {
   session: LiveSession;
   // Only one card drives the browser-tab title (with several sessions the
   // title would otherwise flip between them).
   ownsTitle: boolean;
   pipOpen: boolean;
+  // Called after a successful Mola/Devam Et so the parent re-reads the
+  // server and this card picks up the right paused/running look (frozen
+  // time + "Molada", or a fresh ticking baseline) instead of guessing at it.
+  onChanged: () => void;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
+  const [resuming, setResuming] = useState(false);
   // Cards only mount client-side (after the sessions are fetched), so reading
   // browser capabilities here can't cause a hydration mismatch.
   const pipSupported = isPipSupported();
+  const isPaused = session.status === "paused";
 
   const elapsedSeconds = elapsedNow(session, now);
   const shownSeconds = displaySeconds(session, now);
 
   // Ticks on the background ticker, not setInterval: a hidden tab throttles
   // setInterval to about once a minute, which would freeze the tab-title clock.
+  // A paused session's number is frozen (elapsedNow ignores `now` for it), so
+  // this only visibly matters for a running one -- kept unconditional anyway,
+  // it's a no-op re-render otherwise.
   useEffect(() => subscribeTick(() => setNow(Date.now())), []);
 
   // Coach-visible live status while the widget (rather than the fullscreen
-  // timer) is what's tracking this session.
+  // timer) is what's tracking this session. Pointless (and a no-op server-side
+  // anyway) while paused, so skipped entirely then.
   const heartbeatRef = useRef(() => {
     sendFocusHeartbeat().catch(() => {});
     heartbeatFocusSession(session.taskId).catch(() => {});
   });
   useEffect(() => {
+    if (isPaused) return;
     const beat = heartbeatRef.current;
     beat();
     const id = setInterval(beat, HEARTBEAT_INTERVAL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [isPaused]);
 
-  const { due, confirm } = useStillStudyingPrompt(session.taskId, elapsedSeconds, true);
+  const { due, confirm } = useStillStudyingPrompt(session.taskId, elapsedSeconds, !isPaused);
+
+  // Devam Et -- true resume (not a bank + fresh start): the server flips the
+  // session straight back to running from its exact banked total. Not
+  // optimistic like Mola/Bitir below, since there's no natural "hidden"
+  // state to show in between -- it stays on screen throughout, just briefly
+  // disabled, then the parent's fresh read (onChanged) takes over ticking.
+  function handleResumeClick() {
+    setResuming(true);
+    resumeFocusSession(session.taskId)
+      .then((result) => {
+        if (!result) {
+          toast.error("Bu mola artık geçerli değil, görevdeki Süre Tut'a bas.");
+          return;
+        }
+        onChanged();
+      })
+      .catch(() => toast.error("Devam edilemedi, tekrar dene."))
+      .finally(() => setResuming(false));
+  }
 
   // The tab title shows the running time ("⏳ 01:25:30") so it's visible from
-  // the tab bar while the student is on another site.
+  // the tab bar while the student is on another site -- pointless while
+  // paused (nothing is ticking), so left as the plain page title then.
   const shownWhole = Math.floor(shownSeconds);
   useEffect(() => {
     if (!ownsTitle) return;
-    setTimerTitle(formatTimerTitle(shownWhole, due));
-  }, [ownsTitle, shownWhole, due]);
+    setTimerTitle(isPaused ? null : formatTimerTitle(shownWhole, due));
+  }, [ownsTitle, shownWhole, due, isPaused]);
   useEffect(() => {
     if (!ownsTitle) return;
     return () => setTimerTitle(null);
   }, [ownsTitle]);
 
-  // Mola is OPTIMISTIC, same as Bitir below: the card disappears (and its
-  // ticker stops, since it leaves the DOM) the instant it's clicked, not
-  // after the server round trip -- focusEndingStore hides it right away,
-  // and the widget's own "settling" logic keeps it hidden until a fresh
-  // read confirms the pause (or reveals it again, still running, if the
-  // save failed).
+  // Mola stays visible throughout -- unlike Bitir below, pausing doesn't
+  // remove the card, it just switches this same card to the frozen
+  // "Molada" look, so the banked time is never off-screen even for a
+  // moment. onChanged() re-reads the server once paused, picking up the
+  // frozen elapsedSeconds and the "paused" status.
   function handlePause() {
     const taskId = session.taskId;
-    focusEndingStore.begin(taskId);
     pauseFocusSession(taskId)
-      .then(() => toast.success("Mola verildi. Devam etmek için görevdeki Süre Tut'a bas."))
+      .then(() => {
+        toast.success("Mola verildi. Süren üstte görünüyor.");
+        onChanged();
+      })
       .catch(() => toast.error("Mola verilemedi, tekrar dene."))
       .finally(() => {
         focusOptimisticSessionStore.clear(taskId);
-        focusEndingStore.end(taskId);
       });
   }
 
@@ -350,12 +389,18 @@ function RunningSessionCard({
 
   return (
     <>
-      <div className="border-border bg-card flex w-72 flex-col gap-2 rounded-lg border p-3 shadow-lg">
+      <div className={cn("border-border bg-card flex w-72 flex-col gap-2 rounded-lg border p-3 shadow-lg", isPaused && "border-amber-500/40")}>
         <div className="flex items-center gap-2">
-          <span className="relative flex size-2.5 shrink-0">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
-          </span>
+          {isPaused ? (
+            <span className="relative flex size-2.5 shrink-0">
+              <span className="relative inline-flex size-2.5 rounded-full bg-amber-500" />
+            </span>
+          ) : (
+            <span className="relative flex size-2.5 shrink-0">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+            </span>
+          )}
           <Timer className="text-muted-foreground size-4 shrink-0" />
           <p className="text-foreground min-w-0 flex-1 truncate text-xs font-medium" title={session.taskTitle}>
             {session.taskTitle}
@@ -364,10 +409,12 @@ function RunningSessionCard({
         <div className="flex items-end justify-between gap-2">
           <div>
             <p className="text-foreground text-2xl font-bold tabular-nums">{formatTimerClock(shownSeconds)}</p>
-            <p className="text-muted-foreground text-[11px]">{modeLabel(session, now)}</p>
+            <p className={cn("text-[11px]", isPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+              {modeLabel(session, now)}
+            </p>
           </div>
           <div className="flex gap-1.5">
-            {pipSupported && (
+            {pipSupported && !isPaused && (
               <Button
                 type="button"
                 variant={pipOpen ? "secondary" : "outline"}
@@ -380,11 +427,18 @@ function RunningSessionCard({
                 <PictureInPicture2 className="size-4" />
               </Button>
             )}
-            <Button type="button" variant="outline" size="sm" onClick={handlePause}>
-              <Pause className="size-3.5" />
-              Mola
-            </Button>
-            <Button type="button" size="sm" onClick={() => handleEnd()}>
+            {isPaused ? (
+              <Button type="button" size="sm" onClick={handleResumeClick} disabled={resuming}>
+                <Play className="size-3.5" />
+                Devam Et
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={handlePause}>
+                <Pause className="size-3.5" />
+                Mola
+              </Button>
+            )}
+            <Button type="button" size="sm" variant={isPaused ? "outline" : "default"} onClick={() => handleEnd()}>
               Bitir
             </Button>
           </div>
