@@ -102,19 +102,20 @@ export async function fetchParentAnnouncements(studentId: string | null): Promis
 
 // Read-only for coaches -- unlike a parent, a coach has many students, not
 // one linked student, so there's no single RSVP "response" of their own to
-// join in (per-student decline reasons already surface separately, in the
-// coach dashboard's own "Duyuru Katılım Durumu" card). Just the plain
-// active announcement list, same one every panel already sees.
+// join in (per-student participation detail lives on the coach's own
+// dedicated /coach/events page instead). Just the plain active announcement
+// list, same one every panel already sees.
 export async function fetchCoachAnnouncements(): Promise<CoachAnnouncement[]> {
   return fetchActiveAnnouncementRows();
 }
 
-// The subset of active announcements a student can actually be "still
-// waiting to respond to" -- reuses the exact same active/in-window query as
-// every other panel (fetchActiveAnnouncementRows) so this can never drift
-// out of sync with what a student is actually shown, then narrows to the
-// RSVP-gated ones. Used by the coach dashboard's "Cevap Bekleyenler" column.
-export async function fetchActiveRsvpRequiredAnnouncements(): Promise<{ id: string; title: string }[]> {
+// The subset of active announcements that are actually RSVP-gated -- reuses
+// the exact same active/in-window query as every other panel
+// (fetchActiveAnnouncementRows) so this can never drift out of sync with
+// what a student is actually shown. Used by the coach's /coach/events page
+// to build one Katılacaklar/Katılmayacaklar/Cevap Bekleyenler section per
+// announcement, plus its event date/time for display.
+export async function fetchActiveRsvpRequiredAnnouncements(): Promise<CoachAnnouncement[]> {
   const rows = await fetchActiveAnnouncementRows();
-  return rows.filter((a) => a.requires_rsvp).map((a) => ({ id: a.id, title: a.title }));
+  return rows.filter((a) => a.requires_rsvp);
 }

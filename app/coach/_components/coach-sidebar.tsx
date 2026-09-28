@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, Calendar, ChevronLeft, ChevronRight, Home, Settings, Timer, User, Users } from "lucide-react";
+import { BarChart3, Bell, Calendar, ChevronLeft, ChevronRight, Home, Megaphone, Settings, Timer, User, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/coach/students", label: "Öğrencilerim", icon: Users },
   { href: "/coach/stopwatch", label: "Kronometre Yarışması", icon: Timer },
   { href: "/coach/sessions", label: "Görüşmelerim", icon: Calendar },
+  { href: "/coach/events", label: "Etkinlikler", icon: Megaphone },
   { href: "/coach/stats", label: "İstatistiklerim", icon: BarChart3 },
   { href: "/coach/profile", label: "Profil", icon: User },
   { href: "/coach/settings", label: "Ayarlar", icon: Settings },
