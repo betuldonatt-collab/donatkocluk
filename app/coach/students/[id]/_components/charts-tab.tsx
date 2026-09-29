@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
@@ -11,10 +12,13 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
+  MAARIF9_EXAM_SUBJECTS,
+  MAARIF10_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { DualMetricChart } from "./charts/dual-metric-chart";
 import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
@@ -32,12 +36,19 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m
 }
 
 type ExamMode = "genel" | "brans";
-type MainTrack = "tyt" | "ayt";
+// m9/m10: a Maarif 9./10. Sınıf student's own Genel Deneme track (migration
+// 0096/0099) -- disjoint from TYT/AYT, one student is ever only ever on one
+// of these four, never a mix.
+type MainTrack = "tyt" | "ayt" | "m9" | "m10";
 
 const GENEL_COLORS = ["var(--primary)", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4"];
 
 function seriesFor(groups: { key: string; label: string }[]): StackedSeries[] {
   return groups.map((g, i) => ({ key: g.key, label: g.label, color: GENEL_COLORS[i % GENEL_COLORS.length] }));
+}
+
+function formatExamDate(dateStr: string) {
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 function selectClassName() {
@@ -96,12 +107,19 @@ export function ChartsTab({
   const netOf = isLgs ? computeLgsNet : computeNet;
   const [examMode, setExamMode] = useState<ExamMode>("genel");
 
+  // A Maarif 9./10. Sınıf student (migration 0096/0099) never has TYT/AYT
+  // exams at all -- their Genel Deneme is always the m9/m10 track, so this
+  // tab defaults straight to it instead of a TYT toggle that would only ever
+  // show an empty chart. Not LGS/Maarif at all -> the ordinary tyt default.
+  const maarifGrade = useMaarifGrade();
+  const defaultMainTrack: MainTrack = maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "tyt";
+
   // Branş Denemesi course picker: a Track -> Course cascade over the full
   // curriculum, not just courses the student happens to have exam data
   // for -- a coach browsing a course with no data yet should still be
   // able to select it and see an empty state, not have it missing from
   // the list entirely.
-  const [mainTrack, setMainTrack] = useState<MainTrack>("tyt");
+  const [mainTrack, setMainTrack] = useState<MainTrack>(defaultMainTrack);
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
   const [branchCourseId, setBranchCourseId] = useState<string>(isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id);
 
@@ -160,16 +178,20 @@ export function ChartsTab({
     .filter((r) => r.book_pages_read !== null)
     .map((r) => ({ date: r.entry_date, value: r.book_pages_read! }));
 
-  // Breakdown by subject group (Türkçe/Sosyal/Matematik/Fen for TYT, or the
-  // relevant AYT sections for the selected track) instead of one summed
-  // total, so the coach can see exactly which section is driving the exam's
-  // overall net.
+  // Breakdown by subject group (Türkçe/Sosyal/Matematik/Fen for TYT, the
+  // relevant AYT sections for the selected track, or the fixed Maarif
+  // 9./10. Sınıf subject list) instead of one summed total, so the coach can
+  // see exactly which section is driving the exam's overall net.
   // LGS's general exam is scored per subject (six of them, keyed lgs_*).
   const genelGroups = isLgs
     ? LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label }))
     : mainTrack === "tyt"
       ? TYT_SUBJECT_GROUPS
-      : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
+      : mainTrack === "ayt"
+        ? AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack]
+        : mainTrack === "m9"
+          ? MAARIF9_EXAM_SUBJECTS
+          : MAARIF10_EXAM_SUBJECTS;
   const genelSeries = seriesFor(genelGroups);
   const genelBreakdownData = generalExams
     .filter(
@@ -179,7 +201,7 @@ export function ChartsTab({
         (isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"
           : parseGeneralExamTrack(e.title) === mainTrack &&
-            (mainTrack === "tyt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
+            (mainTrack !== "ayt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
     )
     .slice()
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
@@ -192,6 +214,29 @@ export function ChartsTab({
         }),
       ),
     }));
+
+  // Genel Deneme Geçmişi (the table below the charts): every general exam
+  // with scores entered, regardless of the TYT/AYT/m9/m10 toggle above --
+  // the charts only ever show ONE track at a time (whichever the toggle is
+  // on), so a coach who forgets to switch it could easily conclude an exam
+  // "isn't there" when it's simply plotted under a different toggle state.
+  // This list is the audit trail: nothing here depends on mainTrack/
+  // aytSubTrack at all, only the shared date-range control everything else
+  // on this tab already respects.
+  const generalExamHistory = generalExams
+    .filter((e) => isDateInChartRange(e.task_date, chartRange) && e.subject_scores)
+    .map((e) => {
+      const totals = Object.values(e.subject_scores!).reduce<{ correct: number; wrong: number; empty: number }>(
+        (acc, s) => ({
+          correct: acc.correct + (s?.correct ?? 0),
+          wrong: acc.wrong + (s?.wrong ?? 0),
+          empty: acc.empty + (s?.empty ?? 0),
+        }),
+        { correct: 0, wrong: 0, empty: 0 },
+      );
+      return { id: e.id, date: e.task_date, title: e.title, ...totals, net: netOf(totals.correct, totals.wrong) };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const bransChartData = branchExams
     .filter(
@@ -270,7 +315,10 @@ export function ChartsTab({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {!isLgs && (
+            {/* A Maarif student is always on exactly one of m9/m10 -- there
+                is no TYT/AYT choice to make, so this toggle would just sit
+                on neither option highlighted. */}
+            {!isLgs && !maarifGrade && (
               <TrackToggle
                 options={[
                   { value: "tyt", label: "TYT" },
@@ -318,6 +366,49 @@ export function ChartsTab({
             </p>
           ) : (
             <DualMetricChart data={bransChartData} labelA="Net" labelB="Süre" unitB=" dk" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Genel Deneme Geçmişi</CardTitle>
+          <CardDescription>
+            Öğrencinin tamamladığı tüm genel denemeler (TYT/AYT/LGS/Maarif) -- yukarıdaki grafik seçimine bağlı değildir.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {generalExamHistory.length === 0 ? (
+            <p className="text-muted-foreground flex h-[100px] items-center justify-center text-sm">
+              Bu tarih aralığında kayıtlı genel deneme yok.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>Sınav Adı</TableHead>
+                    <TableHead className="text-right">Doğru</TableHead>
+                    <TableHead className="text-right">Yanlış</TableHead>
+                    <TableHead className="text-right">Boş</TableHead>
+                    <TableHead className="text-right">Net</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {generalExamHistory.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap">{formatExamDate(row.date)}</TableCell>
+                      <TableCell>{row.title}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.correct}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.wrong}</TableCell>
+                      <TableCell className="text-right tabular-nums">{row.empty}</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">{row.net.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
