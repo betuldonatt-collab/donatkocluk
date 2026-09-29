@@ -302,7 +302,13 @@ export function SessionDetailDialog({
         </div>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleting || session.outcome === "completed"}
+            title={session.outcome === "completed" ? "Gerçekleşmiş bir görüşme silinemez." : undefined}
+          >
             {deleting ? "Siliniyor..." : "Görüşmeyi İptal Et"}
           </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

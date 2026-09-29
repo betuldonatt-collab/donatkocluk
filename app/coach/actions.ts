@@ -309,13 +309,37 @@ export async function createCoachingSession(input: {
   return data;
 }
 
+// Removes a mistakenly added or duplicate "Görüşme Paketi" row -- never a
+// completed one, since a completed session's own rating/feedback/outcome
+// is real history the coach/student/parent panels all still read.
+// Deliberately refused server-side too, not just hidden in the UI, so a
+// stale page can't slip a completed session's delete through. Nothing
+// else in the schema references a coaching_sessions row by id (its
+// rating/feedback/outcome/is_paid all live on the row itself -- see
+// 0020_session_ratings.sql / 0084_session_payment_tracking.sql), so a
+// plain DELETE here can never cascade into or orphan coach_notes or
+// anything else; there's simply nothing pointing at it to protect.
 export async function deleteCoachingSession(sessionId: string) {
   await assertNotImpersonating();
   const sessionIdV = parseInput(uuidSchema, sessionId);
   const supabase = await createClient();
+
+  const { data: session, error: fetchError } = await supabase
+    .from("coaching_sessions")
+    .select("id, student_id, outcome")
+    .eq("id", sessionIdV)
+    .maybeSingle();
+  if (fetchError) throw dbError(fetchError);
+  if (!session) throw new Error("Görüşme bulunamadı.");
+  if (session.outcome === "completed") throw new Error("Gerçekleşmiş bir görüşme silinemez.");
+
   const { error } = await supabase.from("coaching_sessions").delete().eq("id", sessionIdV);
   if (error) throw dbError(error);
+
   revalidatePath("/coach/dashboard");
+  revalidatePath("/coach/sessions");
+  revalidatePath(`/coach/students/${session.student_id}`);
+  revalidatePath("/parent");
 }
 
 export async function updateSessionPaymentStatus(sessionId: string, isPaid: boolean) {

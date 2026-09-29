@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Pencil } from "lucide-react";
+import { BookOpen, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { updateSessionPaymentStatus, updateSessionSchedule } from "../../../actions";
+import { deleteCoachingSession, updateSessionPaymentStatus, updateSessionSchedule } from "../../../actions";
 import type { DetailSession } from "../types";
 import { AddSessionBatchDialog } from "./add-session-batch-dialog";
 
@@ -55,6 +56,11 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  // The session pending a delete confirmation -- kept as the whole object
+  // (not just an id) so the confirm dialog can still show its date after
+  // the underlying session list has changed.
+  const [pendingDelete, setPendingDelete] = useState<DetailSession | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function startEdit(session: DetailSession) {
     const { date, time } = turkeyDateTime(session.scheduled_at);
@@ -91,6 +97,21 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
       toast.error(e instanceof Error ? e.message : "Ödeme durumu güncellenemedi.");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteCoachingSession(pendingDelete.id);
+      setSessions((prev) => prev.filter((s) => s.id !== pendingDelete.id));
+      setPendingDelete(null);
+      toast.success("Görüşme silindi.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Görüşme silinemedi.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -186,6 +207,18 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
                   >
                     {s.is_paid ? "Ödenmedi işaretle" : "Ödendi işaretle"}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive size-10 disabled:opacity-40"
+                    onClick={() => setPendingDelete(s)}
+                    disabled={s.outcome === "completed"}
+                    aria-label="Görüşmeyi sil"
+                    title={s.outcome === "completed" ? "Gerçekleşmiş bir görüşme silinemez." : "Görüşmeyi sil"}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
               </div>
             ),
@@ -199,6 +232,26 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
         studentId={studentId}
         onCreated={(created) => setSessions((prev) => [...prev, ...created])}
       />
+
+      <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Görüşmeyi Sil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            {pendingDelete && <p className="text-foreground font-medium">{formatDate(pendingDelete.scheduled_at)}</p>}
+            <p className="text-muted-foreground">Bu paketi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              İptal
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>
+              {deleting ? "Siliniyor..." : "Sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
