@@ -63,6 +63,17 @@ export const MIN_CARD_HEIGHT_PX = 104;
 // video pill by default too.
 export const DEFAULT_CARD_HEIGHT_PX = 160;
 
+// Kitap Okuma's actual read range -- the coach's proof of completion for
+// this task type now (migration 0107), replacing what used to be a Kanıt
+// Fotoğrafı camera icon here. Null until the student has entered both
+// pages (correct_count, shown elsewhere via subtitleText, is already that
+// same total -- this just adds the range it came from).
+function readingPageRangeText(task: DetailTask): string | null {
+  if (task.task_type !== "reading" || task.start_page === null || task.end_page === null) return null;
+  const total = task.correct_count ?? task.end_page - task.start_page + 1;
+  return `${task.start_page}-${task.end_page}. sayfa (${total} sayfa okundu)`;
+}
+
 function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>): string {
   // The generic type label ("Soru Çözümü") is a placeholder for what's
   // actually assigned -- once real resources are linked, their names are
@@ -127,6 +138,7 @@ function CardVideoLinks({ videoLinks }: { videoLinks: DetailTask["video_links"] 
 export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
+  const pageRange = readingPageRangeText(task);
 
   return (
     <div className="min-w-0 flex-1 space-y-1">
@@ -147,6 +159,8 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
 
       <p className="text-muted-foreground text-[11px] leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
 
+      {pageRange && <p className="text-muted-foreground text-[11px] leading-snug break-words">{pageRange}</p>}
+
       <CardVideoLinks videoLinks={task.video_links} />
     </div>
   );
@@ -158,6 +172,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
 export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTask; resourceNameById?: Map<string, string> }) {
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
+  const pageRange = readingPageRangeText(task);
 
   return (
     <div className="space-y-1.5">
@@ -172,6 +187,8 @@ export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTa
       )}
 
       <p className="text-muted-foreground text-xs leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
+
+      {pageRange && <p className="text-muted-foreground text-xs leading-snug break-words">{pageRange}</p>}
 
       {task.video_links.length > 0 && (
         <div className="flex flex-col items-start gap-1 pt-0.5">

@@ -3,7 +3,10 @@ import { isGeneralExamScoresIncomplete } from "./exam-results-validation";
 // LGS students only: what a task needs before it can be completed (and so sent
 // to the coach for approval).
 //
-//   - EVERY task needs at least one evidence photo (Kanıt Fotoğrafı);
+//   - Every task EXCEPT Kitap Okuma needs at least one evidence photo
+//     (Kanıt Fotoğrafı); Kitap Okuma's Başlangıç/Bitiş Sayfası range (the
+//     caller derives `correct` -- Okunan Sayfa -- from it, see
+//     task-modal.tsx) is proof enough on its own instead.
 //   - Soru Çözümü, Branş Denemesi and Genel Deneme also need their Doğru /
 //     Yanlış / Boş results (0 for what wasn't solved -- never left blank);
 //     a Genel Deneme needs a full row for every subject.
@@ -20,6 +23,12 @@ export function lgsCompletionProblem(input: {
   empty: number | null | undefined;
   subjectScores: Record<string, { correct?: number | null; wrong?: number | null; empty?: number | null }> | null | undefined;
 }): string | null {
+  if (input.taskType === "reading") {
+    if (input.correct == null) {
+      return "Bu görevi tamamlamak için başlangıç ve bitiş sayfasını girmelisin.";
+    }
+    return null;
+  }
   if (input.photoCount < 1) {
     return "Bu görevi tamamlamak için en az bir kanıt fotoğrafı yüklemelisin.";
   }

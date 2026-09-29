@@ -69,6 +69,8 @@ function toDetailTask(item: MissingExamAlert): DetailTask {
     correct_count: item.correctCount,
     wrong_count: item.wrongCount,
     empty_count: item.emptyCount,
+    start_page: null,
+    end_page: null,
     duration_minutes: null,
     video_links: [],
     order_index: 0,

@@ -49,6 +49,11 @@ export type DetailTask = {
   correct_count: number | null;
   wrong_count: number | null;
   empty_count: number | null;
+  // Kitap Okuma only (migration 0107): the page range the student actually
+  // read. correct_count IS the derived (end_page - start_page + 1) total --
+  // these two just keep the range itself for the coach's own view.
+  start_page: number | null;
+  end_page: number | null;
   duration_minutes: number | null;
   video_links: VideoLink[];
   order_index: number;

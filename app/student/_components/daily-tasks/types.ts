@@ -44,6 +44,12 @@ export type StudentTask = {
   correct_count: number | null;
   wrong_count: number | null;
   empty_count: number | null;
+  // Kitap Okuma only (migration 0107): the page range the student actually
+  // read this save. correct_count IS the derived (end_page - start_page +
+  // 1) total -- these two just keep the range itself alongside it, for a
+  // richer coach view than a bare page count.
+  start_page: number | null;
+  end_page: number | null;
   duration_minutes: number | null;
   tracked_duration_minutes: number;
   // The real, second-precise column (tracked_duration_minutes above is a

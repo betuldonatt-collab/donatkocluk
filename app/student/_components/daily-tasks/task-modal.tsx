@@ -67,7 +67,8 @@ export function TaskModal({
   // *same* task (even mid-flow, e.g. after finishing the analysis step)
   // always starts from a clean slate instead of resuming stale local state.
   openKey?: number;
-  // Kanıt Fotoğrafı (photo of the finished work) is offered to LGS students.
+  // Kanıt Fotoğrafı (photo of the finished work) is offered to LGS students
+  // -- except for Kitap Okuma, which proves itself with a page range instead.
   examType?: ExamType;
 }) {
   // Any task type that renders the Toplam/Doğru/Yanlış/Boş (or per-subject)
@@ -149,7 +150,7 @@ function Field({
   );
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: number | null }) {
+function ReadOnlyField({ label, value }: { label: string; value: number | string | null }) {
   return (
     <div className="min-w-0 space-y-1.5">
       <Label className="text-muted-foreground">{label}</Label>
@@ -283,6 +284,14 @@ function TaskModalBody({
   const [correctCount, setCorrectCount] = useState(task.correct_count?.toString() ?? "");
   const [wrongCount, setWrongCount] = useState(task.wrong_count?.toString() ?? "");
   const [emptyCount, setEmptyCount] = useState(task.empty_count?.toString() ?? "");
+  // Kitap Okuma's own proof of completion, replacing Kanıt Fotoğrafı for
+  // this task type (see the EvidenceUploader gate below): a page range
+  // instead of a single typed-in page count. correctCount (Okunan Sayfa)
+  // is derived FROM these two instead of read directly -- see
+  // effectiveCorrectCount below -- so every downstream reader (status
+  // preview, buildCountsPatch) stays correct with no other changes.
+  const [startPage, setStartPage] = useState(task.start_page?.toString() ?? "");
+  const [endPage, setEndPage] = useState(task.end_page?.toString() ?? "");
   const [durationMinutes, setDurationMinutes] = useState(task.duration_minutes?.toString() ?? "");
   // A video link created before this feature shipped has no `watched` key
   // at all in its stored jsonb -- normalized to false here so Checkbox
@@ -415,6 +424,25 @@ function TaskModalBody({
   // would show two fields that mean nothing for this type.
   const showReadingProgress = isReading;
 
+  // Başlangıç/Bitiş Sayfası -> Okunan Sayfa. Both fields must be filled
+  // and positive, and Bitiş can't be before Başlangıç -- anything short of
+  // that has no total to show or save yet (null, not 0: an empty/invalid
+  // range means "not entered", not "zero pages read").
+  const startPageNum = toNumberOrNull(startPage);
+  const endPageNum = toNumberOrNull(endPage);
+  const pageRangeInvalid = startPageNum !== null && endPageNum !== null && endPageNum < startPageNum;
+  const totalPagesRead =
+    startPageNum !== null && endPageNum !== null && startPageNum > 0 && endPageNum >= startPageNum
+      ? endPageNum - startPageNum + 1
+      : null;
+
+  // Okunan Sayfa as a pure function of the page range for reading (never
+  // typed in directly anymore, see the removed correctCount Field below) --
+  // every other task type keeps reading the real correctCount state. Every
+  // downstream count reader below goes through this instead of correctCount
+  // directly, so none of them need to know a range was ever involved.
+  const effectiveCorrectCount = showReadingProgress ? (totalPagesRead !== null ? String(totalPagesRead) : "") : correctCount;
+
   // Needs the persistent top selector + shared Kaydet flow (merged status,
   // required before saving) rather than the plain auto-status path or the
   // three single-part tasks' immediate-save buttons.
@@ -460,13 +488,18 @@ function TaskModalBody({
   // assigned total is never blocked from saving. Only shown once they've
   // actually entered something (not on a freshly-opened, untouched form),
   // and null whenever there's no known Toplam to compare against at all.
-  const hasEnteredCounts = correctCount.trim() !== "" || wrongCount.trim() !== "" || emptyCount.trim() !== "";
+  const hasEnteredCounts = effectiveCorrectCount.trim() !== "" || wrongCount.trim() !== "" || emptyCount.trim() !== "";
   // Reading rides the exact same computeAutoTaskStatus call, wrong/empty
   // just always 0 -- there's no separate UI for them on this type, so
   // wrongCount/emptyCount state simply never gets touched.
   const countStatus =
     (showFlatCounts || showReadingProgress) && hasEnteredCounts
-      ? computeAutoTaskStatus(toNumberOrNull(totalCount), Number(correctCount) || 0, Number(wrongCount) || 0, Number(emptyCount) || 0)
+      ? computeAutoTaskStatus(
+          toNumberOrNull(totalCount),
+          Number(effectiveCorrectCount) || 0,
+          Number(wrongCount) || 0,
+          Number(emptyCount) || 0,
+        )
       : null;
 
   // What Kaydet will actually persist: for a dual task, the merge of the
@@ -547,8 +580,12 @@ function TaskModalBody({
       // Sayfa Hedefi + Okunan Sayfa -- wrong_count/empty_count simply never
       // get touched for this type (stay whatever they already were, always
       // null in practice), same auto-status rule as showFlatCounts above.
+      // correct_count is the derived total from start/end_page (never
+      // typed in directly anymore, see effectiveCorrectCount above).
       patch.total_count = toNumberOrNull(totalCount);
-      patch.correct_count = toNumberOrNull(correctCount);
+      patch.correct_count = totalPagesRead;
+      patch.start_page = startPageNum;
+      patch.end_page = endPageNum;
     }
     if (showSubjectScores) {
       const perSubject = activeGroups.map((g) => ({
@@ -615,8 +652,20 @@ function TaskModalBody({
     return true;
   }
 
+  // Kitap Okuma's Başlangıç/Bitiş Sayfası -- the same rule
+  // updateTaskProgress re-checks server-side, caught here first so an
+  // invalid range never even leaves a round trip before showing the inline
+  // message already rendered next to the fields.
+  function blockedByPageRange(): boolean {
+    if (showReadingProgress && pageRangeInvalid) {
+      setError("Bitiş sayfası başlangıç sayfasından küçük olamaz.");
+      return true;
+    }
+    return false;
+  }
+
   async function handleSaveSimple() {
-    if (blockedWithoutManualStatus() || blockedByMissingExamScores()) return;
+    if (blockedWithoutManualStatus() || blockedByMissingExamScores() || blockedByPageRange()) return;
     setSaving(true);
     setError(null);
     try {
@@ -815,7 +864,11 @@ function TaskModalBody({
           {showReadingProgress && (
             <div className="grid grid-cols-2 gap-3">
               <ReadOnlyField label="Sayfa Hedefi" value={task.total_count} />
-              <ReadOnlyField label="Okunan Sayfa" value={task.correct_count} />
+              <ReadOnlyField
+                label="Başlangıç - Bitiş Sayfası"
+                value={task.start_page !== null && task.end_page !== null ? `${task.start_page} - ${task.end_page}` : null}
+              />
+              <ReadOnlyField label="Toplam Okunan Sayfa" value={task.correct_count} />
             </div>
           )}
 
@@ -1049,17 +1102,31 @@ function TaskModalBody({
           </div>
         )}
 
-        {/* Kitap Okuma's own simpler 2-field block -- no Yanlış/Boş
-            equivalent for pages read, so this is deliberately its own grid
-            rather than reusing showFlatCounts's 4-column one. */}
+        {/* Kitap Okuma's own block: Sayfa Hedefi (target, unchanged) plus a
+            Başlangıç/Bitiş Sayfası range instead of a typed-in Okunan
+            Sayfa -- the range itself is this task type's proof of
+            completion now (see the EvidenceUploader gate below), so
+            there's no separate photo upload for it anymore. */}
         {showReadingProgress && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             {task.is_coach_assigned ? (
               <ReadOnlyField label="Sayfa Hedefi" value={task.total_count} />
             ) : (
               <Field label="Sayfa Hedefi" value={totalCount} onChange={setTotalCount} />
             )}
-            <Field label="Okunan Sayfa" value={correctCount} onChange={setCorrectCount} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Başlangıç Sayfası" value={startPage} onChange={setStartPage} invalid={pageRangeInvalid} />
+              <Field label="Bitiş Sayfası" value={endPage} onChange={setEndPage} invalid={pageRangeInvalid} />
+            </div>
+            {pageRangeInvalid ? (
+              <p className="text-destructive text-xs">Bitiş sayfası başlangıç sayfasından küçük olamaz.</p>
+            ) : (
+              totalPagesRead !== null && (
+                <p className="text-muted-foreground text-xs">
+                  Toplam Okunan Sayfa: <span className="text-foreground font-medium">{totalPagesRead}</span>
+                </p>
+              )
+            )}
           </div>
         )}
 
@@ -1148,7 +1215,9 @@ function TaskModalBody({
           </div>
         )}
 
-        {examType === "LGS" && (
+        {/* Kitap Okuma proves itself with a page range now (see
+            showReadingProgress above), not a photo. */}
+        {examType === "LGS" && !isReading && (
           <EvidenceUploader
             taskId={task.id}
             paths={task.evidence_image_paths ?? []}

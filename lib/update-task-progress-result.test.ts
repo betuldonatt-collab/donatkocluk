@@ -136,6 +136,20 @@ describe("updateTaskProgress never throws -- always a result", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("Kitap Okuma's Bitiş Sayfası before Başlangıç Sayfası resolves ok:false instead of rejecting", async () => {
+    state.task = baseTask({ task_type: "reading", title: "Fatih Harbiye", total_count: 250 });
+    const result = await updateTaskProgress(TASK, { start_page: 50, end_page: 40, correct_count: 11 });
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("Bitiş sayfası") });
+  });
+
+  it("Kitap Okuma's page range saves alongside the derived correct_count", async () => {
+    state.task = baseTask({ task_type: "reading", title: "Fatih Harbiye", total_count: 250 });
+    const result = await updateTaskProgress(TASK, { start_page: 40, end_page: 62, correct_count: 23 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toMatchObject({ start_page: 40, end_page: 62, correct_count: 23 });
+  });
+
   it("a TYT subject whose Doğru+Yanlış+Boş doesn't match its fixed question count resolves ok:false with a subject-specific message", async () => {
     const result = await updateTaskProgress(TASK, {
       subject_scores: {

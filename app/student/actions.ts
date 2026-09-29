@@ -52,6 +52,10 @@ export type TaskProgressPatch = Partial<{
   correct_count: number | null;
   wrong_count: number | null;
   empty_count: number | null;
+  // Kitap Okuma only (migration 0107) -- see taskProgressPatchSchema below
+  // for the validation (positive integers, end >= start).
+  start_page: number | null;
+  end_page: number | null;
   duration_minutes: number | null;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   completed: boolean;
@@ -110,19 +114,31 @@ const subjectScoreSchema = z.object({
 // where Doğru+Yanlış+Boş falling short of Toplam is now a legitimate,
 // expected state ("Yarım Yapıldı"), not a data-entry error to reject. See
 // computeAutoTaskStatus below.
-const taskProgressPatchSchema = z.object({
-  total_count: countField,
-  correct_count: countField,
-  wrong_count: countField,
-  empty_count: countField,
-  duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
-  subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
-  completed: z.boolean().optional(),
-  analysis_pending: z.boolean().optional(),
-  status: z.enum(["pending", "done", "half_done", "not_done"]).optional(),
-  reason: z.string().trim().max(1000).nullable().optional(),
-  note: z.string().trim().max(2000).nullable().optional(),
-});
+const pageField = z.number().int().positive().max(100000).nullable().optional();
+const taskProgressPatchSchema = z
+  .object({
+    total_count: countField,
+    correct_count: countField,
+    wrong_count: countField,
+    empty_count: countField,
+    // Kitap Okuma's page range (migration 0107). Both positive integers,
+    // and (when both are present -- the .refine below) end >= start; a
+    // save always sends both together or neither (buildCountsPatch,
+    // task-modal.tsx), so a lone one here would mean a forged/direct call.
+    start_page: pageField,
+    end_page: pageField,
+    duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
+    subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
+    completed: z.boolean().optional(),
+    analysis_pending: z.boolean().optional(),
+    status: z.enum(["pending", "done", "half_done", "not_done"]).optional(),
+    reason: z.string().trim().max(1000).nullable().optional(),
+    note: z.string().trim().max(2000).nullable().optional(),
+  })
+  .refine((v) => v.start_page == null || v.end_page == null || v.end_page >= v.start_page, {
+    message: "Bitiş sayfası başlangıç sayfasından küçük olamaz.",
+    path: ["end_page"],
+  });
 
 // Security Hardening Group 4 (double-layer authorization): student_tasks
 // RLS (student_tasks_student_update) already restricts this update to
