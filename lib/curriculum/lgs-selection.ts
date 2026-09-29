@@ -81,10 +81,11 @@ const DIN_KULTURU_EXEMPT_TOPIC_IDS = new Set([
 //   - Matematik: selectable = Konu (one level below Ünite); every unit in
 //     lgs.json already carries a konu, so this is just "one node per
 //     entry", no cross-entry merging needed.
-//   - Fen Bilimleri: same as Matematik, but ONLY for the entries that
-//     actually have a Konu split (Ünite 7 today) -- every other unit's
-//     topics already sit exactly one level below their Ünite, so they
-//     stay individually selectable, unchanged.
+//   - Fen Bilimleri: selectable = the Ünite itself for every unit EXCEPT
+//     the last one (Ünite 7 today, the only entry with a Konu split) --
+//     that one keeps the Matematik-style Konu-level rollup instead, one
+//     node per (Ünite, Konu) entry. Everything else in the unit becomes
+//     read-only context either way.
 //   - Türkçe / İnkılap Tarihi (Sosyal): selectable = the Ünite itself --
 //     every topic inside it becomes read-only context.
 //   - İngilizce: unchanged -- each "Unit N" topic is already Ünite-level
@@ -95,10 +96,8 @@ const DIN_KULTURU_EXEMPT_TOPIC_IDS = new Set([
 export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
   switch (course.id) {
     case "lgs-matematik":
-      return course.units.map((u) => group(u.konu ?? u.unit, u.unit, u.topics));
-
     case "lgs-fen-bilimleri":
-      return course.units.flatMap((u) => (u.konu ? [group(u.konu, u.unit, u.topics)] : u.topics.map((t) => leaf(t, u.unit))));
+      return course.units.map((u) => group(u.konu ?? u.unit, u.unit, u.topics));
 
     case "lgs-turkce":
     case "lgs-inkilap-tarihi":

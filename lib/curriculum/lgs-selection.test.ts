@@ -25,15 +25,27 @@ describe("lgsSelectionNodes", () => {
     for (const n of nodes) expect(allTopicIds.has(n.id)).toBe(true);
   });
 
-  it("Fen Bilimleri: units without a Konu split stay individually selectable, Ünite 7 rolls up", () => {
-    const nodes = lgsSelectionNodes(courseById("lgs-fen-bilimleri"));
-    const leafTopic = nodes.find((n) => n.label === "Mevsimlerin Oluşumu");
-    expect(leafTopic).toMatchObject({ readOnlyNames: [], memberTopicIds: [leafTopic!.id] });
+  it("Fen Bilimleri: Ünite 1-6 roll up to the Ünite level, Ünite 7 keeps its Konu-level rollup", () => {
+    const course = courseById("lgs-fen-bilimleri");
+    const nodes = lgsSelectionNodes(course);
 
+    // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM") has no Konu split -- both of
+    // its topics roll up under the Ünite itself now, same as Türkçe/İnkılap.
+    const unit1 = nodes.find((n) => n.label === "1. ÜNİTE: MEVSİMLER VE İKLİM");
+    expect(unit1).toMatchObject({ readOnlyNames: ["Mevsimlerin Oluşumu", "İklim ve Hava Hareketleri"] });
+    expect(nodes.find((n) => n.label === "Mevsimlerin Oluşumu")).toBeUndefined(); // no longer its own node
+
+    // Ünite 7 ("... ELEKTRİK ...") keeps rolling up at the Konu level.
     const rolledGroup = nodes.find((n) => n.label === "Elektrik Yükleri ve Elektriklenme");
     expect(rolledGroup).toMatchObject({
       readOnlyNames: ["Sürtünme ile Elektriklenme", "Dokunma ile Elektriklenme", "Etki (Tesir) ile Etkilenme"],
     });
+    expect(nodes.find((n) => n.label.startsWith("7. ÜNİTE"))).toBeUndefined(); // Ünite 7 itself is not a node
+
+    // One node per Ünite 1-6, plus one per Konu within Ünite 7.
+    const unite7KonuCount = course.units.filter((u) => u.konu !== undefined).length;
+    const otherUniteCount = new Set(course.units.filter((u) => u.konu === undefined).map((u) => u.unit)).size;
+    expect(nodes).toHaveLength(otherUniteCount + unite7KonuCount);
   });
 
   it("Türkçe and İnkılap Tarihi: selectable node is the Ünite itself, topics become read-only", () => {
