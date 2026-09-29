@@ -2,9 +2,23 @@
 
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
+import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
 
 export type TopicMistakeStatus = "wrong" | "blank";
 export type TopicMistake = { course_id: string; topic_id: string; status: TopicMistakeStatus };
+
+// Re-groups the course's flat selection rows (one per checkable/selectable
+// unit -- see lib/curriculum/lgs-selection.ts) back into per-Ünite blocks
+// for this list's own small header lines, using the same unitRowSpan
+// bookkeeping a table would use for its sticky Ünite column.
+function selectionBlocks(course: Course): { unitLabel: string; rows: SelectionRow[] }[] {
+  const blocks: { unitLabel: string; rows: SelectionRow[] }[] = [];
+  for (const row of flattenSelectionRows(course)) {
+    if (row.unitRowSpan !== null) blocks.push({ unitLabel: row.unitLabel, rows: [row] });
+    else blocks[blocks.length - 1].rows.push(row);
+  }
+  return blocks;
+}
 
 // Coach-side mirror of app/student/_components/daily-tasks/topic-mistake-selector.tsx
 // (duplicated per this repo's panel-duplication convention, not shared).
@@ -43,24 +57,31 @@ export function TopicMistakeSelector({
               {group.courses.length > 1 && (
                 <p className="text-foreground text-sm font-medium">{course.name}</p>
               )}
-              {course.units.map((unit, unitIndex) => (
+              {selectionBlocks(course).map((block, blockIndex) => (
                 // Index included -- the curriculum data can have multiple
                 // units literally named "-" (standalone/ungrouped
                 // topics), which would otherwise collide on unit.unit alone.
-                <div key={`${unit.unit}-${unitIndex}`} className="space-y-1 pl-1">
-                  <p className="text-muted-foreground text-xs">{unit.konu ? `${unit.unit} › ${unit.konu}` : unit.unit}</p>
+                <div key={`${block.unitLabel}-${blockIndex}`} className="space-y-1 pl-1">
+                  <p className="text-muted-foreground text-xs">{block.unitLabel}</p>
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
-                    {unit.topics.map((topic) => {
-                      const status = statusOf(course.id, topic.id);
+                    {block.rows.map((row) => {
+                      const status = statusOf(course.id, row.id);
                       return (
                         <div
-                          key={topic.id}
+                          key={row.id}
                           className="hover:bg-accent/40 flex items-center gap-2 rounded-md px-2 py-1 text-sm"
                         >
-                          <span className="text-foreground min-w-0 flex-1 truncate">{topic.name}</span>
+                          <span className="text-foreground min-w-0 flex-1 truncate">
+                            {row.label}
+                            {row.readOnlyNames.length > 0 && (
+                              <span className="text-muted-foreground block truncate text-[10px] font-normal">
+                                {row.readOnlyNames.join(", ")}
+                              </span>
+                            )}
+                          </span>
                           <button
                             type="button"
-                            onClick={() => setStatus(course.id, topic.id, "wrong")}
+                            onClick={() => setStatus(course.id, row.id, "wrong")}
                             aria-pressed={status === "wrong"}
                             title="Yanlış"
                             className={cn(
@@ -72,7 +93,7 @@ export function TopicMistakeSelector({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setStatus(course.id, topic.id, "blank")}
+                            onClick={() => setStatus(course.id, row.id, "blank")}
                             aria-pressed={status === "blank"}
                             title="Boş"
                             className={cn(

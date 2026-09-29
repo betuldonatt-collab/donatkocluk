@@ -5,8 +5,9 @@ import { ArrowLeft } from "lucide-react";
 
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
-import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById } from "@/lib/curriculum";
+import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
+import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import { weekDates } from "@/lib/date";
@@ -458,23 +459,39 @@ async function fetchStudentDetail(studentId: string) {
     const course = findCourseById(courseId);
     if (!course) return [];
     const sampleSize = courseExamCounts.get(courseId) ?? 0;
-    return course.units.flatMap((u) =>
-      u.topics.map((topic) => {
-        const key = `${courseId}::${topic.id}`;
-        const c = counts.get(key);
-        return {
-          courseId,
-          courseName: course.name,
-          topicId: topic.id,
-          // LGS's Konu level is part of the name so same-named Alt Konu rows
-          // under different Konu (e.g. "Örnekler") stay distinguishable.
-          topicName: u.konu ? `${u.konu} › ${topic.name}` : topic.name,
-          count: c?.count ?? 0,
-          examTitles: c?.examTitles ?? [],
-          sampleSize,
-        };
-      }),
-    );
+    // An LGS course reports at its selection-node granularity (see
+    // lib/curriculum/lgs-selection.ts) -- one row per Konu/Ünite/etc.
+    // instead of one per raw Alt Konu/topic, summing every member's
+    // mistake count so a mistake tagged on any of them (old data from
+    // before this rollup, or new data tagged directly against the node's
+    // own representative id) still counts toward the same row. Every
+    // non-LGS course keeps its existing one-row-per-topic behavior.
+    const nodes = isLgsCourseId(courseId)
+      ? lgsSelectionNodes(course)
+      : course.units.flatMap((u) =>
+          u.topics.map((t) => ({
+            id: t.id,
+            // LGS's Konu level is part of the name so same-named Alt Konu rows
+            // under different Konu (e.g. "Örnekler") stay distinguishable --
+            // moot here (no non-LGS course has a konu level) but kept for
+            // parity with the LGS branch's own naming.
+            label: u.konu ? `${u.konu} › ${t.name}` : t.name,
+            memberTopicIds: [t.id],
+          })),
+        );
+    return nodes.map((node) => {
+      const count = node.memberTopicIds.reduce((n, id) => n + (counts.get(`${courseId}::${id}`)?.count ?? 0), 0);
+      const examTitles = node.memberTopicIds.flatMap((id) => counts.get(`${courseId}::${id}`)?.examTitles ?? []);
+      return {
+        courseId,
+        courseName: course.name,
+        topicId: node.id,
+        topicName: node.label,
+        count,
+        examTitles,
+        sampleSize,
+      };
+    });
   }).sort((a, b) => b.count - a.count);
 
   // Topic-based question aggregation (distinct from the mistake-count
@@ -486,7 +503,15 @@ async function fetchStudentDetail(studentId: string) {
   // (meaningless-per-topic) totals.
   const topicQuestionTotals = new Map<string, { total: number; correct: number; incorrect: number }>();
   function bumpQuestionTotals(courseId: string, topicId: string, total: number, correct: number, incorrect: number) {
-    const key = `${courseId}::${topicId}`;
+    // Folds a stored topic_id onto its LGS selection node's representative
+    // id first (a no-op for every non-LGS course, and for a topic_id that
+    // already IS a node's own id) -- so topicPerformance's lookup by
+    // `row.topicId` (also a node id) below finds this contribution
+    // regardless of which of the node's now-hidden members it was
+    // originally logged against.
+    const course = findCourseById(courseId);
+    const resolvedTopicId = course && isLgsCourseId(courseId) ? lgsNodeIdForTopicId(course, topicId) : topicId;
+    const key = `${courseId}::${resolvedTopicId}`;
     const existing = topicQuestionTotals.get(key) ?? { total: 0, correct: 0, incorrect: 0 };
     existing.total += total;
     existing.correct += correct;

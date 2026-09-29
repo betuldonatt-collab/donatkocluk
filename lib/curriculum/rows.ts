@@ -6,7 +6,8 @@
 //
 // YKS courses have no `konu` level, and come out exactly as before: every
 // unit entry is its own span, "-" (ungrouped) topics are single-row units.
-import type { Course, Topic } from "./index";
+import { isLgsCourseId, type Course, type Topic } from "./index";
+import { lgsSelectionNodes } from "./lgs-selection";
 
 export type CourseRow = {
   topic: Topic;
@@ -55,6 +56,64 @@ export function flattenCourseRows(course: Course): CourseRow[] {
         blockRowIndex++;
       });
     }
+    i = j;
+  }
+  return rows;
+}
+
+// One row per checkable/selectable unit for a curriculum table -- the row
+// the coach asked to collapse Task Assignment/Kaynak Takibi/Analiz down
+// to. For any non-LGS course this is exactly flattenCourseRows, just
+// reshaped (one topic == one row, nothing rolled up, readOnlyNames always
+// empty) so every table that renders it needs only one code path. For an
+// LGS course, rows come from lgsSelectionNodes instead: a rolled-up node
+// becomes ONE row (id = a real topic id, see lib/curriculum/lgs-selection.ts)
+// with its members' names listed in readOnlyNames, so the table can show
+// them as plain read-only context under the selectable label instead of
+// their own rows/checkboxes -- nothing is dropped, it just stops being
+// individually interactive. Always exactly 2 sticky columns worth of
+// bookkeeping (Ünite + the selectable label) since Konu/Alt Konu never
+// need a column of their own anymore: Konu either became a node's own
+// label (Matematik, Fen Ünite 7) or a node's read-only members'
+// description (Türkçe, İnkılap Tarihi, Din Kültürü).
+export type SelectionRow = {
+  id: string;
+  label: string;
+  unitLabel: string;
+  unitRowSpan: number | null;
+  readOnlyNames: string[];
+  memberTopicIds: string[];
+};
+
+export function flattenSelectionRows(course: Course): SelectionRow[] {
+  if (!isLgsCourseId(course.id)) {
+    return flattenCourseRows(course).map((r) => ({
+      id: r.topic.id,
+      label: r.topic.name,
+      unitLabel: r.unitLabel,
+      unitRowSpan: r.unitRowSpan,
+      readOnlyNames: [],
+      memberTopicIds: [r.topic.id],
+    }));
+  }
+
+  const nodes = lgsSelectionNodes(course);
+  const rows: SelectionRow[] = [];
+  let i = 0;
+  while (i < nodes.length) {
+    let j = i + 1;
+    while (j < nodes.length && nodes[j].unitLabel === nodes[i].unitLabel) j++;
+    const block = nodes.slice(i, j);
+    block.forEach((node, idx) => {
+      rows.push({
+        id: node.id,
+        label: node.label,
+        unitLabel: node.unitLabel,
+        unitRowSpan: idx === 0 ? block.length : null,
+        readOnlyNames: node.readOnlyNames,
+        memberTopicIds: node.memberTopicIds,
+      });
+    });
     i = j;
   }
   return rows;

@@ -12,16 +12,27 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
-import type { PipelineBinding } from "@/lib/topic-pipeline";
+import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
 import type { Course } from "@/lib/curriculum";
-import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
+import { flattenSelectionRows } from "@/lib/curriculum/rows";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
 
 function progressKey(topicId: string, resourceId: string) {
   return `${topicId}::${resourceId}`;
 }
 
-const ZERO_STAT: TopicStat = { total: 0, correct: 0, wrong: 0, empty: 0 };
+// Sums a row's stat across every real topic id it rolls up (see
+// flattenSelectionRows) -- 1 id for a plain/ungrouped row, so this is a
+// no-op lookup everywhere except a rolled-up LGS row.
+function aggregateStat(byTopic: Record<string, TopicStat>, topicIds: string[]): TopicStat {
+  return topicIds.reduce(
+    (acc, id) => {
+      const s = byTopic[id];
+      return s ? { total: acc.total + s.total, correct: acc.correct + s.correct, wrong: acc.wrong + s.wrong, empty: acc.empty + s.empty } : acc;
+    },
+    { total: 0, correct: 0, wrong: 0, empty: 0 },
+  );
+}
 
 // Compact Toplam/D/Y/B cluster reused for every topic row and the Karma
 // row at the bottom -- mirrors the student side's own StatCells
@@ -111,9 +122,12 @@ export function EditableCourseTable({
     setDialogOpen(false);
   }
 
-  // LGS Matematik-style courses add a Konu level between Ünite and topic.
-  const rows = flattenCourseRows(course);
-  const hasKonu = courseHasKonu(course);
+  // One row per checkable/selectable unit -- an LGS course rolls up its
+  // Konu/Ünite level here (see lib/curriculum/lgs-selection.ts), so this is
+  // never one row per raw Alt Konu/topic for those courses; everything
+  // else (YKS, Maarif) renders exactly as many rows as it always did.
+  const rows = flattenSelectionRows(course);
+  const collapsedPipeline = pipeline && { ...pipeline, map: collapsePipelineMapForRows(rows, pipeline.map, pipeline.config) };
 
   return (
     <Card>
@@ -125,7 +139,7 @@ export function EditableCourseTable({
         </Button>
       </CardHeader>
       <CardContent>
-        {pipeline && <PipelineSummaryBar course={course} map={pipeline.map} config={pipeline.config} />}
+        {collapsedPipeline && <PipelineSummaryBar course={course} map={collapsedPipeline.map} config={collapsedPipeline.config} />}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -136,16 +150,8 @@ export function EditableCourseTable({
                 <TableHead className="bg-background sticky left-0 z-20 border-l w-12 align-bottom" rowSpan={2}>
                   Ünite
                 </TableHead>
-                {hasKonu && (
-                  <TableHead className="bg-background sticky left-12 z-20 w-44 min-w-44 border-r align-bottom" rowSpan={2}>
-                    Konu
-                  </TableHead>
-                )}
-                <TableHead
-                  className={cn("bg-background sticky z-20 border-r align-bottom", hasKonu ? "left-[14rem]" : "left-12")}
-                  rowSpan={2}
-                >
-                  {hasKonu ? "Alt Konu" : "Konu"}
+                <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom" rowSpan={2}>
+                  Konu
                 </TableHead>
                 {pipeline && <PipelineStepHeads steps={pipeline.config.start} />}
                 {resources.map((resource) => (
@@ -218,8 +224,8 @@ export function EditableCourseTable({
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.topic.id}>
-                  <StatCells stat={topicStats.byTopic[row.topic.id] ?? ZERO_STAT} />
+                <TableRow key={row.id}>
+                  <StatCells stat={aggregateStat(topicStats.byTopic, row.memberTopicIds)} />
                   {row.unitRowSpan !== null && (
                     <TableCell
                       rowSpan={row.unitRowSpan}
@@ -237,63 +243,55 @@ export function EditableCourseTable({
                       )}
                     </TableCell>
                   )}
-                  {hasKonu && row.konuRowSpan !== null && (
-                    <TableCell
-                      rowSpan={row.konuRowSpan}
-                      className="bg-card sticky left-12 z-10 w-44 min-w-44 border-r align-middle font-medium whitespace-normal"
-                    >
-                      {row.konuLabel}
-                    </TableCell>
-                  )}
-                  <TableCell
-                    colSpan={hasKonu && row.konuLabel === null ? 2 : 1}
-                    className={cn(
-                      "bg-card sticky z-10 border-r font-medium whitespace-normal",
-                      hasKonu && row.konuLabel !== null ? "left-[14rem]" : "left-12",
+                  <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
+                    {row.label}
+                    {/* Every subtopic this selectable row rolls up, shown as
+                        plain read-only context -- nothing here is its own
+                        checkbox anymore, it's just what "{row.label}" covers. */}
+                    {row.readOnlyNames.length > 0 && (
+                      <p className="text-muted-foreground mt-1 text-xs font-normal">{row.readOnlyNames.join(", ")}</p>
                     )}
-                  >
-                    {row.topic.name}
                   </TableCell>
-                  {pipeline && (
+                  {collapsedPipeline && (
                     <PipelineCells
-                      steps={pipeline.config.start}
+                      steps={collapsedPipeline.config.start}
                       courseName={course.name}
-                      topicName={row.topic.name}
-                      topicId={row.topic.id}
-                      map={pipeline.map}
-                      onToggle={pipeline.onToggle}
+                      topicName={row.label}
+                      topicId={row.id}
+                      map={collapsedPipeline.map}
+                      onToggle={collapsedPipeline.onToggle}
                     />
                   )}
                   {resources.map((resource) => {
-                    const key = progressKey(row.topic.id, resource.id);
-                    const state = progress[key] ?? { solved: false, reviewed: false };
+                    const solved = row.memberTopicIds.some((id) => progress[progressKey(id, resource.id)]?.solved);
+                    const reviewed = row.memberTopicIds.some((id) => progress[progressKey(id, resource.id)]?.reviewed);
                     return (
                       <Fragment key={resource.id}>
                         <TableCell className="border-l text-center">
                           <Checkbox
-                            checked={state.solved}
-                            onCheckedChange={() => onToggle(row.topic.id, resource.id, "solved")}
-                            aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Soru Çözümü`}
+                            checked={solved}
+                            onCheckedChange={() => onToggle(row.id, resource.id, "solved")}
+                            aria-label={`${course.name} - ${row.label} - ${resource.name} - Soru Çözümü`}
                           />
                         </TableCell>
                         <TableCell className="text-center">
                           <Checkbox
-                            checked={state.reviewed}
-                            onCheckedChange={() => onToggle(row.topic.id, resource.id, "reviewed")}
-                            aria-label={`${course.name} - ${row.topic.name} - ${resource.name} - Kaynak Taraması Yapıldı`}
+                            checked={reviewed}
+                            onCheckedChange={() => onToggle(row.id, resource.id, "reviewed")}
+                            aria-label={`${course.name} - ${row.label} - ${resource.name} - Kaynak Taraması Yapıldı`}
                           />
                         </TableCell>
                       </Fragment>
                     );
                   })}
-                  {pipeline && (
+                  {collapsedPipeline && (
                     <PipelineCells
-                      steps={pipeline.config.end}
+                      steps={collapsedPipeline.config.end}
                       courseName={course.name}
-                      topicName={row.topic.name}
-                      topicId={row.topic.id}
-                      map={pipeline.map}
-                      onToggle={pipeline.onToggle}
+                      topicName={row.label}
+                      topicId={row.id}
+                      map={collapsedPipeline.map}
+                      onToggle={collapsedPipeline.onToggle}
                     />
                   )}
                 </TableRow>
@@ -304,7 +302,7 @@ export function EditableCourseTable({
                   discrepancy. */}
               <TableRow className="bg-muted/40">
                 <StatCells stat={topicStats.karma} />
-                <TableCell colSpan={hasKonu ? 3 : 2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
+                <TableCell colSpan={2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
                   Karma
                 </TableCell>
                 {pipeline && <PipelineFillerCell count={pipeline.config.start.length} />}

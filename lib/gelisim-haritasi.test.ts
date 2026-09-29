@@ -65,4 +65,23 @@ describe("computeGelisimHaritasi", () => {
     expect(r.wrongCount).toBe(0);
     expect(r.blankCount).toBe(0);
   });
+
+  it("rolls up an LGS course's rows to Konu level, folding mistakes tagged on any of its Alt Konu members", () => {
+    const LGS_COURSE_ID = "lgs-matematik";
+    // "EKOK" and "EBOB" are both members of the "1.1 Çarpanlar ve Katlar"
+    // node (lgs-matematik-u0-t0) alongside its representative topic.
+    const exams = [{ id: "e1", task_date: "2026-01-04", task_type: "branch_exam", course_id: LGS_COURSE_ID }];
+    const mistakeRows = [
+      { task_id: "e1", course_id: LGS_COURSE_ID, topic_id: "lgs-matematik-u0-t1", status: "wrong" as const }, // EKOK
+      { task_id: "e1", course_id: LGS_COURSE_ID, topic_id: "lgs-matematik-u0-t2", status: "blank" as const }, // EBOB
+    ];
+
+    const rows = computeGelisimHaritasi([LGS_COURSE_ID], exams, mistakeRows);
+    // One row for the whole Konu, not one per Alt Konu.
+    expect(rows.filter((r) => r.courseId === LGS_COURSE_ID)).toHaveLength(12);
+    const carpanlarVeKatlar = rows.find((r) => r.topicId === "lgs-matematik-u0-t0")!;
+    expect(carpanlarVeKatlar.topicName).toBe("1.1 Çarpanlar ve Katlar");
+    expect(carpanlarVeKatlar.wrongCount).toBe(1);
+    expect(carpanlarVeKatlar.blankCount).toBe(1);
+  });
 });

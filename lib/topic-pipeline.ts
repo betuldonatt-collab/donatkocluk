@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { MAARIF_GRADES, type MaarifGrade } from "./maarif-grade";
 import { AYT_COURSES_BY_TRACK, TYT_COURSES, findCourseById, isLgsCourseId, type Course } from "@/lib/curriculum";
+import { lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import type { ExamType } from "@/lib/exam-type";
 
 // The per-topic "learning pipeline" checkboxes on the Kaynak Takibi table.
@@ -91,14 +92,21 @@ export type PipelineSummary = {
   completed: number;
 };
 
+// Iterates the course's selection nodes (lib/curriculum/lgs-selection.ts),
+// not its raw topic list -- for a non-LGS course, or an LGS course with no
+// rollup for a given unit, a node is exactly one topic, so this is
+// unchanged from before. For a rolled-up LGS node it's one entry for the
+// whole group, so a Kaynak Takibi table that only renders one pipeline row
+// per node (not one per now-hidden Alt Konu) gets a totalTopics/completed
+// count that actually matches what's on screen.
 export function summarizePipeline(course: Course, map: PipelineMap, config: PipelineConfig): PipelineSummary {
-  const topics = course.units.flatMap((u) => u.topics);
+  const nodes = lgsSelectionNodes(course);
   const steps = allPipelineSteps(config);
   const perStep: Partial<Record<PipelineStepKey, number>> = {};
   for (const step of steps) perStep[step.key] = 0;
   let completed = 0;
-  for (const topic of topics) {
-    const state = map[topic.id];
+  for (const node of nodes) {
+    const state = map[node.id];
     if (!state) continue;
     let all = true;
     for (const step of steps) {
@@ -107,7 +115,30 @@ export function summarizePipeline(course: Course, map: PipelineMap, config: Pipe
     }
     if (all) completed += 1;
   }
-  return { totalTopics: topics.length, perStep, completed };
+  return { totalTopics: nodes.length, perStep, completed };
+}
+
+// Folds a raw per-topic PipelineMap onto a table's own selection rows (OR
+// across each row's memberTopicIds), so a Kaynak Takibi row that now
+// represents a whole rolled-up LGS group (e.g. a Konu standing in for its
+// Alt Konu list) shows checked the moment ANY of those now-hidden
+// subtopics was checked before this change -- nothing looks reset just
+// because the table stopped rendering them as their own rows. A no-op
+// (1:1 remap) for a table whose rows are already one real topic each,
+// which is every non-LGS course and every ungrouped LGS row.
+export function collapsePipelineMapForRows(
+  rows: { id: string; memberTopicIds: string[] }[],
+  map: PipelineMap,
+  config: PipelineConfig,
+): PipelineMap {
+  const steps = allPipelineSteps(config);
+  const collapsed: PipelineMap = {};
+  for (const row of rows) {
+    const state: PipelineState = {};
+    for (const step of steps) state[step.key] = row.memberTopicIds.some((id) => map[id]?.[step.key]);
+    collapsed[row.id] = state;
+  }
+  return collapsed;
 }
 
 // The courses whose Kaynak Takibi table has a pipeline for each cohort: the

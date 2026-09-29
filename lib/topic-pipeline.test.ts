@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES } from "./curriculum";
+import { flattenSelectionRows } from "./curriculum/rows";
 import {
   PIPELINE_CONFIG,
   allPipelineSteps,
+  collapsePipelineMapForRows,
   groupPipelineRows,
   pipelineSelectColumns,
   pipelineStepSchema,
@@ -39,23 +41,32 @@ describe("PIPELINE_CONFIG", () => {
 });
 
 describe("summarizePipeline", () => {
-  it("LGS: counts each step and the fully completed topics", () => {
+  // lgsCourse (Matematik) collapses to one selectable node per Konu (see
+  // lib/curriculum/lgs-selection.ts) -- summarizePipeline counts THOSE, not
+  // raw Alt Konu topics, since a Kaynak Takibi row now IS one Konu. It
+  // expects an already-collapsed map (keyed by each node's own id), which
+  // is what collapsePipelineMapForRows produces -- see the "end to end"
+  // test below for the raw-map path a real table actually takes.
+  const lgsNodes = flattenSelectionRows(lgsCourse);
+
+  it("LGS: counts Konu-level nodes, not raw Alt Konu topics", () => {
     const map: PipelineMap = {
-      [lgsTopics[0].id]: { okul_ilerlemesi: true, konu_tekrari: true, meb_kaynagi: true, cikmis_sorular: true },
-      [lgsTopics[1].id]: { okul_ilerlemesi: true },
+      [lgsNodes[0].id]: { okul_ilerlemesi: true, konu_tekrari: true, meb_kaynagi: true, cikmis_sorular: true },
+      [lgsNodes[1].id]: { okul_ilerlemesi: true },
     };
     const s = summarizePipeline(lgsCourse, map, PIPELINE_CONFIG.LGS);
-    expect(s.totalTopics).toBe(lgsTopics.length);
+    expect(s.totalTopics).toBe(lgsNodes.length); // 12 Konu, not 42 Alt Konu
     expect(s.perStep).toEqual({ okul_ilerlemesi: 2, konu_tekrari: 1, meb_kaynagi: 1, cikmis_sorular: 1 });
     expect(s.completed).toBe(1);
   });
 
-  it("YKS: a topic is complete once both of its two steps are checked", () => {
+  it("YKS: a topic is complete once both of its two steps are checked (every node is a real topic here, unchanged)", () => {
     const map: PipelineMap = {
       [yksTopics[0].id]: { konu_calismasi: true, cikmis_sorular: true },
       [yksTopics[1].id]: { konu_calismasi: true, cikmis_sorular: false },
     };
     const s = summarizePipeline(yksCourse, map, PIPELINE_CONFIG.YKS);
+    expect(s.totalTopics).toBe(yksTopics.length);
     expect(s.perStep).toEqual({ konu_calismasi: 2, cikmis_sorular: 1 });
     expect(s.completed).toBe(1);
   });
@@ -64,6 +75,31 @@ describe("summarizePipeline", () => {
     const s = summarizePipeline(lgsCourse, {}, PIPELINE_CONFIG.LGS);
     expect(s.completed).toBe(0);
     expect(Object.values(s.perStep).every((n) => n === 0)).toBe(true);
+  });
+});
+
+describe("collapsePipelineMapForRows", () => {
+  it("folds a raw per-Alt-Konu map onto its Konu row (OR across members), end to end with summarizePipeline", () => {
+    const rows = flattenSelectionRows(lgsCourse);
+    const carpanlarVeKatlar = rows.find((r) => r.label === "1.1 Çarpanlar ve Katlar")!;
+    // A step checked on "EKOK" (a non-representative member, never a node
+    // id of its own) before this change must still show up on the row.
+    const ekok = carpanlarVeKatlar.memberTopicIds.find((id) => id !== carpanlarVeKatlar.id)!;
+    const rawMap: PipelineMap = { [ekok]: { okul_ilerlemesi: true } };
+
+    const collapsed = collapsePipelineMapForRows(rows, rawMap, PIPELINE_CONFIG.LGS);
+    expect(collapsed[carpanlarVeKatlar.id]).toMatchObject({ okul_ilerlemesi: true, konu_tekrari: false });
+
+    const s = summarizePipeline(lgsCourse, collapsed, PIPELINE_CONFIG.LGS);
+    expect(s.totalTopics).toBe(rows.length);
+    expect(s.perStep.okul_ilerlemesi).toBe(1);
+  });
+
+  it("is a no-op remap for rows that are already one real topic each (non-LGS)", () => {
+    const rows = flattenSelectionRows(yksCourse);
+    const rawMap: PipelineMap = { [yksTopics[0].id]: { konu_calismasi: true } };
+    const collapsed = collapsePipelineMapForRows(rows, rawMap, PIPELINE_CONFIG.YKS);
+    expect(collapsed[yksTopics[0].id]).toMatchObject({ konu_calismasi: true });
   });
 });
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
-import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
+import { flattenSelectionRows } from "@/lib/curriculum/rows";
 import type { DetailTask } from "../types";
 
 function formatExamDate(dateStr: string) {
@@ -40,9 +40,11 @@ export function CoachExamTopicTable({
   onOpenExam: (task: DetailTask) => void;
   onDelete: (taskId: string) => void;
 }) {
-  // LGS Matematik-style courses add a Konu level between Ünite and topic.
-  const rows = flattenCourseRows(course);
-  const hasKonu = courseHasKonu(course);
+  // One row per checkable/selectable unit -- an LGS course rolls up its
+  // Konu/Ünite level here (see lib/curriculum/lgs-selection.ts), so a
+  // mistake mark shows on the group even if it was tagged against one of
+  // its now-hidden members.
+  const rows = flattenSelectionRows(course);
 
   return (
     <Card>
@@ -55,14 +57,7 @@ export function CoachExamTopicTable({
             <TableHeader>
               <TableRow>
                 <TableHead className="bg-background sticky left-0 z-20 w-12 align-bottom">Ünite</TableHead>
-                {hasKonu && (
-                  <TableHead className="bg-background sticky left-12 z-20 w-44 min-w-44 border-r align-bottom">Konu</TableHead>
-                )}
-                <TableHead
-                  className={cn("bg-background sticky z-20 border-r align-bottom", hasKonu ? "left-[14rem]" : "left-12")}
-                >
-                  {hasKonu ? "Alt Konu" : "Konu"}
-                </TableHead>
+                <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom">Konu</TableHead>
                 {exams.map((exam) => (
                   <TableHead key={exam.id} className="border-l p-0 text-center">
                     <div className="flex w-full flex-col items-center gap-1 px-2 py-2 text-center">
@@ -108,7 +103,7 @@ export function CoachExamTopicTable({
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.topic.id}>
+                <TableRow key={row.id}>
                   {row.unitRowSpan !== null && (
                     <TableCell
                       rowSpan={row.unitRowSpan}
@@ -128,25 +123,14 @@ export function CoachExamTopicTable({
                       )}
                     </TableCell>
                   )}
-                  {hasKonu && row.konuRowSpan !== null && (
-                    <TableCell
-                      rowSpan={row.konuRowSpan}
-                      className="bg-card sticky left-12 z-10 w-44 min-w-44 border-r align-middle font-medium whitespace-normal"
-                    >
-                      {row.konuLabel}
-                    </TableCell>
-                  )}
-                  <TableCell
-                    colSpan={hasKonu && row.konuLabel === null ? 2 : 1}
-                    className={cn(
-                      "bg-card sticky z-10 border-r font-medium whitespace-normal",
-                      hasKonu && row.konuLabel !== null ? "left-[14rem]" : "left-12",
+                  <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
+                    {row.label}
+                    {row.readOnlyNames.length > 0 && (
+                      <p className="text-muted-foreground mt-1 text-xs font-normal">{row.readOnlyNames.join(", ")}</p>
                     )}
-                  >
-                    {row.topic.name}
                   </TableCell>
                   {exams.map((exam) => {
-                    const missed = mistakesByExam[exam.id]?.has(row.topic.id) ?? false;
+                    const missed = row.memberTopicIds.some((id) => mistakesByExam[exam.id]?.has(id));
                     return (
                       <TableCell key={exam.id} className="border-l text-center">
                         {missed && <X className="mx-auto size-4 text-rose-500" />}

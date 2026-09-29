@@ -5,7 +5,8 @@
 // client, no auth) -- shared across panels rather than duplicated, unlike
 // the UI components that render it, since a drifted copy here would mean
 // the coach and student literally see different colors for the same data.
-import { findCourseById } from "./curriculum";
+import { findCourseById, isLgsCourseId } from "./curriculum";
+import { lgsSelectionNodes } from "./curriculum/lgs-selection";
 import { LGS_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 
 export type GelisimHaritasiRow = {
@@ -97,29 +98,47 @@ export function computeGelisimHaritasi(
       .slice(0, WINDOW_SIZE);
     const windowSize = relevant.length;
 
-    for (const unit of course.units) {
-      for (const topic of unit.topics) {
-        const key = `${courseId}::${topic.id}`;
-        let wrongCount = 0;
-        let blankCount = 0;
-        for (const e of relevant) {
-          const status = mistakesByTask.get(e.id)?.get(key);
+    // An LGS course reports at its selection-node granularity (see
+    // lib/curriculum/lgs-selection.ts) -- a rolled-up node's mistake count
+    // sums every one of its now-hidden Alt Konu/topic members, so a
+    // mistake tagged against any of them (old data, tagged before this
+    // rollup, or new data tagged directly against the node's own
+    // representative id) still counts toward the same tile. Every
+    // non-LGS course keeps reporting one row per raw topic, unchanged.
+    const nodes = isLgsCourseId(courseId)
+      ? lgsSelectionNodes(course)
+      : course.units.flatMap((u) =>
+          u.topics.map((t) => ({
+            id: t.id,
+            // An LGS Alt Konu ("EKOK") means nothing without its Konu --
+            // moot here since no non-LGS course has a konu level, but kept
+            // for parity with topicOptionsForCourse's own naming.
+            label: u.konu ? `${u.konu} › ${t.name}` : t.name,
+            memberTopicIds: [t.id],
+          })),
+        );
+
+    for (const node of nodes) {
+      let wrongCount = 0;
+      let blankCount = 0;
+      for (const e of relevant) {
+        const byKey = mistakesByTask.get(e.id);
+        for (const memberId of node.memberTopicIds) {
+          const status = byKey?.get(`${courseId}::${memberId}`);
           if (status === "wrong") wrongCount++;
           else if (status === "blank") blankCount++;
         }
-        rows.push({
-          courseId,
-          courseName: course.name,
-          topicId: topic.id,
-          // An LGS Alt Konu ("EKOK") means nothing without its Konu; every
-          // course without a konu level (all of YKS) keeps the plain name.
-          topicName: unit.konu ? `${unit.konu} › ${topic.name}` : topic.name,
-          count: wrongCount + blankCount,
-          wrongCount,
-          blankCount,
-          windowSize,
-        });
       }
+      rows.push({
+        courseId,
+        courseName: course.name,
+        topicId: node.id,
+        topicName: node.label,
+        count: wrongCount + blankCount,
+        wrongCount,
+        blankCount,
+        windowSize,
+      });
     }
   }
   return rows;

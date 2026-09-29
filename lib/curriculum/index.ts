@@ -12,6 +12,7 @@ import lgsJson from "./lgs.json";
 
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { lgsSelectionNodes } from "./lgs-selection";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
 // `konu` is LGS's middle hierarchy level (Ünite -> Konu -> Alt Konu):
@@ -205,6 +206,12 @@ export function topicsForCourse(course: Course): Topic[] {
 // course without a `konu` level (all of YKS) gets its plain topic name,
 // exactly as before.
 export function topicOptionsForCourse(course: Course): { id: string; label: string }[] {
+  if (isLgsCourseId(course.id)) {
+    return [
+      ...lgsSelectionNodes(course).map((n) => ({ id: n.id, label: n.label })),
+      { id: KARMA_TOPIC.id, label: KARMA_TOPIC.name },
+    ];
+  }
   return [
     ...course.units.flatMap((u) => u.topics.map((t) => ({ id: t.id, label: u.konu ? `${u.konu} › ${t.name}` : t.name }))),
     { id: KARMA_TOPIC.id, label: KARMA_TOPIC.name },
@@ -216,6 +223,17 @@ export function findTopicById(courseId: string | null | undefined, topicId: stri
   if (topicId === KARMA_TOPIC_ID) return KARMA_TOPIC;
   const course = findCourseById(courseId);
   if (!course) return null;
+  // An LGS course's selection nodes are checked first: a rolled-up node's
+  // id IS a real topic id (see lib/curriculum/lgs-selection.ts), so this
+  // would otherwise resolve to that one specific Alt Konu's own name (e.g.
+  // "EKOK") instead of the group label a coach actually picked ("1.1
+  // Çarpanlar ve Katlar"). Falls through to the raw topic list for any
+  // other real id (a non-representative member from before this change,
+  // or a non-LGS course), so no historical row ever fails to resolve.
+  if (isLgsCourseId(course.id)) {
+    const node = lgsSelectionNodes(course).find((n) => n.id === topicId);
+    if (node) return { id: node.id, name: node.label };
+  }
   return course.units.flatMap((u) => u.topics).find((t) => t.id === topicId) ?? null;
 }
 
