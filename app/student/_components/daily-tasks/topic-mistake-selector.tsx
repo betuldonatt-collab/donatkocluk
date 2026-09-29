@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
+import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { TopicMistake, TopicMistakeStatus } from "./types";
 
 // Re-groups the course's flat selection rows (one per checkable/selectable
@@ -67,18 +68,14 @@ export function TopicMistakeSelector({
                       return (
                         <div
                           key={row.id}
-                          className="hover:bg-accent/40 flex items-center gap-2 rounded-md px-2 py-1 text-sm"
+                          className="hover:bg-accent/40 flex items-start gap-2 rounded-md px-2 py-1 text-sm"
                         >
-                          <span className="text-foreground min-w-0 flex-1 truncate">
-                            {row.label}
+                          <span className="text-foreground min-w-0 flex-1">
+                            <span className="block truncate">{row.label}</span>
                             {/* Every subtopic this selectable row rolls up,
                                 as plain read-only context -- marking Y/B
                                 here applies to the whole group. */}
-                            {row.readOnlyNames.length > 0 && (
-                              <span className="text-muted-foreground block truncate text-[10px] font-normal">
-                                {row.readOnlyNames.join(", ")}
-                              </span>
-                            )}
+                            <ReadOnlySubtopics names={row.readOnlyNames} />
                           </span>
                           <button
                             type="button"

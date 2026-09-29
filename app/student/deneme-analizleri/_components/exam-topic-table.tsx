@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
+import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { StudentTask } from "../../_components/daily-tasks/types";
 
 function formatExamDate(dateStr: string) {
@@ -106,9 +107,7 @@ export function ExamTopicTable({
                   )}
                   <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
                     {row.label}
-                    {row.readOnlyNames.length > 0 && (
-                      <p className="text-muted-foreground mt-1 text-xs font-normal">{row.readOnlyNames.join(", ")}</p>
-                    )}
+                    <ReadOnlySubtopics names={row.readOnlyNames} />
                   </TableCell>
                   {exams.map((exam) => {
                     const missed = row.memberTopicIds.some((id) => mistakesByExam[exam.id]?.has(id));

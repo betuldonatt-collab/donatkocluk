@@ -15,6 +15,7 @@ import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBa
 import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
+import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
 
 function progressKey(topicId: string, resourceId: string) {
@@ -246,11 +247,9 @@ export function EditableCourseTable({
                   <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
                     {row.label}
                     {/* Every subtopic this selectable row rolls up, shown as
-                        plain read-only context -- nothing here is its own
+                        plain read-only chips -- nothing here is its own
                         checkbox anymore, it's just what "{row.label}" covers. */}
-                    {row.readOnlyNames.length > 0 && (
-                      <p className="text-muted-foreground mt-1 text-xs font-normal">{row.readOnlyNames.join(", ")}</p>
-                    )}
+                    <ReadOnlySubtopics names={row.readOnlyNames} />
                   </TableCell>
                   {collapsedPipeline && (
                     <PipelineCells
