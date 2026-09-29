@@ -15,7 +15,20 @@
 // a historical task/mistake/progress row that already used that exact id
 // (assigned before this change) keeps landing on the same node with zero
 // migration.
-import type { Course, Topic } from "./index";
+import { toTurkishTitleCase, type Course, type Topic } from "./index";
+
+// lgs.json's `unit` field is a mix of a bare "N. ÜNİTE" (Matematik, Din
+// Kültürü -- already short/fine either way) and a full ALL CAPS heading
+// (Fen Bilimleri, Türkçe, İnkılap Tarihi, e.g. "1. ÜNİTE: MEVSİMLER VE
+// İKLİM") straight from the official workbook -- every course's own
+// hand-written `konu`/topic text is already properly cased and untouched
+// here. Every node's unitLabel (and, for Fen/Türkçe/İnkılap, its label
+// too) comes from this one formatted value, so the fix is universal
+// across Task Assignment, Kaynak Takibi and Analiz without a per-surface
+// change.
+function uniteLabel(unit: string): string {
+  return toTurkishTitleCase(unit);
+}
 
 export type LgsSelectionNode = {
   id: string;
@@ -97,26 +110,36 @@ export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
   switch (course.id) {
     case "lgs-matematik":
     case "lgs-fen-bilimleri":
-      return course.units.map((u) => group(u.konu ?? u.unit, u.unit, u.topics));
+      return course.units.map((u) => {
+        const unit = uniteLabel(u.unit);
+        return group(u.konu ?? unit, unit, u.topics);
+      });
 
     case "lgs-turkce":
     case "lgs-inkilap-tarihi":
-      return course.units.map((u) => group(u.unit, u.unit, u.topics));
+      return course.units.map((u) => {
+        const unit = uniteLabel(u.unit);
+        return group(unit, unit, u.topics);
+      });
 
     case "lgs-din-kulturu":
       return course.units.flatMap((u, i) => {
+        const unit = uniteLabel(u.unit);
         const rolled = u.topics.filter((t) => !DIN_KULTURU_EXEMPT_TOPIC_IDS.has(t.id));
         const exempt = u.topics.filter((t) => DIN_KULTURU_EXEMPT_TOPIC_IDS.has(t.id));
         const nodes: LgsSelectionNode[] = [];
-        if (rolled.length > 0) nodes.push(group(DIN_KULTURU_UNIT_LABELS[i] ?? u.unit, u.unit, rolled));
-        nodes.push(...exempt.map((t) => leaf(t, u.unit)));
+        if (rolled.length > 0) nodes.push(group(DIN_KULTURU_UNIT_LABELS[i] ?? unit, unit, rolled));
+        nodes.push(...exempt.map((t) => leaf(t, unit)));
         return nodes;
       });
 
     default:
       // İngilizce, and any non-LGS course this is ever called on: one
       // node per existing topic, identical to the old ungrouped behavior.
-      return course.units.flatMap((u) => u.topics.map((t) => leaf(t, u.unit)));
+      return course.units.flatMap((u) => {
+        const unit = uniteLabel(u.unit);
+        return u.topics.map((t) => leaf(t, unit));
+      });
   }
 }
 

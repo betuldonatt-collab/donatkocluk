@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LGS_COURSES, TYT_COURSES, type Course } from "./index";
+import { LGS_COURSES, TYT_COURSES, toTurkishTitleCase, type Course } from "./index";
 import { courseHasKonu, flattenCourseRows, flattenSelectionRows } from "./rows";
 
 const t = (id: string) => ({ id, name: id });
@@ -85,7 +85,7 @@ describe("flattenSelectionRows", () => {
     const rows = flattenSelectionRows(course);
     expect(rows).toHaveLength(course.units.length);
     rows.forEach((row, i) => {
-      expect(row.label).toBe(course.units[i].unit);
+      expect(row.label).toBe(toTurkishTitleCase(course.units[i].unit));
       expect(row.unitRowSpan).toBe(1); // each Ünite is its own single selectable row now
       expect(row.readOnlyNames).toEqual(course.units[i].topics.map((t) => t.name));
     });

@@ -7,6 +7,7 @@ import {
   normalizeTr,
   ROUTINE_COURSES,
   topicsForCourse,
+  toTurkishTitleCase,
   TYT_COURSES,
 } from "./index";
 
@@ -103,5 +104,30 @@ describe("normalizeTr", () => {
 
   it("makes visually different spellings compare equal", () => {
     expect(normalizeTr("Fizik")).toBe(normalizeTr("FİZİK"));
+  });
+});
+
+describe("toTurkishTitleCase", () => {
+  it("title-cases an ALL CAPS Ünite heading, keeping 've' lowercase", () => {
+    expect(toTurkishTitleCase("1. ÜNİTE: MEVSİMLER VE İKLİM")).toBe("1. Ünite: Mevsimler ve İklim");
+  });
+
+  it("handles the dotted/dotless İ-I distinction correctly in both directions", () => {
+    // Dotted capital İ -> dotted lowercase i -> capitalized back to İ.
+    expect(toTurkishTitleCase("İSTANBUL")).toBe("İstanbul");
+    // Dotless capital I -> dotless lowercase ı -> capitalized back to I.
+    expect(toTurkishTitleCase("IŞIK")).toBe("Işık");
+  });
+
+  it("never capitalizes a grammatical suffix attached to a number", () => {
+    expect(toTurkishTitleCase("10'UN FARKLI KUVVETLERİ")).toBe("10'un Farklı Kuvvetleri");
+  });
+
+  it("capitalizes a short connector word only when it opens the string", () => {
+    expect(toTurkishTitleCase("VE BÖYLE DEVAM EDER")).toBe("Ve Böyle Devam Eder");
+  });
+
+  it("is a no-op on text that's already properly cased", () => {
+    expect(toTurkishTitleCase("Pozitif Tam Sayıların Çarpanları")).toBe("Pozitif Tam Sayıların Çarpanları");
   });
 });

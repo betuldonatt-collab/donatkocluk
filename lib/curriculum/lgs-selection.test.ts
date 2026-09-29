@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LGS_COURSES } from "./index";
+import { LGS_COURSES, toTurkishTitleCase } from "./index";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "./lgs-selection";
 
 function courseById(id: string) {
@@ -15,7 +15,7 @@ describe("lgsSelectionNodes", () => {
     const carpanlarVeKatlar = nodes.find((n) => n.label === "1.1 Çarpanlar ve Katlar");
     expect(carpanlarVeKatlar).toMatchObject({
       id: "lgs-matematik-u0-t0",
-      unitLabel: "1. ÜNİTE",
+      unitLabel: "1. Ünite",
       readOnlyNames: ["Pozitif Tam Sayıların Pozitif Tam Sayı Çarpanları", "EKOK", "EBOB"],
       memberTopicIds: ["lgs-matematik-u0-t0", "lgs-matematik-u0-t1", "lgs-matematik-u0-t2"],
     });
@@ -29,9 +29,10 @@ describe("lgsSelectionNodes", () => {
     const course = courseById("lgs-fen-bilimleri");
     const nodes = lgsSelectionNodes(course);
 
-    // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM") has no Konu split -- both of
-    // its topics roll up under the Ünite itself now, same as Türkçe/İnkılap.
-    const unit1 = nodes.find((n) => n.label === "1. ÜNİTE: MEVSİMLER VE İKLİM");
+    // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM" in the raw data, Title Cased
+    // here) has no Konu split -- both of its topics roll up under the
+    // Ünite itself now, same as Türkçe/İnkılap.
+    const unit1 = nodes.find((n) => n.label === "1. Ünite: Mevsimler ve İklim");
     expect(unit1).toMatchObject({ readOnlyNames: ["Mevsimlerin Oluşumu", "İklim ve Hava Hareketleri"] });
     expect(nodes.find((n) => n.label === "Mevsimlerin Oluşumu")).toBeUndefined(); // no longer its own node
 
@@ -40,7 +41,7 @@ describe("lgsSelectionNodes", () => {
     expect(rolledGroup).toMatchObject({
       readOnlyNames: ["Sürtünme ile Elektriklenme", "Dokunma ile Elektriklenme", "Etki (Tesir) ile Etkilenme"],
     });
-    expect(nodes.find((n) => n.label.startsWith("7. ÜNİTE"))).toBeUndefined(); // Ünite 7 itself is not a node
+    expect(nodes.find((n) => n.label.startsWith("7. Ünite"))).toBeUndefined(); // Ünite 7 itself is not a node
 
     // One node per Ünite 1-6, plus one per Konu within Ünite 7.
     const unite7KonuCount = course.units.filter((u) => u.konu !== undefined).length;
@@ -48,14 +49,14 @@ describe("lgsSelectionNodes", () => {
     expect(nodes).toHaveLength(otherUniteCount + unite7KonuCount);
   });
 
-  it("Türkçe and İnkılap Tarihi: selectable node is the Ünite itself, topics become read-only", () => {
+  it("Türkçe and İnkılap Tarihi: selectable node is the Ünite itself (Title Cased), topics become read-only", () => {
     for (const courseId of ["lgs-turkce", "lgs-inkilap-tarihi"]) {
       const course = courseById(courseId);
       const nodes = lgsSelectionNodes(course);
       // One node per unit, in the exact original unit count/order.
       expect(nodes).toHaveLength(course.units.length);
       nodes.forEach((n, i) => {
-        expect(n.label).toBe(course.units[i].unit);
+        expect(n.label).toBe(toTurkishTitleCase(course.units[i].unit));
         expect(n.readOnlyNames).toEqual(course.units[i].topics.map((t) => t.name));
         expect(n.id).toBe(course.units[i].topics[0].id);
       });
