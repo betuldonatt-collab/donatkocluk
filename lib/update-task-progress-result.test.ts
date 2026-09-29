@@ -142,6 +142,14 @@ describe("updateTaskProgress never throws -- always a result", () => {
     expect(result).toEqual({ ok: false, error: expect.stringContaining("Bitiş sayfası") });
   });
 
+  it("a lone start_page or end_page (a forged/direct call -- the client always sends both together) resolves ok:false with a specific message", async () => {
+    state.task = baseTask({ task_type: "reading", title: "Fatih Harbiye", total_count: 250 });
+    const onlyStart = await updateTaskProgress(TASK, { start_page: 40 });
+    expect(onlyStart).toEqual({ ok: false, error: expect.stringContaining("hem bitiş sayfasını") });
+    const onlyEnd = await updateTaskProgress(TASK, { end_page: 62 });
+    expect(onlyEnd).toEqual({ ok: false, error: expect.stringContaining("hem bitiş sayfasını") });
+  });
+
   it("Kitap Okuma's page range saves alongside the derived correct_count", async () => {
     state.task = baseTask({ task_type: "reading", title: "Fatih Harbiye", total_count: 250 });
     const result = await updateTaskProgress(TASK, { start_page: 40, end_page: 62, correct_count: 23 });

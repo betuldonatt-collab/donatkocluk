@@ -135,9 +135,27 @@ const taskProgressPatchSchema = z
     reason: z.string().trim().max(1000).nullable().optional(),
     note: z.string().trim().max(2000).nullable().optional(),
   })
-  .refine((v) => v.start_page == null || v.end_page == null || v.end_page >= v.start_page, {
-    message: "Bitiş sayfası başlangıç sayfasından küçük olamaz.",
-    path: ["end_page"],
+  .superRefine((v, ctx) => {
+    // Kitap Okuma's page range: both filled or both left alone -- a lone
+    // start_page/end_page (the student typed one and left, or a forged
+    // call) is never valid on its own, and mirrors the same rule as a DB
+    // check constraint (0107) that would otherwise reject it with an
+    // opaque generic error instead of this specific one.
+    if ((v.start_page == null) !== (v.end_page == null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hem başlangıç hem bitiş sayfasını gir.",
+        path: v.start_page == null ? ["start_page"] : ["end_page"],
+      });
+      return;
+    }
+    if (v.start_page != null && v.end_page != null && v.end_page < v.start_page) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Bitiş sayfası başlangıç sayfasından küçük olamaz.",
+        path: ["end_page"],
+      });
+    }
   });
 
 // Security Hardening Group 4 (double-layer authorization): student_tasks

@@ -427,10 +427,21 @@ function TaskModalBody({
   // Başlangıç/Bitiş Sayfası -> Okunan Sayfa. Both fields must be filled
   // and positive, and Bitiş can't be before Başlangıç -- anything short of
   // that has no total to show or save yet (null, not 0: an empty/invalid
-  // range means "not entered", not "zero pages read").
+  // range means "not entered", not "zero pages read"). Mirrors
+  // taskProgressPatchSchema's own superRefine in app/student/actions.ts
+  // exactly, so the message the student sees here (before Kaydet is even
+  // clicked) never disagrees with the one a forged/direct call would get
+  // back from the server.
   const startPageNum = toNumberOrNull(startPage);
   const endPageNum = toNumberOrNull(endPage);
-  const pageRangeInvalid = startPageNum !== null && endPageNum !== null && endPageNum < startPageNum;
+  const pageRangeHalfFilled = (startPage.trim() !== "") !== (endPage.trim() !== "");
+  const pageRangeOutOfOrder = startPageNum !== null && endPageNum !== null && endPageNum < startPageNum;
+  const pageRangeInvalid = pageRangeHalfFilled || pageRangeOutOfOrder;
+  const pageRangeError = pageRangeHalfFilled
+    ? "Hem başlangıç hem bitiş sayfasını gir."
+    : pageRangeOutOfOrder
+      ? "Bitiş sayfası başlangıç sayfasından küçük olamaz."
+      : null;
   const totalPagesRead =
     startPageNum !== null && endPageNum !== null && startPageNum > 0 && endPageNum >= startPageNum
       ? endPageNum - startPageNum + 1
@@ -657,8 +668,8 @@ function TaskModalBody({
   // invalid range never even leaves a round trip before showing the inline
   // message already rendered next to the fields.
   function blockedByPageRange(): boolean {
-    if (showReadingProgress && pageRangeInvalid) {
-      setError("Bitiş sayfası başlangıç sayfasından küçük olamaz.");
+    if (showReadingProgress && pageRangeError) {
+      setError(pageRangeError);
       return true;
     }
     return false;
@@ -1118,8 +1129,8 @@ function TaskModalBody({
               <Field label="Başlangıç Sayfası" value={startPage} onChange={setStartPage} invalid={pageRangeInvalid} />
               <Field label="Bitiş Sayfası" value={endPage} onChange={setEndPage} invalid={pageRangeInvalid} />
             </div>
-            {pageRangeInvalid ? (
-              <p className="text-destructive text-xs">Bitiş sayfası başlangıç sayfasından küçük olamaz.</p>
+            {pageRangeError ? (
+              <p className="text-destructive text-xs">{pageRangeError}</p>
             ) : (
               totalPagesRead !== null && (
                 <p className="text-muted-foreground text-xs">
