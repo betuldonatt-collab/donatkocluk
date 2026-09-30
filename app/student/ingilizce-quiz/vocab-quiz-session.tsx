@@ -12,8 +12,9 @@ import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type Acti
 
 type BatchWord = QuizWord & { direction: QuizDirection };
 
-// How long the auto-advancing "Doğru!" popup stays up before moving on by
-// itself -- inside the coach's requested 750-1000ms window.
+// How long a correct answer's feedback stays up before the same window
+// moves on to the next word by itself -- inside the coach's requested
+// 750-1000ms window.
 const AUTO_ADVANCE_MS = 900;
 
 type Feedback = { result: AnswerResult; correctAnswer: string; wasSkipped: boolean };
@@ -28,10 +29,11 @@ function promptFor(word: BatchWord) {
     : { promptLabel: "İngilizcesi", prompt: word.english_word, answerLabel: "Türkçesi", correctAnswer: word.turkish_meaning };
 }
 
-// The full-screen, Duolingo-style feedback popup content -- EXACT_MATCH
-// gets no button at all (VocabQuizSession's own effect auto-advances it),
-// everything else waits on an explicit "Anladım" so the correct answer is
-// actually read, not just flashed past.
+// Content shown INSIDE the one quiz window once an answer's been given --
+// EXACT_MATCH gets no button at all (VocabQuizSession's own effect
+// auto-advances it), everything else waits on an explicit "Anladım" so the
+// correct answer is actually read, not just flashed past. Replaces the
+// word/input/Kontrol Et form in place -- never a second popup on top of it.
 const FEEDBACK_CONTENT: Record<
   AnswerResult,
   { icon: typeof CheckCircle2; iconClass: string; title: (wasSkipped: boolean) => string; titleClass: string }
@@ -56,13 +58,7 @@ const FEEDBACK_CONTENT: Record<
   },
 };
 
-// Fixed, centered, blurred-backdrop popup -- replaces what used to be an
-// inline colored banner on the card itself. Doesn't render its own
-// Dialog/Radix primitive (no close-on-Escape/backdrop-click, no stray X
-// button): for EXACT_MATCH there is nothing to dismiss, it closes itself;
-// for everything else, "Anladım" is the only way out, on purpose, so the
-// correct answer actually gets read before moving on.
-function AnswerFeedbackOverlay({
+function AnswerFeedbackContent({
   feedback,
   isSaving,
   submitError,
@@ -78,39 +74,58 @@ function AnswerFeedbackOverlay({
   const needsAcknowledgement = feedback.result !== "EXACT_MATCH";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-md">
-      <div className="bg-card w-full max-w-xs space-y-4 rounded-2xl border p-6 text-center shadow-2xl">
-        <Icon className={cn("mx-auto size-14", content.iconClass)} />
-        <div className="space-y-1.5">
-          <p className={cn("text-xl font-bold", content.titleClass)}>{content.title(feedback.wasSkipped)}</p>
-          {needsAcknowledgement && (
-            <p className="text-foreground text-sm">
-              Doğru cevap: <span className="font-semibold">{feedback.correctAnswer}</span>
-            </p>
-          )}
-        </div>
-
-        {isSaving && !submitError && <p className="text-muted-foreground text-xs">Kaydediliyor...</p>}
-        {submitError && <p className="text-destructive text-xs">{submitError}</p>}
-
+    <div className="space-y-4 py-6 text-center">
+      <Icon className={cn("mx-auto size-14", content.iconClass)} />
+      <div className="space-y-1.5">
+        <p className={cn("text-xl font-bold", content.titleClass)}>{content.title(feedback.wasSkipped)}</p>
         {needsAcknowledgement && (
-          <Button type="button" className="w-full" size="lg" onClick={onAcknowledge}>
-            Anladım
-          </Button>
+          <p className="text-foreground text-sm">
+            Doğru cevap: <span className="font-semibold">{feedback.correctAnswer}</span>
+          </p>
         )}
       </div>
+
+      {isSaving && !submitError && <p className="text-muted-foreground text-xs">Kaydediliyor...</p>}
+      {submitError && <p className="text-destructive text-xs">{submitError}</p>}
+
+      {needsAcknowledgement && (
+        <Button type="button" className="w-full" size="lg" onClick={onAcknowledge}>
+          Anladım
+        </Button>
+      )}
     </div>
   );
 }
 
-// One unit's quiz, start to finish: fetch a batch (plus any coach-assigned
-// word-count target still open for this unit), ask each word (random
-// direction per word), give immediate feedback via a full-screen popup --
-// auto-advancing for a correct answer, waiting on "Anladım" for anything
-// else -- then a summary screen whose "Çalışmaya Devam Et" fetches the
-// next batch in place -- no route change, so it's instant. Lives entirely
-// inside VocabQuizDashboard, which swaps this in for the unit grid while
-// active.
+// The one focus-mode window every phase below renders inside -- fixed,
+// centered, over a blurred/darkened dashboard that stays mounted (and
+// interactive-looking, if not actually reachable) behind it. No
+// backdrop-click-to-close: a student mid-answer shouldn't be able to lose
+// their place with one stray tap outside the card. Deliberately a
+// module-level component, not one redefined inside VocabQuizSession's own
+// body: a component defined per-render gets a fresh function identity
+// every time, which React treats as a different component type -- every
+// single keystroke in the answer Input would have unmounted and
+// remounted this whole tree, losing focus (and the browser's own
+// autofocus) on every character typed.
+function Window({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-md">
+      <Card className="max-h-[90vh] w-full max-w-md overflow-y-auto">{children}</Card>
+    </div>
+  );
+}
+
+// One unit's quiz, start to finish, as a single focus-mode window: fetch a
+// batch (plus any coach-assigned word-count target still open for this
+// unit), ask each word (random direction per word) in a fixed, centered,
+// backdrop-blurred overlay over the dashboard -- the blurred/darkened
+// units grid stays visible underneath, but only this window is
+// interactive. Every state (loading, a word, its feedback, the task-
+// complete congrats, the empty/summary screens) swaps content INSIDE that
+// same window; "Quizden çık"/"Ünitelere Dön" is the only way to close it
+// and return to the crisp dashboard. Rendered by VocabQuizDashboard, which
+// keeps the (still-mounted, now-blurred) unit grid behind it.
 export function VocabQuizSession({
   unitNumber,
   onExit,
@@ -133,7 +148,7 @@ export function VocabQuizSession({
   // Backs the background save that follows every answer (Kontrol Et/Pas
   // Geç already show feedback synchronously, before this even starts --
   // see recordAnswer) -- isSaving only ever drives a small, non-blocking
-  // "Kaydediliyor..." hint inside the popup, never the feedback itself.
+  // "Kaydediliyor..." hint inside the window, never the feedback itself.
   const [isSaving, startSaveTransition] = useTransition();
 
   async function loadBatch() {
@@ -188,8 +203,8 @@ export function VocabQuizSession({
   // Feedback appears the instant this runs -- setFeedback/setResults below
   // are the very first thing that happens, synchronously, before the
   // background save (startSaveTransition) even starts. The save itself
-  // runs as a transition so it never blocks the popup from showing or the
-  // student from clicking through to the next word.
+  // runs as a transition so it never blocks the window from swapping to
+  // the feedback content or the student from clicking through.
   function recordAnswer(result: AnswerResult, correctAnswer: string, wasSkipped: boolean) {
     if (!current) return;
     setFeedback({ result, correctAnswer, wasSkipped });
@@ -214,8 +229,8 @@ export function VocabQuizSession({
           setActiveTask((prev) => (prev ? { ...prev, current: Math.min(prev.current + 1, prev.target) } : prev));
         }
         // Immediately, the moment this answer crosses the assigned task's
-        // own target -- overrides the popup's own auto-advance/Anladım
-        // flow below (see the congrats block further down).
+        // own target -- overrides the window's own auto-advance/Anladım
+        // flow with the congrats content instead.
         if (outcome.taskCompleted) setTaskJustCompleted(true);
       } catch {
         setSubmitError("İlerleme kaydedilemedi, tekrar dene.");
@@ -251,11 +266,11 @@ export function VocabQuizSession({
     setSubmitError(null);
   }
 
-  // A correct answer's popup closes itself -- ~900ms to register, then
+  // A correct answer's feedback clears itself -- ~900ms to register, then
   // straight to the next word (or the summary screen, via handleNext).
   // Cleared on every dependency change (including a task-completion
   // arriving mid-countdown, which cancels the auto-advance in favor of the
-  // congrats popup instead) AND on unmount, so a student who exits the
+  // congrats content instead) AND on unmount, so a student who exits the
   // instant "Doğru!" appears never triggers a setState on a gone component.
   useEffect(() => {
     if (!feedback || feedback.result !== "EXACT_MATCH" || taskJustCompleted) return;
@@ -264,17 +279,20 @@ export function VocabQuizSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedback, taskJustCompleted]);
 
+
   if (phase === "loading") {
     return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <p className="text-muted-foreground text-sm">Kelimeler yükleniyor...</p>
-      </div>
+      <Window>
+        <CardContent className="flex min-h-[240px] items-center justify-center">
+          <p className="text-muted-foreground text-sm">Kelimeler yükleniyor...</p>
+        </CardContent>
+      </Window>
     );
   }
 
   if (phase === "empty") {
     return (
-      <Card>
+      <Window>
         <CardHeader>
           <CardTitle className="text-base">{vocabUnitTitle(unitNumber)}</CardTitle>
         </CardHeader>
@@ -299,14 +317,14 @@ export function VocabQuizSession({
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Window>
     );
   }
 
   if (phase === "summary") {
     const correctCount = results.filter((r) => r !== "INCORRECT").length;
     return (
-      <Card>
+      <Window>
         <CardHeader>
           <CardTitle className="text-base">{vocabUnitTitle(unitNumber)} -- Tur Tamamlandı</CardTitle>
         </CardHeader>
@@ -325,53 +343,80 @@ export function VocabQuizSession({
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </Window>
     );
   }
 
   if (!current) return null;
   const { promptLabel, prompt, answerLabel } = promptFor(current);
 
-  return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-2">
-          <CardTitle className="flex items-center gap-1.5 text-base leading-snug">
-            <Languages className="text-primary size-4 shrink-0" />
-            {vocabUnitTitle(unitNumber)}
-          </CardTitle>
-          <div className="flex shrink-0 items-center gap-3 text-xs">
-            {activeTask && (
-              <span className="text-muted-foreground tabular-nums">
-                Görev: {activeTask.current}/{activeTask.target} kelime
-              </span>
-            )}
-            <span className="text-muted-foreground tabular-nums">
-              Kelime {index + 1}/{batch.length}
-            </span>
+  // The moment this word's answer crossed the assigned task's own target,
+  // this REPLACES the normal feedback content -- "immediately", per the
+  // coach's own request, not after finishing the rest of whatever batch
+  // happened to be loaded.
+  if (feedback && taskJustCompleted) {
+    return (
+      <Window>
+        <CardContent className="space-y-4 py-6 text-center">
+          <Sparkles className="mx-auto size-14 text-amber-500" />
+          <p className="text-sm text-amber-800">
+            Bugün atanan görevlerini tamamladın, tebrikler! 🌟 İstersen çalışmaya devam edebilirsin.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Button type="button" onClick={loadBatch}>
+              Çalışmaya Devam Et
+            </Button>
+            <Button type="button" variant="outline" onClick={onExit}>
+              <ArrowLeft className="size-4" />
+              Ünitelere Dön
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs">{promptLabel}</p>
-            <p className="text-foreground text-2xl font-semibold">{prompt}</p>
-          </div>
+        </CardContent>
+      </Window>
+    );
+  }
 
-          <form onSubmit={handleSubmitAnswer} className="space-y-2">
-            <label htmlFor="vocab-answer" className="text-muted-foreground text-xs">
-              {answerLabel}
-            </label>
-            <Input
-              id="vocab-answer"
-              autoFocus
-              autoComplete="off"
-              autoCapitalize="off"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              disabled={!!feedback}
-              className="text-base"
-            />
-            {!feedback && (
+  return (
+    <Window>
+      <CardHeader className="flex flex-row items-start justify-between gap-2">
+        <CardTitle className="flex items-center gap-1.5 text-base leading-snug">
+          <Languages className="text-primary size-4 shrink-0" />
+          {vocabUnitTitle(unitNumber)}
+        </CardTitle>
+        <div className="flex shrink-0 items-center gap-3 text-xs">
+          {activeTask && (
+            <span className="text-muted-foreground tabular-nums">
+              Görev: {activeTask.current}/{activeTask.target} kelime
+            </span>
+          )}
+          <span className="text-muted-foreground tabular-nums">
+            Kelime {index + 1}/{batch.length}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {feedback ? (
+          <AnswerFeedbackContent feedback={feedback} isSaving={isSaving} submitError={submitError} onAcknowledge={handleNext} />
+        ) : (
+          <>
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">{promptLabel}</p>
+              <p className="text-foreground text-2xl font-semibold">{prompt}</p>
+            </div>
+
+            <form onSubmit={handleSubmitAnswer} className="space-y-2">
+              <label htmlFor="vocab-answer" className="text-muted-foreground text-xs">
+                {answerLabel}
+              </label>
+              <Input
+                id="vocab-answer"
+                autoFocus
+                autoComplete="off"
+                autoCapitalize="off"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                className="text-base"
+              />
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1" disabled={!answer.trim()}>
                   Kontrol Et
@@ -381,42 +426,14 @@ export function VocabQuizSession({
                   Pas Geç
                 </Button>
               </div>
-            )}
-          </form>
+            </form>
+          </>
+        )}
 
-          <button type="button" onClick={onExit} className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline">
-            Quizden çık
-          </button>
-        </CardContent>
-      </Card>
-
-      {/* The moment this word's answer crossed the assigned task's own
-          target, this REPLACES the normal feedback popup -- "immediately",
-          per the coach's own request, not after finishing the rest of
-          whatever batch happened to be loaded. */}
-      {feedback && taskJustCompleted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-md">
-          <div className="bg-card w-full max-w-xs space-y-4 rounded-2xl border border-amber-400/50 p-6 text-center shadow-2xl">
-            <Sparkles className="mx-auto size-14 text-amber-500" />
-            <p className="text-sm text-amber-800">
-              Bugün atanan görevlerini tamamladın, tebrikler! 🌟 İstersen çalışmaya devam edebilirsin.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button type="button" onClick={loadBatch}>
-                Çalışmaya Devam Et
-              </Button>
-              <Button type="button" variant="outline" onClick={onExit}>
-                <ArrowLeft className="size-4" />
-                Ünitelere Dön
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {feedback && !taskJustCompleted && (
-        <AnswerFeedbackOverlay feedback={feedback} isSaving={isSaving} submitError={submitError} onAcknowledge={handleNext} />
-      )}
-    </>
+        <button type="button" onClick={onExit} className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline">
+          Quizden çık
+        </button>
+      </CardContent>
+    </Window>
   );
 }
