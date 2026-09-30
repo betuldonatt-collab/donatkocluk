@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, PartyPopper, SkipForward, Sparkles, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Languages, PartyPopper, SkipForward, Sparkles, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { checkVocabAnswer, type AnswerResult, type QuizDirection, type QuizWord } from "@/lib/lgs-vocab";
+import { checkVocabAnswer, vocabUnitTitle, type AnswerResult, type QuizDirection, type QuizWord } from "@/lib/lgs-vocab";
 import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
 
 type BatchWord = QuizWord & { direction: QuizDirection };
@@ -172,7 +172,7 @@ export function VocabQuizSession({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{unitNumber}. Ünite</CardTitle>
+          <CardTitle className="text-base">{vocabUnitTitle(unitNumber)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {loadError ? (
@@ -204,7 +204,7 @@ export function VocabQuizSession({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{unitNumber}. Ünite -- Tur Tamamlandı</CardTitle>
+          <CardTitle className="text-base">{vocabUnitTitle(unitNumber)} -- Tur Tamamlandı</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-foreground text-sm">
@@ -232,9 +232,12 @@ export function VocabQuizSession({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">{unitNumber}. Ünite</CardTitle>
-        <div className="flex items-center gap-3 text-xs">
+      <CardHeader className="flex flex-row items-start justify-between gap-2">
+        <CardTitle className="flex items-center gap-1.5 text-base leading-snug">
+          <Languages className="text-primary size-4 shrink-0" />
+          {vocabUnitTitle(unitNumber)}
+        </CardTitle>
+        <div className="flex shrink-0 items-center gap-3 text-xs">
           {activeTask && (
             <span className="text-muted-foreground tabular-nums">
               Görev: {activeTask.current}/{activeTask.target} kelime

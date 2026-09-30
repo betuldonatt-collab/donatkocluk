@@ -18,6 +18,34 @@ export type LgsWord = {
   created_at: string;
 };
 
+// The 10 official LGS İngilizce unit titles, index-matched to unit_number
+// (1-10) -- shown on the quiz dashboard/session cards so the student
+// always knows which unit's vocabulary they're studying, not just its
+// number. A fixed, hand-curated list rather than pulled from lib/curriculum
+// (whose lgs-ingilizce course names these units too, but as bare "Unit N:
+// ..." with no "Ünite" prefix): the vocab quiz's own lgs_words table is
+// intentionally independent of the curriculum module, and the coach asked
+// for this exact wording.
+const VOCAB_UNIT_TITLES = [
+  "1. Ünite: Friendship",
+  "2. Ünite: Teen Life",
+  "3. Ünite: In the Kitchen",
+  "4. Ünite: On the Phone",
+  "5. Ünite: The Internet",
+  "6. Ünite: Adventures",
+  "7. Ünite: Tourism",
+  "8. Ünite: Chores",
+  "9. Ünite: Science",
+  "10. Ünite: Natural Forces",
+];
+
+// Falls back to a bare "N. Ünite" for a number outside 1-10, which should
+// never happen (every caller's own unit picker is already capped there)
+// but keeps this a safe, crash-proof lookup regardless.
+export function vocabUnitTitle(unitNumber: number): string {
+  return VOCAB_UNIT_TITLES[unitNumber - 1] ?? `${unitNumber}. Ünite`;
+}
+
 // One row per (student, word) -- a simple spaced-repetition streak.
 // is_mastered flips to true once correct_streak reaches 3; that transition
 // is application logic (a later phase's server action), not enforced at

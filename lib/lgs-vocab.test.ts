@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { checkVocabAnswer, computeUnitStats, levenshteinDistance, selectQuizBatch, type WordProgressSummary } from "./lgs-vocab";
+import {
+  checkVocabAnswer,
+  computeUnitStats,
+  levenshteinDistance,
+  selectQuizBatch,
+  vocabUnitTitle,
+  type WordProgressSummary,
+} from "./lgs-vocab";
 
 describe("levenshteinDistance", () => {
   it("is 0 for identical strings", () => {
@@ -126,5 +133,18 @@ describe("computeUnitStats", () => {
     const stats = computeUnitStats(words, new Set(["a"]));
     expect(stats[0]).toEqual({ unitNumber: 1, total: 2, mastered: 1 });
     expect(stats[1]).toEqual({ unitNumber: 2, total: 1, mastered: 0 });
+  });
+});
+
+describe("vocabUnitTitle", () => {
+  it("maps each of the 10 units to its official LGS İngilizce title", () => {
+    expect(vocabUnitTitle(1)).toBe("1. Ünite: Friendship");
+    expect(vocabUnitTitle(5)).toBe("5. Ünite: The Internet");
+    expect(vocabUnitTitle(10)).toBe("10. Ünite: Natural Forces");
+  });
+
+  it("falls back to a bare 'N. Ünite' for an out-of-range number instead of crashing", () => {
+    expect(vocabUnitTitle(11)).toBe("11. Ünite");
+    expect(vocabUnitTitle(0)).toBe("0. Ünite");
   });
 });

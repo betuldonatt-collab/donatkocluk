@@ -6,7 +6,7 @@ import { BookOpenCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { UnitStat } from "@/lib/lgs-vocab";
+import { vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
 import { VocabQuizSession } from "./vocab-quiz-session";
 
 function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
@@ -14,9 +14,9 @@ function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
   const complete = stat.total > 0 && stat.mastered === stat.total;
   return (
     <Card className={cn(complete && "border-emerald-500/50 bg-emerald-500/5")}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">{stat.unitNumber}. Ünite</CardTitle>
-        {complete && <Trophy className="size-4 text-emerald-600" />}
+      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+        <CardTitle className="text-base leading-snug">{vocabUnitTitle(stat.unitNumber)}</CardTitle>
+        {complete && <Trophy className="mt-0.5 size-4 shrink-0 text-emerald-600" />}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1.5">
