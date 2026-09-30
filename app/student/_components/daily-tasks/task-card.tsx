@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
+  Languages,
   Lock,
   MinusCircle,
   PlayCircle,
@@ -29,6 +30,7 @@ const TASK_TYPE_ICONS = {
   general_exam: Sparkles,
   extra_custom: ClipboardList,
   reading: BookOpen,
+  vocab_quiz: Languages,
 };
 
 // Coach-set target (or, once the student records it via task-modal.tsx's

@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
+  Languages,
   Lock,
   MinusCircle,
   PlayCircle,
@@ -45,6 +46,7 @@ const TASK_TYPE_ICONS = {
   general_exam: Sparkles,
   extra_custom: ClipboardList,
   reading: BookOpen,
+  vocab_quiz: Languages,
 };
 
 // The floor a student can drag a cell down to (see ResizeHandle in

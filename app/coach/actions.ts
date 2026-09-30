@@ -118,6 +118,16 @@ function buildBranchExamTitle(
   return pub ? `${base} - ${pub}` : base;
 }
 
+// "İngilizce Kelime Quizi" has no course/topic pickers of its own -- Ünite
+// (1-10) is stored directly in topic_id as a plain "3" (not a curriculum
+// topic id; this pseudo-course, "ingilizce-quiz", has no curriculum entry
+// to look one up from) and the word-count target lives in total_count,
+// same "no new column" convention as generalExamPublisher/bookTitle above.
+function buildVocabQuizTitle(unitTopicId: string | null | undefined, count: number | null | undefined): string {
+  const unit = Number(unitTopicId) || 1;
+  return count ? `${unit}. Ünite - ${count} Kelime` : `${unit}. Ünite`;
+}
+
 function addDaysISO(dateStr: string, days: number) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -1292,7 +1302,14 @@ export async function getPastWeeksForStudent(studentId: string): Promise<{ weekS
 
 // --- Student detail: Haftalık Görev Ata (task assignment) ---------------
 
-export type AssignableTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "video" | "reading";
+export type AssignableTaskType =
+  | "question_bank"
+  | "topic_study"
+  | "branch_exam"
+  | "general_exam"
+  | "video"
+  | "reading"
+  | "vocab_quiz";
 export type VideoLink = { url: string; title: string | null };
 
 type AssignTaskInput = {
@@ -1318,7 +1335,7 @@ type AssignTaskInput = {
 const videoLinkSchema = z.object({ url: z.string().trim().max(2000), title: z.string().trim().max(300).nullable() });
 
 const assignTaskInputSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading"]),
+  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -1375,7 +1392,9 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
         ? buildBranchExamTitle(input.courseId, input.topicId, input.branchExamPublisher)
         : input.taskType === "reading"
           ? input.bookTitle?.trim() || "Kitap Okuma"
-          : buildTaskTitle(input.courseId, input.topicId);
+          : input.taskType === "vocab_quiz"
+            ? buildVocabQuizTitle(input.topicId, input.totalCount)
+            : buildTaskTitle(input.courseId, input.topicId);
 
   const videoLinkGroups: VideoLink[][] =
     input.taskType === "video" && input.videoLinks && input.videoLinks.length > 0
@@ -1412,8 +1431,11 @@ function buildTaskRows(studentId: string, coachId: string, taskDates: string[], 
         // "reading" task always lands in the Rutinler lane via the
         // pseudo-course isRoutineCourseId() checks -- same "kitap-okuma"
         // id lib/curriculum's ROUTINE_COURSES defines, regardless of what
-        // courseId the form happened to send.
-        course_id: input.taskType === "reading" ? "kitap-okuma" : input.courseId || null,
+        // courseId the form happened to send. "vocab_quiz" gets its own
+        // pseudo-course id the same way -- topic_id carries the Ünite
+        // number instead of being cleared, since that's the one thing this
+        // type actually needs to remember.
+        course_id: input.taskType === "reading" ? "kitap-okuma" : input.taskType === "vocab_quiz" ? "ingilizce-quiz" : input.courseId || null,
         topic_id: input.taskType === "reading" ? null : input.topicId || null,
         total_count: input.totalCount ?? null,
         duration_minutes: input.durationMinutes ?? null,
@@ -1540,7 +1562,7 @@ export async function assignRoutineToWeek(input: AssignTaskInput & { studentId: 
 // --- Student detail: schedule workspace (edit/duplicate/move/delete) -----
 
 const updateAssignedTaskSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading"]).optional(),
+  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]).optional(),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -1587,16 +1609,24 @@ export async function updateAssignedTask(
   // Read before the update -- if this edit reassigns course/topic, the
   // OLD bucket (course_id/topic_id as they stood before this write) would
   // otherwise keep a stale count forever, since nothing else would ever
-  // re-touch it once the row moves to a different bucket.
-  const { data: taskBefore } = await supabase.from("student_tasks").select("course_id, topic_id").eq("id", taskIdV).maybeSingle();
+  // re-touch it once the row moves to a different bucket. total_count is
+  // read too, purely so a vocab_quiz title rebuild below has a fallback
+  // value when only topicId (the Ünite) changed this save, not the count.
+  const { data: taskBefore } = await supabase
+    .from("student_tasks")
+    .select("course_id, topic_id, total_count")
+    .eq("id", taskIdV)
+    .maybeSingle();
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input_.taskType !== undefined) patch.task_type = input_.taskType;
   if (input_.courseId !== undefined) {
     // Forced, same as buildTaskRows at create time -- a "reading" task
     // always lands in the Rutinler lane via the "kitap-okuma" pseudo-course,
-    // regardless of what courseId the form happened to send.
-    patch.course_id = input_.taskType === "reading" ? "kitap-okuma" : input_.courseId || null;
+    // and a "vocab_quiz" one via "ingilizce-quiz", regardless of what
+    // courseId the form happened to send.
+    patch.course_id =
+      input_.taskType === "reading" ? "kitap-okuma" : input_.taskType === "vocab_quiz" ? "ingilizce-quiz" : input_.courseId || null;
   }
   if (input_.topicId !== undefined) patch.topic_id = input_.taskType === "reading" ? null : input_.topicId || null;
   if (input_.totalCount !== undefined) patch.total_count = input_.totalCount;
@@ -1605,6 +1635,10 @@ export async function updateAssignedTask(
   if (input_.description !== undefined) patch.description = input_.description?.trim() || null;
   if (input_.taskType === "general_exam") {
     patch.title = buildGeneralExamTitle(input_.generalExamTrack, input_.generalExamPublisher);
+  } else if (input_.taskType === "vocab_quiz" && (input_.topicId !== undefined || input_.totalCount !== undefined)) {
+    const unitTopicId = input_.topicId !== undefined ? input_.topicId : taskBefore?.topic_id;
+    const count = input_.totalCount !== undefined ? input_.totalCount : taskBefore?.total_count;
+    patch.title = buildVocabQuizTitle(unitTopicId, count);
   } else if (
     input_.taskType === "branch_exam" &&
     (input_.courseId !== undefined || input_.topicId !== undefined || input_.branchExamPublisher !== undefined)

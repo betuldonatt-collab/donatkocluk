@@ -28,6 +28,10 @@ describe("lgsCompletionProblem", () => {
     );
   });
 
+  it("İngilizce Kelime Quizi is always ready -- it never completes through this path, it's marked done directly by the quiz action", () => {
+    expect(lgsCompletionProblem({ ...base, taskType: "vocab_quiz", photoCount: 0, correct: null })).toBeNull();
+  });
+
   it("needs Doğru/Yanlış/Boş for Soru Çözümü and Branş Denemesi (0 counts, blank does not)", () => {
     for (const taskType of ["question_bank", "branch_exam"]) {
       expect(lgsCompletionProblem({ ...base, taskType })).toMatch(/doğru, yanlış ve boş/);

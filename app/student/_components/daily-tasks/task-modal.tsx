@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Languages, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -374,6 +375,12 @@ function TaskModalBody({
   const isTytBranchExam = task.task_type === "branch_exam" && task.course_id?.startsWith("tyt-");
   const showAnalysisFlow = task.task_type === "branch_exam" || task.task_type === "general_exam";
   const isReading = task.task_type === "reading";
+  // İngilizce Kelime Quizi is never edited from this modal -- it self-
+  // completes from app/student/ingilizce-quiz's own quiz session the
+  // moment its word-count target is reached (submitVocabAnswer). This
+  // modal only ever shows its progress read-only, with a link to go
+  // actually work on it -- see the dedicated early return below.
+  const isVocabQuiz = task.task_type === "vocab_quiz";
 
   // Whether this video/topic-study task also carries a real question-count
   // target (set by the coach or the student at creation time -- see
@@ -799,6 +806,52 @@ function TaskModalBody({
     } finally {
       setSaving(false);
     }
+  }
+
+  // İngilizce Kelime Quizi never has anything to save here -- it only ever
+  // completes from the quiz page itself (submitVocabAnswer), so this is a
+  // read-only progress view plus a link to go actually work on it, always
+  // (not just under a locked week).
+  if (isVocabQuiz) {
+    const unit = Number(task.topic_id) || 1;
+    return (
+      <>
+        <DialogHeader className="shrink-0">
+          <DialogTitle>{task.title}</DialogTitle>
+          <DialogDescription>İngilizce Kelime Quizi</DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-3">
+            <ReadOnlyField label="Hedef" value={task.total_count} />
+            <ReadOnlyField label="Doğru Bilinen" value={task.correct_count} />
+          </div>
+
+          <p className="text-foreground text-sm">
+            Görev Durumu:{" "}
+            <span className="font-medium">
+              {task.status === "done" ? "Yapıldı" : task.status === "half_done" ? "Yarım Yapıldı" : "Bekliyor"}
+            </span>
+          </p>
+
+          {task.status !== "done" && (
+            <Link
+              href="/student/ingilizce-quiz"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors"
+            >
+              <Languages className="size-4" />
+              {unit}. Üniteye Git
+            </Link>
+          )}
+        </div>
+
+        <DialogFooter className="shrink-0 border-t pt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Kapat
+          </Button>
+        </DialogFooter>
+      </>
+    );
   }
 
   // The week this task belongs to has been locked by the coach -- render

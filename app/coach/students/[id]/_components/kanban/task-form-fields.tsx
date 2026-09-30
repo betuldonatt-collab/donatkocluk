@@ -181,7 +181,8 @@ function isAssignableType(t: string): t is AssignableTaskType {
     t === "branch_exam" ||
     t === "general_exam" ||
     t === "video" ||
-    t === "reading"
+    t === "reading" ||
+    t === "vocab_quiz"
   );
 }
 
@@ -267,8 +268,8 @@ export function taskFormValueToPayload(value: TaskFormValue) {
     // Forced here too (not just server-side) so the drawer's own local
     // state (e.g. the resource picker's course-scoped pool) never reads a
     // stale courseId left over from whichever type was selected before
-    // switching to Kitap Okuma.
-    courseId: value.taskType === "reading" ? "kitap-okuma" : value.courseId || null,
+    // switching to Kitap Okuma / İngilizce Kelime Quizi.
+    courseId: value.taskType === "reading" ? "kitap-okuma" : value.taskType === "vocab_quiz" ? "ingilizce-quiz" : value.courseId || null,
     topicId: value.taskType === "reading" ? null : value.topicId || null,
     totalCount: numberOrNull(value.totalCount),
     durationMinutes: numberOrNull(value.durationMinutes),
@@ -389,6 +390,12 @@ export function TaskFormFields({
   const isGeneralExam = value.taskType === "general_exam";
   const isBranchExam = value.taskType === "branch_exam";
   const isReading = value.taskType === "reading";
+  const isVocabQuiz = value.taskType === "vocab_quiz";
+  // "İngilizce Kelime Quizi" is LGS-only -- offered as one more Görev Türü
+  // option (unlike Kitap Okuma, it's a one-off assignable target, not a
+  // daily Rutinler-lane routine, so it belongs in this same dropdown as
+  // Branş/Genel Deneme rather than behind the separate Rutin Türü pill).
+  const taskTypeOptions = isLgs ? [...TASK_TYPE_OPTIONS, { value: "vocab_quiz" as const, label: "İngilizce Kelime Quizi" }] : TASK_TYPE_OPTIONS;
   // Macro ("whole fruit") subjects lead the Ders picker, atomic ("sliced")
   // ones follow -- ALL_COURSES itself stays atomic-first (its [0] is the
   // universal fallback default for every OTHER task type), so the reorder
@@ -423,11 +430,11 @@ export function TaskFormFields({
   // "Kitap Okuma" has no course/topic/resource either (the book name IS
   // the title, see the dedicated Kitap Adı field below) -- Sayfa Sayısı
   // reuses the same count field question_bank's Soru Sayısı does.
-  const showCourse = !hideCourseTopic && !isGeneralExam && !isReading;
-  const showTopic = !hideCourseTopic && !isGeneralExam && !isBranchExam && !isReading;
-  const showCount = !isGeneralExam;
-  const showDuration = !isGeneralExam;
-  const showVideoLinks = !isGeneralExam && !isReading;
+  const showCourse = !hideCourseTopic && !isGeneralExam && !isReading && !isVocabQuiz;
+  const showTopic = !hideCourseTopic && !isGeneralExam && !isBranchExam && !isReading && !isVocabQuiz;
+  const showCount = !isGeneralExam && !isVocabQuiz;
+  const showDuration = !isGeneralExam && !isVocabQuiz;
+  const showVideoLinks = !isGeneralExam && !isReading && !isVocabQuiz;
 
   function set(patch: Partial<TaskFormValue>) {
     onChange({ ...value, ...patch });
@@ -482,10 +489,16 @@ export function TaskFormFields({
                 // an extra "Kaynak Ekle" click.
                 resources: taskType === "branch_exam" ? [emptyResourceRow()] : [],
                 totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
+                // Ünite defaults to 1 the moment the select would otherwise
+                // show "1. Ünite" without topicId actually holding "1" --
+                // it's what identifies which unit the task targets, so it
+                // has to be a real value, not just the picker's own display
+                // fallback.
+                topicId: taskType === "vocab_quiz" && !value.topicId ? "1" : value.topicId,
               });
             }}
           >
-            {TASK_TYPE_OPTIONS.map((opt) => (
+            {taskTypeOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -541,6 +554,45 @@ export function TaskFormFields({
             onChange={(e) => set({ bookTitle: e.target.value })}
             placeholder="Örn: Fatih Harbiye"
           />
+        </div>
+      )}
+
+      {/* İngilizce Kelime Quizi has no Ders/Konu combobox of its own -- just
+          which of the 10 Üniteler to target. Stored directly in topicId
+          (a plain "3", not a curriculum topic id) since this pseudo-course
+          has no curriculum entry to pick a real one from -- see
+          buildVocabQuizTitle, app/coach/actions.ts. */}
+      {isVocabQuiz && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="task-form-vocab-unit">Ünite</Label>
+            <select
+              id="task-form-vocab-unit"
+              className={selectClassName()}
+              value={value.topicId || "1"}
+              onChange={(e) => set({ topicId: e.target.value })}
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}. Ünite
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="task-form-vocab-count" className="text-sm font-semibold">
+              Kelime Sayısı
+            </Label>
+            <Input
+              id="task-form-vocab-count"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={value.totalCount}
+              onChange={(e) => set({ totalCount: e.target.value })}
+              placeholder="Örn: 30"
+            />
+          </div>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
+import { computeAutoTaskStatus } from "@/lib/count-fields";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
@@ -18,8 +19,9 @@ import { selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/
 // isMastered on success tells the UI whether THIS answer was the one that
 // crossed the streak-of-3 threshold, so the dashboard's mastered count can
 // bump exactly once, right when it actually happens -- not on every
-// correct answer.
-type SubmitAnswerResult = { ok: true; isMastered: boolean } | { ok: false; error: string };
+// correct answer. taskCompleted is the same idea for an assigned
+// vocab_quiz task's own word-count target (see activeTaskId below).
+type SubmitAnswerResult = { ok: true; isMastered: boolean; taskCompleted: boolean } | { ok: false; error: string };
 
 async function requireUserId() {
   await assertNotImpersonating();
@@ -78,11 +80,54 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
   return selectQuizBatch(words, progressByWordId, limitV);
 }
 
+export type ActiveVocabQuizTask = { id: string; target: number; current: number };
+
+// The one coach-assigned "N. Ünite - M Kelime" task (if any) still open for
+// this unit -- Ders Atama (task-form-fields.tsx) stores it as task_type
+// 'vocab_quiz', course_id "ingilizce-quiz", topic_id the Ünite number as
+// plain text, total_count the word-count target. Not started/mastered by
+// the coach at all beyond that: correct_count climbs by one per correct
+// quiz answer (submitVocabAnswer below) until it reaches total_count, at
+// which point the task is marked done and stops showing up here.
+export async function getActiveVocabQuizTask(unitNumber: number): Promise<ActiveVocabQuizTask | null> {
+  const unitV = parseInput(unitNumberSchema, unitNumber);
+  const { supabase, userId } = await requireUserIdReadOnly();
+  const { data, error } = await supabase
+    .from("student_tasks")
+    .select("id, total_count, correct_count")
+    .eq("student_id", userId)
+    .eq("task_type", "vocab_quiz")
+    .eq("topic_id", String(unitV))
+    .neq("status", "done")
+    .not("total_count", "is", null)
+    .order("task_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw dbError(error);
+  if (!data || data.total_count === null) return null;
+  return { id: data.id, target: data.total_count, current: data.correct_count ?? 0 };
+}
+
 // Upserts this student's streak for one word: correct extends it by one
-// (mastered once it reaches 3), incorrect resets it to 0. last_tested_at
-// always moves to now, whichever way it went -- both feed selectQuizBatch's
-// own prioritization on the NEXT batch fetch.
-export async function submitVocabAnswer(wordId: string, isCorrect: boolean): Promise<SubmitAnswerResult> {
+// (mastered once it reaches 3), incorrect (including a "Pas Geç" skip --
+// the caller passes isCorrect: false for that too) resets it to 0.
+// last_tested_at always moves to now, whichever way it went -- both feed
+// selectQuizBatch's own prioritization on the NEXT batch fetch.
+//
+// activeTaskId (getActiveVocabQuizTask above) additionally bumps that
+// assigned task's own correct_count by one -- but ONLY on a correct
+// answer; a miss/skip resets the WORD's own streak, never the task's
+// cumulative progress toward its target, since the target is "answer N
+// correctly", not "N correct in a row". Marks the task done the moment it
+// reaches its target, same computeAutoTaskStatus every other count-driven
+// task type already uses -- an LGS vocab_quiz task is exempted from the
+// Kanıt Fotoğrafı/evidence-hold gate entirely (lgsCompletionProblem), so
+// this can set status/completed directly with no extra approval step.
+export async function submitVocabAnswer(
+  wordId: string,
+  isCorrect: boolean,
+  activeTaskId?: string | null,
+): Promise<SubmitAnswerResult> {
   try {
     const wordIdV = parseInput(uuidSchema, wordId);
     const isCorrectV = parseInput(z.boolean(), isCorrect);
@@ -110,8 +155,38 @@ export async function submitVocabAnswer(wordId: string, isCorrect: boolean): Pro
     );
     if (error) throw dbError(error);
 
+    let taskCompleted = false;
+    if (isCorrectV && activeTaskId) {
+      const activeTaskIdV = parseInput(uuidSchema, activeTaskId);
+      const { data: task, error: taskFetchError } = await supabase
+        .from("student_tasks")
+        .select("student_id, total_count, correct_count, status")
+        .eq("id", activeTaskIdV)
+        .maybeSingle();
+      if (taskFetchError) throw dbError(taskFetchError);
+      // Silently skipped, not an error: the task may have been completed
+      // or removed by the coach between this batch loading and this
+      // answer -- the word's own streak above is already saved either way.
+      if (task && task.student_id === userId && task.total_count !== null && task.status !== "done") {
+        const nextCorrect = Math.min((task.correct_count ?? 0) + 1, task.total_count);
+        const status = computeAutoTaskStatus(task.total_count, nextCorrect, 0, 0);
+        taskCompleted = status === "done";
+        const { error: taskUpdateError } = await supabase
+          .from("student_tasks")
+          .update({
+            correct_count: nextCorrect,
+            status: status ?? task.status,
+            completed: taskCompleted,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", activeTaskIdV);
+        if (taskUpdateError) throw dbError(taskUpdateError);
+      }
+    }
+
     revalidatePath("/student/ingilizce-quiz");
-    return { ok: true, isMastered };
+    revalidatePath("/student");
+    return { ok: true, isMastered, taskCompleted };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }

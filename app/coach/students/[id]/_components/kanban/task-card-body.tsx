@@ -14,6 +14,7 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   general_exam: "Genel Deneme",
   extra_custom: "Ekstra Çalışma",
   reading: "Kitap Okuma",
+  vocab_quiz: "İngilizce Kelime Quizi",
 };
 
 export function courseLabel(courseId: string | null) {
@@ -74,6 +75,16 @@ function readingPageRangeText(task: DetailTask): string | null {
   return `${task.start_page}-${task.end_page}. sayfa (${total} sayfa okundu)`;
 }
 
+// İngilizce Kelime Quizi's own progress line -- correct_count climbs one at
+// a time as the student answers correctly in the quiz (see submitVocabAnswer,
+// app/student/ingilizce-quiz/actions.ts), until it reaches the coach's own
+// total_count target and the task auto-completes. Never edited by hand on
+// either panel, so this is read-only by construction.
+function vocabQuizProgressText(task: DetailTask): string | null {
+  if (task.task_type !== "vocab_quiz" || task.total_count === null) return null;
+  return `${task.correct_count ?? 0}/${task.total_count} kelime doğru`;
+}
+
 function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>): string {
   // The generic type label ("Soru Çözümü") is a placeholder for what's
   // actually assigned -- once real resources are linked, their names are
@@ -83,7 +94,8 @@ function subtitleText(task: DetailTask, resourceNameById?: Map<string, string>):
     .map((id) => resourceNameById?.get(id))
     .filter((name): name is string => !!name);
   const base = resourceNames.length > 0 ? resourceNames.join(" + ") : (TASK_TYPE_LABELS[task.task_type] ?? task.task_type);
-  const countUnit = task.task_type === "branch_exam" ? "adet" : task.task_type === "reading" ? "sayfa" : "soru";
+  const countUnit =
+    task.task_type === "branch_exam" ? "adet" : task.task_type === "reading" ? "sayfa" : task.task_type === "vocab_quiz" ? "kelime" : "soru";
   const count = task.total_count !== null ? ` · ${task.total_count} ${countUnit}` : "";
   const duration = task.duration_minutes !== null ? ` · ${task.duration_minutes} dk` : "";
   return `${base}${count}${duration}`;
@@ -139,6 +151,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
   const pageRange = readingPageRangeText(task);
+  const vocabProgress = vocabQuizProgressText(task);
 
   return (
     <div className="min-w-0 flex-1 space-y-1">
@@ -160,6 +173,7 @@ export function TaskCardBody({ task, resourceNameById }: { task: DetailTask; res
       <p className="text-muted-foreground text-[11px] leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
 
       {pageRange && <p className="text-muted-foreground text-[11px] leading-snug break-words">{pageRange}</p>}
+      {vocabProgress && <p className="text-muted-foreground text-[11px] leading-snug break-words">{vocabProgress}</p>}
 
       <CardVideoLinks videoLinks={task.video_links} />
     </div>
@@ -173,6 +187,7 @@ export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTa
   const cLabel = courseLabel(task.course_id);
   const topic = findTopicById(task.course_id, task.topic_id);
   const pageRange = readingPageRangeText(task);
+  const vocabProgress = vocabQuizProgressText(task);
 
   return (
     <div className="space-y-1.5">
@@ -189,6 +204,7 @@ export function TaskCardHoverDetail({ task, resourceNameById }: { task: DetailTa
       <p className="text-muted-foreground text-xs leading-snug break-words">{subtitleText(task, resourceNameById)}</p>
 
       {pageRange && <p className="text-muted-foreground text-xs leading-snug break-words">{pageRange}</p>}
+      {vocabProgress && <p className="text-muted-foreground text-xs leading-snug break-words">{vocabProgress}</p>}
 
       {task.video_links.length > 0 && (
         <div className="flex flex-col items-start gap-1 pt-0.5">

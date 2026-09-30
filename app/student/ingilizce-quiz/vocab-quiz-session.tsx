@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, PartyPopper, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, PartyPopper, SkipForward, Sparkles, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { checkVocabAnswer, type AnswerResult, type QuizDirection, type QuizWord } from "@/lib/lgs-vocab";
-import { getVocabQuizBatch, submitVocabAnswer } from "./actions";
+import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
 
 type BatchWord = QuizWord & { direction: QuizDirection };
 
@@ -40,11 +40,13 @@ const FEEDBACK_STYLES: Record<AnswerResult, { banner: string; Icon: typeof Check
   },
 };
 
-// One unit's quiz, start to finish: fetch a batch, ask each word (random
-// direction per word), give immediate feedback, then a summary screen
-// whose "Çalışmaya Devam Et" fetches the next batch in place -- no route
-// change, so it's instant. Lives entirely inside VocabQuizDashboard, which
-// swaps this in for the unit grid while active.
+// One unit's quiz, start to finish: fetch a batch (plus any coach-assigned
+// word-count target still open for this unit), ask each word (random
+// direction per word), give immediate feedback -- no auto-advance, the
+// student always clicks through it -- then a summary screen whose
+// "Çalışmaya Devam Et" fetches the next batch in place -- no route change,
+// so it's instant. Lives entirely inside VocabQuizDashboard, which swaps
+// this in for the unit grid while active.
 export function VocabQuizSession({
   unitNumber,
   onExit,
@@ -63,12 +65,16 @@ export function VocabQuizSession({
   const [results, setResults] = useState<AnswerResult[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<ActiveVocabQuizTask | null>(null);
+  const [taskJustCompleted, setTaskJustCompleted] = useState(false);
 
   async function loadBatch() {
     setPhase("loading");
     setLoadError(null);
+    setTaskJustCompleted(false);
     try {
-      const words = await getVocabQuizBatch(unitNumber);
+      const [words, task] = await Promise.all([getVocabQuizBatch(unitNumber), getActiveVocabQuizTask(unitNumber)]);
+      setActiveTask(task);
       if (words.length === 0) {
         setPhase("empty");
         return;
@@ -95,28 +101,53 @@ export function VocabQuizSession({
 
   const current = batch[index];
 
-  async function handleSubmitAnswer(e: React.FormEvent) {
-    e.preventDefault();
-    if (!current || feedback || submitting) return;
-    const { correctAnswer } = promptFor(current);
-    const result = checkVocabAnswer(answer, correctAnswer, current.direction);
+  async function recordAnswer(result: AnswerResult, correctAnswer: string) {
+    if (!current) return;
     setFeedback({ result, correctAnswer });
     setResults((prev) => [...prev, result]);
 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const outcome = await submitVocabAnswer(current.id, result !== "INCORRECT");
+      const outcome = await submitVocabAnswer(current.id, result !== "INCORRECT", activeTask?.id);
       if (!outcome.ok) {
         setSubmitError(outcome.error);
-      } else if (outcome.isMastered) {
-        onWordMastered();
+      } else {
+        if (outcome.isMastered) onWordMastered();
+        // Keeps the "Görev: X/Y kelime" counter live within this session --
+        // a correct answer that actually counted toward the task (one
+        // exists, and this answer wasn't just skipped/wrong) bumps it by
+        // one, capped at the target the same way the server does.
+        if (result !== "INCORRECT") {
+          setActiveTask((prev) => (prev ? { ...prev, current: Math.min(prev.current + 1, prev.target) } : prev));
+        }
+        // Immediately, the moment this answer crosses the assigned task's
+        // own target -- overrides the normal next-word flow below (see
+        // the congrats block in the "quiz" render).
+        if (outcome.taskCompleted) setTaskJustCompleted(true);
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "İlerleme kaydedilemedi, tekrar dene.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmitAnswer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!current || feedback || submitting) return;
+    const { correctAnswer } = promptFor(current);
+    await recordAnswer(checkVocabAnswer(answer, correctAnswer, current.direction), correctAnswer);
+  }
+
+  // Pas Geç: mathematically an incorrect answer (resets the word's streak,
+  // never the assigned task's cumulative progress -- see submitVocabAnswer)
+  // -- but never silent about it. The correct answer is revealed exactly
+  // like a genuine wrong answer, same halt-until-acknowledged flow.
+  async function handleSkip() {
+    if (!current || feedback || submitting) return;
+    const { correctAnswer } = promptFor(current);
+    await recordAnswer("INCORRECT", correctAnswer);
   }
 
   function handleNext() {
@@ -197,14 +228,22 @@ export function VocabQuizSession({
   if (!current) return null;
   const { promptLabel, prompt, answerLabel, correctAnswer } = promptFor(current);
   const feedbackStyle = feedback ? FEEDBACK_STYLES[feedback.result] : null;
+  const isLast = index + 1 >= batch.length;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">{unitNumber}. Ünite</CardTitle>
-        <span className="text-muted-foreground text-xs tabular-nums">
-          Kelime {index + 1}/{batch.length}
-        </span>
+        <div className="flex items-center gap-3 text-xs">
+          {activeTask && (
+            <span className="text-muted-foreground tabular-nums">
+              Görev: {activeTask.current}/{activeTask.target} kelime
+            </span>
+          )}
+          <span className="text-muted-foreground tabular-nums">
+            Kelime {index + 1}/{batch.length}
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
@@ -227,9 +266,15 @@ export function VocabQuizSession({
             className="text-base"
           />
           {!feedback && (
-            <Button type="submit" className="w-full" disabled={!answer.trim()}>
-              Kontrol Et
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1" disabled={!answer.trim() || submitting}>
+                Kontrol Et
+              </Button>
+              <Button type="button" variant="outline" onClick={handleSkip} disabled={submitting}>
+                <SkipForward className="size-4" />
+                Pas Geç
+              </Button>
+            </div>
           )}
         </form>
 
@@ -242,10 +287,32 @@ export function VocabQuizSession({
 
         {submitError && <p className="text-destructive text-xs">{submitError}</p>}
 
-        {feedback && (
-          <Button type="button" className="w-full" onClick={handleNext}>
-            {index + 1 >= batch.length ? "Turu Bitir" : "Sonraki Kelime"}
-          </Button>
+        {/* The moment this word's answer crossed the assigned task's own
+            target, this REPLACES the normal Sonraki/Anladım button below --
+            "immediately", per the coach's own request, not after finishing
+            the rest of whatever batch happened to be loaded. */}
+        {feedback && taskJustCompleted ? (
+          <div className="space-y-3 rounded-md border border-amber-400/50 bg-amber-500/10 p-3">
+            <p className="flex items-start gap-2 text-sm text-amber-800">
+              <Sparkles className="mt-0.5 size-4 shrink-0" />
+              Bugün atanan görevlerini tamamladın, tebrikler! 🌟 İstersen çalışmaya devam edebilirsin.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={loadBatch}>
+                Çalışmaya Devam Et
+              </Button>
+              <Button type="button" variant="outline" onClick={onExit}>
+                <ArrowLeft className="size-4" />
+                Ünitelere Dön
+              </Button>
+            </div>
+          </div>
+        ) : (
+          feedback && (
+            <Button type="button" className="w-full" onClick={handleNext}>
+              {isLast ? "Turu Bitir" : feedback.result === "INCORRECT" ? "Anladım" : "Sonraki Kelime"}
+            </Button>
+          )
         )}
 
         <button type="button" onClick={onExit} className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline">
