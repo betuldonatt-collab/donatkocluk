@@ -1,0 +1,82 @@
+"use client";
+
+import { useState } from "react";
+import { BookOpenCheck, Trophy } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import type { UnitStat } from "@/lib/lgs-vocab";
+import { VocabQuizSession } from "./vocab-quiz-session";
+
+function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
+  const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+  const complete = stat.total > 0 && stat.mastered === stat.total;
+  return (
+    <Card className={cn(complete && "border-emerald-500/50 bg-emerald-500/5")}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base">{stat.unitNumber}. Ünite</CardTitle>
+        {complete && <Trophy className="size-4 text-emerald-600" />}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1.5">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="text-muted-foreground">Öğrenildi</span>
+            <span className="text-foreground font-medium tabular-nums">
+              {stat.mastered}/{stat.total}
+            </span>
+          </div>
+          <div className="bg-secondary h-1.5 overflow-hidden rounded-full" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="bg-primary h-full rounded-full transition-[width]" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <Button type="button" className="w-full" onClick={onStart} disabled={stat.total === 0}>
+          {stat.total === 0 ? "Kelime Yok" : "Quize Başla"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Dashboard <-> active quiz session, all in one page (no route change) so
+// "Çalışmaya Devam Et" (VocabQuizSession's own continue button) can fetch
+// the next batch instantly instead of a full navigation.
+export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: UnitStat[] }) {
+  const [unitStats, setUnitStats] = useState(initialUnitStats);
+  const [activeUnit, setActiveUnit] = useState<number | null>(null);
+
+  // Called whenever a word transitions to mastered during a session, so the
+  // dashboard's own counters are correct the moment the student exits back
+  // to it -- without needing a full server round-trip/page reload.
+  function handleWordMastered(unitNumber: number) {
+    setUnitStats((prev) => prev.map((s) => (s.unitNumber === unitNumber ? { ...s, mastered: s.mastered + 1 } : s)));
+  }
+
+  if (activeUnit !== null) {
+    return (
+      <VocabQuizSession
+        unitNumber={activeUnit}
+        onExit={() => setActiveUnit(null)}
+        onWordMastered={() => handleWordMastered(activeUnit)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <BookOpenCheck className="text-primary size-6" />
+        <div>
+          <h1 className="text-foreground text-xl font-semibold">İngilizce Kelime Quizi</h1>
+          <p className="text-muted-foreground text-sm">Bir ünite seç ve kelimeleri tekrar et.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {unitStats.map((stat) => (
+          <UnitCard key={stat.unitNumber} stat={stat} onStart={() => setActiveUnit(stat.unitNumber)} />
+        ))}
+      </div>
+    </div>
+  );
+}

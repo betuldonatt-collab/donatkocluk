@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
+  Languages,
   Library,
   Settings,
   Target,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { href: "/student/kaynak-takibi", label: "Kaynak Takibi", icon: BookOpenCheck },
   { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", icon: CalendarClock },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", icon: BarChart3 },
+  { href: "/student/ingilizce-quiz", label: "İngilizce Quiz", icon: Languages },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", icon: Library },
   { href: "/student/profile", label: "Profilim", icon: UserCircle },
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
@@ -38,6 +40,9 @@ const NAV_ITEMS = [
 
 // Only the YKS past-questions page stays hidden for 9th graders.
 const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
+// İngilizce Quiz is LGS-only -- a YKS (or Maarif 9th/10th grade) student
+// never sees it at all.
+const LGS_ONLY_HREFS = new Set(["/student/ingilizce-quiz"]);
 
 export function StudentSidebar({
   fullName = null,
@@ -54,14 +59,17 @@ export function StudentSidebar({
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
   const isMobile = useIsMobileViewport();
   const effectiveCollapsed = collapsed && !isMobile;
-  // LGS students get every page a YKS student does; only the Paragraf/
-  // Problem page is renamed (it is Paragraf / Kitap Okuma for them).
-  const navItems = NAV_ITEMS.filter((item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href))).map((item) =>
-    examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item,
-  );
+  // LGS students get every page a YKS student does, PLUS İngilizce Quiz
+  // (LGS-only); only the Paragraf/Problem page is renamed (it is Paragraf
+  // / Kitap Okuma for them).
+  const navItems = NAV_ITEMS.filter(
+    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
+  ).map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
 
   // The guided tour walks the same list -- same rename.
-  const tourItems = STUDENT_NAV_ITEMS.filter((item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href))).map((item) =>
+  const tourItems = STUDENT_NAV_ITEMS.filter(
+    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
+  ).map((item) =>
     examType === "LGS" && item.href === "/student/paragraf-problem"
       ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
       : item,
