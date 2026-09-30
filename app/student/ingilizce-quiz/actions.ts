@@ -10,12 +10,20 @@ import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
 
-// Writes return their outcome instead of throwing (same convention as
-// app/student/paragraf-problem/lgs-actions.ts's SaveResult) -- a thrown
-// message is stripped to a generic one once it crosses the Server Action
-// boundary in a production build. Reads (getVocabQuizBatch below) throw
-// directly, same as that file's own getMoreLgsEntries -- the caller wraps
-// them in its own try/catch when it needs a friendly message instead.
+// Every action here returns its outcome instead of throwing -- reads
+// included, unlike app/student/paragraf-problem/lgs-actions.ts's
+// getMoreLgsEntries (which throws and relies on its caller's own
+// try/catch). That worked there because nothing renders the caught
+// error's raw .message; this feature's own quiz session does, straight
+// into the card, and a THROWN error's real message is stripped to an
+// opaque "Minified React error #441..." once it crosses the Server Action
+// boundary in a production build -- silently swapping every friendly
+// Turkish message this file writes for that instead. Returning the
+// outcome as a plain value sidesteps that entirely: it's just data, never
+// treated as an "error" crossing the boundary, so it always reaches the
+// client exactly as written.
+type GetVocabQuizBatchResult = { ok: true; words: QuizWord[] } | { ok: false; error: string };
+type GetActiveVocabQuizTaskResult = { ok: true; task: ActiveVocabQuizTask | null } | { ok: false; error: string };
 // isMastered on success tells the UI whether THIS answer was the one that
 // crossed the streak-of-3 threshold, so the dashboard's mastered count can
 // bump exactly once, right when it actually happens -- not on every
@@ -51,33 +59,37 @@ const batchLimitSchema = z.number().int().min(1).max(50);
 // no per-student scoping to push down, and a left-join-with-null-or-false
 // filter across two tables isn't a single clean PostgREST filter, while
 // this is a handful of rows either way (a unit's word list is small).
-export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise<QuizWord[]> {
-  const unitV = parseInput(unitNumberSchema, unitNumber);
-  const limitV = parseInput(batchLimitSchema, limit);
-  const { supabase, userId } = await requireUserIdReadOnly();
+export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise<GetVocabQuizBatchResult> {
+  try {
+    const unitV = parseInput(unitNumberSchema, unitNumber);
+    const limitV = parseInput(batchLimitSchema, limit);
+    const { supabase, userId } = await requireUserIdReadOnly();
 
-  const { data: words, error: wordsError } = await supabase
-    .from("lgs_words")
-    .select("id, english_word, turkish_meaning")
-    .eq("unit_number", unitV);
-  if (wordsError) throw dbError(wordsError);
-  if (!words || words.length === 0) return [];
+    const { data: words, error: wordsError } = await supabase
+      .from("lgs_words")
+      .select("id, english_word, turkish_meaning")
+      .eq("unit_number", unitV);
+    if (wordsError) throw dbError(wordsError);
+    if (!words || words.length === 0) return { ok: true, words: [] };
 
-  const wordIds = words.map((w) => w.id);
-  const { data: progressRows, error: progressError } = await supabase
-    .from("student_word_progress")
-    .select("word_id, correct_streak, is_mastered, last_tested_at")
-    .eq("student_id", userId)
-    .in("word_id", wordIds);
-  if (progressError) throw dbError(progressError);
+    const wordIds = words.map((w) => w.id);
+    const { data: progressRows, error: progressError } = await supabase
+      .from("student_word_progress")
+      .select("word_id, correct_streak, is_mastered, last_tested_at")
+      .eq("student_id", userId)
+      .in("word_id", wordIds);
+    if (progressError) throw dbError(progressError);
 
-  const progressByWordId = new Map<string, WordProgressSummary>(
-    (progressRows ?? []).map((p) => [
-      p.word_id,
-      { correct_streak: p.correct_streak, is_mastered: p.is_mastered, last_tested_at: p.last_tested_at },
-    ]),
-  );
-  return selectQuizBatch(words, progressByWordId, limitV);
+    const progressByWordId = new Map<string, WordProgressSummary>(
+      (progressRows ?? []).map((p) => [
+        p.word_id,
+        { correct_streak: p.correct_streak, is_mastered: p.is_mastered, last_tested_at: p.last_tested_at },
+      ]),
+    );
+    return { ok: true, words: selectQuizBatch(words, progressByWordId, limitV) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
 }
 
 export type ActiveVocabQuizTask = { id: string; target: number; current: number };
@@ -89,23 +101,27 @@ export type ActiveVocabQuizTask = { id: string; target: number; current: number 
 // the coach at all beyond that: correct_count climbs by one per correct
 // quiz answer (submitVocabAnswer below) until it reaches total_count, at
 // which point the task is marked done and stops showing up here.
-export async function getActiveVocabQuizTask(unitNumber: number): Promise<ActiveVocabQuizTask | null> {
-  const unitV = parseInput(unitNumberSchema, unitNumber);
-  const { supabase, userId } = await requireUserIdReadOnly();
-  const { data, error } = await supabase
-    .from("student_tasks")
-    .select("id, total_count, correct_count")
-    .eq("student_id", userId)
-    .eq("task_type", "vocab_quiz")
-    .eq("topic_id", String(unitV))
-    .neq("status", "done")
-    .not("total_count", "is", null)
-    .order("task_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw dbError(error);
-  if (!data || data.total_count === null) return null;
-  return { id: data.id, target: data.total_count, current: data.correct_count ?? 0 };
+export async function getActiveVocabQuizTask(unitNumber: number): Promise<GetActiveVocabQuizTaskResult> {
+  try {
+    const unitV = parseInput(unitNumberSchema, unitNumber);
+    const { supabase, userId } = await requireUserIdReadOnly();
+    const { data, error } = await supabase
+      .from("student_tasks")
+      .select("id, total_count, correct_count")
+      .eq("student_id", userId)
+      .eq("task_type", "vocab_quiz")
+      .eq("topic_id", String(unitV))
+      .neq("status", "done")
+      .not("total_count", "is", null)
+      .order("task_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw dbError(error);
+    if (!data || data.total_count === null) return { ok: true, task: null };
+    return { ok: true, task: { id: data.id, target: data.total_count, current: data.correct_count ?? 0 } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
 }
 
 // Upserts this student's streak for one word: correct extends it by one

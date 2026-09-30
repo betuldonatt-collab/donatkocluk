@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ArrowLeft, CheckCircle2, Languages, PartyPopper, SkipForward, Sparkles, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,31 +63,51 @@ export function VocabQuizSession({
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<{ result: AnswerResult; correctAnswer: string } | null>(null);
   const [results, setResults] = useState<AnswerResult[]>([]);
-  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<ActiveVocabQuizTask | null>(null);
   const [taskJustCompleted, setTaskJustCompleted] = useState(false);
+  // Backs the background save that follows every answer (Kontrol Et/Pas
+  // Geç already show feedback synchronously, before this even starts --
+  // see recordAnswer) -- isSaving only ever drives a small, non-blocking
+  // "Kaydediliyor..." hint, never the feedback itself.
+  const [isSaving, startSaveTransition] = useTransition();
 
   async function loadBatch() {
     setPhase("loading");
     setLoadError(null);
     setTaskJustCompleted(false);
+    // Both reads always resolve to a result object, never a thrown
+    // rejection -- see the comment on GetVocabQuizBatchResult in
+    // ./actions.ts for why that matters here specifically. The outer
+    // try/catch below is only a backstop for a genuinely unexpected
+    // failure (e.g. the network call itself never reaching the server),
+    // and deliberately never shows that caught error's own raw message.
     try {
-      const [words, task] = await Promise.all([getVocabQuizBatch(unitNumber), getActiveVocabQuizTask(unitNumber)]);
-      setActiveTask(task);
-      if (words.length === 0) {
+      const [batchResult, taskResult] = await Promise.all([getVocabQuizBatch(unitNumber), getActiveVocabQuizTask(unitNumber)]);
+      if (!batchResult.ok) {
+        setLoadError(batchResult.error);
         setPhase("empty");
         return;
       }
-      setBatch(words.map((w) => ({ ...w, direction: randomDirection() })));
+      // A failed task lookup doesn't block practice -- it just means the
+      // "Görev: X/Y kelime" counter won't show for this load; logged for
+      // diagnosis, not shown, since the batch itself is otherwise ready.
+      setActiveTask(taskResult.ok ? taskResult.task : null);
+      if (!taskResult.ok) console.error("[getActiveVocabQuizTask]", taskResult.error);
+
+      if (batchResult.words.length === 0) {
+        setPhase("empty");
+        return;
+      }
+      setBatch(batchResult.words.map((w) => ({ ...w, direction: randomDirection() })));
       setIndex(0);
       setAnswer("");
       setFeedback(null);
       setResults([]);
       setSubmitError(null);
       setPhase("quiz");
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Kelimeler yüklenemedi, tekrar dene.");
+    } catch {
+      setLoadError("Kelimeler yüklenemedi, sayfayı yenileyip tekrar dene.");
       setPhase("empty");
     }
   }
@@ -101,18 +121,26 @@ export function VocabQuizSession({
 
   const current = batch[index];
 
-  async function recordAnswer(result: AnswerResult, correctAnswer: string) {
+  // Feedback appears the instant this runs -- setFeedback/setResults below
+  // are the very first thing that happens, synchronously, before the
+  // background save (startSaveTransition) even starts. The save itself
+  // runs as a transition so it never blocks the student from reading their
+  // result or clicking through to the next word.
+  function recordAnswer(result: AnswerResult, correctAnswer: string) {
     if (!current) return;
     setFeedback({ result, correctAnswer });
     setResults((prev) => [...prev, result]);
-
-    setSubmitting(true);
     setSubmitError(null);
-    try {
-      const outcome = await submitVocabAnswer(current.id, result !== "INCORRECT", activeTask?.id);
-      if (!outcome.ok) {
-        setSubmitError(outcome.error);
-      } else {
+
+    const wordId = current.id;
+    const taskId = activeTask?.id;
+    startSaveTransition(async () => {
+      try {
+        const outcome = await submitVocabAnswer(wordId, result !== "INCORRECT", taskId);
+        if (!outcome.ok) {
+          setSubmitError(outcome.error);
+          return;
+        }
         if (outcome.isMastered) onWordMastered();
         // Keeps the "Görev: X/Y kelime" counter live within this session --
         // a correct answer that actually counted toward the task (one
@@ -125,29 +153,27 @@ export function VocabQuizSession({
         // own target -- overrides the normal next-word flow below (see
         // the congrats block in the "quiz" render).
         if (outcome.taskCompleted) setTaskJustCompleted(true);
+      } catch {
+        setSubmitError("İlerleme kaydedilemedi, tekrar dene.");
       }
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "İlerleme kaydedilemedi, tekrar dene.");
-    } finally {
-      setSubmitting(false);
-    }
+    });
   }
 
-  async function handleSubmitAnswer(e: React.FormEvent) {
+  function handleSubmitAnswer(e: React.FormEvent) {
     e.preventDefault();
-    if (!current || feedback || submitting) return;
+    if (!current || feedback) return;
     const { correctAnswer } = promptFor(current);
-    await recordAnswer(checkVocabAnswer(answer, correctAnswer, current.direction), correctAnswer);
+    recordAnswer(checkVocabAnswer(answer, correctAnswer, current.direction), correctAnswer);
   }
 
   // Pas Geç: mathematically an incorrect answer (resets the word's streak,
   // never the assigned task's cumulative progress -- see submitVocabAnswer)
   // -- but never silent about it. The correct answer is revealed exactly
   // like a genuine wrong answer, same halt-until-acknowledged flow.
-  async function handleSkip() {
-    if (!current || feedback || submitting) return;
+  function handleSkip() {
+    if (!current || feedback) return;
     const { correctAnswer } = promptFor(current);
-    await recordAnswer("INCORRECT", correctAnswer);
+    recordAnswer("INCORRECT", correctAnswer);
   }
 
   function handleNext() {
@@ -158,6 +184,7 @@ export function VocabQuizSession({
     setIndex((i) => i + 1);
     setAnswer("");
     setFeedback(null);
+    setSubmitError(null);
   }
 
   if (phase === "loading") {
@@ -270,10 +297,10 @@ export function VocabQuizSession({
           />
           {!feedback && (
             <div className="flex gap-2">
-              <Button type="submit" className="flex-1" disabled={!answer.trim() || submitting}>
+              <Button type="submit" className="flex-1" disabled={!answer.trim()}>
                 Kontrol Et
               </Button>
-              <Button type="button" variant="outline" onClick={handleSkip} disabled={submitting}>
+              <Button type="button" variant="outline" onClick={handleSkip}>
                 <SkipForward className="size-4" />
                 Pas Geç
               </Button>
@@ -288,6 +315,10 @@ export function VocabQuizSession({
           </div>
         )}
 
+        {/* Purely informational -- the feedback above already reflects the
+            answer instantly; this just admits the background save (streak,
+            and the assigned task's own progress) hasn't landed yet. */}
+        {isSaving && !submitError && <p className="text-muted-foreground text-xs">Kaydediliyor...</p>}
         {submitError && <p className="text-destructive text-xs">{submitError}</p>}
 
         {/* The moment this word's answer crossed the assigned task's own
