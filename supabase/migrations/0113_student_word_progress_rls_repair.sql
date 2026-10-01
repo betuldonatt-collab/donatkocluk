@@ -71,10 +71,10 @@ begin
       and tc.table_name = 'student_word_progress'
       and tc.constraint_type = 'UNIQUE'
       and (
-        select array_agg(kcu.column_name order by kcu.column_name)
+        select array_agg(kcu.column_name::text order by kcu.column_name)
         from information_schema.key_column_usage kcu
         where kcu.constraint_name = tc.constraint_name and kcu.table_schema = 'public'
-      ) = array['student_id', 'word_id']
+      ) = array['student_id', 'word_id']::text[]
   ) then
     alter table public.student_word_progress
       add constraint student_word_progress_student_word_unique unique (student_id, word_id);
