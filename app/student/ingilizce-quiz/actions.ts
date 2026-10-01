@@ -1,14 +1,34 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus } from "@/lib/count-fields";
-import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
+import { GENERIC_DB_ERROR } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { selectQuizBatch, WORD_MASTERY_STREAK, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
+
+// Logs the real error server-side (console + Sentry) and, when it carries a
+// Postgres/PostgREST error code (an RLS denial, a missing grant, a check
+// constraint, ...), surfaces that code in the message instead of a fully
+// generic one -- same reasoning as focusActionError in app/student/
+// actions.ts. A bare "Beklenmeyen bir hata oluştu" with no code is
+// impossible to tell apart from "nothing went wrong, you just haven't
+// answered enough right yet" -- exactly what let a genuine write failure on
+// student_word_progress go unnoticed here: EXACT_MATCH auto-advances to the
+// next word in under a second, wiping this message before anyone had a
+// chance to read it, and the generic text gave no reason to suspect
+// anything was actually broken.
+function vocabActionError(label: string, e: unknown): string {
+  console.error(`[${label}] failed:`, e);
+  Sentry.captureException(e);
+  const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : null;
+  if (code) return `Kelime ilerlemesi kaydedilemedi (hata kodu: ${code}).`;
+  return e instanceof Error ? e.message : GENERIC_DB_ERROR;
+}
 
 // Every action here returns its outcome instead of throwing -- reads
 // included, unlike app/student/paragraf-problem/lgs-actions.ts's
@@ -75,7 +95,7 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
       .from("lgs_words")
       .select("id, english_word, turkish_meaning")
       .eq("unit_number", unitV);
-    if (wordsError) throw dbError(wordsError);
+    if (wordsError) throw wordsError;
     if (!words || words.length === 0) return { ok: true, words: [] };
 
     const wordIds = words.map((w) => w.id);
@@ -84,7 +104,7 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
       .select("word_id, correct_streak, is_mastered, last_tested_at")
       .eq("student_id", userId)
       .in("word_id", wordIds);
-    if (progressError) throw dbError(progressError);
+    if (progressError) throw progressError;
 
     const progressByWordId = new Map<string, WordProgressSummary>(
       (progressRows ?? []).map((p) => [
@@ -94,7 +114,7 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
     );
     return { ok: true, words: selectQuizBatch(words, progressByWordId, limitV) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+    return { ok: false, error: vocabActionError("getVocabQuizBatch", e) };
   }
 }
 
@@ -122,11 +142,11 @@ export async function getActiveVocabQuizTask(unitNumber: number): Promise<GetAct
       .order("task_date", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) throw dbError(error);
+    if (error) throw error;
     if (!data || data.total_count === null) return { ok: true, task: null };
     return { ok: true, task: { id: data.id, target: data.total_count, current: data.correct_count ?? 0 } };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+    return { ok: false, error: vocabActionError("getActiveVocabQuizTask", e) };
   }
 }
 
@@ -161,7 +181,7 @@ export async function submitVocabAnswer(
       .eq("student_id", userId)
       .eq("word_id", wordIdV)
       .maybeSingle();
-    if (fetchError) throw dbError(fetchError);
+    if (fetchError) throw fetchError;
 
     const nextStreak = isCorrectV ? (existing?.correct_streak ?? 0) + 1 : 0;
     const isMastered = nextStreak >= WORD_MASTERY_STREAK;
@@ -175,7 +195,7 @@ export async function submitVocabAnswer(
       },
       { onConflict: "student_id,word_id" },
     );
-    if (error) throw dbError(error);
+    if (error) throw error;
 
     let taskCompleted = false;
     if (isCorrectV && activeTaskId) {
@@ -185,7 +205,7 @@ export async function submitVocabAnswer(
         .select("student_id, total_count, correct_count, status")
         .eq("id", activeTaskIdV)
         .maybeSingle();
-      if (taskFetchError) throw dbError(taskFetchError);
+      if (taskFetchError) throw taskFetchError;
       // Silently skipped, not an error: the task may have been completed
       // or removed by the coach between this batch loading and this
       // answer -- the word's own streak above is already saved either way.
@@ -202,7 +222,7 @@ export async function submitVocabAnswer(
             updated_at: new Date().toISOString(),
           })
           .eq("id", activeTaskIdV);
-        if (taskUpdateError) throw dbError(taskUpdateError);
+        if (taskUpdateError) throw taskUpdateError;
       }
     }
 
@@ -210,6 +230,6 @@ export async function submitVocabAnswer(
     revalidatePath("/student");
     return { ok: true, isMastered, taskCompleted, nextStreak };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+    return { ok: false, error: vocabActionError("submitVocabAnswer", e) };
   }
 }

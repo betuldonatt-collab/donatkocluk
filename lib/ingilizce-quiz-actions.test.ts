@@ -112,6 +112,13 @@ describe("submitVocabAnswer", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("surfaces the real Postgres/PostgREST error code in the message instead of a fully generic one (e.g. an RLS denial, 42501)", async () => {
+    state.upsertError = { code: "42501", message: "permission denied" };
+    const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
+    const result = await submitVocabAnswer(WORD, true);
+    if (!result.ok) expect(result.error).toContain("42501");
+  });
+
   it("returns a diagnosable error when an assigned task's own update fails, even though the word's streak already saved", async () => {
     state.taskRow = { student_id: "u1", total_count: 10, correct_count: 0, status: "pending" };
     state.taskUpdateError = { code: "42501", message: "permission denied" };
