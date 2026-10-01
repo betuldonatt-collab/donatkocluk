@@ -93,20 +93,48 @@ export type QuizDirection = "en_to_tr" | "tr_to_en";
 // language `correctAnswer` actually is -- English text lowercased with
 // "tr-TR" gets the Turkish dotless-I rule wrong (a mobile keyboard's
 // auto-capitalized "Item" would wrongly become "ıtem"), and Turkish text
-// lowercased with plain toLowerCase() gets İ/I wrong the other way.
+// lowercased with plain toLowerCase() gets İ/I wrong the other way. Hyphens
+// are stripped outright (not replaced with a space) rather than compared --
+// a compound word's hyphen ("well-known", "x-ray") is easy to drop by
+// accident, and the source data itself sometimes carries one, so stripping
+// it on BOTH sides means a student typing it either way always matches.
 function normalizeForDirection(s: string, direction: QuizDirection): string {
-  return s.trim().toLocaleLowerCase(direction === "tr_to_en" ? "en-US" : "tr-TR");
+  return s
+    .trim()
+    .toLocaleLowerCase(direction === "tr_to_en" ? "en-US" : "tr-TR")
+    .replace(/-/g, "");
 }
 
-// EXACT_MATCH beats a typo check outright. ACCEPTED_TYPO only ever applies
-// typing English (tr_to_en) and only for words over 4 letters, at edit
-// distance <= 1 -- short words have too little room for a 1-character
-// difference to still clearly mean the same word.
+// Some lgs_words rows record more than one acceptable meaning for the same
+// word, slash-separated ("çekici/büyüleyici") -- the student only has to
+// land on ONE of them, not reproduce the whole slash-joined string. Applies
+// to whichever side is being checked against (normally turkish_meaning, for
+// en_to_tr; harmless no-op for a plain single-meaning answer either way).
+function acceptedVariants(correctAnswer: string): string[] {
+  return correctAnswer
+    .split("/")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
+
+// EXACT_MATCH beats a typo check outright, and is checked against every
+// accepted variant (see acceptedVariants above), not just the raw
+// slash-joined string. ACCEPTED_TYPO only ever applies typing English
+// (tr_to_en) and only for a variant over 4 letters, at edit distance <= 1 --
+// short words have too little room for a 1-character difference to still
+// clearly mean the same word. Deliberately NOT extended to en_to_tr: Turkish
+// is the student's native language, so a 1-edit "typo" there is more likely
+// to actually be a different, wrong word than it would be for a foreign
+// word the student is still learning to spell.
 export function checkVocabAnswer(userAnswer: string, correctAnswer: string, direction: QuizDirection): AnswerResult {
   const a = normalizeForDirection(userAnswer, direction);
-  const b = normalizeForDirection(correctAnswer, direction);
-  if (a === b) return "EXACT_MATCH";
-  if (direction === "tr_to_en" && b.length > 4 && levenshteinDistance(a, b) <= 1) return "ACCEPTED_TYPO";
+  const variants = acceptedVariants(correctAnswer).map((v) => normalizeForDirection(v, direction));
+  if (variants.length === 0) return "INCORRECT";
+
+  if (variants.includes(a)) return "EXACT_MATCH";
+  if (direction === "tr_to_en" && variants.some((v) => v.length > 4 && levenshteinDistance(a, v) <= 1)) {
+    return "ACCEPTED_TYPO";
+  }
   return "INCORRECT";
 }
 

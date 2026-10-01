@@ -66,6 +66,29 @@ describe("checkVocabAnswer", () => {
   it("lowercases a Turkish answer with the Turkish locale (dotted/dotless İ-I)", () => {
     expect(checkVocabAnswer("İSTANBUL", "istanbul", "en_to_tr")).toBe("EXACT_MATCH");
   });
+
+  it("accepts any one of several slash-separated meanings", () => {
+    expect(checkVocabAnswer("çekici", "çekici/büyüleyici", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("büyüleyici", "çekici/büyüleyici", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("ilginç", "çekici/büyüleyici", "en_to_tr")).toBe("INCORRECT");
+  });
+
+  it("ignores surrounding whitespace around each slash-separated meaning", () => {
+    expect(checkVocabAnswer("büyüleyici", "çekici / büyüleyici", "en_to_tr")).toBe("EXACT_MATCH");
+  });
+
+  it("tolerates a typo inside one of several slash-separated English meanings", () => {
+    expect(checkVocabAnswer("atractive", "attractive/charming", "tr_to_en")).toBe("ACCEPTED_TYPO");
+  });
+
+  it("ignores hyphens the student omits, either direction", () => {
+    expect(checkVocabAnswer("wellknown", "well-known", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("xray", "x-ray", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+
+  it("ignores hyphens even when the student types one the answer doesn't have", () => {
+    expect(checkVocabAnswer("well-known", "wellknown", "tr_to_en")).toBe("EXACT_MATCH");
+  });
 });
 
 describe("selectQuizBatch", () => {
