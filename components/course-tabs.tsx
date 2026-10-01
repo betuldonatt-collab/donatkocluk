@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { BookOpenCheck } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
 import { LGS_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
@@ -71,10 +73,21 @@ export function CourseTabs({
   const maarifGrade = useMaarifGrade();
   const [m9CourseId, setM9CourseId] = useState("");
 
-  // 9th graders (profiles.is_maarif9): one chip row of the 9th-grade subjects,
-  // no TYT/AYT split -- every page built on this component adapts at once.
+  // Maarif-grade students (profiles.is_maarif9/10/11): one chip row of that
+  // grade's subjects, no TYT/AYT split -- every page built on this component
+  // adapts at once. A grade with no Kaynak Takibi data yet (11th grade, for
+  // now) shows an empty state instead of crashing on an empty course list.
   if (maarifGrade !== null && examType !== "LGS") {
     const gradeCourses = MAARIF_GRADES[maarifGrade].courses;
+    if (gradeCourses.length === 0) {
+      return (
+        <EmptyState
+          icon={BookOpenCheck}
+          title="Müfredat henüz eklenmedi"
+          description={`${MAARIF_GRADES[maarifGrade].label} için ders listesi hazırlandığında burada görünecek.`}
+        />
+      );
+    }
     const selected = gradeCourses.find((c) => c.id === m9CourseId) ?? gradeCourses[0];
     return (
       <div className="space-y-4">

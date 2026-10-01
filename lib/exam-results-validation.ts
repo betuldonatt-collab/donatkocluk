@@ -42,9 +42,10 @@ type SubjectScore = { correct?: Filled; wrong?: Filled; empty?: Filled };
 
 // A general exam's title is the only place its track lives (no course_id) --
 // same convention every panel parses.
-function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
+function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" | "m11" {
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
+  if (/^11\.\s*SINIF\b/i.test(title)) return "m11";
   if (/^LGS\b/i.test(title)) return "lgs";
   return /^AYT\b/i.test(title) ? "ayt" : "tyt";
 }
@@ -52,12 +53,17 @@ function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10"
 // The subject keys a general exam of this track must carry a full row for.
 // null = can't tell (an AYT exam whose alan hasn't been chosen / can't be
 // inferred from the scores), in which case only the rows that ARE present
-// are checked.
+// are checked. "m11" has no exam-subject data yet (no 11th-grade Genel
+// Deneme curriculum exists) -- an empty list, same effect as null's
+// fallback (isGeneralExamScoresIncomplete never flags a missing subject
+// that was never required in the first place) without pretending TYT's
+// own subject list applies to an 11th grader's exam.
 export function expectedGeneralExamKeys(title: string, scores: Record<string, unknown> | null | undefined): string[] | null {
   const track = examTrackFromTitle(title);
   if (track === "lgs") return LGS_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.map((s) => s.key);
+  if (track === "m11") return [];
   if (track === "tyt") return TYT_SUBJECT_GROUPS.map((g) => g.key);
   const aytTrack = inferAytTrackFromScores(scores);
   return aytTrack ? AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => g.key) : null;
@@ -91,6 +97,7 @@ function questionsForGeneralExamKey(
   if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
+  if (track === "m11") return null; // no fixed per-subject question counts yet
   if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
   const aytTrack = inferAytTrackFromScores(scores);
   if (!aytTrack) return null;

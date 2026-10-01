@@ -11,20 +11,20 @@ import {
 } from "./curriculum/subject-groups";
 
 // Maarif ("Türkiye Yüzyılı") grades a student can be flagged with:
-// profiles.is_maarif9 (0096) or profiles.is_maarif10 (0099) -- mutually
-// exclusive (a CHECK constraint enforces it). Everything that picks WHICH
-// curriculum a student sees goes through this one table, so the two grades
-// can never leak into each other: a 9th grader is only ever offered the 9th
-// grade's courses/subjects, a 10th grader only the 10th's.
-export type MaarifGrade = 9 | 10;
+// profiles.is_maarif9 (0096), is_maarif10 (0099) or is_maarif11 (0114) --
+// pairwise mutually exclusive (a CHECK constraint enforces it). Everything
+// that picks WHICH curriculum a student sees goes through this one table,
+// so grades can never leak into each other: a 9th grader is only ever
+// offered the 9th grade's courses/subjects, and so on.
+export type MaarifGrade = 9 | 10 | 11;
 
 export type MaarifExamSubject = { key: string; label: string; section: string; courseIds: string[]; questions: number };
 
-export type GeneralExamTrack = "tyt" | "ayt" | "lgs" | "m9" | "m10";
+export type GeneralExamTrack = "tyt" | "ayt" | "lgs" | "m9" | "m10" | "m11";
 
 type GradeConfig = {
   label: string; // "9. Sınıf"
-  track: "m9" | "m10";
+  track: "m9" | "m10" | "m11";
   titlePrefix: string; // "9. SINIF" -- the general-exam title prefix
   courses: Course[]; // Kaynak Takibi courses
   examSubjects: MaarifExamSubject[]; // Genel Deneme, 120 questions
@@ -51,10 +51,28 @@ export const MAARIF_GRADES: Record<MaarifGrade, GradeConfig> = {
     isCourseId: isMaarif10CourseId,
     coursesForExamSubject: coursesForMaarif10ExamSubject,
   },
+  // No Kaynak Takibi / Genel Deneme curriculum data exists for 11th grade
+  // yet (app/student/11-sinif-maarif has its own, separate, still-empty
+  // MAARIF11_SUBJECTS placeholder -- a different type shape entirely, not
+  // wired through this Course[] pipeline). Empty arrays here, not an
+  // omitted entry: every consumer of MAARIF_GRADES[grade] (course-tabs.tsx,
+  // the general-exam pickers, ...) already has to handle an empty course
+  // list gracefully regardless, so a real 11th grader hitting one of those
+  // shared pages shows "nothing here yet" instead of either crashing or
+  // silently falling back to a different grade's data.
+  11: {
+    label: "11. Sınıf",
+    track: "m11",
+    titlePrefix: "11. SINIF",
+    courses: [],
+    examSubjects: [],
+    isCourseId: (id) => !!id && id.startsWith("maarif11-"),
+    coursesForExamSubject: () => [],
+  },
 };
 
 export function gradeOfTrack(track: GeneralExamTrack): MaarifGrade | null {
-  return track === "m9" ? 9 : track === "m10" ? 10 : null;
+  return track === "m9" ? 9 : track === "m10" ? 10 : track === "m11" ? 11 : null;
 }
 
 // "9. Sınıf Matematik" -> "Matematik" (picker/chip labels).
@@ -63,17 +81,23 @@ export function stripGradePrefix(name: string): string {
 }
 
 // Pure parse of the flag columns; null = an ordinary YKS/LGS student.
-export function gradeFromFlags(flags: { is_maarif9?: boolean | null; is_maarif10?: boolean | null } | null | undefined): MaarifGrade | null {
+export function gradeFromFlags(
+  flags: { is_maarif9?: boolean | null; is_maarif10?: boolean | null; is_maarif11?: boolean | null } | null | undefined,
+): MaarifGrade | null {
+  if (flags?.is_maarif11 === true) return 11;
   if (flags?.is_maarif10 === true) return 10;
   if (flags?.is_maarif9 === true) return 9;
   return null;
 }
 
 // Server-side read of a student's Maarif grade. Tolerant of migrations not
-// being applied yet: if is_maarif10 does not exist (0099 pending) it falls
-// back to is_maarif9 alone; any other error just means "ordinary student",
-// which is exactly how every pre-Maarif student behaves.
+// being applied yet: tries all three flags, then falls back a step at a
+// time (is_maarif9/10, then is_maarif9 alone) if a column doesn't exist
+// yet -- any other error just means "ordinary student", which is exactly
+// how every pre-Maarif student behaves.
 export async function fetchMaarifGrade(supabase: SupabaseClient, studentId: string): Promise<MaarifGrade | null> {
+  const all = await supabase.from("profiles").select("is_maarif9, is_maarif10, is_maarif11").eq("id", studentId).maybeSingle();
+  if (!all.error) return gradeFromFlags(all.data as { is_maarif9?: boolean; is_maarif10?: boolean; is_maarif11?: boolean } | null);
   const both = await supabase.from("profiles").select("is_maarif9, is_maarif10").eq("id", studentId).maybeSingle();
   if (!both.error) return gradeFromFlags(both.data as { is_maarif9?: boolean; is_maarif10?: boolean } | null);
   const nine = await supabase.from("profiles").select("is_maarif9").eq("id", studentId).maybeSingle();
@@ -82,8 +106,10 @@ export async function fetchMaarifGrade(supabase: SupabaseClient, studentId: stri
 }
 
 // The same tolerant read for a signup request (signup_requests.is_maarif9 /
-// is_maarif10, migrations 0097 / 0099).
+// is_maarif10 / is_maarif11, migrations 0097 / 0099 / 0114).
 export async function fetchRequestedMaarifGrade(supabase: SupabaseClient, requestId: string): Promise<MaarifGrade | null> {
+  const all = await supabase.from("signup_requests").select("is_maarif9, is_maarif10, is_maarif11").eq("id", requestId).maybeSingle();
+  if (!all.error) return gradeFromFlags(all.data as { is_maarif9?: boolean; is_maarif10?: boolean; is_maarif11?: boolean } | null);
   const both = await supabase.from("signup_requests").select("is_maarif9, is_maarif10").eq("id", requestId).maybeSingle();
   if (!both.error) return gradeFromFlags(both.data as { is_maarif9?: boolean; is_maarif10?: boolean } | null);
   const nine = await supabase.from("signup_requests").select("is_maarif9").eq("id", requestId).maybeSingle();
@@ -100,14 +126,19 @@ export async function fetchMaarifGradesByIds(
 ): Promise<Map<string, MaarifGrade>> {
   const result = new Map<string, MaarifGrade>();
   if (ids.length === 0) return result;
-  type Row = { id: string; is_maarif9?: boolean; is_maarif10?: boolean };
+  type Row = { id: string; is_maarif9?: boolean; is_maarif10?: boolean; is_maarif11?: boolean };
   let rows: Row[] | null = null;
-  const both = await supabase.from(table).select("id, is_maarif9, is_maarif10").in("id", ids);
-  if (!both.error) {
-    rows = both.data as Row[];
+  const all = await supabase.from(table).select("id, is_maarif9, is_maarif10, is_maarif11").in("id", ids);
+  if (!all.error) {
+    rows = all.data as Row[];
   } else {
-    const nine = await supabase.from(table).select("id, is_maarif9").in("id", ids);
-    if (!nine.error) rows = nine.data as Row[];
+    const both = await supabase.from(table).select("id, is_maarif9, is_maarif10").in("id", ids);
+    if (!both.error) {
+      rows = both.data as Row[];
+    } else {
+      const nine = await supabase.from(table).select("id, is_maarif9").in("id", ids);
+      if (!nine.error) rows = nine.data as Row[];
+    }
   }
   for (const r of rows ?? []) {
     const grade = gradeFromFlags(r);

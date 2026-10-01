@@ -38,20 +38,31 @@ describe("grade separation (9th vs 10th)", () => {
     expect(() => validatePipelineStep("YKS", input(ten) as never, null)).toThrow("Geçersiz ders.");
   });
 
-  it("reads the grade from the flag columns (10 wins only if set; both never expected)", () => {
+  it("reads the grade from the flag columns (highest grade set wins; none expected together)", () => {
     expect(gradeFromFlags(null)).toBeNull();
     expect(gradeFromFlags({ is_maarif9: false, is_maarif10: false })).toBeNull();
     expect(gradeFromFlags({ is_maarif9: true, is_maarif10: false })).toBe(9);
     expect(gradeFromFlags({ is_maarif9: false, is_maarif10: true })).toBe(10);
-    expect(gradeFromFlags({ is_maarif9: true })).toBe(9); // is_maarif10 column missing (0099 pending)
+    expect(gradeFromFlags({ is_maarif9: true })).toBe(9); // is_maarif10/11 columns missing (pre-migration)
+    expect(gradeFromFlags({ is_maarif11: true })).toBe(11);
+    expect(gradeFromFlags({ is_maarif9: false, is_maarif10: false, is_maarif11: true })).toBe(11);
   });
 
   it("maps exam tracks to grades and strips the prefix for labels", () => {
     expect(gradeOfTrack("m9")).toBe(9);
     expect(gradeOfTrack("m10")).toBe(10);
+    expect(gradeOfTrack("m11")).toBe(11);
     expect(gradeOfTrack("tyt")).toBeNull();
     expect(stripGradePrefix("9. Sınıf Matematik")).toBe("Matematik");
     expect(stripGradePrefix("10. Sınıf Din Kültürü ve Ahlak Bilgisi")).toBe("Din Kültürü ve Ahlak Bilgisi");
+  });
+
+  it("11th grade has no Kaynak Takibi/Genel Deneme data yet, but resolves safely instead of crashing", () => {
+    expect(MAARIF_GRADES[11].courses).toEqual([]);
+    expect(MAARIF_GRADES[11].examSubjects).toEqual([]);
+    expect(MAARIF_GRADES[11].isCourseId("maarif11-matematik")).toBe(true);
+    expect(MAARIF_GRADES[11].isCourseId("maarif9-matematik")).toBe(false);
+    expect(MAARIF_GRADES[11].coursesForExamSubject("anything")).toEqual([]);
   });
 
   it("findCourseById resolves both grades' stored courses", () => {

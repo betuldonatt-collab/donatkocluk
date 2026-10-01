@@ -13,7 +13,7 @@ type SignupRequest = {
   requested_role: "student" | "parent" | "coach";
   // Only student requests carry a cohort (copied onto the profile on approval).
   exam_type?: "YKS" | "LGS" | null;
-  maarif_grade?: 9 | 10 | null;
+  maarif_grade?: 9 | 10 | 11 | null;
 };
 
 const ROLE_LABELS: Record<SignupRequest["requested_role"], string> = {

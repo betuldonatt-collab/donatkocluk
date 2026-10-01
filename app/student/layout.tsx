@@ -78,7 +78,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={maarifGrade !== null} />}>
+      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={maarifGrade !== null} maarifGrade={maarifGrade} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />

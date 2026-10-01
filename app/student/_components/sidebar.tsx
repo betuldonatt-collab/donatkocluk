@@ -24,6 +24,7 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { LogoutButton } from "@/components/logout-button";
 import { YksCountdown } from "@/components/ui/yks-countdown";
+import type { MaarifGrade } from "@/lib/maarif-grade";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -51,36 +52,40 @@ const NAV_ITEMS_BOTTOM: NavItem[] = [
 // 9th, 10th and 11th grade all belong to the Türkiye Yüzyılı Maarif Modeli
 // curriculum -- grouped under one small labeled section (not folded into
 // the flat list above) so that shared origin reads at a glance. 9-10 share
-// one page with a grade tab-switcher inside it (TYT); 11 has its own page
-// (no 11th-grade content/cohort flag exists yet, see app/student/
-// 11-sinif-maarif/page.tsx's own comment).
+// one page with a grade tab-switcher inside it (TYT); 11 has its own page.
 const MAARIF_GROUP_ITEMS: NavItem[] = [
   { href: "/student/9-10-sinif-tyt", label: "9-10. Sınıf (TYT)", icon: School },
   { href: "/student/11-sinif-maarif", label: "11. Sınıf", icon: GraduationCap },
 ];
+const ELEVENTH_GRADE_HREF = "/student/11-sinif-maarif";
+const MAARIF_GROUP_HREFS = new Set(MAARIF_GROUP_ITEMS.map((item) => item.href));
 
 // Only the YKS past-questions page stays hidden for 9th graders.
 const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
-// İngilizce Quiz is LGS-only -- a YKS (or Maarif 9th/10th grade) student
-// never sees it at all.
+// İngilizce Quiz is LGS-only -- a YKS (or Maarif 9th/10th/11th grade)
+// student never sees it at all.
 const LGS_ONLY_HREFS = new Set(["/student/ingilizce-quiz"]);
-// The Maarif curriculum pages are YKS-only in the opposite direction -- an
-// LGS (ortaokul) student has no 9th/10th/11th-grade content to browse.
-const YKS_ONLY_HREFS = new Set(MAARIF_GROUP_ITEMS.map((item) => item.href));
 
 // Shared by both the real nav and the tour's step list -- one spot for
 // "which pages does this student's cohort actually see."
 function filterNavItems<T extends { href: string; label: string }>(
   items: T[],
-  { isMaarif9, examType }: { isMaarif9: boolean; examType: "YKS" | "LGS" },
+  { isMaarif9, examType, maarifGrade }: { isMaarif9: boolean; examType: "YKS" | "LGS"; maarifGrade: MaarifGrade | null },
 ): T[] {
   return items
-    .filter(
-      (item) =>
-        !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) &&
-        !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)) &&
-        !(examType === "LGS" && YKS_ONLY_HREFS.has(item.href)),
-    )
+    .filter((item) => {
+      if (isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) return false;
+      if (examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)) return false;
+      if (MAARIF_GROUP_HREFS.has(item.href)) {
+        // The whole Maarif group is 9th/10th/11th-grade Maarif students
+        // only -- an ordinary YKS 12th-grade/mezun student has no 9-11th
+        // grade content of their own to browse here.
+        if (maarifGrade === null) return false;
+        // "11. Sınıf" narrows further still, to an actual 11th grader.
+        if (item.href === ELEVENTH_GRADE_HREF) return maarifGrade === 11;
+      }
+      return true;
+    })
     .map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
 }
 
@@ -88,11 +93,16 @@ export function StudentSidebar({
   fullName = null,
   examType = "YKS",
   isMaarif9 = false,
+  maarifGrade = null,
 }: {
   fullName?: string | null;
   examType?: "YKS" | "LGS";
   // 9th grader: no YKS countdown, no TYT/AYT-specific tracking/analytics pages.
   isMaarif9?: boolean;
+  // The actual grade (9/10/11), not just "is some Maarif grade" -- needed to
+  // tell the 9-10 TYT page (any Maarif grade) apart from the 11th-grade-only
+  // page in the Maarif group below.
+  maarifGrade?: MaarifGrade | null;
 }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
@@ -100,9 +110,9 @@ export function StudentSidebar({
   const isMobile = useIsMobileViewport();
   const effectiveCollapsed = collapsed && !isMobile;
   // LGS students get every page a YKS student does, PLUS İngilizce Quiz
-  // (LGS-only), MINUS the Maarif group (YKS-only); only the Paragraf/
-  // Problem page is renamed (it is Paragraf / Kitap Okuma for them).
-  const cohort = { isMaarif9, examType };
+  // (LGS-only), MINUS the Maarif group (Maarif-grade-only); only the
+  // Paragraf/Problem page is renamed (it is Paragraf / Kitap Okuma for them).
+  const cohort = { isMaarif9, examType, maarifGrade };
   const navItemsTop = filterNavItems(NAV_ITEMS_TOP, cohort);
   const navItemsBottom = filterNavItems(NAV_ITEMS_BOTTOM, cohort);
   const maarifGroupItems = filterNavItems(MAARIF_GROUP_ITEMS, cohort);

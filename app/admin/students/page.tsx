@@ -10,7 +10,7 @@ import { PaginationControls } from "../_components/pagination-controls";
 
 const PAGE_SIZE = 25;
 
-type AcademicTrack = "yks_sayisal" | "yks_ea" | "yks_sozel" | "yks_ydt" | "lgs_ortaokul" | "maarif9" | "maarif10";
+type AcademicTrack = "yks_sayisal" | "yks_ea" | "yks_sozel" | "yks_ydt" | "lgs_ortaokul" | "maarif9" | "maarif10" | "maarif11";
 
 const TRACK_LABELS: Record<AcademicTrack, string> = {
   yks_sayisal: "YKS-Sayısal",
@@ -20,6 +20,7 @@ const TRACK_LABELS: Record<AcademicTrack, string> = {
   lgs_ortaokul: "LGS/Ortaokul",
   maarif9: "9. Sınıf",
   maarif10: "10. Sınıf",
+  maarif11: "11. Sınıf",
 };
 
 const POOL_STATUS_LABELS: Record<string, string> = {

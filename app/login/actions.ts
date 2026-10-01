@@ -189,16 +189,20 @@ export async function submitSignupRequest(
   // this null regardless of what the form sent.
   const isMaarif9 = role === "student" && examTypeRaw === "MAARIF9";
   const isMaarif10 = role === "student" && examTypeRaw === "MAARIF10";
-  // "9./10. Sınıf (Maarif)" are not exam_types: those students stay on the YKS
-  // default and are marked by profiles.is_maarif9 / is_maarif10 (carried as
-  // signup_requests.is_maarif9 / is_maarif10). The two are mutually exclusive.
-  const examType = role === "student" ? (isMaarif9 || isMaarif10 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
+  const isMaarif11 = role === "student" && examTypeRaw === "MAARIF11";
+  // "9./10./11. Sınıf (Maarif)" are not exam_types: those students stay on
+  // the YKS default and are marked by profiles.is_maarif9 / is_maarif10 /
+  // is_maarif11 (carried as the matching signup_requests columns). The
+  // three are pairwise mutually exclusive.
+  const examType =
+    role === "student" ? (isMaarif9 || isMaarif10 || isMaarif11 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("signup_requests")
     // The Maarif flags are only sent when true, so every other signup keeps
-    // working exactly as before even if migrations 0097/0099 are not applied yet.
+    // working exactly as before even if migrations 0097/0099/0114 are not
+    // applied yet.
     .insert({
       full_name: fullName,
       phone,
@@ -206,6 +210,7 @@ export async function submitSignupRequest(
       exam_type: examType,
       ...(isMaarif9 ? { is_maarif9: true } : {}),
       ...(isMaarif10 ? { is_maarif10: true } : {}),
+      ...(isMaarif11 ? { is_maarif11: true } : {}),
     });
 
   if (error) {

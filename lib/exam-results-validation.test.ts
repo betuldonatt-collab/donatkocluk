@@ -40,6 +40,24 @@ describe("expectedGeneralExamKeys", () => {
   it("AYT with no recognisable alan is undecidable", () => {
     expect(expectedGeneralExamKeys("AYT Genel Deneme", {})).toBeNull();
   });
+
+  it("11th grade (Maarif) has no subject data yet -- an empty list, not TYT's", () => {
+    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual([]);
+  });
+});
+
+describe("11th-grade (Maarif) general exam has no subject data yet", () => {
+  it("a non-empty submission is never flagged incomplete, since no specific subject is required yet", () => {
+    expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", { anything: row })).toBe(false);
+  });
+
+  it("still rejects a wholly empty submission (the same blanket rule every track uses)", () => {
+    expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", {})).toBe(true);
+  });
+
+  it("never reports a question-count mismatch, since no fixed count exists yet", () => {
+    expect(findGeneralExamTotalMismatch("11. SINIF Genel Deneme", { matematik: row })).toBeNull();
+  });
 });
 
 describe("isGeneralExamScoresIncomplete", () => {

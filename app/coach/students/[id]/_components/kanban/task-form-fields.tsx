@@ -21,7 +21,7 @@ import {
   type Course,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
-import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, stripGradePrefix, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
@@ -92,7 +92,7 @@ export type TaskFormValue = {
   // these two live only in form state and get folded into the saved
   // title string (buildGeneralExamTitle in actions.ts), never persisted
   // as their own columns.
-  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10";
+  generalExamTrack: GeneralExamTrack;
   generalExamPublisher: string;
   // "Branş Denemesi" only -- same "lives only in the title, never its own
   // column" convention as generalExamPublisher above.
@@ -156,11 +156,17 @@ export function defaultTaskFormValue(examType: ExamType = "YKS", maarifGrade: Ma
 // Reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
 // editing an existing general-exam task pre-fills the track/publisher
 // fields instead of showing them blank.
-function parseGeneralExamTitle(title: string): { track: "tyt" | "ayt" | "lgs" | "m9" | "m10"; publisher: string } {
-  const match = title.match(/^(TYT|AYT|LGS|9\.\s*SINIF|10\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
+function parseGeneralExamTitle(title: string): { track: GeneralExamTrack; publisher: string } {
+  const match = title.match(/^(TYT|AYT|LGS|9\.\s*SINIF|10\.\s*SINIF|11\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
   const track = match?.[1].toLowerCase();
   return {
-    track: track === "ayt" ? "ayt" : track === "lgs" ? "lgs" : track?.startsWith("10") ? "m10" : track?.startsWith("9") ? "m9" : "tyt",
+    track:
+      track === "ayt" ? "ayt"
+      : track === "lgs" ? "lgs"
+      : track?.startsWith("11") ? "m11"
+      : track?.startsWith("10") ? "m10"
+      : track?.startsWith("9") ? "m9"
+      : "tyt",
     publisher: match?.[2]?.trim() ?? "",
   };
 }
@@ -208,7 +214,7 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     resourceName: libraryResources.find((r) => r.id === id)?.name ?? "",
     addToLibrary: true,
   }));
-  const generalExam: { track: "tyt" | "ayt" | "lgs" | "m9" | "m10"; publisher: string } =
+  const generalExam: { track: GeneralExamTrack; publisher: string } =
     taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt", publisher: "" };
   const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
   // An older branch exam task saved before this field merged into Kaynak

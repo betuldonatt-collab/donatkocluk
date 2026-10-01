@@ -19,7 +19,7 @@ import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
 import type { StudentTask } from "./types";
-import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, stripGradePrefix, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 
 // Atomic TYT/AYT courses only -- deliberately NOT Paragraf/Problem's
@@ -80,7 +80,7 @@ type FormState = {
   // defaults to) rather than guessing "yes" just because it's the first
   // type selected.
   isCompleted: boolean;
-  generalExamTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10";
+  generalExamTrack: GeneralExamTrack;
   generalExamPublisher: string;
   freeTitle: string;
   freeDescription: string;

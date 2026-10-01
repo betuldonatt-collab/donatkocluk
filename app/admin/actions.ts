@@ -235,18 +235,19 @@ export async function updateAcademicTrack(studentId: string, track: string | nul
   revalidatePath("/admin/students");
 }
 
-// Maarif grade of a student: profiles.is_maarif9 (0096) / is_maarif10 (0099),
-// mutually exclusive -- both columns are always written together so a student
-// can never end up with both. null = ordinary YKS/LGS student. Admin-only; the
-// profiles guard trigger rejects anyone else's attempt at the DB level.
-export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | null) {
+// Maarif grade of a student: profiles.is_maarif9 (0096) / is_maarif10 (0099) /
+// is_maarif11 (0114), pairwise mutually exclusive -- all three columns are
+// always written together so a student can never end up with more than one.
+// null = ordinary YKS/LGS student. Admin-only; the profiles guard trigger
+// rejects anyone else's attempt at the DB level.
+export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | 11 | null) {
   await requireAdmin();
   const studentIdV = parseInput(uuidSchema, studentId);
-  const gradeV = parseInput(z.union([z.literal(9), z.literal(10)]).nullable(), grade);
+  const gradeV = parseInput(z.union([z.literal(9), z.literal(10), z.literal(11)]).nullable(), grade);
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
-    .update({ is_maarif9: gradeV === 9, is_maarif10: gradeV === 10 })
+    .update({ is_maarif9: gradeV === 9, is_maarif10: gradeV === 10, is_maarif11: gradeV === 11 })
     .eq("id", studentIdV)
     .eq("role", "student");
   if (error) throw dbError(error);
@@ -580,7 +581,7 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
       // submitSignupRequest, app/login/actions.ts).
       ...(request.requested_role === "student" && request.exam_type ? { exam_type: request.exam_type } : {}),
       ...(request.requested_role === "student" && requestedGrade !== null
-        ? { is_maarif9: requestedGrade === 9, is_maarif10: requestedGrade === 10 }
+        ? { is_maarif9: requestedGrade === 9, is_maarif10: requestedGrade === 10, is_maarif11: requestedGrade === 11 }
         : {}),
     })
     .eq("id", createData.user.id);

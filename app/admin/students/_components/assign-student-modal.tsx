@@ -10,7 +10,7 @@ import { ResetPasswordButton } from "../../_components/reset-password-button";
 import { SendToPoolButton } from "../../_components/send-to-pool-button";
 
 type Person = { id: string; full_name: string | null };
-type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | null };
+type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | 11 | null };
 type PoolCoach = Person & { activeCount: number; maxStudents: number };
 
 const TRACK_OPTIONS: { value: string; label: string }[] = [
@@ -19,9 +19,10 @@ const TRACK_OPTIONS: { value: string; label: string }[] = [
   { value: "yks_sozel", label: "YKS-Sözel" },
   { value: "yks_ydt", label: "YKS-YDT" },
   { value: "lgs_ortaokul", label: "LGS/Ortaokul" },
-  // Needs migration 0098 (academic_track is the coach_specialization enum).
+  // Needs migration 0098/0099/0114 (academic_track is the coach_specialization enum).
   { value: "maarif9", label: "9. Sınıf" },
   { value: "maarif10", label: "10. Sınıf" },
+  { value: "maarif11", label: "11. Sınıf" },
 ];
 
 const selectClass =
@@ -68,13 +69,13 @@ function AdminNotesField({ studentId, initialNotes }: { studentId: string; initi
 // Maarif grade -- switches the student's panel and the coach's forms to that grade's
 // curriculum (no YKS countdown / TYT-AYT tabs). 9th and 10th grade are mutually
 // exclusive (one select; the database also enforces it).
-function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 9 | 10 | null }) {
-  const [grade, setGrade] = useState<9 | 10 | null>(initial);
+function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 9 | 10 | 11 | null }) {
+  const [grade, setGrade] = useState<9 | 10 | 11 | null>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleChange(raw: string) {
-    const next = raw === "9" ? 9 : raw === "10" ? 10 : null;
+    const next = raw === "9" ? 9 : raw === "10" ? 10 : raw === "11" ? 11 : null;
     const previous = grade;
     setGrade(next);
     setSaving(true);
@@ -83,7 +84,7 @@ function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 
       await updateMaarifGrade(studentId, next);
     } catch {
       setGrade(previous);
-      setError("Kaydedilemedi. Migration 0099 uygulandı mı?");
+      setError("Kaydedilemedi. Migration 0114 uygulandı mı?");
     } finally {
       setSaving(false);
     }
@@ -96,6 +97,7 @@ function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 
         <option value="">Yok (YKS / LGS)</option>
         <option value="9">9. Sınıf (Maarif)</option>
         <option value="10">10. Sınıf (Maarif)</option>
+        <option value="11">11. Sınıf (Maarif)</option>
       </select>
       <p className="text-muted-foreground text-xs">Seçilen sınıfın müfredatı görünür; YKS geri sayımı ve TYT/AYT sekmeleri gizlenir.</p>
       {error && <p className="text-destructive text-xs">{error}</p>}
