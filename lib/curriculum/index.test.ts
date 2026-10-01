@@ -6,6 +6,7 @@ import {
   KARMA_TOPIC_ID,
   normalizeTr,
   ROUTINE_COURSES,
+  topicOptionsForCourse,
   topicsForCourse,
   toTurkishTitleCase,
   TYT_COURSES,
@@ -65,6 +66,21 @@ describe("topicsForCourse", () => {
     const topics = topicsForCourse(ROUTINE_COURSES[0]);
     expect(topics).toHaveLength(1);
     expect(topics[0].id).toBe(KARMA_TOPIC_ID);
+  });
+});
+
+describe("topicOptionsForCourse", () => {
+  it("always appends the synthetic karma option, for a real course", () => {
+    const options = topicOptionsForCourse(realCourse);
+    expect(options.at(-1)?.id).toBe(KARMA_TOPIC_ID);
+  });
+
+  it("returns an empty list instead of throwing when there's no course yet", () => {
+    // A cohort with no curriculum data yet (e.g. 11th-grade Maarif) has an
+    // empty course list -- a caller's own `.find() ?? list[0]` fallback
+    // chain can end up with undefined, not a real Course.
+    expect(topicOptionsForCourse(undefined)).toEqual([]);
+    expect(topicOptionsForCourse(null)).toEqual([]);
   });
 });
 

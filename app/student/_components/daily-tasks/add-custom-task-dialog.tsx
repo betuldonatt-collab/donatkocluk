@@ -90,9 +90,15 @@ type FormState = {
 };
 
 function initialFormState(examType: ExamType, maarifGrade: MaarifGrade | null = null): FormState {
+  // A grade with no Kaynak Takibi data yet (11th grade, for now) has an
+  // empty courses list -- courses[0] would throw reading .id off
+  // undefined (this runs as a useState lazy initializer, so it fires the
+  // instant this dialog's own component mounts, i.e. on page load, not
+  // only once the dialog is opened). Falls back to "" (no course selected
+  // yet) instead of assuming one always exists.
   return {
     taskType: "question_bank",
-    courseId: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses[0].id : examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
+    courseId: maarifGrade !== null ? (MAARIF_GRADES[maarifGrade].courses[0]?.id ?? "") : examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id,
     topicId: "",
     resources: [],
     totalCount: "",

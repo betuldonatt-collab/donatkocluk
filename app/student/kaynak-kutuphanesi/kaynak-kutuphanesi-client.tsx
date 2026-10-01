@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,8 +80,21 @@ function MaarifLibrary({
   onAdded: (rows: LibraryResource[]) => void;
 }) {
   const gradeCourses = MAARIF_GRADES[grade].courses;
-  const [courseId, setCourseId] = useState(gradeCourses[0].id);
+  // A grade with no Kaynak Takibi data yet (11th grade, for now) has an
+  // empty courses list -- gradeCourses[0] would throw reading .id off
+  // undefined, so this falls back to "" (no course selected yet), and the
+  // whole picker is skipped below rather than rendering with no real course.
+  const [courseId, setCourseId] = useState(gradeCourses[0]?.id ?? "");
   const course = gradeCourses.find((c) => c.id === courseId) ?? gradeCourses[0];
+  if (!course) {
+    return (
+      <EmptyState
+        icon={Library}
+        title="Müfredat henüz eklenmedi"
+        description={`${MAARIF_GRADES[grade].label} için ders listesi hazırlandığında kaynak eklemeye buradan başlayabilirsin.`}
+      />
+    );
+  }
   return (
     <div className="space-y-4">
       <CourseChips

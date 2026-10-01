@@ -205,7 +205,15 @@ export function topicsForCourse(course: Course): Topic[] {
 // it's labeled with its Konu ("1.1 Çarpanlar ve Katlar › EKOK"). Every
 // course without a `konu` level (all of YKS) gets its plain topic name,
 // exactly as before.
-export function topicOptionsForCourse(course: Course): { id: string; label: string }[] {
+//
+// `course` can genuinely be missing: a caller whose own course list comes
+// from a cohort with no curriculum data yet (an 11th-grade Maarif student,
+// for now -- MAARIF_GRADES[11].courses is empty) has nothing to fall back
+// to and ends up passing undefined here. No topic options at all, rather
+// than throwing on course.id -- the form's own topic picker just shows
+// none, matching "no course selected yet".
+export function topicOptionsForCourse(course: Course | null | undefined): { id: string; label: string }[] {
+  if (!course) return [];
   if (isLgsCourseId(course.id)) {
     return [
       ...lgsSelectionNodes(course).map((n) => ({ id: n.id, label: n.label })),

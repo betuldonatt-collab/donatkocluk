@@ -112,11 +112,15 @@ export function CoachExamAnalysisSection({
   const [examMode, setExamMode] = useState<ExamMode>("brans");
   const [mainTrack, setMainTrack] = useState<"tyt" | "ayt">("tyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
+  // A grade with no Kaynak Takibi/Genel Deneme data yet (11th grade, for
+  // now) has an empty courses/examSubjects list -- courses[0]/examSubjects[0]
+  // would throw reading .id/.key off undefined, so these fall back to ""
+  // (no course/subject selected yet) instead of assuming one always exists.
   const [branchCourseId, setBranchCourseId] = useState<string>(
-    gradeCfg ? gradeCfg.courses[0].id : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
+    gradeCfg ? (gradeCfg.courses[0]?.id ?? "") : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
   );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    gradeCfg ? gradeCfg.examSubjects[0].key : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    gradeCfg ? (gradeCfg.examSubjects[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {

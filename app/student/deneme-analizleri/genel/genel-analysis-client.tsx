@@ -170,7 +170,11 @@ export function GenelAnalysisClient({
       .filter((e) => parseGeneralExamTrack(e.title) === gradeCfg.track)
       .sort((a, b) => b.task_date.localeCompare(a.task_date));
     const m9NetChartData = netChartFor(m9Exams);
-    const activeSubjectKey = m9SubjectKey || gradeCfg.examSubjects[0].key;
+    // A grade with no Genel Deneme subject data yet (11th grade, for now)
+    // has an empty examSubjects list -- examSubjects[0] would throw reading
+    // .key off undefined, so this falls back to "" (no subject selected
+    // yet) instead of assuming one always exists.
+    const activeSubjectKey = m9SubjectKey || (gradeCfg.examSubjects[0]?.key ?? "");
     const m9Courses = gradeCfg.coursesForExamSubject(activeSubjectKey);
     return (
       <div className="space-y-6">

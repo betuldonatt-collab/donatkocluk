@@ -133,7 +133,11 @@ export function courseOptionsFor(
 }
 
 export function firstCourseIdFor(examType: ExamType, maarifGrade: MaarifGrade | null = null): string {
-  if (maarifGrade !== null) return MAARIF_GRADES[maarifGrade].courses[0].id;
+  // A grade with no Kaynak Takibi data yet (11th grade, for now) has an
+  // empty courses list -- courses[0] would throw reading .id off
+  // undefined, so this falls back to "" (no course selected yet) instead
+  // of assuming one always exists.
+  if (maarifGrade !== null) return MAARIF_GRADES[maarifGrade].courses[0]?.id ?? "";
   return examType === "LGS" ? LGS_COURSES[0].id : ALL_COURSES[0].id;
 }
 
