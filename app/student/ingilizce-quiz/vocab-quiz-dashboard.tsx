@@ -23,26 +23,32 @@ function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
       className={cn(complete && "border-transparent")}
       style={complete ? { borderColor: pastelGreenForProgress(pct, 0.6), backgroundColor: pastelGreenForProgress(pct, 0.08) } : undefined}
     >
-      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-        <CardTitle className="text-base leading-snug">{vocabUnitTitle(stat.unitNumber)}</CardTitle>
-        {complete && <Trophy className="mt-0.5 size-4 shrink-0" style={{ color: fillColor }} />}
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <CardTitle className="text-xl leading-snug">{vocabUnitTitle(stat.unitNumber)}</CardTitle>
+        {complete && <Trophy className="mt-0.5 size-7 shrink-0" style={{ color: fillColor }} />}
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="space-y-1.5">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Öğrenildi</span>
-            <span className="text-foreground font-medium tabular-nums">
+      <CardContent className="space-y-6">
+        <div className="space-y-2.5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-muted-foreground text-sm">Öğrenildi</span>
+            <span className="text-foreground text-lg font-semibold tabular-nums">
               {stat.mastered}/{stat.total}
             </span>
           </div>
-          <div className="bg-secondary h-1.5 overflow-hidden rounded-full" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div
+            className="bg-secondary h-4 overflow-hidden rounded-full"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <div
               className="h-full rounded-full transition-[width,background-color] duration-300"
               style={{ width: `${pct}%`, backgroundColor: fillColor }}
             />
           </div>
         </div>
-        <Button type="button" className="w-full" onClick={onStart} disabled={stat.total === 0}>
+        <Button type="button" size="lg" className="w-full text-base" onClick={onStart} disabled={stat.total === 0}>
           {stat.total === 0 ? "Kelime Yok" : "Quize Başla"}
         </Button>
       </CardContent>
@@ -75,16 +81,19 @@ export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: Uni
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <BookOpenCheck className="text-primary size-6" />
+    <div className="space-y-8">
+      <div className="flex items-center gap-3">
+        <BookOpenCheck className="text-primary size-8" />
         <div>
-          <h1 className="text-foreground text-xl font-semibold">İngilizce Kelime Quizi</h1>
-          <p className="text-muted-foreground text-sm">Bir ünite seç ve kelimeleri tekrar et.</p>
+          <h1 className="text-foreground text-2xl font-semibold">İngilizce Kelime Quizi</h1>
+          <p className="text-muted-foreground text-base">Bir ünite seç ve kelimeleri tekrar et.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      {/* Two wide columns, not the previous up-to-5-across grid -- each
+          card's progress bar/counters need to actually be noticeable at a
+          glance, which a narrow 1/5-width card never gave them room for. */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {unitStats.map((stat) => (
           <UnitCard key={stat.unitNumber} stat={stat} onStart={() => setActiveUnit(stat.unitNumber)} />
         ))}
