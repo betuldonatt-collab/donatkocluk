@@ -80,13 +80,25 @@ export function pastelGreenForProgress(pct: number, alpha = 1): string {
 }
 
 // The quiz session's own per-word "leveling up" dots (vocab-quiz-session.tsx)
-// reuse this SAME five-step scale rather than a second color table -- dot
-// `dotIndex` (0-indexed) of `totalDots` just lands on whichever step its own
-// fraction of the way through the dots would be, so the LAST dot always
-// lands on the deepest step, same as a fully-mastered unit's own dashboard
-// card above.
+// -- a SEPARATE, directly-interpolated 2-point scale rather than indexing
+// into the bar's five 20%-wide buckets above: with only 2-4 dots in play,
+// bucketing by (dotIndex+1)/totalDots skips most of those five steps
+// entirely and can land the very FIRST dot on the bar's barely-there 0-20%
+// shade -- fine smoothed out across a wide, continuous bar, but a single
+// 12px dot at that lightness reads as practically unfilled against a light
+// card. Interpolating directly between a dot-sized "clearly lit, still
+// soft" starting shade and the bar's own deepest/100% shade keeps the two
+// scales part of the same family (hue, saturation range, and the LAST dot
+// of any totalDots is pixel-identical to a fully-mastered unit's own
+// dashboard color) while actually being visible one dot at a time.
+const STREAK_DOT_START = { saturation: 40, lightness: 72 };
+const STREAK_DOT_END = PASTEL_GREEN_STEPS[PASTEL_GREEN_STEPS.length - 1];
+
 export function pastelGreenForStreakDot(dotIndex: number, totalDots: number): string {
-  return pastelGreenForProgress(((dotIndex + 1) / totalDots) * 100);
+  const t = totalDots <= 1 ? 1 : dotIndex / (totalDots - 1);
+  const saturation = Math.round(STREAK_DOT_START.saturation + (STREAK_DOT_END.saturation - STREAK_DOT_START.saturation) * t);
+  const lightness = Math.round(STREAK_DOT_START.lightness + (STREAK_DOT_END.lightness - STREAK_DOT_START.lightness) * t);
+  return `hsl(${PASTEL_GREEN_HUE} ${saturation}% ${lightness}% / 1)`;
 }
 
 // A word is mastered once its correct-answer streak reaches this many in a

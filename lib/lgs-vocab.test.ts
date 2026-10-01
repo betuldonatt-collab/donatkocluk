@@ -232,8 +232,9 @@ describe("pastelGreenForProgress", () => {
 });
 
 describe("pastelGreenForStreakDot", () => {
-  it("darkens from the first dot to the last, reusing pastelGreenForProgress's own scale", () => {
-    const lightnessOf = (color: string) => Number(color.match(/(\d+)%\s*\/\s*[\d.]+\)$/)?.[1]);
+  const lightnessOf = (color: string) => Number(color.match(/(\d+)%\s*\/\s*[\d.]+\)$/)?.[1]);
+
+  it("darkens from the first dot to the last", () => {
     const dots = [0, 1, 2].map((i) => lightnessOf(pastelGreenForStreakDot(i, 3)));
     expect(dots[0]).toBeGreaterThan(dots[1]);
     expect(dots[1]).toBeGreaterThan(dots[2]);
@@ -241,6 +242,21 @@ describe("pastelGreenForStreakDot", () => {
 
   it("the last dot always lands on the deepest step, same as a fully-mastered unit card", () => {
     expect(pastelGreenForStreakDot(2, 3)).toBe(pastelGreenForProgress(100));
+  });
+
+  it("the first dot is clearly visible, not a barely-there near-white tint", () => {
+    // A single small dot has far less surface area than the dashboard's own
+    // wide bar -- its lightest step must stay noticeably darker than that
+    // bar's own 0-20% bucket (lightnessOf(pastelGreenForProgress(0)) = 88),
+    // or the "1st correct answer" dot reads as unfilled.
+    expect(lightnessOf(pastelGreenForStreakDot(0, 3))).toBeLessThanOrEqual(75);
+  });
+
+  it("still never leaves the pastel range (moderate saturation) at any dot", () => {
+    const saturationOf = (color: string) => Number(color.match(/hsl\(\d+ (\d+)%/)?.[1]);
+    for (const i of [0, 1, 2]) {
+      expect(saturationOf(pastelGreenForStreakDot(i, 3))).toBeLessThanOrEqual(50);
+    }
   });
 });
 

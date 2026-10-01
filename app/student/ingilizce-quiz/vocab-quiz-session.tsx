@@ -56,7 +56,13 @@ function WordProgressDots({
       {Array.from({ length: totalDots }, (_, i) => (
         <span
           key={i}
-          className={cn("size-2.5 rounded-full transition-colors duration-300", i >= streak && "bg-secondary")}
+          // A border on every dot (not just a fill) keeps the shape crisp
+          // against a light card regardless of the fill shade -- a pale
+          // pastel fill with no outline at all was easy to miss entirely.
+          className={cn(
+            "size-3 rounded-full border transition-colors duration-300",
+            i >= streak ? "bg-secondary border-border" : "border-transparent",
+          )}
           style={i < streak ? { backgroundColor: pastelGreenForStreakDot(i, totalDots) } : undefined}
         />
       ))}
