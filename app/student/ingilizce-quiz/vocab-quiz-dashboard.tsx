@@ -6,17 +6,26 @@ import { BookOpenCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
+import { pastelGreenForProgress, vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
 import { VocabQuizSession } from "./vocab-quiz-session";
 
 function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
   const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
   const complete = stat.total > 0 && stat.mastered === stat.total;
+  // The fill "levels up" through soft green shades as mastered grows
+  // (pastelGreenForProgress, lib/lgs-vocab.ts) instead of one flat color at
+  // every percentage -- the completed card's own accent reuses the same
+  // deepest step as a tint, so it reads as the natural top of the same
+  // scale rather than a second, unrelated color.
+  const fillColor = pastelGreenForProgress(pct);
   return (
-    <Card className={cn(complete && "border-emerald-500/50 bg-emerald-500/5")}>
+    <Card
+      className={cn(complete && "border-transparent")}
+      style={complete ? { borderColor: pastelGreenForProgress(pct, 0.6), backgroundColor: pastelGreenForProgress(pct, 0.08) } : undefined}
+    >
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
         <CardTitle className="text-base leading-snug">{vocabUnitTitle(stat.unitNumber)}</CardTitle>
-        {complete && <Trophy className="mt-0.5 size-4 shrink-0 text-emerald-600" />}
+        {complete && <Trophy className="mt-0.5 size-4 shrink-0" style={{ color: fillColor }} />}
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1.5">
@@ -27,7 +36,10 @@ function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
             </span>
           </div>
           <div className="bg-secondary h-1.5 overflow-hidden rounded-full" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div className="bg-primary h-full rounded-full transition-[width]" style={{ width: `${pct}%` }} />
+            <div
+              className="h-full rounded-full transition-[width,background-color] duration-300"
+              style={{ width: `${pct}%`, backgroundColor: fillColor }}
+            />
           </div>
         </div>
         <Button type="button" className="w-full" onClick={onStart} disabled={stat.total === 0}>

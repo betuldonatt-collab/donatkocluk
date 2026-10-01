@@ -46,6 +46,39 @@ export function vocabUnitTitle(unitNumber: number): string {
   return VOCAB_UNIT_TITLES[unitNumber - 1] ?? `${unitNumber}. Ünite`;
 }
 
+// --- Dashboard progress shading ---------------------------------------------
+//
+// The unit dashboard's own progress bar (vocab-quiz-dashboard.tsx) "levels
+// up" through soft green shades as a student masters more of a unit's words,
+// instead of staying one flat fill color at every percentage. Five fixed
+// steps (not a continuous gradient) so the level-up actually reads as
+// discrete, step-by-step progress at a glance -- all five stay in the same
+// soft/muted range (low-to-moderate saturation, high lightness) so even the
+// deepest, 80-100% step is a deeper PASTEL, never a bright/neon green.
+const PASTEL_GREEN_HUE = 142;
+const PASTEL_GREEN_STEPS: { saturation: number; lightness: number }[] = [
+  { saturation: 35, lightness: 88 }, // 0-20%: barely-there mint
+  { saturation: 38, lightness: 78 }, // 20-40%
+  { saturation: 40, lightness: 68 }, // 40-60%
+  { saturation: 42, lightness: 58 }, // 60-80%
+  { saturation: 45, lightness: 48 }, // 80-100%: deepest step -- still a soft sage, not neon emerald
+];
+
+// Clamped to 0-100 so a slightly out-of-range caller (rounding, a mastered
+// count briefly ahead of a stale total mid-update) never indexes past the
+// array instead of just clamping to the last step.
+export function pastelGreenStepForProgress(pct: number): number {
+  const clamped = Math.min(100, Math.max(0, pct));
+  return Math.min(PASTEL_GREEN_STEPS.length - 1, Math.floor(clamped / 20));
+}
+
+// `alpha` lets the same step double as a soft background/border tint (e.g.
+// a completed unit's card accent) without needing a second color scale.
+export function pastelGreenForProgress(pct: number, alpha = 1): string {
+  const { saturation, lightness } = PASTEL_GREEN_STEPS[pastelGreenStepForProgress(pct)];
+  return `hsl(${PASTEL_GREEN_HUE} ${saturation}% ${lightness}% / ${alpha})`;
+}
+
 // One row per (student, word) -- a simple spaced-repetition streak.
 // is_mastered flips to true once correct_streak reaches 3; that transition
 // is application logic (a later phase's server action), not enforced at

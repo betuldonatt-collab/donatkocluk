@@ -4,6 +4,8 @@ import {
   checkVocabAnswer,
   fillUnitStats,
   levenshteinDistance,
+  pastelGreenForProgress,
+  pastelGreenStepForProgress,
   selectQuizBatch,
   vocabUnitTitle,
   type WordProgressSummary,
@@ -173,5 +175,47 @@ describe("vocabUnitTitle", () => {
   it("falls back to a bare 'N. Ünite' for an out-of-range number instead of crashing", () => {
     expect(vocabUnitTitle(11)).toBe("11. Ünite");
     expect(vocabUnitTitle(0)).toBe("0. Ünite");
+  });
+});
+
+describe("pastelGreenStepForProgress", () => {
+  it("buckets 0-100% into 5 steps of 20 points each", () => {
+    expect(pastelGreenStepForProgress(0)).toBe(0);
+    expect(pastelGreenStepForProgress(19)).toBe(0);
+    expect(pastelGreenStepForProgress(20)).toBe(1);
+    expect(pastelGreenStepForProgress(39)).toBe(1);
+    expect(pastelGreenStepForProgress(40)).toBe(2);
+    expect(pastelGreenStepForProgress(59)).toBe(2);
+    expect(pastelGreenStepForProgress(60)).toBe(3);
+    expect(pastelGreenStepForProgress(79)).toBe(3);
+    expect(pastelGreenStepForProgress(80)).toBe(4);
+    expect(pastelGreenStepForProgress(100)).toBe(4);
+  });
+
+  it("clamps out-of-range input instead of indexing past the step table", () => {
+    expect(pastelGreenStepForProgress(-10)).toBe(0);
+    expect(pastelGreenStepForProgress(150)).toBe(4);
+  });
+});
+
+describe("pastelGreenForProgress", () => {
+  it("darkens (lightness decreases) as progress climbs, step by step", () => {
+    // hsl(142 <saturation>% <lightness>% / <alpha>) -- the lightness is the
+    // percentage immediately before " / <alpha>)".
+    const lightnessOf = (color: string) => Number(color.match(/(\d+)%\s*\/\s*[\d.]+\)$/)?.[1]);
+    const lightnesses = [0, 20, 40, 60, 80].map((pct) => lightnessOf(pastelGreenForProgress(pct)));
+    for (let i = 1; i < lightnesses.length; i++) {
+      expect(lightnesses[i]).toBeLessThan(lightnesses[i - 1]);
+    }
+  });
+
+  it("never leaves the pastel range (saturation stays moderate) even at full progress", () => {
+    const saturation = Number(pastelGreenForProgress(100).match(/hsl\(\d+ (\d+)%/)?.[1]);
+    expect(saturation).toBeLessThanOrEqual(50);
+  });
+
+  it("applies the requested alpha without changing the hue/lightness step", () => {
+    expect(pastelGreenForProgress(50, 0.08)).toMatch(/\/ 0\.08\)$/);
+    expect(pastelGreenForProgress(50, 0.08).replace("0.08", "1")).toBe(pastelGreenForProgress(50));
   });
 });
