@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { checkVocabAnswer, vocabUnitTitle, type AnswerResult, type QuizDirection, type QuizWord } from "@/lib/lgs-vocab";
+import {
+  checkVocabAnswer,
+  pastelGreenForStreakDot,
+  vocabUnitTitle,
+  WORD_MASTERY_STREAK,
+  type AnswerResult,
+  type QuizDirection,
+  type QuizWord,
+} from "@/lib/lgs-vocab";
 import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
 
 type BatchWord = QuizWord & { direction: QuizDirection };
@@ -17,7 +25,44 @@ type BatchWord = QuizWord & { direction: QuizDirection };
 // 750-1000ms window.
 const AUTO_ADVANCE_MS = 900;
 
-type Feedback = { result: AnswerResult; correctAnswer: string; wasSkipped: boolean };
+// streakAfter is this word's own correct_streak once this answer is
+// accounted for -- set OPTIMISTICALLY the instant the answer is given
+// (recordAnswer mirrors submitVocabAnswer's own formula), then reconciled
+// with the server's authoritative value once the background save resolves,
+// same spirit as this component's other optimistic state (activeTask.current
+// below).
+type Feedback = { result: AnswerResult; correctAnswer: string; wasSkipped: boolean; streakAfter: number };
+
+// The per-word "leveling up" indicator: one dot per step toward
+// WORD_MASTERY_STREAK, each filled dot colored by pastelGreenForStreakDot
+// (lib/lgs-vocab.ts) -- the SAME five-step pastel-green scale the dashboard's
+// own per-unit progress bar uses, so a word visibly "leveling up" here reads
+// as part of the same reward language as the unit card filling in.
+function WordProgressDots({
+  streak,
+  totalDots = WORD_MASTERY_STREAK,
+  className,
+}: {
+  streak: number;
+  totalDots?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("flex items-center gap-1.5", className)}
+      role="img"
+      aria-label={`Kelime serisi: ${Math.min(streak, totalDots)}/${totalDots}`}
+    >
+      {Array.from({ length: totalDots }, (_, i) => (
+        <span
+          key={i}
+          className={cn("size-2.5 rounded-full transition-colors duration-300", i >= streak && "bg-secondary")}
+          style={i < streak ? { backgroundColor: pastelGreenForStreakDot(i, totalDots) } : undefined}
+        />
+      ))}
+    </div>
+  );
+}
 
 function randomDirection(): QuizDirection {
   return Math.random() < 0.5 ? "en_to_tr" : "tr_to_en";
@@ -76,6 +121,7 @@ function AnswerFeedbackContent({
   return (
     <div className="space-y-4 py-6 text-center">
       <Icon className={cn("mx-auto size-14", content.iconClass)} />
+      <WordProgressDots streak={feedback.streakAfter} className="justify-center" />
       <div className="space-y-1.5">
         <p className={cn("text-xl font-bold", content.titleClass)}>{content.title(feedback.wasSkipped)}</p>
         {needsAcknowledgement && (
@@ -207,7 +253,12 @@ export function VocabQuizSession({
   // the feedback content or the student from clicking through.
   function recordAnswer(result: AnswerResult, correctAnswer: string, wasSkipped: boolean) {
     if (!current) return;
-    setFeedback({ result, correctAnswer, wasSkipped });
+    // Optimistic streak, mirroring submitVocabAnswer's own formula exactly --
+    // the dots already show the right step the instant the answer is given,
+    // reconciled below with the server's authoritative figure once the save
+    // resolves.
+    const optimisticStreak = result === "INCORRECT" ? 0 : Math.min(current.correctStreak + 1, WORD_MASTERY_STREAK);
+    setFeedback({ result, correctAnswer, wasSkipped, streakAfter: optimisticStreak });
     setResults((prev) => [...prev, result]);
     setSubmitError(null);
 
@@ -220,6 +271,7 @@ export function VocabQuizSession({
           setSubmitError(outcome.error);
           return;
         }
+        setFeedback((prev) => (prev ? { ...prev, streakAfter: outcome.nextStreak } : prev));
         if (outcome.isMastered) onWordMastered();
         // Keeps the "Görev: X/Y kelime" counter live within this session --
         // a correct answer that actually counted toward the task (one
@@ -400,7 +452,10 @@ export function VocabQuizSession({
         ) : (
           <>
             <div className="space-y-1">
-              <p className="text-muted-foreground text-xs">{promptLabel}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-muted-foreground text-xs">{promptLabel}</p>
+                <WordProgressDots streak={current.correctStreak} />
+              </div>
               <p className="text-foreground text-2xl font-semibold">{prompt}</p>
             </div>
 

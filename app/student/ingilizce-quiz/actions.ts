@@ -8,7 +8,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus } from "@/lib/count-fields";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
-import { selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
+import { selectQuizBatch, WORD_MASTERY_STREAK, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
 
 // Every action here returns its outcome instead of throwing -- reads
 // included, unlike app/student/paragraf-problem/lgs-actions.ts's
@@ -25,11 +25,17 @@ import { selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/
 type GetVocabQuizBatchResult = { ok: true; words: QuizWord[] } | { ok: false; error: string };
 type GetActiveVocabQuizTaskResult = { ok: true; task: ActiveVocabQuizTask | null } | { ok: false; error: string };
 // isMastered on success tells the UI whether THIS answer was the one that
-// crossed the streak-of-3 threshold, so the dashboard's mastered count can
-// bump exactly once, right when it actually happens -- not on every
-// correct answer. taskCompleted is the same idea for an assigned
+// crossed the WORD_MASTERY_STREAK threshold, so the dashboard's mastered
+// count can bump exactly once, right when it actually happens -- not on
+// every correct answer. taskCompleted is the same idea for an assigned
 // vocab_quiz task's own word-count target (see activeTaskId below).
-type SubmitAnswerResult = { ok: true; isMastered: boolean; taskCompleted: boolean } | { ok: false; error: string };
+// nextStreak is this word's own correct_streak AFTER this answer (0 on a
+// miss/skip) -- the quiz session's per-word dot indicator renders straight
+// off this, authoritative over whatever it may have optimistically guessed
+// the instant the answer was given.
+type SubmitAnswerResult =
+  | { ok: true; isMastered: boolean; taskCompleted: boolean; nextStreak: number }
+  | { ok: false; error: string };
 
 async function requireUserId() {
   await assertNotImpersonating();
@@ -125,7 +131,7 @@ export async function getActiveVocabQuizTask(unitNumber: number): Promise<GetAct
 }
 
 // Upserts this student's streak for one word: correct extends it by one
-// (mastered once it reaches 3), incorrect (including a "Pas Geç" skip --
+// (mastered once it reaches WORD_MASTERY_STREAK), incorrect (including a "Pas Geç" skip --
 // the caller passes isCorrect: false for that too) resets it to 0.
 // last_tested_at always moves to now, whichever way it went -- both feed
 // selectQuizBatch's own prioritization on the NEXT batch fetch.
@@ -158,7 +164,7 @@ export async function submitVocabAnswer(
     if (fetchError) throw dbError(fetchError);
 
     const nextStreak = isCorrectV ? (existing?.correct_streak ?? 0) + 1 : 0;
-    const isMastered = nextStreak >= 3;
+    const isMastered = nextStreak >= WORD_MASTERY_STREAK;
     const { error } = await supabase.from("student_word_progress").upsert(
       {
         student_id: userId,
@@ -202,7 +208,7 @@ export async function submitVocabAnswer(
 
     revalidatePath("/student/ingilizce-quiz");
     revalidatePath("/student");
-    return { ok: true, isMastered, taskCompleted };
+    return { ok: true, isMastered, taskCompleted, nextStreak };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }

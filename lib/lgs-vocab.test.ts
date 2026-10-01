@@ -5,9 +5,11 @@ import {
   fillUnitStats,
   levenshteinDistance,
   pastelGreenForProgress,
+  pastelGreenForStreakDot,
   pastelGreenStepForProgress,
   selectQuizBatch,
   vocabUnitTitle,
+  WORD_MASTERY_STREAK,
   type WordProgressSummary,
 } from "./lgs-vocab";
 
@@ -135,9 +137,18 @@ describe("selectQuizBatch", () => {
     expect(batch).toHaveLength(2);
   });
 
-  it("returns only the display fields, not progress internals", () => {
+  it("returns the display fields plus correctStreak, not the rest of the progress row", () => {
     const [first] = selectQuizBatch(words, new Map(), 1);
-    expect(first).toEqual({ id: "w1", english_word: "apple", turkish_meaning: "elma" });
+    expect(first).toEqual({ id: "w1", english_word: "apple", turkish_meaning: "elma", correctStreak: 0 });
+  });
+
+  it("carries each word's own correct_streak through for the per-word dot indicator", () => {
+    const progress = new Map<string, WordProgressSummary>([
+      ["w2", { correct_streak: 2, is_mastered: false, last_tested_at: null }],
+    ]);
+    const batch = selectQuizBatch(words, progress, 10);
+    expect(batch.find((w) => w.id === "w2")?.correctStreak).toBe(2);
+    expect(batch.find((w) => w.id === "w3")?.correctStreak).toBe(0); // no progress row -> 0
   });
 });
 
@@ -217,5 +228,24 @@ describe("pastelGreenForProgress", () => {
   it("applies the requested alpha without changing the hue/lightness step", () => {
     expect(pastelGreenForProgress(50, 0.08)).toMatch(/\/ 0\.08\)$/);
     expect(pastelGreenForProgress(50, 0.08).replace("0.08", "1")).toBe(pastelGreenForProgress(50));
+  });
+});
+
+describe("pastelGreenForStreakDot", () => {
+  it("darkens from the first dot to the last, reusing pastelGreenForProgress's own scale", () => {
+    const lightnessOf = (color: string) => Number(color.match(/(\d+)%\s*\/\s*[\d.]+\)$/)?.[1]);
+    const dots = [0, 1, 2].map((i) => lightnessOf(pastelGreenForStreakDot(i, 3)));
+    expect(dots[0]).toBeGreaterThan(dots[1]);
+    expect(dots[1]).toBeGreaterThan(dots[2]);
+  });
+
+  it("the last dot always lands on the deepest step, same as a fully-mastered unit card", () => {
+    expect(pastelGreenForStreakDot(2, 3)).toBe(pastelGreenForProgress(100));
+  });
+});
+
+describe("WORD_MASTERY_STREAK", () => {
+  it("is 3, matching the quiz's own 'answer it right 3 times in a row' rule", () => {
+    expect(WORD_MASTERY_STREAK).toBe(3);
   });
 });

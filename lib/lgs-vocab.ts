@@ -79,6 +79,23 @@ export function pastelGreenForProgress(pct: number, alpha = 1): string {
   return `hsl(${PASTEL_GREEN_HUE} ${saturation}% ${lightness}% / ${alpha})`;
 }
 
+// The quiz session's own per-word "leveling up" dots (vocab-quiz-session.tsx)
+// reuse this SAME five-step scale rather than a second color table -- dot
+// `dotIndex` (0-indexed) of `totalDots` just lands on whichever step its own
+// fraction of the way through the dots would be, so the LAST dot always
+// lands on the deepest step, same as a fully-mastered unit's own dashboard
+// card above.
+export function pastelGreenForStreakDot(dotIndex: number, totalDots: number): string {
+  return pastelGreenForProgress(((dotIndex + 1) / totalDots) * 100);
+}
+
+// A word is mastered once its correct-answer streak reaches this many in a
+// row (student_word_progress.correct_streak) -- shared so the quiz UI's own
+// per-word dot indicator always renders exactly this many dots, and the
+// server's own mastery check (submitVocabAnswer, app/student/ingilizce-quiz/
+// actions.ts) can never drift from what the dots promise.
+export const WORD_MASTERY_STREAK = 3;
+
 // One row per (student, word) -- a simple spaced-repetition streak.
 // is_mastered flips to true once correct_streak reaches 3; that transition
 // is application logic (a later phase's server action), not enforced at
@@ -173,7 +190,11 @@ export function checkVocabAnswer(userAnswer: string, correctAnswer: string, dire
 
 // --- Phase 2: quiz batch selection -----------------------------------------
 
-export type QuizWord = Pick<LgsWord, "id" | "english_word" | "turkish_meaning">;
+// correctStreak rides along so the quiz session's own per-word dot indicator
+// can show where a word already stands (0 up to WORD_MASTERY_STREAK - 1 --
+// selectQuizBatch below already drops anything at/past mastery) the instant
+// its prompt appears, not just after the student's next answer.
+export type QuizWord = Pick<LgsWord, "id" | "english_word" | "turkish_meaning"> & { correctStreak: number };
 export type WordProgressSummary = Pick<StudentWordProgress, "correct_streak" | "is_mastered" | "last_tested_at">;
 
 // Pure selection/ordering logic behind getVocabQuizBatch (app/student/
@@ -199,7 +220,12 @@ export function selectQuizBatch(
       return xTime - yTime;
     })
     .slice(0, limit)
-    .map(({ word }) => ({ id: word.id, english_word: word.english_word, turkish_meaning: word.turkish_meaning }));
+    .map(({ word, progress }) => ({
+      id: word.id,
+      english_word: word.english_word,
+      turkish_meaning: word.turkish_meaning,
+      correctStreak: progress?.correct_streak ?? 0,
+    }));
 }
 
 // --- Phase 2: dashboard mastery stats ---------------------------------------
