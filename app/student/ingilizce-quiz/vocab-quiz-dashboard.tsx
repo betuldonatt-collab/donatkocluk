@@ -6,7 +6,8 @@ import { BookOpenCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { pastelGreenForProgress, vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
+import { vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
+import { pastelGreenForProgress } from "@/lib/progress-colors";
 import { VocabQuizSession } from "./vocab-quiz-session";
 
 function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {

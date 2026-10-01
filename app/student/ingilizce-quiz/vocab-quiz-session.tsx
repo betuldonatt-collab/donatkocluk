@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   checkVocabAnswer,
-  pastelGreenForStreakDot,
   vocabUnitTitle,
   WORD_MASTERY_STREAK,
   type AnswerResult,
   type QuizDirection,
   type QuizWord,
 } from "@/lib/lgs-vocab";
+import { pastelGreenForStreakDot } from "@/lib/progress-colors";
 import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
 
 type BatchWord = QuizWord & { direction: QuizDirection };

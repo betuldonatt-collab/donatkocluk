@@ -115,6 +115,7 @@ export const STUDENT_NAV_ITEMS: TourNavItem[] = [
   { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", blurb: "Yıllara göre çıkmış soru dağılımını buradan inceleyebilirsin." },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", blurb: "Girdiğin denemelerin konu bazlı analizlerini burada görürsün." },
   { href: "/student/ingilizce-quiz", label: "İngilizce Quiz", blurb: "Ünite ünite İngilizce kelime tekrarı yaparsın." },
+  { href: "/student/11-sinif-maarif", label: "11. Sınıf Maarif", blurb: "11. sınıf müfredatındaki ders ve konuları buradan incelersin." },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", blurb: "Kullandığın tüm kaynakların listesi burada." },
   { href: "/student/profile", label: "Profilim", blurb: "Kendi profil bilgilerini buradan güncelleyebilirsin." },
   { href: "/student/settings", label: "Ayarlar", blurb: "Görünüm ve hesap ayarlarını buradan yönetirsin." },
