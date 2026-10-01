@@ -145,17 +145,21 @@ export function selectQuizBatch(
 
 export type UnitStat = { unitNumber: number; total: number; mastered: number };
 
-// Pure aggregation behind the "İngilizce Quiz" dashboard's per-unit "15/40
-// Öğrenildi" counters -- units 1-10 always all present (even at 0/0 for a
-// unit with no words loaded yet), in order.
-export function computeUnitStats(words: Pick<LgsWord, "id" | "unit_number">[], masteredWordIds: Set<string>): UnitStat[] {
+// Fills in units 1-10 always all present (even at 0/0 for a unit with no
+// words loaded yet), in order -- from the ALREADY-AGGREGATED per-unit rows
+// returned by the get_lgs_vocab_unit_stats RPC (one row per unit that has
+// >= 1 word), rather than summing every individual word row here. lgs_words
+// can easily exceed PostgREST's default per-request row cap (1000) once
+// every unit is fully populated -- fetching every row to count them
+// client-side silently truncated this dashboard's totals once the table
+// passed that cap (units 1-4 alone already total 900+ words); aggregating
+// in SQL means this page never needs more than 10 rows back, no matter how
+// large the word bank grows.
+export function fillUnitStats(rows: UnitStat[]): UnitStat[] {
   const stats = new Map<number, UnitStat>();
   for (let unit = 1; unit <= 10; unit++) stats.set(unit, { unitNumber: unit, total: 0, mastered: 0 });
-  for (const w of words) {
-    const stat = stats.get(w.unit_number);
-    if (!stat) continue; // a unit_number outside 1-10 should never exist (DB check constraint), but never crash the dashboard over it
-    stat.total += 1;
-    if (masteredWordIds.has(w.id)) stat.mastered += 1;
+  for (const r of rows) {
+    if (stats.has(r.unitNumber)) stats.set(r.unitNumber, r);
   }
   return [...stats.values()];
 }

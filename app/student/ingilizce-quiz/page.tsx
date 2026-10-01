@@ -3,27 +3,25 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireViewContext } from "@/lib/impersonation";
 import { getStudentExamType } from "@/lib/student-exam-type";
-import { computeUnitStats } from "@/lib/lgs-vocab";
+import { fillUnitStats } from "@/lib/lgs-vocab";
 import { VocabQuizDashboard } from "./vocab-quiz-dashboard";
 
 export default async function IngilizceQuizPage() {
-  const view = await requireViewContext("student");
+  await requireViewContext("student");
   // LGS-only feature -- a YKS/Maarif student who lands here anyway (a
   // stale link, browser back/forward) is sent back to their own dashboard
   // instead of seeing an empty or broken page.
   if ((await getStudentExamType()) !== "LGS") redirect("/student");
 
   const supabase = await createClient();
-  const [{ data: words }, { data: masteredRows }] = await Promise.all([
-    supabase.from("lgs_words").select("id, unit_number"),
-    supabase
-      .from("student_word_progress")
-      .select("word_id")
-      .eq("student_id", view.effectiveUserId)
-      .eq("is_mastered", true),
-  ]);
-
-  const unitStats = computeUnitStats(words ?? [], new Set((masteredRows ?? []).map((r) => r.word_id)));
+  // Aggregated in SQL (get_lgs_vocab_unit_stats, migration 0112), not fetched
+  // as raw rows and summed here -- lgs_words can exceed PostgREST's default
+  // per-request row cap (1000) once every unit is populated, which silently
+  // truncated a plain "select every word" query before it ever reached this
+  // page.
+  const { data } = await supabase.rpc("get_lgs_vocab_unit_stats");
+  const rows = (data ?? []) as { unit_number: number; total: number; mastered: number }[];
+  const unitStats = fillUnitStats(rows.map((r) => ({ unitNumber: r.unit_number, total: r.total, mastered: r.mastered })));
 
   return <VocabQuizDashboard initialUnitStats={unitStats} />;
 }

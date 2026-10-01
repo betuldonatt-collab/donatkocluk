@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   checkVocabAnswer,
-  computeUnitStats,
+  fillUnitStats,
   levenshteinDistance,
   selectQuizBatch,
   vocabUnitTitle,
@@ -116,23 +116,27 @@ describe("selectQuizBatch", () => {
   });
 });
 
-describe("computeUnitStats", () => {
-  it("always returns all 10 units in order, even with no words", () => {
-    const stats = computeUnitStats([], new Set());
+describe("fillUnitStats", () => {
+  it("always returns all 10 units in order, even with no rows", () => {
+    const stats = fillUnitStats([]);
     expect(stats).toHaveLength(10);
     expect(stats.map((s) => s.unitNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(stats.every((s) => s.total === 0 && s.mastered === 0)).toBe(true);
   });
 
-  it("counts total and mastered per unit", () => {
-    const words = [
-      { id: "a", unit_number: 1 },
-      { id: "b", unit_number: 1 },
-      { id: "c", unit_number: 2 },
-    ];
-    const stats = computeUnitStats(words, new Set(["a"]));
+  it("fills in only the units a row was given for, leaving the rest at 0/0", () => {
+    const stats = fillUnitStats([
+      { unitNumber: 1, total: 2, mastered: 1 },
+      { unitNumber: 2, total: 1, mastered: 0 },
+    ]);
     expect(stats[0]).toEqual({ unitNumber: 1, total: 2, mastered: 1 });
     expect(stats[1]).toEqual({ unitNumber: 2, total: 1, mastered: 0 });
+    expect(stats[2]).toEqual({ unitNumber: 3, total: 0, mastered: 0 });
+  });
+
+  it("ignores a row for a unit number outside 1-10 instead of crashing", () => {
+    const stats = fillUnitStats([{ unitNumber: 11, total: 5, mastered: 5 }]);
+    expect(stats).toHaveLength(10);
   });
 });
 
