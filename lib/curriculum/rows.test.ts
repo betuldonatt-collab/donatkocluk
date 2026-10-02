@@ -75,7 +75,7 @@ describe("flattenSelectionRows", () => {
     // 12 (unit, konu) entries in lgs.json -> 12 selectable rows, never one per Alt Konu.
     expect(rows).toHaveLength(course.units.length);
     const first = rows[0];
-    expect(first.label).toBe("1.1 Çarpanlar ve Katlar");
+    expect(first.label).toBe("Çarpanlar ve Katlar");
     expect(first.readOnlyNames).toEqual(["Pozitif Tam Sayıların Pozitif Tam Sayı Çarpanları", "EKOK", "EBOB"]);
     // "1. ÜNİTE" holds konu 1.1 and 1.2 -> its Ünite cell spans both rows.
     expect(rows[0].unitRowSpan).toBe(2);

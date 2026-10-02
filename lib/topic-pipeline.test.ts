@@ -118,7 +118,7 @@ describe("summarizePipeline", () => {
 describe("collapsePipelineMapForRows", () => {
   it("folds a raw per-Alt-Konu map onto its Konu row (OR across members), end to end with summarizePipeline", () => {
     const rows = flattenSelectionRows(lgsCourse);
-    const carpanlarVeKatlar = rows.find((r) => r.label === "1.1 Çarpanlar ve Katlar")!;
+    const carpanlarVeKatlar = rows.find((r) => r.label === "Çarpanlar ve Katlar")!;
     // A step checked on "EKOK" (a non-representative member, never a node
     // id of its own) before this change must still show up on the row.
     const ekok = carpanlarVeKatlar.memberTopicIds.find((id) => id !== carpanlarVeKatlar.id)!;

@@ -14,6 +14,7 @@ import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9"
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
+import { stripKonuNumberPrefix } from "./topic-name";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
 // `konu` is LGS's middle hierarchy level (Ünite -> Konu -> Alt Konu):
@@ -29,7 +30,12 @@ export const TYT_COURSES: Course[] = tytJson as Course[];
 
 // LGS (8th grade) subjects -- ids are all "lgs-" prefixed so they can never
 // collide with, or be mistaken for, a tyt-/ayt- course.
-export const LGS_COURSES: Course[] = lgsJson as Course[];
+// The sheet's Konu numbering ("1.1 Çarpanlar ve Katlar") is stripped here so
+// no screen shows it (see ./topic-name); the JSON keeps it for ordering.
+export const LGS_COURSES: Course[] = (lgsJson as Course[]).map((course) => ({
+  ...course,
+  units: course.units.map((u) => (u.konu === undefined ? u : { ...u, konu: stripKonuNumberPrefix(u.konu) })),
+}));
 
 export function isLgsCourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("lgs-");

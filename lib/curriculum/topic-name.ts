@@ -17,6 +17,15 @@ export function stripTopicNumberPrefix(name: string): string {
     .join(" › ");
 }
 
+// LGS's Konu labels ("1.1 Çarpanlar ve Katlar") carry the same kind of sheet
+// numbering, but without a trailing dot. Only ever applied to a Unit's
+// `konu` field: LGS unit labels ("1. ÜNİTE") are real identifiers and a
+// topic like "2. Dünya savaşı ve demokrasi yolunda atılan adımlar" starts
+// with a genuine number, so neither is touched.
+export function stripKonuNumberPrefix(konu: string): string {
+  return konu.replace(/^\d+(?:\.\d+)+\.?\s+/, "");
+}
+
 export function withCleanTopicNames<U extends { topics: { name: string }[] }, C extends { units: U[] }>(courses: C[]): C[] {
   return courses.map(
     (course) =>

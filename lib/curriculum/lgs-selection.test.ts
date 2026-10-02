@@ -12,7 +12,7 @@ function courseById(id: string) {
 describe("lgsSelectionNodes", () => {
   it("Matematik: one selectable node per Konu, id is a real topic id, all Alt Konu names kept read-only", () => {
     const nodes = lgsSelectionNodes(courseById("lgs-matematik"));
-    const carpanlarVeKatlar = nodes.find((n) => n.label === "1.1 Çarpanlar ve Katlar");
+    const carpanlarVeKatlar = nodes.find((n) => n.label === "Çarpanlar ve Katlar");
     expect(carpanlarVeKatlar).toMatchObject({
       id: "lgs-matematik-u0-t0",
       unitLabel: "1. Ünite",

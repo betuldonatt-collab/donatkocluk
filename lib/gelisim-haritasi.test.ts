@@ -68,7 +68,7 @@ describe("computeGelisimHaritasi", () => {
 
   it("rolls up an LGS course's rows to Konu level, folding mistakes tagged on any of its Alt Konu members", () => {
     const LGS_COURSE_ID = "lgs-matematik";
-    // "EKOK" and "EBOB" are both members of the "1.1 Çarpanlar ve Katlar"
+    // "EKOK" and "EBOB" are both members of the "Çarpanlar ve Katlar"
     // node (lgs-matematik-u0-t0) alongside its representative topic.
     const exams = [{ id: "e1", task_date: "2026-01-04", task_type: "branch_exam", course_id: LGS_COURSE_ID }];
     const mistakeRows = [
@@ -80,7 +80,7 @@ describe("computeGelisimHaritasi", () => {
     // One row for the whole Konu, not one per Alt Konu.
     expect(rows.filter((r) => r.courseId === LGS_COURSE_ID)).toHaveLength(12);
     const carpanlarVeKatlar = rows.find((r) => r.topicId === "lgs-matematik-u0-t0")!;
-    expect(carpanlarVeKatlar.topicName).toBe("1.1 Çarpanlar ve Katlar");
+    expect(carpanlarVeKatlar.topicName).toBe("Çarpanlar ve Katlar");
     expect(carpanlarVeKatlar.wrongCount).toBe(1);
     expect(carpanlarVeKatlar.blankCount).toBe(1);
   });
