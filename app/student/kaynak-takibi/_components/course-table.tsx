@@ -24,7 +24,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { MaarifOkulIlerlemesiCell, PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import {
+  MAARIF_KONU_STICKY_LEFT_CLASS,
+  MAARIF_STAT_HEAD_CLASSES,
+  MAARIF_UNIT_COL_CLASS,
+  MaarifStatCells,
+  MaarifTableBody,
+} from "@/components/maarif-table-body";
 import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
@@ -115,8 +122,14 @@ export function CourseTable({
   // never one row per raw Alt Konu/topic for those courses; everything
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
-  const collapsedPipeline = pipeline && { ...pipeline, map: collapsePipelineMapForRows(rows, pipeline.map, pipeline.config) };
   const isMaarif = isMaarifCourseId(course.id);
+  // A Maarif unit's Okul İlerlemesi is ticked per subtopic, so it folds with
+  // AND (unit done only when every subtopic is) for the summary bar.
+  const collapsedMap = pipeline && collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? ["okul_ilerlemesi"] : []);
+  const collapsedPipeline = pipeline && collapsedMap && { ...pipeline, map: collapsedMap };
+  // Maarif courses render as a spreadsheet-style grid (MaarifTableBody);
+  // every other cohort keeps the generic one-row-per-selection-row body.
+  const maarifPipeline = isMaarif && pipeline && collapsedMap ? { raw: pipeline, collapsedMap } : null;
 
   return (
     <Card>
@@ -136,10 +149,16 @@ export function CourseTable({
               <TableHead colSpan={4} className="text-center font-semibold">
                 Soru Dağılımı
               </TableHead>
-              <TableHead className="bg-background sticky left-0 z-20 border-l w-12 align-bottom" rowSpan={2}>
+              <TableHead
+                className={cn("bg-background sticky left-0 z-20 border-l align-bottom", isMaarif ? MAARIF_UNIT_COL_CLASS : "w-12")}
+                rowSpan={2}
+              >
                 Ünite
               </TableHead>
-              <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom" rowSpan={2}>
+              <TableHead
+                className={cn("bg-background sticky z-20 border-r align-bottom", isMaarif ? MAARIF_KONU_STICKY_LEFT_CLASS : "left-12")}
+                rowSpan={2}
+              >
                 Konu
               </TableHead>
               {pipeline && <PipelineStepHeads steps={pipeline.config.start} />}
@@ -155,10 +174,10 @@ export function CourseTable({
               {pipeline && <PipelineStepHeads steps={pipeline.config.end} />}
             </TableRow>
             <TableRow>
-              <TableHead className="text-center text-xs">Toplam</TableHead>
-              <TableHead className="text-center text-xs text-emerald-700">D</TableHead>
-              <TableHead className="text-center text-xs text-rose-700">Y</TableHead>
-              <TableHead className="text-center text-xs text-amber-700">B</TableHead>
+              <TableHead className={cn("text-center text-xs", isMaarif && MAARIF_STAT_HEAD_CLASSES.total)}>Toplam</TableHead>
+              <TableHead className={cn("text-center text-xs text-emerald-700", isMaarif && MAARIF_STAT_HEAD_CLASSES.count)}>D</TableHead>
+              <TableHead className={cn("text-center text-xs text-rose-700", isMaarif && MAARIF_STAT_HEAD_CLASSES.count)}>Y</TableHead>
+              <TableHead className={cn("text-center text-xs text-amber-700", isMaarif && MAARIF_STAT_HEAD_CLASSES.count)}>B</TableHead>
               {resources.map((resource) => (
                 <Fragment key={resource.id}>
                   <TableHead className="border-l h-auto py-2 text-center whitespace-normal">
@@ -176,7 +195,18 @@ export function CourseTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => (
+            {maarifPipeline ? (
+              <MaarifTableBody
+                courseName={course.name}
+                rows={rows}
+                resources={resources}
+                progress={progress}
+                topicStats={topicStats.byTopic}
+                pipeline={maarifPipeline.raw}
+                collapsedMap={maarifPipeline.collapsedMap}
+                onToggleProgress={onToggle}
+              />
+            ) : rows.map((row) => (
               <TableRow key={row.id}>
                 <StatCells stat={aggregateStat(topicStats.byTopic, row.memberTopicIds)} />
                 {row.unitRowSpan !== null && (
@@ -205,7 +235,7 @@ export function CourseTable({
                       checkbox anymore, it's just what "{row.label}" covers. */}
                   <ReadOnlySubtopics names={row.readOnlyNames} />
                 </TableCell>
-                {collapsedPipeline && pipeline && (
+                {collapsedPipeline && (
                   <PipelineCells
                     steps={collapsedPipeline.config.start}
                     courseName={course.name}
@@ -213,20 +243,6 @@ export function CourseTable({
                     topicId={row.id}
                     map={collapsedPipeline.map}
                     onToggle={collapsedPipeline.onToggle}
-                    renderCustomCell={
-                      isMaarif
-                        ? (step, i) =>
-                            step.key === "okul_ilerlemesi" ? (
-                              <MaarifOkulIlerlemesiCell
-                                isFirst={i === 0}
-                                courseName={course.name}
-                                row={row}
-                                map={pipeline.map}
-                                onToggle={pipeline.onToggle}
-                              />
-                            ) : undefined
-                        : undefined
-                    }
                   />
                 )}
                 {resources.map((resource) => {
@@ -270,7 +286,7 @@ export function CourseTable({
                 fixed part of the table rather than something that
                 appears/disappears. */}
             <TableRow className="bg-muted/40">
-              <StatCells stat={topicStats.karma} />
+              {isMaarif ? <MaarifStatCells stat={topicStats.karma} /> : <StatCells stat={topicStats.karma} />}
               <TableCell colSpan={2} className="bg-muted/40 sticky left-0 z-10 border-l font-medium whitespace-normal italic">
                 Karma
               </TableCell>

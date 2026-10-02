@@ -1,11 +1,8 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
-
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableHead } from "@/components/ui/table";
 import type { Course } from "@/lib/curriculum";
-import type { SelectionRow } from "@/lib/curriculum/rows";
 import {
   allPipelineSteps,
   summarizePipeline,
@@ -50,7 +47,6 @@ export function PipelineCells({
   topicId,
   map,
   onToggle,
-  renderCustomCell,
 }: {
   steps: readonly PipelineStep[];
   courseName: string;
@@ -58,76 +54,20 @@ export function PipelineCells({
   topicId: string;
   map: PipelineMap;
   onToggle: (topicId: string, step: PipelineStepKey) => void;
-  // Lets a caller substitute a specific step's whole cell (e.g. the Maarif
-  // cohort's "Okul İlerlemesi" step, which needs one checkbox per raw
-  // subtopic instead of this row's single collapsed one -- see
-  // MaarifOkulIlerlemesiCell below) while every other step still renders
-  // normally, in the exact same column position/order the header
-  // (PipelineStepHeads, rendered from this same unfiltered `steps` list)
-  // already laid out. Returning undefined keeps the normal checkbox cell.
-  renderCustomCell?: (step: PipelineStep, index: number) => ReactNode | undefined;
 }) {
   const state = map[topicId];
   return (
     <>
-      {steps.map((step, i) => {
-        const custom = renderCustomCell?.(step, i);
-        if (custom !== undefined) return <Fragment key={step.key}>{custom}</Fragment>;
-        return (
-          <TableCell key={step.key} className={cn("text-center", i === 0 && "border-l")}>
-            <Checkbox
-              checked={state?.[step.key] ?? false}
-              onCheckedChange={() => onToggle(topicId, step.key)}
-              aria-label={`${courseName} - ${topicName} - ${step.label}`}
-            />
-          </TableCell>
-        );
-      })}
+      {steps.map((step, i) => (
+        <TableCell key={step.key} className={cn("text-center", i === 0 && "border-l")}>
+          <Checkbox
+            checked={state?.[step.key] ?? false}
+            onCheckedChange={() => onToggle(topicId, step.key)}
+            aria-label={`${courseName} - ${topicName} - ${step.label}`}
+          />
+        </TableCell>
+      ))}
     </>
-  );
-}
-
-// The Maarif cohort's "Okul İlerlemesi" step tracks what was actually
-// covered in the student's own school classes -- unlike every other
-// pipeline step (collapsed to one checkbox per Kaynak Takibi unit row, see
-// lib/curriculum/maarif-selection.ts), a teacher can cover some subtopics
-// of a unit and not others, so this one needs real subtopic granularity.
-// Renders its own checklist, one checkbox per real topic the row rolls up
-// (same names/order as ReadOnlySubtopics' plain list), reading/writing the
-// RAW (uncollapsed) pipeline map directly by each topic's own real id --
-// never the row's single representative id the other steps use.
-export function MaarifOkulIlerlemesiCell({
-  isFirst,
-  courseName,
-  row,
-  map,
-  onToggle,
-}: {
-  isFirst: boolean;
-  courseName: string;
-  row: SelectionRow;
-  map: PipelineMap;
-  onToggle: (topicId: string, step: PipelineStepKey) => void;
-}) {
-  return (
-    <TableCell className={cn("text-left align-top", isFirst && "border-l")}>
-      <div className="flex flex-col gap-1">
-        {row.memberTopicIds.map((topicId, i) => {
-          const name = row.readOnlyNames[i] ?? row.label;
-          return (
-            <label key={topicId} className="flex items-start gap-1.5 text-xs leading-snug">
-              <Checkbox
-                className="mt-0.5"
-                checked={map[topicId]?.okul_ilerlemesi ?? false}
-                onCheckedChange={() => onToggle(topicId, "okul_ilerlemesi")}
-                aria-label={`${courseName} - ${row.label} - ${name} - Okul İlerlemesi`}
-              />
-              <span>{name}</span>
-            </label>
-          );
-        })}
-      </div>
-    </TableCell>
   );
 }
 

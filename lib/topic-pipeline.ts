@@ -58,8 +58,8 @@ export const PIPELINE_CONFIG: Record<ExamType, PipelineConfig> = {
 // more column. An ordinary YKS/mezun student's PIPELINE_CONFIG.YKS above is
 // untouched. Unlike every other step (collapsed to one checkbox per Kaynak
 // Takibi unit row, see lib/curriculum/maarif-selection.ts), Okul İlerlemesi
-// renders at raw subtopic granularity -- see MaarifOkulIlerlemesiCell
-// (components/topic-pipeline.tsx) and its use in course-table.tsx /
+// renders at raw subtopic granularity -- see MaarifTableBody
+// (components/maarif-table-body.tsx), used by course-table.tsx and
 // editable-course-table.tsx.
 const MAARIF_PIPELINE_CONFIG: PipelineConfig = {
   table: "yks_topic_pipeline_status",
@@ -160,16 +160,25 @@ export function summarizePipeline(course: Course, map: PipelineMap, config: Pipe
 // because the table stopped rendering them as their own rows. A no-op
 // (1:1 remap) for a table whose rows are already one real topic each,
 // which is every non-LGS course and every ungrouped LGS row.
+//
+// `everyMemberSteps` lists steps that fold with AND instead of OR: a Maarif
+// unit's Okul İlerlemesi is ticked per subtopic, so the unit counts as done
+// (for the summary bar) only once EVERY subtopic is ticked.
 export function collapsePipelineMapForRows(
   rows: { id: string; memberTopicIds: string[] }[],
   map: PipelineMap,
   config: PipelineConfig,
+  everyMemberSteps: readonly PipelineStepKey[] = [],
 ): PipelineMap {
   const steps = allPipelineSteps(config);
   const collapsed: PipelineMap = {};
   for (const row of rows) {
     const state: PipelineState = {};
-    for (const step of steps) state[step.key] = row.memberTopicIds.some((id) => map[id]?.[step.key]);
+    for (const step of steps) {
+      state[step.key] = everyMemberSteps.includes(step.key)
+        ? row.memberTopicIds.length > 0 && row.memberTopicIds.every((id) => map[id]?.[step.key])
+        : row.memberTopicIds.some((id) => map[id]?.[step.key]);
+    }
     collapsed[row.id] = state;
   }
   return collapsed;

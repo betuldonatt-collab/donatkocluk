@@ -132,6 +132,17 @@ describe("collapsePipelineMapForRows", () => {
     expect(s.perStep.okul_ilerlemesi).toBe(1);
   });
 
+  it("folds an everyMemberSteps step with AND: a Maarif unit's Okul İlerlemesi is done only when every subtopic is", () => {
+    const rows = [{ id: "a", memberTopicIds: ["a", "b", "c"] }];
+    const config = pipelineConfigFor("YKS", 9);
+    const partial: PipelineMap = { a: { okul_ilerlemesi: true, konu_calismasi: true }, b: { okul_ilerlemesi: true } };
+    const some = collapsePipelineMapForRows(rows, partial, config, ["okul_ilerlemesi"]);
+    expect(some.a.okul_ilerlemesi).toBe(false); // c is unticked
+    expect(some.a.konu_calismasi).toBe(true); // other steps still fold with OR
+    const all: PipelineMap = { a: { okul_ilerlemesi: true }, b: { okul_ilerlemesi: true }, c: { okul_ilerlemesi: true } };
+    expect(collapsePipelineMapForRows(rows, all, config, ["okul_ilerlemesi"]).a.okul_ilerlemesi).toBe(true);
+  });
+
   it("is a no-op remap for rows that are already one real topic each (non-LGS)", () => {
     const rows = flattenSelectionRows(yksCourse);
     const rawMap: PipelineMap = { [yksTopics[0].id]: { konu_calismasi: true } };
