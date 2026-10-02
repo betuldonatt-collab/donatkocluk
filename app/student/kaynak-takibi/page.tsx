@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { KARMA_TOPIC_ID } from "@/lib/curriculum";
-import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
+import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { getStudentExamType } from "@/lib/student-exam-type";
 import type { ResourceTotals } from "./_components/totals-summary";
 import { KaynakTakibiClient, type CourseData } from "./kaynak-takibi-client";
@@ -42,8 +43,10 @@ export default async function KaynakTakibiPage() {
     ]);
 
     // Per-topic pipeline checkboxes -- the cohort's own table (LGS: 4 steps,
-    // YKS: 2). A missing table (migration not run yet) just reads as empty.
-    const pipelineConfig = PIPELINE_CONFIG[examType];
+    // YKS: 2, Maarif: 3). A missing table/column (migration not run yet)
+    // just reads as empty.
+    const maarifGrade = await fetchMaarifGrade(supabase, view.effectiveUserId);
+    const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
     const { data: pipelineRows, error: pipelineError } = await supabase
       .from(pipelineConfig.table)
       .select(pipelineSelectColumns(pipelineConfig))

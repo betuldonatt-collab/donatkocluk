@@ -9,7 +9,7 @@ import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import {
-  PIPELINE_CONFIG,
+  pipelineConfigFor,
   pipelineStepSchema,
   validatePipelineStep,
   type PipelineActionResult,
@@ -181,9 +181,10 @@ export async function setTopicPipelineStep(input: PipelineStepInput): Promise<Pi
 
     const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", user.id).maybeSingle();
     const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
-    validatePipelineStep(examType, inputV, await fetchMaarifGrade(supabase, user.id));
+    const maarifGrade = await fetchMaarifGrade(supabase, user.id);
+    validatePipelineStep(examType, inputV, maarifGrade);
 
-    const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
+    const { error } = await supabase.from(pipelineConfigFor(examType, maarifGrade).table).upsert(
       {
         student_id: user.id,
         course_id: inputV.courseId,

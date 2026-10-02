@@ -8,6 +8,7 @@ import {
   allPipelineSteps,
   collapsePipelineMapForRows,
   groupPipelineRows,
+  pipelineConfigFor,
   pipelineSelectColumns,
   pipelineStepSchema,
   summarizePipeline,
@@ -39,6 +40,28 @@ describe("PIPELINE_CONFIG", () => {
     expect(pipelineSelectColumns(PIPELINE_CONFIG.LGS)).toBe(
       "course_id, topic_id, okul_ilerlemesi, konu_tekrari, meb_kaynagi, cikmis_sorular",
     );
+  });
+});
+
+describe("pipelineConfigFor", () => {
+  it("LGS always gets the LGS config, regardless of Maarif grade", () => {
+    expect(pipelineConfigFor("LGS", null)).toBe(PIPELINE_CONFIG.LGS);
+    expect(pipelineConfigFor("LGS", 9)).toBe(PIPELINE_CONFIG.LGS);
+  });
+
+  it("an ordinary YKS/mezun student (no Maarif grade) gets the unchanged 2-step YKS config", () => {
+    const config = pipelineConfigFor("YKS", null);
+    expect(config).toBe(PIPELINE_CONFIG.YKS);
+    expect(config.start.map((s) => s.key)).toEqual(["konu_calismasi"]);
+  });
+
+  it("a Maarif student (any of the three grades) gets Okul İlerlemesi first, then Konu Çalışması, on the same YKS table", () => {
+    for (const grade of [9, 10, 11] as const) {
+      const config = pipelineConfigFor("YKS", grade);
+      expect(config.table).toBe("yks_topic_pipeline_status");
+      expect(config.start.map((s) => s.key)).toEqual(["okul_ilerlemesi", "konu_calismasi"]);
+      expect(config.end.map((s) => s.key)).toEqual(["cikmis_sorular"]);
+    }
   });
 });
 
@@ -77,6 +100,18 @@ describe("summarizePipeline", () => {
     const s = summarizePipeline(lgsCourse, {}, PIPELINE_CONFIG.LGS);
     expect(s.completed).toBe(0);
     expect(Object.values(s.perStep).every((n) => n === 0)).toBe(true);
+  });
+
+  it("Maarif: counts unit-level rows, not raw subtopics (regression -- used to call lgsSelectionNodes directly, which doesn't know about the Maarif rollup and counted every raw topic instead)", () => {
+    const maarifCourse = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
+    const maarifRows = flattenSelectionRows(maarifCourse);
+    const rawTopicCount = maarifCourse.units.flatMap((u) => u.topics).length;
+    expect(maarifRows.length).toBeLessThan(rawTopicCount); // the rollup actually collapses something
+    const map: PipelineMap = { [maarifRows[0].id]: { okul_ilerlemesi: true, konu_calismasi: true, cikmis_sorular: true } };
+    const config = pipelineConfigFor("YKS", 9);
+    const s = summarizePipeline(maarifCourse, map, config);
+    expect(s.totalTopics).toBe(maarifRows.length);
+    expect(s.completed).toBe(1);
   });
 });
 
@@ -163,6 +198,18 @@ describe("validatePipelineStep", () => {
     const m9 = MAARIF9_KAYNAK_COURSES[0];
     const input = { courseId: m9.id, topicId: m9.units[0].topics[0].id, step: "konu_calismasi" as const, value: true };
     expect(() => validatePipelineStep("YKS", input, 11)).toThrow("Geçersiz ders.");
+  });
+
+  it("accepts Okul İlerlemesi for a Maarif student (any grade, and the 11th grader's merged Maarif TYT course)", () => {
+    const m9 = MAARIF9_KAYNAK_COURSES[0];
+    const okulIlerlemesi = (courseId: string, topicId: string) => ({ courseId, topicId, step: "okul_ilerlemesi" as const, value: true });
+    expect(() => validatePipelineStep("YKS", okulIlerlemesi(m9.id, m9.units[0].topics[0].id), 9)).not.toThrow();
+    const merged = MAARIF_TYT_MERGED_COURSES[0];
+    expect(() => validatePipelineStep("YKS", okulIlerlemesi(merged.id, merged.units[0].topics[0].id), 11)).not.toThrow();
+  });
+
+  it("rejects Okul İlerlemesi for an ordinary YKS/mezun student (no Maarif grade) on their own TYT course", () => {
+    expect(() => validatePipelineStep("YKS", { ...yksOk, step: "okul_ilerlemesi" }, null)).toThrow("Bu adım bu öğrenci için geçerli değil.");
   });
 });
 

@@ -24,9 +24,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import { MaarifOkulIlerlemesiCell, PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
 import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
-import type { Course } from "@/lib/curriculum";
+import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 
@@ -116,6 +116,7 @@ export function CourseTable({
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
   const collapsedPipeline = pipeline && { ...pipeline, map: collapsePipelineMapForRows(rows, pipeline.map, pipeline.config) };
+  const isMaarif = isMaarifCourseId(course.id);
 
   return (
     <Card>
@@ -204,7 +205,7 @@ export function CourseTable({
                       checkbox anymore, it's just what "{row.label}" covers. */}
                   <ReadOnlySubtopics names={row.readOnlyNames} />
                 </TableCell>
-                {collapsedPipeline && (
+                {collapsedPipeline && pipeline && (
                   <PipelineCells
                     steps={collapsedPipeline.config.start}
                     courseName={course.name}
@@ -212,6 +213,20 @@ export function CourseTable({
                     topicId={row.id}
                     map={collapsedPipeline.map}
                     onToggle={collapsedPipeline.onToggle}
+                    renderCustomCell={
+                      isMaarif
+                        ? (step, i) =>
+                            step.key === "okul_ilerlemesi" ? (
+                              <MaarifOkulIlerlemesiCell
+                                isFirst={i === 0}
+                                courseName={course.name}
+                                row={row}
+                                map={pipeline.map}
+                                onToggle={pipeline.onToggle}
+                              />
+                            ) : undefined
+                        : undefined
+                    }
                   />
                 )}
                 {resources.map((resource) => {

@@ -3,13 +3,15 @@ import { z } from "zod";
 import { MAARIF_GRADES, type MaarifGrade } from "./maarif-grade";
 import { AYT_COURSES_BY_TRACK, TYT_COURSES, findCourseById, isLgsCourseId, type Course } from "@/lib/curriculum";
 import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
-import { lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
+import { flattenSelectionRows } from "@/lib/curriculum/rows";
 import type { ExamType } from "@/lib/exam-type";
 
 // The per-topic "learning pipeline" checkboxes on the Kaynak Takibi table.
 // Each cohort has its own steps and its own table:
 //   LGS (lgs_topic_pipeline_status): Okul İlerlemesi, Konu Tekrarı  ...books...  MEB Kaynağı, Çıkmış Sorular
 //   YKS (yks_topic_pipeline_status): Konu Çalışması                 ...books...  Çıkmış Sorular
+//   Maarif (same yks_topic_pipeline_status table, via pipelineConfigFor):
+//                                     Okul İlerlemesi, Konu Çalışması  ...books...  Çıkmış Sorular
 // `start` steps are the columns right after the topic name (before every
 // resource column), `end` steps come after the last resource column -- the
 // natural order a topic is worked through in. A step's `key` is also its
@@ -49,6 +51,36 @@ export const PIPELINE_CONFIG: Record<ExamType, PipelineConfig> = {
     end: [{ key: "cikmis_sorular", label: "Çıkmış Sorular" }],
   },
 };
+
+// A Maarif student (exam_type='YKS', flagged is_maarif9/10/11) additionally
+// tracks "Okul İlerlemesi" -- what was actually covered in their own school
+// classes -- on the SAME table ordinary YKS students use (0115), with one
+// more column. An ordinary YKS/mezun student's PIPELINE_CONFIG.YKS above is
+// untouched. Unlike every other step (collapsed to one checkbox per Kaynak
+// Takibi unit row, see lib/curriculum/maarif-selection.ts), Okul İlerlemesi
+// renders at raw subtopic granularity -- see MaarifOkulIlerlemesiCell
+// (components/topic-pipeline.tsx) and its use in course-table.tsx /
+// editable-course-table.tsx.
+const MAARIF_PIPELINE_CONFIG: PipelineConfig = {
+  table: "yks_topic_pipeline_status",
+  start: [
+    { key: "okul_ilerlemesi", label: "Okul İlerlemesi" },
+    { key: "konu_calismasi", label: "Konu Çalışması" },
+  ],
+  end: [{ key: "cikmis_sorular", label: "Çıkmış Sorular" }],
+};
+
+// The config a student's Kaynak Takibi pipeline actually renders/validates
+// against -- LGS and an ordinary YKS/mezun student get their fixed
+// PIPELINE_CONFIG entry unchanged; a Maarif student (any of the three
+// grades, including an 11th grader's merged "Maarif TYT" tab) gets
+// MAARIF_PIPELINE_CONFIG instead. The one function every server page,
+// Server Action and client table/tab goes through, so cohort + Maarif
+// grade always resolve to the same config everywhere.
+export function pipelineConfigFor(examType: ExamType, maarifGrade: MaarifGrade | null): PipelineConfig {
+  if (examType === "LGS") return PIPELINE_CONFIG.LGS;
+  return maarifGrade !== null ? MAARIF_PIPELINE_CONFIG : PIPELINE_CONFIG.YKS;
+}
 
 export function allPipelineSteps(config: PipelineConfig): PipelineStep[] {
   return [...config.start, ...config.end];
@@ -93,21 +125,22 @@ export type PipelineSummary = {
   completed: number;
 };
 
-// Iterates the course's selection nodes (lib/curriculum/lgs-selection.ts),
-// not its raw topic list -- for a non-LGS course, or an LGS course with no
-// rollup for a given unit, a node is exactly one topic, so this is
-// unchanged from before. For a rolled-up LGS node it's one entry for the
-// whole group, so a Kaynak Takibi table that only renders one pipeline row
-// per node (not one per now-hidden Alt Konu) gets a totalTopics/completed
-// count that actually matches what's on screen.
+// Iterates the course's own Kaynak Takibi rows (lib/curriculum/rows.ts),
+// not its raw topic list -- for a plain course this is one row per topic,
+// unchanged from before. For a rolled-up LGS or Maarif row it's one entry
+// for the whole group, so a Kaynak Takibi table that only renders one
+// pipeline row per row (not one per now-hidden subtopic) gets a
+// totalTopics/completed count that actually matches what's on screen --
+// using the SAME rollup function the table itself renders from, so the two
+// can never disagree on what counts as "one row" for any cohort.
 export function summarizePipeline(course: Course, map: PipelineMap, config: PipelineConfig): PipelineSummary {
-  const nodes = lgsSelectionNodes(course);
+  const rows = flattenSelectionRows(course);
   const steps = allPipelineSteps(config);
   const perStep: Partial<Record<PipelineStepKey, number>> = {};
   for (const step of steps) perStep[step.key] = 0;
   let completed = 0;
-  for (const node of nodes) {
-    const state = map[node.id];
+  for (const row of rows) {
+    const state = map[row.id];
     if (!state) continue;
     let all = true;
     for (const step of steps) {
@@ -116,7 +149,7 @@ export function summarizePipeline(course: Course, map: PipelineMap, config: Pipe
     }
     if (all) completed += 1;
   }
-  return { totalTopics: nodes.length, perStep, completed };
+  return { totalTopics: rows.length, perStep, completed };
 }
 
 // Folds a raw per-topic PipelineMap onto a table's own selection rows (OR
@@ -178,7 +211,7 @@ export type PipelineActionResult = { ok: true } | { ok: false; error: string };
 // THEIR curriculum, on a topic that belongs to that course. This is what
 // keeps an arbitrary column name or a cross-cohort course out of the upsert.
 export function validatePipelineStep(examType: ExamType, input: PipelineStepInput, maarifGrade: MaarifGrade | null = null): void {
-  const config = PIPELINE_CONFIG[examType];
+  const config = pipelineConfigFor(examType, maarifGrade);
   if (!allPipelineSteps(config).some((s) => s.key === input.step)) {
     throw new Error("Bu adım bu öğrenci için geçerli değil.");
   }

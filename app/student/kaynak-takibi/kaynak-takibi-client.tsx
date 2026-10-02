@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CourseTabs } from "@/components/course-tabs";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { BranchExamStockTable, type BranchExamResourceRef } from "./_components/branch-exam-stock-table";
 import { CourseTable, type CourseTopicStats, type ProgressMap, type Resource } from "./_components/course-table";
 import { TotalsSummary, type ResourceTotals } from "./_components/totals-summary";
@@ -16,7 +17,7 @@ import {
   toggleResourceProgress,
   updateOwnBranchExamStock,
 } from "./actions";
-import { PIPELINE_CONFIG, type PipelineConfig, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
+import { pipelineConfigFor, type PipelineConfig, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
 
 export type CourseData = {
   resources: Resource[];
@@ -40,6 +41,8 @@ export function KaynakTakibiClient({
   examType: ExamType;
 }) {
   const [courseData, setCourseData] = useState<Record<string, CourseData>>(initialCourseData);
+  const maarifGrade = useMaarifGrade();
+  const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
 
   function getData(courseId: string): CourseData {
     return courseData[courseId] ?? EMPTY_COURSE_DATA;
@@ -188,7 +191,7 @@ export function KaynakTakibiClient({
             getData={getData}
             addResource={addResource}
             toggleProgress={toggleProgress}
-            pipelineConfig={PIPELINE_CONFIG[examType]}
+            pipelineConfig={pipelineConfig}
             togglePipeline={togglePipeline}
             addBranchExamResource={addBranchExamResource}
             updateBranchExamStock={updateBranchExamStock}

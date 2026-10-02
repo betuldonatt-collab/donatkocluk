@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
-import { PIPELINE_CONFIG, groupPipelineRows, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
+import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
@@ -153,6 +153,7 @@ async function fetchStudentDetail(studentId: string) {
   // The cohort decides which curriculum the analytics below cover.
   const examType: ExamType = profile.exam_type === "LGS" ? "LGS" : "YKS";
   const curriculumCourseIds = curriculumCourseIdsFor(examType);
+  const maarifGrade = await fetchMaarifGrade(supabase, studentId);
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
@@ -274,9 +275,9 @@ async function fetchStudentDetail(studentId: string) {
           .order("entry_date", { ascending: true })
       : { data: [] };
 
-  // Per-topic pipeline ticks (the student's cohort table: LGS 4 steps, YKS 2),
-  // keyed course -> topic. A missing table reads as empty.
-  const pipelineConfig = PIPELINE_CONFIG[examType];
+  // Per-topic pipeline ticks (the student's cohort table: LGS 4 steps, YKS
+  // 2, Maarif 3), keyed course -> topic. A missing table reads as empty.
+  const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
   const { data: pipelineRows, error: pipelineError } = await supabase
     .from(pipelineConfig.table)
     .select(pipelineSelectColumns(pipelineConfig))
@@ -568,6 +569,7 @@ async function fetchStudentDetail(studentId: string) {
 
   return {
     profile: profile as StudentProfile,
+    maarifGrade,
     completion: computeDualCompletionStats(tasks, today, currentCycle),
     subjectCompletion: computeSubjectCompletion(tasks, today, currentCycle),
     progressFrom: currentCycle.start,
@@ -613,7 +615,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
   const searchParams = await props.searchParams;
   const tabParam = Array.isArray(searchParams.tab) ? searchParams.tab[0] : searchParams.tab;
   const detail = await fetchStudentDetail(id);
-  const maarifGrade = detail ? await fetchMaarifGrade(await createClient(), id) : null;
+  const maarifGrade = detail?.maarifGrade ?? null;
   // This student's Süre Tut sessions over 6 hours, waiting for the coach's
   // decision (best-effort: [] on failure). Only asked for once the student
   // resolved, i.e. is actually on this coach's roster.

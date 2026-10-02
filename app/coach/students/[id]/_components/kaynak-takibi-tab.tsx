@@ -4,8 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CourseTabs } from "@/components/course-tabs";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import type { ExamType } from "@/lib/exam-type";
-import { PIPELINE_CONFIG, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
+import { pipelineConfigFor, type PipelineMap, type PipelineStepKey } from "@/lib/topic-pipeline";
 import {
   addBranchExamResource,
   addStudentResource,
@@ -61,6 +62,8 @@ export function KaynakTakibiTab({
   examType?: ExamType;
 }) {
   const [data, setData] = useState<CourseResourceData>(courseData);
+  const maarifGrade = useMaarifGrade();
+  const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
   function getData(courseId: string) {
     return data[courseId] ?? EMPTY_COURSE_DATA;
   }
@@ -267,7 +270,7 @@ export function KaynakTakibiTab({
                 onReactivateResource={(resourceId) => handleReactivateResource(courseId, resourceId)}
                 onDeleteResource={(resourceId) => handleDeleteResource(courseId, resourceId)}
                 pipeline={{
-                  config: PIPELINE_CONFIG[examType],
+                  config: pipelineConfig,
                   map: courseData.pipeline ?? {},
                   onToggle: (topicId, step) => handleTogglePipeline(courseId, topicId, step),
                 }}

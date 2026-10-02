@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
+import { MaarifOkulIlerlemesiCell, PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
 import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
-import type { Course } from "@/lib/curriculum";
+import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
@@ -129,6 +129,7 @@ export function EditableCourseTable({
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
   const collapsedPipeline = pipeline && { ...pipeline, map: collapsePipelineMapForRows(rows, pipeline.map, pipeline.config) };
+  const isMaarif = isMaarifCourseId(course.id);
 
   return (
     <Card>
@@ -251,7 +252,7 @@ export function EditableCourseTable({
                         checkbox anymore, it's just what "{row.label}" covers. */}
                     <ReadOnlySubtopics names={row.readOnlyNames} />
                   </TableCell>
-                  {collapsedPipeline && (
+                  {collapsedPipeline && pipeline && (
                     <PipelineCells
                       steps={collapsedPipeline.config.start}
                       courseName={course.name}
@@ -259,6 +260,20 @@ export function EditableCourseTable({
                       topicId={row.id}
                       map={collapsedPipeline.map}
                       onToggle={collapsedPipeline.onToggle}
+                      renderCustomCell={
+                        isMaarif
+                          ? (step, i) =>
+                              step.key === "okul_ilerlemesi" ? (
+                                <MaarifOkulIlerlemesiCell
+                                  isFirst={i === 0}
+                                  courseName={course.name}
+                                  row={row}
+                                  map={pipeline.map}
+                                  onToggle={pipeline.onToggle}
+                                />
+                              ) : undefined
+                          : undefined
+                      }
                     />
                   )}
                   {resources.map((resource) => {

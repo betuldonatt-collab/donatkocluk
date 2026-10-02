@@ -40,7 +40,7 @@ import {
 } from "@/lib/karne";
 import { fetchMaarifGrade, type GeneralExamTrack } from "@/lib/maarif-grade";
 import {
-  PIPELINE_CONFIG,
+  pipelineConfigFor,
   pipelineStepSchema,
   validatePipelineStep,
   type PipelineActionResult,
@@ -2606,9 +2606,10 @@ export async function setStudentTopicPipelineStep(studentId: string, input: Pipe
 
     const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", studentIdV).maybeSingle();
     const examType = profile?.exam_type === "LGS" ? "LGS" : "YKS";
-    validatePipelineStep(examType, inputV, await fetchMaarifGrade(supabase, studentIdV));
+    const maarifGrade = await fetchMaarifGrade(supabase, studentIdV);
+    validatePipelineStep(examType, inputV, maarifGrade);
 
-    const { error } = await supabase.from(PIPELINE_CONFIG[examType].table).upsert(
+    const { error } = await supabase.from(pipelineConfigFor(examType, maarifGrade).table).upsert(
       {
         student_id: studentIdV,
         course_id: inputV.courseId,
