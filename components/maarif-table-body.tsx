@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 // spreadsheet with merged cells: every SUBTOPIC is its own <tr>, the unit's
 // title is written once as a rowSpan cell on the left, "Okul İlerlemesi"
 // (the one subtopic-level step) gets a checkbox per subtopic row, and every
-// unit-level column (Konu Çalışması, Çıkmış Sorular, and each resource's
-// Soru Çözümü / Kaynak Taraması) is a single rowSpan cell spanning the whole
-// unit. Shared by the student's and the coach's tables so both read
+// unit-level column (Soru Dağılımı, Konu Çalışması, Çıkmış Sorular, and each
+// resource's Soru Çözümü / Kaynak Taraması) is a single rowSpan cell
+// spanning the whole unit. Shared by the student's and the coach's tables so both read
 // identically; the header row stays in each table (it's the same columns).
 
 // The Ünite column's fixed width, shared with the tables' own sticky header
@@ -25,18 +25,30 @@ export const MAARIF_STAT_HEAD_CLASSES = { total: "w-11 min-w-11 px-0.5 text-[11p
 
 type Stat = { total: number; correct: number; wrong: number; empty: number };
 
-// Deliberately tiny -- Toplam/D/Y/B repeat on every row, so they get the
-// least horizontal space of any column.
-export function MaarifStatCells({ stat }: { stat: Stat | undefined }) {
+// Deliberately tiny -- the least horizontal space of any column. In the body
+// it is one rowSpan block per unit (question stats are tracked per unit);
+// the Karma row passes no rowSpan.
+export function MaarifStatCells({ stat, rowSpan }: { stat: Stat | undefined; rowSpan?: number }) {
   const hasData = !!stat && stat.total > 0;
   const cell = "px-0.5 py-1 text-center text-[11px] tabular-nums";
   return (
     <>
-      <TableCell className={cn(cell, "font-medium", MAARIF_STAT_HEAD_CLASSES.total)}>{hasData ? stat.total : "–"}</TableCell>
-      <TableCell className={cn(cell, "text-emerald-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.correct : "–"}</TableCell>
-      <TableCell className={cn(cell, "text-rose-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.wrong : "–"}</TableCell>
-      <TableCell className={cn(cell, "text-amber-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.empty : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn(cell, "font-medium", MAARIF_STAT_HEAD_CLASSES.total)}>{hasData ? stat.total : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn(cell, "text-emerald-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.correct : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn(cell, "text-rose-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.wrong : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn(cell, "text-amber-700", MAARIF_STAT_HEAD_CLASSES.count)}>{hasData ? stat.empty : "–"}</TableCell>
     </>
+  );
+}
+
+// A unit's stat = the sum over every real subtopic id it rolls up.
+function sumStats(byTopic: Record<string, Stat>, topicIds: string[]): Stat {
+  return topicIds.reduce(
+    (acc, id) => {
+      const s = byTopic[id];
+      return s ? { total: acc.total + s.total, correct: acc.correct + s.correct, wrong: acc.wrong + s.wrong, empty: acc.empty + s.empty } : acc;
+    },
+    { total: 0, correct: 0, wrong: 0, empty: 0 },
   );
 }
 
@@ -97,7 +109,7 @@ export function MaarifTableBody({
           const isLastRow = i === count - 1;
           return (
             <TableRow key={topicId} className={cn(!isLastRow && "border-border/40")}>
-              <MaarifStatCells stat={topicStats[topicId]} />
+              {isFirstRow && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
               {isFirstRow && (
                 <TableCell
                   rowSpan={count}

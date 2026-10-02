@@ -43,7 +43,7 @@ describe("maarif10 curriculum data", () => {
     expect(tde.units[0].topics.map((t) => t.name)).toContain("Dil Bilgisi › İsimler (Adlar)");
     const kimya = MAARIF10_COURSES.find((c) => c.id === "maarif10-kimya")!;
     expect(kimya.units[2].unit).toBe("3. Ünite: Sürdürülebilirlik");
-    expect(kimya.units[0].topics[0].name).toBe("1.1. Kimyasal Tepkimeler › 1.1.1. Kimyasal Tepkimelerin Oluşumu");
+    expect(kimya.units[0].topics[0].name).toBe("Kimyasal Tepkimeler › Kimyasal Tepkimelerin Oluşumu");
     const fizik = MAARIF10_COURSES.find((c) => c.id === "maarif10-fizik")!;
     expect(fizik.units[0].unit).toBe("1. Ünite: Kuvvet ve Hareket");
   });
@@ -57,7 +57,7 @@ describe("maarif10 curriculum data", () => {
 
   it("applies the typo fixes", () => {
     const all = MAARIF10_COURSES.flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.name)));
-    expect(all).toContain("2.2. Ekolojik Sürdürülebilirlik › 2.2.1. Ekolojik Sürdürülebilirliğin Önemi");
+    expect(all).toContain("Ekolojik Sürdürülebilirlik › Ekolojik Sürdürülebilirliğin Önemi");
     expect(all.some((n) => n.includes("Evrendeki Düzen"))).toBe(true);
     expect(all.some((n) => n.includes("Ameli-Fıkhi Yorumlar"))).toBe(true);
     expect(all.some((n) => n.includes("Sürürülebilirlik") || n.includes("Evdendeki"))).toBe(false);

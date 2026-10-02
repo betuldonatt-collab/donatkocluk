@@ -13,18 +13,23 @@
 import type { Course } from "./index";
 import genelDenemeJson from "./maarif10-genel-deneme.json";
 import kaynakTakibiJson from "./maarif10.json";
+import { withCleanTopicNames } from "./topic-name";
 
 export type Maarif10Topic = { id: string; name: string };
 export type Maarif10Unit = { unit: string | null; topics: Maarif10Topic[] };
 
-// "10. Sınıf Kaynak Takibi" -- one course per subject.
+// "10. Sınıf Kaynak Takibi" -- one course per subject. The JSON keeps the
+// sheet's hierarchy numbers for ordering; they are stripped here so no
+// screen shows them (see ./topic-name).
 export type Maarif10Course = { id: string; name: string; units: Maarif10Unit[] };
-export const MAARIF10_COURSES: Maarif10Course[] = kaynakTakibiJson as Maarif10Course[];
+export const MAARIF10_COURSES: Maarif10Course[] = withCleanTopicNames(kaynakTakibiJson as Maarif10Course[]);
 
 // "10. Sınıf Genel Deneme Analizi" -- the sheet's own, separate structure
 // (grouped TÜRKÇE / SOSYAL BİLİMLER / MATEMATİK / FEN BİLİMLERİ; no İngilizce).
 export type Maarif10GenelDenemeSubject = { id: string; group: string; name: string; units: Maarif10Unit[] };
-export const MAARIF10_GENEL_DENEME_SUBJECTS: Maarif10GenelDenemeSubject[] = genelDenemeJson as Maarif10GenelDenemeSubject[];
+export const MAARIF10_GENEL_DENEME_SUBJECTS: Maarif10GenelDenemeSubject[] = withCleanTopicNames(
+  genelDenemeJson as Maarif10GenelDenemeSubject[],
+);
 
 export function isMaarif10CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif10-");

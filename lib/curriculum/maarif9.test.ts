@@ -38,10 +38,10 @@ describe("maarif9 curriculum data", () => {
   it("merges deeper headings into the topic name", () => {
     const tde = MAARIF9_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
     expect(tde.units[0].unit).toBe("TEMA 1: SÖZÜN İNCELİĞİ");
-    expect(tde.units[0].topics.map((t) => t.name)).toContain("1.2. Metin Türleri › Deneme");
+    expect(tde.units[0].topics.map((t) => t.name)).toContain("Metin Türleri › Deneme");
     const bio = MAARIF9_COURSES.find((c) => c.id === "maarif9-biyoloji")!;
     expect(bio.units[0].topics.map((t) => t.name)).toContain(
-      "1.6. Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › 1.6.1. Biyolojik Sınıflandırma Sistemi › Bakteriler",
+      "Sınıflandırmada Üç Üst Âlem (Domain) Sistemi › Biyolojik Sınıflandırma Sistemi › Bakteriler",
     );
   });
 
@@ -73,11 +73,11 @@ describe("maarif9 approved manual overrides", () => {
   it("Biyoloji: one enzyme topic, vitamins nested under Vitaminler", () => {
     const bio = names("maarif9-biyoloji");
     expect(bio.filter((n) => n.includes("Enzim Aktivitesini Etkileyen Koşullar"))).toEqual([
-      "2.2. Organik Moleküller › Enzim Aktivitesini Etkileyen Koşullar",
+      "Organik Moleküller › Enzim Aktivitesini Etkileyen Koşullar",
     ]);
-    expect(bio).toContain("2.2. Organik Moleküller › Vitaminler › Yağda Çözünen Vitaminler");
-    expect(bio).toContain("2.2. Organik Moleküller › Vitaminler › Suda Çözünen Vitaminler");
-    expect(bio).not.toContain("2.2. Organik Moleküller › Vitaminler");
+    expect(bio).toContain("Organik Moleküller › Vitaminler › Yağda Çözünen Vitaminler");
+    expect(bio).toContain("Organik Moleküller › Vitaminler › Suda Çözünen Vitaminler");
+    expect(bio).not.toContain("Organik Moleküller › Vitaminler");
     const gdBio = MAARIF9_GENEL_DENEME_SUBJECTS.find((s) => s.id === "maarif9-gd-biyoloji")!;
     expect(topicCount(gdBio.units)).toBe(43);
   });

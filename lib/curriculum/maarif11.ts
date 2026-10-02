@@ -10,6 +10,9 @@
 // belong to more than one track (Matematik is both Sayısal and EA, for
 // example), same as the real exam structure. Fill this in alongside the
 // real course ids once they exist; until then there's nothing to tag.
+// When the real data lands, load it through withCleanTopicNames (./topic-name)
+// like maarif9.ts / maarif10.ts do, so the sheet's "4.4." numbering is
+// stripped from every displayed name.
 import type { Course } from "./index";
 
 export type Maarif11Track = "sayisal" | "ea" | "sozel";
