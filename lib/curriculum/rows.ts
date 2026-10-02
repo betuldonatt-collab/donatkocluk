@@ -6,8 +6,9 @@
 //
 // YKS courses have no `konu` level, and come out exactly as before: every
 // unit entry is its own span, "-" (ungrouped) topics are single-row units.
-import { isLgsCourseId, type Course, type Topic } from "./index";
-import { lgsSelectionNodes } from "./lgs-selection";
+import { isLgsCourseId, isMaarifCourseId, type Course, type Topic } from "./index";
+import { lgsSelectionNodes, type LgsSelectionNode } from "./lgs-selection";
+import { maarifSelectionNodes } from "./maarif-selection";
 
 export type CourseRow = {
   topic: Topic;
@@ -63,19 +64,22 @@ export function flattenCourseRows(course: Course): CourseRow[] {
 
 // One row per checkable/selectable unit for a curriculum table -- the row
 // the coach asked to collapse Task Assignment/Kaynak Takibi/Analiz down
-// to. For any non-LGS course this is exactly flattenCourseRows, just
-// reshaped (one topic == one row, nothing rolled up, readOnlyNames always
-// empty) so every table that renders it needs only one code path. For an
-// LGS course, rows come from lgsSelectionNodes instead: a rolled-up node
-// becomes ONE row (id = a real topic id, see lib/curriculum/lgs-selection.ts)
-// with its members' names listed in readOnlyNames, so the table can show
-// them as plain read-only context under the selectable label instead of
-// their own rows/checkboxes -- nothing is dropped, it just stops being
-// individually interactive. Always exactly 2 sticky columns worth of
-// bookkeeping (Ünite + the selectable label) since Konu/Alt Konu never
-// need a column of their own anymore: Konu either became a node's own
-// label (Matematik, Fen Ünite 7) or a node's read-only members'
-// description (Türkçe, İnkılap Tarihi, Din Kültürü).
+// to. For a course with no rollup rule (every YKS TYT/AYT course) this is
+// exactly flattenCourseRows, just reshaped (one topic == one row, nothing
+// rolled up, readOnlyNames always empty) so every table that renders it
+// needs only one code path. An LGS course rolls up via lgsSelectionNodes
+// (per-subject rules, see lib/curriculum/lgs-selection.ts); a Maarif course
+// (9th/10th/11th grade, or the 11th grade's merged "Maarif TYT" tab) rolls
+// up via maarifSelectionNodes (uniformly one node per unit, see
+// lib/curriculum/maarif-selection.ts) -- either way a rolled-up node
+// becomes ONE row (id = a real topic id) with its members' names listed in
+// readOnlyNames, so the table can show them as plain read-only context
+// under the selectable label instead of their own rows/checkboxes --
+// nothing is dropped, it just stops being individually interactive. Always
+// exactly 2 sticky columns worth of bookkeeping (Ünite + the selectable
+// label) since Konu/Alt Konu never need a column of their own anymore:
+// Konu either became a node's own label or a node's read-only members'
+// description.
 export type SelectionRow = {
   id: string;
   label: string;
@@ -85,19 +89,7 @@ export type SelectionRow = {
   memberTopicIds: string[];
 };
 
-export function flattenSelectionRows(course: Course): SelectionRow[] {
-  if (!isLgsCourseId(course.id)) {
-    return flattenCourseRows(course).map((r) => ({
-      id: r.topic.id,
-      label: r.topic.name,
-      unitLabel: r.unitLabel,
-      unitRowSpan: r.unitRowSpan,
-      readOnlyNames: [],
-      memberTopicIds: [r.topic.id],
-    }));
-  }
-
-  const nodes = lgsSelectionNodes(course);
+function rowsFromNodes(nodes: LgsSelectionNode[]): SelectionRow[] {
   const rows: SelectionRow[] = [];
   let i = 0;
   while (i < nodes.length) {
@@ -117,4 +109,18 @@ export function flattenSelectionRows(course: Course): SelectionRow[] {
     i = j;
   }
   return rows;
+}
+
+export function flattenSelectionRows(course: Course): SelectionRow[] {
+  if (isLgsCourseId(course.id)) return rowsFromNodes(lgsSelectionNodes(course));
+  if (isMaarifCourseId(course.id)) return rowsFromNodes(maarifSelectionNodes(course));
+
+  return flattenCourseRows(course).map((r) => ({
+    id: r.topic.id,
+    label: r.topic.name,
+    unitLabel: r.unitLabel,
+    unitRowSpan: r.unitRowSpan,
+    readOnlyNames: [],
+    memberTopicIds: [r.topic.id],
+  }));
 }

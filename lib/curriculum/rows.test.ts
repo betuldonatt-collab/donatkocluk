@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { LGS_COURSES, TYT_COURSES, toTurkishTitleCase, type Course } from "./index";
 import { courseHasKonu, flattenCourseRows, flattenSelectionRows } from "./rows";
+import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
+import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 
 const t = (id: string) => ({ id, name: id });
 
@@ -93,6 +95,33 @@ describe("flattenSelectionRows", () => {
 
   it("never drops a topic -- every course's rows cover every original topic id exactly once", () => {
     for (const course of [...TYT_COURSES, ...LGS_COURSES]) {
+      const topicIds = course.units.flatMap((u) => u.topics.map((t) => t.id));
+      const covered = flattenSelectionRows(course).flatMap((r) => r.memberTopicIds);
+      expect(covered.sort()).toEqual([...topicIds].sort());
+    }
+  });
+
+  it("collapses a Maarif course to one row per unit, spanning the Ünite column across itself", () => {
+    const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
+    const rows = flattenSelectionRows(course);
+    expect(rows).toHaveLength(course.units.length);
+    rows.forEach((row, i) => {
+      expect(row.unitLabel).toBe(course.units[i].unit);
+      expect(row.unitRowSpan).toBe(1); // every Maarif unit is its own single selectable row
+      expect(row.readOnlyNames).toEqual(course.units[i].topics.map((t) => t.name));
+      expect(row.id).toBe(course.units[i].topics[0].id);
+    });
+  });
+
+  it("collapses the merged 'Maarif TYT' course the same way, across both grades' units", () => {
+    const course = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-matematik")!;
+    const rows = flattenSelectionRows(course);
+    expect(rows).toHaveLength(course.units.length);
+    expect(rows.every((r) => r.unitRowSpan === 1)).toBe(true);
+  });
+
+  it("never drops a topic for Maarif courses either, including the merged Maarif TYT ones", () => {
+    for (const course of [...MAARIF9_KAYNAK_COURSES, ...MAARIF_TYT_MERGED_COURSES]) {
       const topicIds = course.units.flatMap((u) => u.topics.map((t) => t.id));
       const covered = flattenSelectionRows(course).flatMap((r) => r.memberTopicIds);
       expect(covered.sort()).toEqual([...topicIds].sort());

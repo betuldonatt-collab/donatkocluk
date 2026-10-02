@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findCourseById,
   findTopicById,
+  isMaarifCourseId,
   isRoutineCourseId,
   KARMA_TOPIC_ID,
   normalizeTr,
@@ -34,6 +35,27 @@ describe("findCourseById", () => {
   it("returns null for null/undefined input", () => {
     expect(findCourseById(null)).toBeNull();
     expect(findCourseById(undefined)).toBeNull();
+  });
+
+  it("resolves a Maarif grade course and the merged 'Maarif TYT' course via the fallback chain", () => {
+    expect(findCourseById("maarif9-matematik")?.id).toBe("maarif9-matematik");
+    expect(findCourseById("maarif-tyt-matematik")?.id).toBe("maarif-tyt-matematik");
+  });
+});
+
+describe("isMaarifCourseId", () => {
+  it("recognizes every Maarif grade prefix and the merged Maarif TYT prefix", () => {
+    expect(isMaarifCourseId("maarif9-matematik")).toBe(true);
+    expect(isMaarifCourseId("maarif10-matematik")).toBe(true);
+    expect(isMaarifCourseId("maarif11-matematik")).toBe(true);
+    expect(isMaarifCourseId("maarif-tyt-matematik")).toBe(true);
+  });
+
+  it("rejects non-Maarif course ids and nullish input", () => {
+    expect(isMaarifCourseId(realCourse.id)).toBe(false);
+    expect(isMaarifCourseId("lgs-matematik")).toBe(false);
+    expect(isMaarifCourseId(null)).toBe(false);
+    expect(isMaarifCourseId(undefined)).toBe(false);
   });
 });
 

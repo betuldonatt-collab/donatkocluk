@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Course } from "./curriculum";
 import { MAARIF9_KAYNAK_COURSES, isMaarif9CourseId } from "./curriculum/maarif9";
 import { MAARIF10_KAYNAK_COURSES, isMaarif10CourseId } from "./curriculum/maarif10";
+import { MAARIF11_KAYNAK_COURSES, isMaarif11CourseId } from "./curriculum/maarif11";
 import {
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
@@ -51,22 +52,23 @@ export const MAARIF_GRADES: Record<MaarifGrade, GradeConfig> = {
     isCourseId: isMaarif10CourseId,
     coursesForExamSubject: coursesForMaarif10ExamSubject,
   },
-  // No Kaynak Takibi / Genel Deneme curriculum data exists for 11th grade
-  // yet (app/student/11-sinif-maarif has its own, separate, still-empty
-  // MAARIF11_SUBJECTS placeholder -- a different type shape entirely, not
-  // wired through this Course[] pipeline). Empty arrays here, not an
-  // omitted entry: every consumer of MAARIF_GRADES[grade] (course-tabs.tsx,
-  // the general-exam pickers, ...) already has to handle an empty course
-  // list gracefully regardless, so a real 11th grader hitting one of those
-  // shared pages shows "nothing here yet" instead of either crashing or
-  // silently falling back to a different grade's data.
+  // No Kaynak Takibi / Genel Deneme curriculum data exists for 11th grade's
+  // OWN courses yet (lib/curriculum/maarif11.ts's MAARIF11_KAYNAK_COURSES is
+  // still an empty placeholder, same Course[] shape as 9th/10th grade's own
+  // so real data can drop in later with no changes elsewhere) -- an 11th
+  // grader's Kaynak Takibi instead leads with the "Maarif TYT" tab (9th+10th
+  // grade merged, lib/curriculum/maarif-tyt.ts), with this grade's own
+  // courses as a second "11. Sınıf" tab once they exist. Every consumer of
+  // MAARIF_GRADES[grade] (course-tabs.tsx, the general-exam pickers, ...)
+  // already has to handle an empty course list gracefully regardless, so an
+  // 11th grader's own tab shows "nothing here yet" instead of crashing.
   11: {
     label: "11. Sınıf",
     track: "m11",
     titlePrefix: "11. SINIF",
-    courses: [],
+    courses: MAARIF11_KAYNAK_COURSES,
     examSubjects: [],
-    isCourseId: (id) => !!id && id.startsWith("maarif11-"),
+    isCourseId: isMaarif11CourseId,
     coursesForExamSubject: () => [],
   },
 };

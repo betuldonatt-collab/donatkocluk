@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES } from "./curriculum";
 import { flattenSelectionRows } from "./curriculum/rows";
+import { MAARIF_TYT_MERGED_COURSES } from "./curriculum/maarif-tyt";
+import { MAARIF9_KAYNAK_COURSES } from "./curriculum/maarif9";
 import {
   PIPELINE_CONFIG,
   allPipelineSteps,
@@ -146,6 +148,21 @@ describe("validatePipelineStep", () => {
 
   it("rejects a topic that belongs to another course", () => {
     expect(() => validatePipelineStep("LGS", { ...lgsOk, topicId: LGS_COURSES[1].units[0].topics[0].id })).toThrow();
+  });
+
+  it("accepts the merged 'Maarif TYT' course only for an 11th grader, never a 9th/10th grader", () => {
+    const merged = MAARIF_TYT_MERGED_COURSES[0];
+    const input = { courseId: merged.id, topicId: merged.units[0].topics[0].id, step: "konu_calismasi" as const, value: true };
+    expect(() => validatePipelineStep("YKS", input, 11)).not.toThrow();
+    expect(() => validatePipelineStep("YKS", input, 9)).toThrow("Geçersiz ders.");
+    expect(() => validatePipelineStep("YKS", input, 10)).toThrow("Geçersiz ders.");
+    expect(() => validatePipelineStep("YKS", input, null)).toThrow("Geçersiz ders.");
+  });
+
+  it("an 11th grader does not get direct access to a 9th grade course outside the Maarif TYT merge", () => {
+    const m9 = MAARIF9_KAYNAK_COURSES[0];
+    const input = { courseId: m9.id, topicId: m9.units[0].topics[0].id, step: "konu_calismasi" as const, value: true };
+    expect(() => validatePipelineStep("YKS", input, 11)).toThrow("Geçersiz ders.");
   });
 });
 

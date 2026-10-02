@@ -12,6 +12,7 @@ import lgsJson from "./lgs.json";
 
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
@@ -170,9 +171,10 @@ const ALL_COURSES: Course[] = [
   ...BRANCH_EXAM_MACRO_COURSES,
 ];
 
-// 9th-grade (Maarif) courses are looked up as a fallback only -- they are
-// deliberately NOT part of ALL_COURSES, so no existing YKS/LGS list or picker
-// that iterates ALL_COURSES can ever pick them up.
+// Maarif (9th/10th-grade, and the 11th grade's merged "Maarif TYT" tab)
+// courses are looked up as a fallback only -- they are deliberately NOT
+// part of ALL_COURSES, so no existing YKS/LGS list or picker that iterates
+// ALL_COURSES can ever pick them up.
 function findMaarif9Course(courseId: string): Course | null {
   // Lookup by id only (so any stored task resolves); WHICH grade's courses a
   // picker offers is decided by lib/maarif-grade.ts, never here.
@@ -181,7 +183,23 @@ function findMaarif9Course(courseId: string): Course | null {
     MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
+    MAARIF_TYT_MERGED_COURSES.find((c) => c.id === courseId) ??
     null
+  );
+}
+
+// Any Maarif-origin course id -- 9th/10th grade's own, the 11th grade's
+// merged "Maarif TYT" tab, or (once real data lands) 11th grade's own.
+// Shared by lib/curriculum/rows.ts to decide whether a course rolls up to
+// unit-level selection nodes (maarif-selection.ts) instead of rendering one
+// row per raw topic.
+export function isMaarifCourseId(courseId: string | null | undefined): boolean {
+  return (
+    !!courseId &&
+    (courseId.startsWith("maarif9-") ||
+      courseId.startsWith("maarif10-") ||
+      courseId.startsWith("maarif11-") ||
+      courseId.startsWith("maarif-tyt-"))
   );
 }
 

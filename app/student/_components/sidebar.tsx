@@ -8,57 +8,35 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
-  GraduationCap,
   Home,
   Languages,
   Library,
-  School,
   Settings,
   Target,
   UserCircle,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { LogoutButton } from "@/components/logout-button";
 import { YksCountdown } from "@/components/ui/yks-countdown";
-import type { MaarifGrade } from "@/lib/maarif-grade";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
 import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
-
-// Split around the Maarif Müfredatı group (below) so that group can render
-// as its own small labeled section -- same two arrays feed both the real
-// nav and, further down, the tour's step list.
-const NAV_ITEMS_TOP: NavItem[] = [
+const NAV_ITEMS = [
   { href: "/student", label: "Ana Sayfa", icon: Home },
   { href: "/student/paragraf-problem", label: "Paragraf/Problem Takibi", icon: Target },
   { href: "/student/kaynak-takibi", label: "Kaynak Takibi", icon: BookOpenCheck },
   { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", icon: CalendarClock },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", icon: BarChart3 },
   { href: "/student/ingilizce-quiz", label: "İngilizce Quiz", icon: Languages },
-];
-const NAV_ITEMS_BOTTOM: NavItem[] = [
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", icon: Library },
   { href: "/student/profile", label: "Profilim", icon: UserCircle },
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
-
-// 9th, 10th and 11th grade all belong to the Türkiye Yüzyılı Maarif Modeli
-// curriculum -- grouped under one small labeled section (not folded into
-// the flat list above) so that shared origin reads at a glance. 9-10 share
-// one page with a grade tab-switcher inside it (TYT); 11 has its own page.
-const MAARIF_GROUP_ITEMS: NavItem[] = [
-  { href: "/student/9-10-sinif-tyt", label: "9-10. Sınıf (TYT)", icon: School },
-  { href: "/student/11-sinif-maarif", label: "11. Sınıf", icon: GraduationCap },
-];
-const ELEVENTH_GRADE_HREF = "/student/11-sinif-maarif";
-const MAARIF_GROUP_HREFS = new Set(MAARIF_GROUP_ITEMS.map((item) => item.href));
 
 // Only the YKS past-questions page stays hidden for 9th graders.
 const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
@@ -66,43 +44,18 @@ const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
 // student never sees it at all.
 const LGS_ONLY_HREFS = new Set(["/student/ingilizce-quiz"]);
 
-// Shared by both the real nav and the tour's step list -- one spot for
-// "which pages does this student's cohort actually see."
-function filterNavItems<T extends { href: string; label: string }>(
-  items: T[],
-  { isMaarif9, examType, maarifGrade }: { isMaarif9: boolean; examType: "YKS" | "LGS"; maarifGrade: MaarifGrade | null },
-): T[] {
-  return items
-    .filter((item) => {
-      if (isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) return false;
-      if (examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)) return false;
-      if (MAARIF_GROUP_HREFS.has(item.href)) {
-        // The whole Maarif group is 9th/10th/11th-grade Maarif students
-        // only -- an ordinary YKS 12th-grade/mezun student has no 9-11th
-        // grade content of their own to browse here.
-        if (maarifGrade === null) return false;
-        // "11. Sınıf" narrows further still, to an actual 11th grader.
-        if (item.href === ELEVENTH_GRADE_HREF) return maarifGrade === 11;
-      }
-      return true;
-    })
-    .map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
-}
-
 export function StudentSidebar({
   fullName = null,
   examType = "YKS",
   isMaarif9 = false,
-  maarifGrade = null,
 }: {
   fullName?: string | null;
   examType?: "YKS" | "LGS";
-  // 9th grader: no YKS countdown, no TYT/AYT-specific tracking/analytics pages.
+  // Any Maarif grade (9th/10th/11th): no YKS countdown, no TYT/AYT-specific
+  // tracking/analytics pages. The Maarif curriculum itself now lives
+  // entirely inside Kaynak Takibi (components/course-tabs.tsx), not a
+  // separate nav entry -- the sidebar looks identical for every YKS cohort.
   isMaarif9?: boolean;
-  // The actual grade (9/10/11), not just "is some Maarif grade" -- needed to
-  // tell the 9-10 TYT page (any Maarif grade) apart from the 11th-grade-only
-  // page in the Maarif group below.
-  maarifGrade?: MaarifGrade | null;
 }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
@@ -110,44 +63,20 @@ export function StudentSidebar({
   const isMobile = useIsMobileViewport();
   const effectiveCollapsed = collapsed && !isMobile;
   // LGS students get every page a YKS student does, PLUS İngilizce Quiz
-  // (LGS-only), MINUS the Maarif group (Maarif-grade-only); only the
-  // Paragraf/Problem page is renamed (it is Paragraf / Kitap Okuma for them).
-  const cohort = { isMaarif9, examType, maarifGrade };
-  const navItemsTop = filterNavItems(NAV_ITEMS_TOP, cohort);
-  const navItemsBottom = filterNavItems(NAV_ITEMS_BOTTOM, cohort);
-  const maarifGroupItems = filterNavItems(MAARIF_GROUP_ITEMS, cohort);
+  // (LGS-only); only the Paragraf/Problem page is renamed (it is Paragraf
+  // / Kitap Okuma for them).
+  const navItems = NAV_ITEMS.filter(
+    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
+  ).map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
 
-  // The guided tour walks the same flat STUDENT_NAV_ITEMS list (which
-  // already includes the Maarif group's two entries, in sidebar order) --
-  // same cohort filtering, same rename.
-  const tourItems = filterNavItems(STUDENT_NAV_ITEMS, cohort).map((item) =>
+  // The guided tour walks the same list -- same rename.
+  const tourItems = STUDENT_NAV_ITEMS.filter(
+    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
+  ).map((item) =>
     examType === "LGS" && item.href === "/student/paragraf-problem"
       ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
       : item,
   );
-
-  function renderLink({ href, label, icon: Icon }: NavItem) {
-    const active = href === "/student" ? pathname === href : pathname.startsWith(href);
-    return (
-      <Link
-        key={href}
-        href={href}
-        data-tour={href}
-        title={effectiveCollapsed ? label : undefined}
-        onClick={() => setMobileOpen(false)}
-        className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-          effectiveCollapsed && "justify-center px-0",
-          active
-            ? "bg-primary-foreground/15 font-medium text-primary-foreground"
-            : "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground",
-        )}
-      >
-        <Icon className="size-4 shrink-0" />
-        {!effectiveCollapsed && label}
-      </Link>
-    );
-  }
 
   return (
     <aside
@@ -163,18 +92,28 @@ export function StudentSidebar({
       </div>
       {!effectiveCollapsed && !isMaarif9 && <YksCountdown variant="student" examType={examType} />}
       <nav className="flex flex-col gap-1 px-3">
-        {navItemsTop.map(renderLink)}
-
-        {maarifGroupItems.length > 0 && (
-          <div className="mt-2 flex flex-col gap-1">
-            {!effectiveCollapsed && (
-              <p className="text-primary-foreground/50 px-3 text-[10px] font-semibold tracking-wide uppercase">Maarif Müfredatı</p>
-            )}
-            {maarifGroupItems.map(renderLink)}
-          </div>
-        )}
-
-        {navItemsBottom.map(renderLink)}
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = href === "/student" ? pathname === href : pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              data-tour={href}
+              title={effectiveCollapsed ? label : undefined}
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                effectiveCollapsed && "justify-center px-0",
+                active
+                  ? "bg-primary-foreground/15 font-medium text-primary-foreground"
+                  : "text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground",
+              )}
+            >
+              <Icon className="size-4 shrink-0" />
+              {!effectiveCollapsed && label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto px-3 pb-3">

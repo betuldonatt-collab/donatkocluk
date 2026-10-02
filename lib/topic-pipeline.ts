@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { MAARIF_GRADES, type MaarifGrade } from "./maarif-grade";
 import { AYT_COURSES_BY_TRACK, TYT_COURSES, findCourseById, isLgsCourseId, type Course } from "@/lib/curriculum";
+import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
 import { lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import type { ExamType } from "@/lib/exam-type";
 
@@ -182,12 +183,17 @@ export function validatePipelineStep(examType: ExamType, input: PipelineStepInpu
     throw new Error("Bu adım bu öğrenci için geçerli değil.");
   }
   const course = findCourseById(input.courseId);
-  // A Maarif student (an exam_type=YKS row with is_maarif9 / is_maarif10) tracks
-  // ONLY their own grade's courses -- never the other grade's.
+  // A Maarif student (an exam_type=YKS row with is_maarif9 / is_maarif10 /
+  // is_maarif11) tracks only their own grade's courses -- except an 11th
+  // grader, who additionally gets the "Maarif TYT" tab's merged 9th+10th
+  // grade courses (lib/curriculum/maarif-tyt.ts), never the other grade's
+  // SOLO courses directly.
   const courseAllowed =
     examType === "LGS"
       ? isLgsCourseId(input.courseId)
-      : yksCourseIds().has(input.courseId) || (maarifGrade !== null && MAARIF_GRADES[maarifGrade].isCourseId(input.courseId));
+      : yksCourseIds().has(input.courseId) ||
+        (maarifGrade !== null && MAARIF_GRADES[maarifGrade].isCourseId(input.courseId)) ||
+        (maarifGrade === 11 && isMaarifTytMergedCourseId(input.courseId));
   if (!course || !courseAllowed) throw new Error("Geçersiz ders.");
   if (!course.units.some((u) => u.topics.some((t) => t.id === input.topicId))) {
     throw new Error("Geçersiz konu.");
