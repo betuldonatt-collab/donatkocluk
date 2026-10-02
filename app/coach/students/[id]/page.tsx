@@ -18,7 +18,9 @@ import { getPendingFocusReviews, type CoachReportCardRow, type StudentFixedTask 
 import { DetailTabs } from "./_components/detail-tabs";
 import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
+import { MissingTasksCard } from "./_components/missing-tasks-card";
 import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
+import { findMissingTasks } from "@/lib/missing-tasks";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
@@ -589,6 +591,8 @@ async function fetchStudentDetail(studentId: string) {
     weekTasks: (weekTaskRows ?? []) as DetailTask[],
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
+    // Only LGS tasks need a Kanıt Fotoğrafı (lib/lgs-completion.ts).
+    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: examType === "LGS" }),
     courseResourceData,
     today,
     weekStats,
@@ -657,6 +661,8 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                 </div>
 
                 <PendingFocusReviewsCard reviews={focusReviews} />
+
+                <MissingTasksCard items={detail.missingTasks} studentId={id} />
 
                 {examType === "LGS" && <LgsExamHistory exams={buildLgsExamHistory(detail.generalExams)} />}
 
