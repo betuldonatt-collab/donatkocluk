@@ -67,8 +67,8 @@ export function toTurkishTitleCase(s: string): string {
 const isAllUpper = (s: string) => s === s.toLocaleUpperCase("tr-TR") && s !== s.toLocaleLowerCase("tr-TR");
 
 // Maarif unit labels arrive in several shapes ("TEMA 1: SÖZÜN İNCELİĞİ",
-// "1.ÜNİTE: COĞRAFYANIN DOĞASI", "3. TEMA: GEOMETRİK ŞEKİLLER", "THEME 4",
-// "1. Ünite: Sözün Ezgisi"). Every one reads as "N. Ünite: Title" / "N. Tema:
+// "1.ÜNİTE: COĞRAFYANIN DOĞASI", "3. TEMA: GEOMETRİK ŞEKİLLER", "1. Ünite:
+// Sözün Ezgisi"). Every one reads as "N. Ünite: Title" / "N. Tema:
 // Title" in Title Case on screen, like the 10th grade's -- an ALL-CAPS title
 // is Title Cased, a title already in mixed case is left alone (apart from a
 // stray capital "Ve"). Idempotent, so already-clean labels pass through.

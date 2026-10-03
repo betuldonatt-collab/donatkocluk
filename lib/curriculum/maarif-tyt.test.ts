@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { findCourseById } from "./index";
 import { MAARIF_TYT_MERGED_COURSES, isMaarifTytMergedCourseId, splitUnitGradeTag } from "./maarif-tyt";
 
 describe("MAARIF_TYT_MERGED_COURSES", () => {
@@ -61,10 +62,8 @@ describe("splitUnitGradeTag", () => {
     expect(splitUnitGradeTag("(9. Sınıf) 4. Tema: Dilin Zenginliği")).toEqual({ grade: "9. Sınıf", title: "4. Tema: Dilin Zenginliği" });
   });
 
-  it("a unit with no label of its own (İngilizce) is just the grade, with an empty title", () => {
+  it("a unit with no label of its own is just the grade, with an empty title", () => {
     expect(splitUnitGradeTag("(10. Sınıf) ")).toEqual({ grade: "10. Sınıf", title: "" });
-    const ingilizce = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-ingilizce")!;
-    expect(ingilizce.units.some((u) => splitUnitGradeTag(u.unit).title === "")).toBe(true);
   });
 
   it("returns an untagged label whole, with no grade", () => {
@@ -86,5 +85,30 @@ describe("splitUnitGradeTag", () => {
   it("the Türk Dili merge reads 9th grade's themes in Title Case", () => {
     const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
     expect(tde.units[0].unit).toBe("(9. Sınıf) 1. Tema: Sözün İnceliği");
+  });
+});
+
+describe("İngilizce is not part of the Maarif curriculum", () => {
+  it("has no merged course, and the merged list is exactly the nine remaining subjects", () => {
+    expect(MAARIF_TYT_MERGED_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
+    expect(MAARIF_TYT_MERGED_COURSES.map((c) => c.id)).toEqual([
+      "maarif-tyt-turk-dili-ve-edebiyati",
+      "maarif-tyt-matematik",
+      "maarif-tyt-cografya",
+      "maarif-tyt-fizik",
+      "maarif-tyt-kimya",
+      "maarif-tyt-din-kulturu",
+      "maarif-tyt-tarih",
+      "maarif-tyt-biyoloji",
+      "maarif-tyt-felsefe",
+    ]);
+  });
+
+  it("is gone from the 9th and 10th grade's own course lists and from course lookup", () => {
+    expect(MAARIF9_KAYNAK_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
+    expect(MAARIF10_KAYNAK_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
+    for (const id of ["maarif9-ingilizce", "maarif10-ingilizce", "maarif-tyt-ingilizce"]) {
+      expect(findCourseById(id)).toBeNull();
+    }
   });
 });

@@ -26,7 +26,6 @@ const MERGE_PAIRS: MergePair[] = [
   { id: "maarif-tyt-turk-dili-ve-edebiyati", name: "Türk Dili ve Edebiyatı", m9Id: "maarif9-turk-dili-ve-edebiyati", m10Id: "maarif10-turk-dili-ve-edebiyati" },
   { id: "maarif-tyt-matematik", name: "Matematik", m9Id: "maarif9-matematik", m10Id: "maarif10-matematik" },
   { id: "maarif-tyt-cografya", name: "Coğrafya", m9Id: "maarif9-cografya", m10Id: "maarif10-cografya" },
-  { id: "maarif-tyt-ingilizce", name: "İngilizce", m9Id: "maarif9-ingilizce", m10Id: "maarif10-ingilizce" },
   { id: "maarif-tyt-fizik", name: "Fizik", m9Id: "maarif9-fizik", m10Id: "maarif10-fizik" },
   { id: "maarif-tyt-kimya", name: "Kimya", m9Id: "maarif9-kimya", m10Id: "maarif10-kimya" },
   { id: "maarif-tyt-din-kulturu", name: "Din Kültürü ve Ahlak Bilgisi", m9Id: "maarif9-din", m10Id: "maarif10-din-kulturu-ve-ahlak-bilgisi" },
@@ -47,9 +46,9 @@ function taggedUnits(units: Unit[], gradeLabel: string): Unit[] {
 const GRADE_TAG = /^\((\d+\. Sınıf)\)\s*(.*)$/;
 
 // "(10. Sınıf) 1. Ünite: Sözün Ezgisi" -> { grade: "10. Sınıf", title: "1. Ünite:
-// Sözün Ezgisi" }. A unit with no label of its own (İngilizce has no unit
-// level) is just the tag, so its title is "". A label with no tag (every
-// non-merged course) comes back whole, with grade null.
+// Sözün Ezgisi" }. A unit with no label of its own is just the tag, so its
+// title is "". A label with no tag (every non-merged course) comes back
+// whole, with grade null.
 export function splitUnitGradeTag(label: string): { grade: string | null; title: string } {
   const m = GRADE_TAG.exec(label);
   return m ? { grade: m[1], title: m[2] } : { grade: null, title: label };

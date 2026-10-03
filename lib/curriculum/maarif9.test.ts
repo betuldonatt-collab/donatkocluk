@@ -5,13 +5,12 @@ import { MAARIF9_COURSES, MAARIF9_GENEL_DENEME_SUBJECTS, isMaarif9CourseId } fro
 const topicCount = (units: { topics: unknown[] }[]) => units.reduce((a, u) => a + u.topics.length, 0);
 
 describe("maarif9 curriculum data", () => {
-  it("has the nine Kaynak Takibi subjects with the sheet's topic counts", () => {
+  it("has the eight Kaynak Takibi subjects with the sheet's topic counts", () => {
     const counts = Object.fromEntries(MAARIF9_COURSES.map((c) => [c.name, topicCount(c.units)]));
     expect(counts).toEqual({
       "9. Sınıf Türk Dili ve Edebiyatı": 23,
       "9. Sınıf Matematik": 20,
       "9. Sınıf Coğrafya": 22,
-      "9. Sınıf İngilizce": 8,
       "9. Sınıf Fizik": 24,
       "9. Sınıf Kimya": 20,
       "9. Sınıf Din": 20,

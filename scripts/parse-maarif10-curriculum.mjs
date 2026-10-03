@@ -15,9 +15,8 @@
 //   - Türk Dili ve Edebiyatı is listed twice in Kaynak Takibi (rows 1 and 147);
 //     the copies must be identical and are merged into one subject.
 //   - A cell is a UNIT only when it sits in the unit column and reads
-//     "N. Ünite ..."; İngilizce's "Theme N" rows and the Genel Deneme's
-//     Coğrafya/Din/Felsefe items sit in the topic columns and are topics with
-//     unit = null.
+//     "N. Ünite ..."; the Genel Deneme's Coğrafya/Din/Felsefe items sit in the
+//     topic columns and are topics with unit = null.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -28,6 +27,10 @@ const SOURCE = path.join(ROOT, "supabase", "curriculum-source", "10. Sınıf - T
 const OUT_DIR = path.join(ROOT, "lib", "curriculum");
 
 const SEP = " › ";
+
+// Subjects deliberately NOT part of the platform's Maarif curriculum: skipped
+// entirely, so re-running this script can never bring them back.
+const EXCLUDED_SUBJECTS = new Set(["maarif10-ingilizce"]);
 const TR_MAP = { ç: "c", Ç: "C", ğ: "g", Ğ: "G", ı: "i", I: "I", İ: "i", ö: "o", Ö: "O", ş: "s", Ş: "S", ü: "u", Ü: "U" };
 const slugify = (s) =>
   s.split("").map((ch) => TR_MAP[ch] ?? ch).join("").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -35,7 +38,6 @@ const slugify = (s) =>
 // Whole-cell replacements, matched AFTER whitespace normalisation.
 const TYPO_FIXES = new Map([
   ["2.2. Ekolojik Sürürülebilirlik", "2.2. Ekolojik Sürdürülebilirlik"],
-  ["Theme 3: Personel Life & Well - Being", "Theme 3: Personal Life & Well-Being"],
   ["Allah - Alem İlişkisi (Yaratılış ve Evdendeki Düzen)", "Allah - Alem İlişkisi (Yaratılış ve Evrendeki Düzen)"],
   ["Ameli-Fıkhi Yorumla", "Ameli-Fıkhi Yorumlar"],
   ["İslam' da Bilgi ve Bilginin Kaynakları", "İslam'da Bilgi ve Bilginin Kaynakları"],
@@ -148,6 +150,11 @@ function parseKaynakTakibi() {
       if (!current) return;
       const subject = titleCaseTr(current.rawName);
       const id = `maarif10-${slugify(subject)}`;
+      if (EXCLUDED_SUBJECTS.has(id)) {
+        anomalies.push(`${subject}: excluded subject, skipped`);
+        current = null;
+        return;
+      }
       const course = { id, name: `10. Sınıf ${subject}`, units: withIds(id, toUnits(buildTree(current.cells), 0)) };
       if (byId.has(id)) {
         const same = JSON.stringify(byId.get(id)) === JSON.stringify(course);

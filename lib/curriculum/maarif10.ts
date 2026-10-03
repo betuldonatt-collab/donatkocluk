@@ -8,8 +8,7 @@
 //
 // Same shape and conventions as ./maarif9 (Course/Unit/Topic; deeper sheet
 // headings merged into the topic name with " › "; `unit: null` where the sheet
-// has no unit level, e.g. İngilizce's themes and the Genel Deneme's
-// Coğrafya / Din / Felsefe lists).
+// has no unit level, e.g. the Genel Deneme's Coğrafya / Din / Felsefe lists).
 import type { Course } from "./index";
 import genelDenemeJson from "./maarif10-genel-deneme.json";
 import kaynakTakibiJson from "./maarif10.json";

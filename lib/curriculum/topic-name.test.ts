@@ -96,7 +96,8 @@ describe("normalizeUnitLabel", () => {
     expect(normalizeUnitLabel("1.ÜNİTE: COĞRAFYANIN DOĞASI")).toBe("1. Ünite: Coğrafyanın Doğası");
     expect(normalizeUnitLabel("2. ÜNİTE: MEKÂNSAL BİLGİ TEKNOLOJİLERİ")).toBe("2. Ünite: Mekânsal Bilgi Teknolojileri");
     expect(normalizeUnitLabel("5.ÜNİTE: KUR'AN'A GÖRE HZ. MUHAMMED")).toBe("5. Ünite: Kur'an'a Göre Hz. Muhammed");
-    expect(normalizeUnitLabel("THEME 4")).toBe("Theme 4");
+    // A shape matching none of the patterns is still Title Cased when it is ALL CAPS.
+    expect(normalizeUnitLabel("GİRİŞ VE AMAÇ")).toBe("Giriş ve Amaç");
   });
 
   it("leaves labels that are already clean alone (idempotent)", () => {

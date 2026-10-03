@@ -12,7 +12,7 @@
 // a topic by itself. The sheets nest up to 4 levels below the subject:
 // Tema/Ünite -> heading -> sub-heading -> sub-sub-heading (Biyoloji 1.6.x,
 // Fizik Isı). Level-1 cells are treated as a "unit" only when they carry
-// an ÜNİTE / TEMA / THEME label; otherwise (e.g. Genel Deneme's Türk Dili
+// an ÜNİTE / TEMA label; otherwise (e.g. Genel Deneme's Türk Dili
 // list, which has no themes) the topics have unit = null.
 //
 // Text: cell line breaks become single spaces (a hyphenated break is
@@ -28,6 +28,10 @@ const SOURCE = path.join(ROOT, "supabase", "curriculum-source", "9. Sınıf - Ta
 const OUT_DIR = path.join(ROOT, "lib", "curriculum");
 
 const SEP = " › ";
+
+// Subjects deliberately NOT part of the platform's Maarif curriculum: skipped
+// entirely, so re-running this script can never bring them back.
+const EXCLUDED_SUBJECTS = new Set(["maarif9-ingilizce"]);
 const TR_MAP = { ç: "c", Ç: "C", ğ: "g", Ğ: "G", ı: "i", I: "I", İ: "i", ö: "o", Ö: "O", ş: "s", Ş: "S", ü: "u", Ü: "U" };
 const slugify = (s) =>
   s.split("").map((ch) => TR_MAP[ch] ?? ch).join("").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -83,7 +87,7 @@ function titleCaseTr(s) {
 }
 
 const isBool = (s) => /^(TRUE|FALSE)$/i.test(s);
-const UNIT_LABEL = /(ÜNİTE|ÜNITE|TEMA|THEME)/i;
+const UNIT_LABEL = /(ÜNİTE|ÜNITE|TEMA)/i;
 
 // Column-indexed nesting: a cell is a child of the nearest earlier cell in a
 // strictly smaller column (so a row that skips a column still nests right).
@@ -182,6 +186,11 @@ function parseKaynakTakibi() {
       const tree = buildTree(current.cells);
       const subject = current.name.replace(/^9\.\s*Sınıf:?\s*/i, "");
       const id = `maarif9-${slugify(subject)}`;
+      if (EXCLUDED_SUBJECTS.has(id)) {
+        console.log(`Skipped excluded subject: ${id}`);
+        current = null;
+        return;
+      }
       courses.push({ id, name: titleCaseTr(current.name), units: withIds(id, applyOverrides(id, toUnits(tree))) });
       current = null;
     };

@@ -5,7 +5,7 @@ import { MAARIF10_COURSES, MAARIF10_GENEL_DENEME_SUBJECTS, isMaarif10CourseId } 
 const topicCount = (units: { topics: unknown[] }[]) => units.reduce((a, u) => a + u.topics.length, 0);
 
 describe("maarif10 curriculum data", () => {
-  it("has the ten Kaynak Takibi subjects (Title Case) with the sheet's topic counts", () => {
+  it("has the nine Kaynak Takibi subjects (Title Case) with the sheet's topic counts", () => {
     const counts = Object.fromEntries(MAARIF10_COURSES.map((c) => [c.name, topicCount(c.units)]));
     expect(counts).toEqual({
       "10. Sınıf Türk Dili ve Edebiyatı": 25,
@@ -17,7 +17,6 @@ describe("maarif10 curriculum data", () => {
       "10. Sınıf Kimya": 18,
       "10. Sınıf Felsefe": 9,
       "10. Sınıf Biyoloji": 19,
-      "10. Sınıf İngilizce": 8,
     });
   });
 
@@ -46,13 +45,6 @@ describe("maarif10 curriculum data", () => {
     expect(kimya.units[0].topics[0].name).toBe("Kimyasal Tepkimeler › Kimyasal Tepkimelerin Oluşumu");
     const fizik = MAARIF10_COURSES.find((c) => c.id === "maarif10-fizik")!;
     expect(fizik.units[0].unit).toBe("1. Ünite: Kuvvet ve Hareket");
-  });
-
-  it("puts İngilizce's themes in a unit-less list", () => {
-    const eng = MAARIF10_COURSES.find((c) => c.id === "maarif10-ingilizce")!;
-    expect(eng.units).toHaveLength(1);
-    expect(eng.units[0].unit).toBeNull();
-    expect(eng.units[0].topics.map((t) => t.name)).toContain("Theme 3: Personal Life & Well-Being");
   });
 
   it("applies the typo fixes", () => {

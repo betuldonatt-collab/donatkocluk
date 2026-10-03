@@ -77,7 +77,6 @@ describe("9th-grade subject colours", () => {
       ["maarif9-cografya", "tyt-cografya"],
       ["maarif9-din", "tyt-din"],
       ["maarif9-turk-dili-ve-edebiyati", "tyt-turkce"],
-      ["maarif9-ingilizce", "lgs-ingilizce"],
       ["maarif9-gd-matematik", "tyt-matematik"],
     ];
     for (const [nine, existing] of pairs) {
