@@ -5,12 +5,14 @@ import { Fragment } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
+import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
 import type { SelectionRow } from "@/lib/curriculum/rows";
 import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
 
 // Maarif (9th/10th/11th grade) Kaynak Takibi body, laid out like a
-// spreadsheet with merged cells: every SUBTOPIC is its own <tr>, the unit's
+// spreadsheet with merged cells: every SUBTOPIC is its own <tr> (with each
+// shared heading written once as a muted group row above its topics), the unit's
 // title is written once as a rowSpan cell on the left, "Okul İlerlemesi"
 // (the one subtopic-level step) gets a checkbox per subtopic row, and every
 // unit-level column (Soru Dağılımı, Konu Çalışması, Çıkmış Sorular, and each
@@ -89,22 +91,25 @@ export function MaarifTableBody({
   collapsedMap: PipelineMap;
   onToggleProgress: (topicId: string, resourceId: string, field: "solved" | "reviewed") => void;
 }) {
-  function stepCell(step: PipelineStep, stepIndex: number, row: SelectionRow, topicId: string, name: string, isFirstRow: boolean) {
+  // One Okul İlerlemesi cell per row of the unit. A heading line has no topic
+  // of its own, so its cell is left blank.
+  function stepCell(step: PipelineStep, stepIndex: number, row: SelectionRow, line: TopicLine, fullName: string, isFirstRow: boolean, rowSpan: number) {
     const border = stepIndex === 0 && "border-l";
     if (step.key === "okul_ilerlemesi") {
+      if (line.kind === "heading") return <TableCell key={step.key} className={cn("bg-muted/40 px-3 py-1", border)} />;
       return (
         <TableCell key={step.key} className={cn("px-3 py-1 text-center", border)}>
           <Checkbox
-            checked={pipeline.map[topicId]?.okul_ilerlemesi ?? false}
-            onCheckedChange={() => pipeline.onToggle(topicId, "okul_ilerlemesi")}
-            aria-label={`${courseName} - ${row.label} - ${name} - ${step.label}`}
+            checked={pipeline.map[line.topicId]?.okul_ilerlemesi ?? false}
+            onCheckedChange={() => pipeline.onToggle(line.topicId, "okul_ilerlemesi")}
+            aria-label={`${courseName} - ${row.label} - ${fullName} - ${step.label}`}
           />
         </TableCell>
       );
     }
     if (!isFirstRow) return null;
     return (
-      <TableCell key={step.key} rowSpan={row.memberTopicIds.length} className={cn("text-center", border)}>
+      <TableCell key={step.key} rowSpan={rowSpan} className={cn("text-center", border)}>
         <Checkbox
           checked={collapsedMap[row.id]?.[step.key] ?? false}
           onCheckedChange={() => pipeline.onToggle(row.id, step.key)}
@@ -117,13 +122,19 @@ export function MaarifTableBody({
   return (
     <>
       {rows.map((row) => {
-        const count = row.memberTopicIds.length;
-        return row.memberTopicIds.map((topicId, i) => {
-          const name = row.readOnlyNames[i] ?? row.label;
-          const isFirstRow = i === 0;
-          const isLastRow = i === count - 1;
+        // The unit's topics as display lines: each heading once, its topics
+        // on clean lines beneath it (lib/curriculum/topic-display.ts). Every
+        // merged unit-level cell spans ALL of these lines, headings included.
+        const fullNames = new Map(row.memberTopicIds.map((id, i) => [id, row.readOnlyNames[i] ?? row.label]));
+        const lines = topicLinesForUnit(row.memberTopicIds.map((id) => ({ id, name: fullNames.get(id)! })));
+        const count = lines.length;
+        return lines.map((line, li) => {
+          const isFirstRow = li === 0;
+          const isLastRow = li === count - 1;
+          const isHeading = line.kind === "heading";
+          const fullName = line.kind === "topic" ? fullNames.get(line.topicId)! : line.text;
           return (
-            <TableRow key={topicId} className={cn(!isLastRow && "border-border/40")}>
+            <TableRow key={line.kind === "topic" ? line.topicId : `${row.id}-heading-${li}`} className={cn(!isLastRow && "border-border/40")}>
               {isFirstRow && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
               {isFirstRow && (
                 <TableCell
@@ -137,14 +148,16 @@ export function MaarifTableBody({
                 </TableCell>
               )}
               <TableCell
+                style={{ paddingLeft: `${0.75 + line.depth * 0.9}rem` }}
                 className={cn(
-                  "bg-card sticky z-10 min-w-56 border-r px-3 py-1.5 text-sm whitespace-normal",
+                  "sticky z-10 min-w-56 border-r py-1.5 pr-3 text-sm whitespace-normal",
                   MAARIF_KONU_STICKY_LEFT_CLASS,
+                  isHeading ? "bg-muted text-foreground text-xs font-semibold" : "bg-card",
                 )}
               >
-                {name}
+                {line.text}
               </TableCell>
-              {pipeline.config.start.map((step, si) => stepCell(step, si, row, topicId, name, isFirstRow))}
+              {pipeline.config.start.map((step, si) => stepCell(step, si, row, line, fullName, isFirstRow, count))}
               {isFirstRow &&
                 resources.map((resource) => {
                   const solved = row.memberTopicIds.some((id) => progress[`${id}::${resource.id}`]?.solved);
@@ -168,7 +181,7 @@ export function MaarifTableBody({
                     </Fragment>
                   );
                 })}
-              {pipeline.config.end.map((step, si) => stepCell(step, si, row, topicId, name, isFirstRow))}
+              {pipeline.config.end.map((step, si) => stepCell(step, si, row, line, fullName, isFirstRow, count))}
             </TableRow>
           );
         });
