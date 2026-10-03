@@ -64,3 +64,15 @@ export function findMissingTasks<T extends MissingTaskInput>(
   // Newest day first; within a day keep the board's own order.
   return result.sort((a, b) => (a.task.task_date < b.task.task_date ? 1 : a.task.task_date > b.task.task_date ? -1 : 0));
 }
+
+// Buckets an already newest-first list by day (order preserved), so a day's
+// date is written once as a header instead of on every row.
+export function groupMissingByDate<T extends { task_date: string }>(items: T[]): { date: string; items: T[] }[] {
+  const groups: { date: string; items: T[] }[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === item.task_date) last.items.push(item);
+    else groups.push({ date: item.task_date, items: [item] });
+  }
+  return groups;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findMissingTasks, isKitapOkumaTask, type MissingTaskInput } from "./missing-tasks";
+import { findMissingTasks, groupMissingByDate, isKitapOkumaTask, type MissingTaskInput } from "./missing-tasks";
 
 const TODAY = "2026-10-10";
 
@@ -80,5 +80,20 @@ describe("findMissingTasks", () => {
   it("sorts newest day first", () => {
     const tasks = [task({ id: "a", task_date: "2026-10-05" }), task({ id: "b", task_date: "2026-10-09" })];
     expect(find(tasks).map((m) => m.task.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("groupMissingByDate", () => {
+  it("writes each day once, keeping order and the tasks under it", () => {
+    const items = [
+      { id: "a", task_date: "2026-10-09" },
+      { id: "b", task_date: "2026-10-09" },
+      { id: "c", task_date: "2026-10-07" },
+    ];
+    expect(groupMissingByDate(items)).toEqual([
+      { date: "2026-10-09", items: [items[0], items[1]] },
+      { date: "2026-10-07", items: [items[2]] },
+    ]);
+    expect(groupMissingByDate([])).toEqual([]);
   });
 });

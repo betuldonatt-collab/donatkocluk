@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
+import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS, type MissingTaskInput } from "@/lib/missing-tasks";
 import {
   getPendingFocusReviews,
   getPendingStudentTasks,
@@ -15,6 +16,7 @@ import type {
   CoachingSession,
   CalendarBlock,
   CoachTask,
+  LgsMissingTasksAlert,
   MissingExamAlert,
   PendingReportCardAlert,
   RosterStudent,
@@ -77,6 +79,8 @@ function buildCoachAlerts(
     subject_scores: MissingExamAlert["subjectScores"];
   }[],
   pendingReportCardRows: { id: string; student_id: string; cycle_number: number; generated_at: string }[],
+  lgsTaskRows: (MissingTaskInput & { student_id: string; title: string })[],
+  today: string,
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
@@ -133,7 +137,36 @@ function buildCoachAlerts(
     }))
     .filter((a): a is PendingReportCardAlert => !!a.student);
 
-  return { inactive, lowPerformance, missingExams, pendingReportCards };
+  // Same rule as the "Tamamlanmayan Görevler" card on each student's page
+  // (lib/missing-tasks.ts): past-due, still not done, Kitap Okuma excluded,
+  // photos already awaiting review excluded. LGS only -- the only cohort
+  // with Kanıt Fotoğrafı.
+  const lgsMissingTasks: LgsMissingTasksAlert[] = [];
+  const tasksByStudent = new Map<string, typeof lgsTaskRows>();
+  for (const row of lgsTaskRows) {
+    const list = tasksByStudent.get(row.student_id) ?? [];
+    list.push(row);
+    tasksByStudent.set(row.student_id, list);
+  }
+  for (const student of roster) {
+    if (student.exam_type !== "LGS") continue;
+    const missing = findMissingTasks(tasksByStudent.get(student.id) ?? [], today, { requiresPhoto: true });
+    if (missing.length === 0) continue;
+    lgsMissingTasks.push({
+      student,
+      tasks: missing.map(({ task, reason }) => ({
+        id: task.id,
+        task_date: task.task_date,
+        title: task.title,
+        course_id: task.course_id,
+        reason,
+      })),
+    });
+  }
+  // The student with the most to chase first.
+  lgsMissingTasks.sort((a, b) => b.tasks.length - a.tasks.length);
+
+  return { inactive, lowPerformance, missingExams, pendingReportCards, lgsMissingTasks };
 }
 
 async function fetchDashboardData(
@@ -207,7 +240,7 @@ async function fetchDashboardData(
   const [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }] =
     studentIds.length > 0
       ? await Promise.all([
-          supabase.from("profiles").select("id, full_name").in("id", studentIds),
+          supabase.from("profiles").select("id, full_name, exam_type").in("id", studentIds),
           supabase
             .from("student_tasks")
             .select("student_id, updated_at, created_at")
@@ -237,12 +270,30 @@ async function fetchDashboardData(
       : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const roster = (profiles ?? []) as RosterStudent[];
+
+  // Past-due, not-yet-completed tasks of this coach's LGS students, bounded to
+  // the same look-back window the student page uses. Needs the roster's
+  // exam types, so it runs after the profiles read above.
+  const lgsStudentIds = roster.filter((s) => s.exam_type === "LGS").map((s) => s.id);
+  const { data: lgsTaskRows } =
+    lgsStudentIds.length > 0
+      ? await supabase
+          .from("student_tasks")
+          .select("id, student_id, task_date, task_type, course_id, title, status, is_approved_by_coach, evidence_image_paths, evidence_review_status")
+          .in("student_id", lgsStudentIds)
+          .lt("task_date", today)
+          .gte("task_date", addDaysISO(today, -MISSING_TASKS_WINDOW_DAYS))
+          .in("status", ["pending", "not_done"])
+      : { data: [] };
+
   const alerts = buildCoachAlerts(
     roster,
     recentActivityRows ?? [],
     prevWeekTaskRows ?? [],
     missingExamRows ?? [],
     pendingReportCardRows ?? [],
+    (lgsTaskRows ?? []) as (MissingTaskInput & { student_id: string; title: string })[],
+    today,
   );
 
   return {
@@ -284,7 +335,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
       weekSessions: [],
       weekBlocks: [],
       weekTasks: [],
-      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [] },
+      alerts: { inactive: [], lowPerformance: [], missingExams: [], pendingReportCards: [], lgsMissingTasks: [] },
     },
     [],
     [],

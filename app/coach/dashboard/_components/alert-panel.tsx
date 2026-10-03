@@ -4,6 +4,7 @@ import { AlertTriangle, ClipboardCheck, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
 import type { CoachAlerts } from "../types";
+import { LgsMissingTasksPanel } from "./lgs-missing-tasks-panel";
 import { MissingExamAnalysisPanel } from "./missing-exam-analysis-panel";
 import { PendingApprovalsPanel } from "./pending-approvals-panel";
 import { PendingFocusReviewsPanel } from "./pending-focus-reviews-panel";
@@ -63,6 +64,7 @@ export function AlertPanel({
     alerts.lowPerformance.length +
     alerts.missingExams.length +
     alerts.pendingReportCards.length +
+    alerts.lgsMissingTasks.length +
     pendingApprovals.length +
     focusReviews.length;
 
@@ -110,6 +112,7 @@ export function AlertPanel({
       />
       <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS")} />
       <PendingApprovalsPanel title="LGS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType === "LGS")} />
+      <LgsMissingTasksPanel alerts={alerts.lgsMissingTasks} />
     </div>
   );
 }

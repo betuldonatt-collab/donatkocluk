@@ -1,3 +1,5 @@
+import type { MissingTaskRow } from "../_components/missing-task-groups";
+
 export type SessionOutcome = "pending" | "completed" | "not_happened";
 export type MissedReason = "student_no_show" | "coach_no_show" | "other";
 
@@ -45,6 +47,7 @@ export type CoachTask = {
 export type RosterStudent = {
   id: string;
   full_name: string | null;
+  exam_type?: "YKS" | "LGS";
 };
 
 export type InactiveAlert = { student: RosterStudent };
@@ -72,11 +75,15 @@ export type PendingReportCardAlert = {
   cycleNumber: number;
   generatedAt: string;
 };
+// One LGS student's past-due, uncompleted tasks (lib/missing-tasks.ts) for
+// the dashboard's "LGS Eksik/Tamamlanmayan Görevler" card.
+export type LgsMissingTasksAlert = { student: RosterStudent; tasks: MissingTaskRow[] };
 export type CoachAlerts = {
   inactive: InactiveAlert[];
   lowPerformance: LowPerformanceAlert[];
   missingExams: MissingExamAlert[];
   pendingReportCards: PendingReportCardAlert[];
+  lgsMissingTasks: LgsMissingTasksAlert[];
 };
 
 export const COACH_TASK_STATUS_LABELS: Record<CoachTaskStatus, string> = {
