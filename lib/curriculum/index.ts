@@ -12,6 +12,7 @@ import lgsJson from "./lgs.json";
 
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
 import { stripKonuNumberPrefix } from "./topic-name";
@@ -177,7 +178,7 @@ const ALL_COURSES: Course[] = [
   ...BRANCH_EXAM_MACRO_COURSES,
 ];
 
-// Maarif (9th/10th-grade, and the 11th grade's merged "Maarif TYT" tab)
+// Maarif (9th/10th/11th-grade, and the 11th grade's merged "Maarif TYT" tab)
 // courses are looked up as a fallback only -- they are deliberately NOT
 // part of ALL_COURSES, so no existing YKS/LGS list or picker that iterates
 // ALL_COURSES can ever pick them up.
@@ -189,13 +190,14 @@ function findMaarif9Course(courseId: string): Course | null {
     MAARIF9_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
+    MAARIF11_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF_TYT_MERGED_COURSES.find((c) => c.id === courseId) ??
     null
   );
 }
 
 // Any Maarif-origin course id -- 9th/10th grade's own, the 11th grade's
-// merged "Maarif TYT" tab, or (once real data lands) 11th grade's own.
+// merged "Maarif TYT" tab, or 11th grade's own.
 // Shared by lib/curriculum/rows.ts to decide whether a course rolls up to
 // unit-level selection nodes (maarif-selection.ts) instead of rendering one
 // row per raw topic.
@@ -231,9 +233,8 @@ export function topicsForCourse(course: Course): Topic[] {
 // exactly as before.
 //
 // `course` can genuinely be missing: a caller whose own course list comes
-// from a cohort with no curriculum data yet (an 11th-grade Maarif student,
-// for now -- MAARIF_GRADES[11].courses is empty) has nothing to fall back
-// to and ends up passing undefined here. No topic options at all, rather
+// from a cohort with no curriculum data (or a track with no subjects yet)
+// has nothing to fall back to and ends up passing undefined here. No topic options at all, rather
 // than throwing on course.id -- the form's own topic picker just shows
 // none, matching "no course selected yet".
 export function topicOptionsForCourse(course: Course | null | undefined): { id: string; label: string }[] {

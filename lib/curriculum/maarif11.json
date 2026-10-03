@@ -1,0 +1,891 @@
+[
+  {
+    "id": "maarif11-matematik",
+    "name": "11. Sınıf Matematik",
+    "units": [
+      {
+        "unit": "1. Ünite: İstatistiksel Araştırma Süreci",
+        "topics": [
+          {
+            "id": "maarif11-matematik-u0-t0",
+            "name": "1.1. İki Nicel Değişkenli Veriler"
+          },
+          {
+            "id": "maarif11-matematik-u0-t1",
+            "name": "1.2. Başkaları Tarafından Oluşturulan İki Nicel Değişkenli Verileri İnceleme"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Geometrik Şekiller",
+        "topics": [
+          {
+            "id": "maarif11-matematik-u1-t0",
+            "name": "2.1. Dörtgenlerin Özellikleri"
+          },
+          {
+            "id": "maarif11-matematik-u1-t1",
+            "name": "2.2. Özel Dörtgenler Arasındaki İlişkiler"
+          },
+          {
+            "id": "maarif11-matematik-u1-t2",
+            "name": "2.3. Dışbükey Çokgenlerin Özellikleri"
+          },
+          {
+            "id": "maarif11-matematik-u1-t3",
+            "name": "2.4. Çokgenlerle İlgili Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Nicelikler ve Değişimler (1)",
+        "topics": [
+          {
+            "id": "maarif11-matematik-u2-t0",
+            "name": "3.1. Trigonometrik Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif11-matematik-u2-t1",
+            "name": "3.2. Trigonometrik Fonksiyonlarla İfade Edilebilen Denklemler İçeren Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Nicelikler ve Değişimler (2)",
+        "topics": [
+          {
+            "id": "maarif11-matematik-u3-t0",
+            "name": "4.1. Üstel Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif11-matematik-u3-t1",
+            "name": "4.2. Üstel Fonksiyonların Ters Fonksiyonları"
+          },
+          {
+            "id": "maarif11-matematik-u3-t2",
+            "name": "4.3. Logaritmik Fonksiyonlar ve Nitel Özellikleri"
+          },
+          {
+            "id": "maarif11-matematik-u3-t3",
+            "name": "4.4. Üstel ve Logaritmik Fonksiyonlarla İfade Edilebilen Denklem ve Eşitsizlikler İçeren Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Nicelikler ve Değişimler (3)",
+        "topics": [
+          {
+            "id": "maarif11-matematik-u4-t0",
+            "name": "5.1. Fonksiyonların Bileşkesi"
+          },
+          {
+            "id": "maarif11-matematik-u4-t1",
+            "name": "5.2. Fonksiyonlarda Dört İşlem"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-fizik",
+    "name": "11. Sınıf Fizik",
+    "units": [
+      {
+        "unit": "1. Ünite: Kuvvet ve Hareket",
+        "topics": [
+          {
+            "id": "maarif11-fizik-u0-t0",
+            "name": "1.1. Serbest Düşme › 1.1.1. Serbest Düşen Cisimler"
+          },
+          {
+            "id": "maarif11-fizik-u0-t1",
+            "name": "1.1. Serbest Düşme › 1.1.2. Serbest Düşme Hareketi İle İlgili Veriler"
+          },
+          {
+            "id": "maarif11-fizik-u0-t2",
+            "name": "1.2. İki Boyutta Sabit İvmeli Hareket"
+          },
+          {
+            "id": "maarif11-fizik-u0-t3",
+            "name": "1.3. Newton'ın Hareket Yasaları › 1.3.1. Bileşke Kuvvet ve Hareket Arasındaki İlişki"
+          },
+          {
+            "id": "maarif11-fizik-u0-t4",
+            "name": "1.3. Newton'ın Hareket Yasaları › 1.3.2. Serbest Cisim Diyagramı"
+          },
+          {
+            "id": "maarif11-fizik-u0-t5",
+            "name": "1.4. Sürtünme Kuvveti › 1.4.1. Statik ve Kinetik Sürtünme Kuvvetleri"
+          },
+          {
+            "id": "maarif11-fizik-u0-t6",
+            "name": "1.4. Sürtünme Kuvveti › 1.4.2. Sürtünme Kuvvetinin Bağlı Olduğu Değişkenler"
+          },
+          {
+            "id": "maarif11-fizik-u0-t7",
+            "name": "1.5. Limit Hız"
+          },
+          {
+            "id": "maarif11-fizik-u0-t8",
+            "name": "1.6. Düzgün Çembersel Hareket › 1.6.1. Çembersel Harekette Yörünge ve Hız Kavramları"
+          },
+          {
+            "id": "maarif11-fizik-u0-t9",
+            "name": "1.6. Düzgün Çembersel Hareket › 1.6.2. Çembersel Hareketin Değişkenleri"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Elektrik ve Manyetizma",
+        "topics": [
+          {
+            "id": "maarif11-fizik-u1-t0",
+            "name": "2.1. Elektriksel Kuvvet ve Elektriksel Alan › 2.1.1. Elektriksel Kuvvet"
+          },
+          {
+            "id": "maarif11-fizik-u1-t1",
+            "name": "2.1. Elektriksel Kuvvet ve Elektriksel Alan › 2.1.2. Elektriksel Alan"
+          },
+          {
+            "id": "maarif11-fizik-u1-t2",
+            "name": "2.1. Elektriksel Kuvvet ve Elektriksel Alan › 2.1.3. Faraday Kafesi"
+          },
+          {
+            "id": "maarif11-fizik-u1-t3",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.1. Manyetik Alan"
+          },
+          {
+            "id": "maarif11-fizik-u1-t4",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.2. Üzerinden Akım Geçen Düz İletken Telin Manyetik Alanı"
+          },
+          {
+            "id": "maarif11-fizik-u1-t5",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.3. Akım Makarasının Manyetik Alanı"
+          },
+          {
+            "id": "maarif11-fizik-u1-t6",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.4. Elektromıknatısların Kullanım Alanları"
+          },
+          {
+            "id": "maarif11-fizik-u1-t7",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.5. Manyetik Alanda Üzerinden Akım Geçen Düz Bir Tele Etki Eden Kuvvet"
+          },
+          {
+            "id": "maarif11-fizik-u1-t8",
+            "name": "2.2. Manyetik Alan ve Manyetik Kuvvet › 2.2.6. Manyetik Alanda Üzerinden Akım Geçen Dikdörtgen Telin Bir Eksen Etrafında Dönmesi"
+          },
+          {
+            "id": "maarif11-fizik-u1-t9",
+            "name": "2.3. İndüksiyon Akımı › 2.3.1. Manyetik Akı"
+          },
+          {
+            "id": "maarif11-fizik-u1-t10",
+            "name": "2.3. İndüksiyon Akımı › 2.3.2. İndüksiyon Gerilimi"
+          },
+          {
+            "id": "maarif11-fizik-u1-t11",
+            "name": "2.3. İndüksiyon Akımı › 2.3.3. Alternatif Akım"
+          },
+          {
+            "id": "maarif11-fizik-u1-t12",
+            "name": "2.4. Transformatörler"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Optik",
+        "topics": [
+          {
+            "id": "maarif11-fizik-u2-t0",
+            "name": "3.1. Işık Şiddeti, Işık Akısı ve Aydınlanma"
+          },
+          {
+            "id": "maarif11-fizik-u2-t1",
+            "name": "3.2. Düzlem Aynalar"
+          },
+          {
+            "id": "maarif11-fizik-u2-t2",
+            "name": "3.3. Küresel Aynalar › 3.3.1. Küresel Ayna Çeşitleri ve Özellikleri"
+          },
+          {
+            "id": "maarif11-fizik-u2-t3",
+            "name": "3.3. Küresel Aynalar › 3.3.2. Küresel Aynalarda Görüntü Oluşumu"
+          },
+          {
+            "id": "maarif11-fizik-u2-t4",
+            "name": "3.4. Kırılma"
+          },
+          {
+            "id": "maarif11-fizik-u2-t5",
+            "name": "3.5. Görünür Derinlik"
+          },
+          {
+            "id": "maarif11-fizik-u2-t6",
+            "name": "3.6. Fiber Optik"
+          },
+          {
+            "id": "maarif11-fizik-u2-t7",
+            "name": "3.7. Prizmalar"
+          },
+          {
+            "id": "maarif11-fizik-u2-t8",
+            "name": "3.8. Mercekler › 3.8.1. Merceklerin Özellikleri"
+          },
+          {
+            "id": "maarif11-fizik-u2-t9",
+            "name": "3.8. Mercekler › 3.8.2. Merceklerde Görüntü Oluşumu"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-kimya",
+    "name": "11. Sınıf Kimya",
+    "units": [
+      {
+        "unit": "1. Ünite: Etkileşim",
+        "topics": [
+          {
+            "id": "maarif11-kimya-u0-t0",
+            "name": "1.1. Enerji › 1.1.1. Tepkimelerde Meydana Gelen Enerji Değişimi"
+          },
+          {
+            "id": "maarif11-kimya-u0-t1",
+            "name": "1.1. Enerji › 1.1.2. Maddelerin Enerji Kaynağı Olma Potansiyeli"
+          },
+          {
+            "id": "maarif11-kimya-u0-t2",
+            "name": "1.1. Enerji › 1.1.3. Bağ Enerjileriyle Tepkime Entalpisinin Hesaplanması"
+          },
+          {
+            "id": "maarif11-kimya-u0-t3",
+            "name": "1.1. Enerji › 1.1.4. Standart Oluşum Entalpisi - Standart Tepkime Entalpisi"
+          },
+          {
+            "id": "maarif11-kimya-u0-t4",
+            "name": "1.2. Kimyasal Tepkimelerde Hız › 1.2.1. Kimyasal Tepkimelerin Gerçekleşmesi İçin Gerekli Şartlar - Çarpışma Teorisi - Aktivasyon Enerjisi"
+          },
+          {
+            "id": "maarif11-kimya-u0-t5",
+            "name": "1.2. Kimyasal Tepkimelerde Hız › 1.2.2. Tepken ve Ürün Derişimleriyle Ortalama Tepkime Hızlarının Hesaplanması - Ortalama Tepkime Hızı"
+          },
+          {
+            "id": "maarif11-kimya-u0-t6",
+            "name": "1.2. Kimyasal Tepkimelerde Hız › 1.2.3. Tepkime Hızına Etki Eden Faktörler"
+          },
+          {
+            "id": "maarif11-kimya-u0-t7",
+            "name": "1.2. Kimyasal Tepkimelerde Hız › 1.2.4. Kimyasal Tepkimelerin Hız Denklemi - Çok Basamaklı Tepkimeler"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Çeşitlilik",
+        "topics": [
+          {
+            "id": "maarif11-kimya-u1-t0",
+            "name": "2.1. Denge › 2.1.1. Tersinir Tepkimelerin Özellikleri"
+          },
+          {
+            "id": "maarif11-kimya-u1-t1",
+            "name": "2.1. Denge › 2.1.2. Fiziksel ve Kimyasal Değişimlerde Denge"
+          },
+          {
+            "id": "maarif11-kimya-u1-t2",
+            "name": "2.1. Denge › 2.1.3. Denge Sabiti İfadesinin Yazılması"
+          },
+          {
+            "id": "maarif11-kimya-u1-t3",
+            "name": "2.1. Denge › 2.1.4. Tepkime Oranı"
+          },
+          {
+            "id": "maarif11-kimya-u1-t4",
+            "name": "2.1. Denge › 2.1.5. Dengeyi Etkileyen Faktörler"
+          },
+          {
+            "id": "maarif11-kimya-u1-t5",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.1. Saf Suyun Otoiyonizasyonu"
+          },
+          {
+            "id": "maarif11-kimya-u1-t6",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.2. Asit-Baz Teorilerinin Karşılaştırılması"
+          },
+          {
+            "id": "maarif11-kimya-u1-t7",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.3. Asitlerin ve Bazların Kuvveti"
+          },
+          {
+            "id": "maarif11-kimya-u1-t8",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.4. Kuvvetli ve Zayıf Asit-Baz Sulu Çözeltilerinde pH Hesaplamaları"
+          },
+          {
+            "id": "maarif11-kimya-u1-t9",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.5. Kuvvetli Asit ve Kuvvetli Bazların Nötralleşme Tepkimeleri"
+          },
+          {
+            "id": "maarif11-kimya-u1-t10",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.6. Kuvvetli Asit-Kuvvetli Baz Titrasyonları"
+          },
+          {
+            "id": "maarif11-kimya-u1-t11",
+            "name": "2.2. Asit ve Baz Çözeltilerinde Denge › 2.2.7. Asidik ve Bazik Ürünlerin Seçiminde Dikkat Edilmesi Gerekenler"
+          },
+          {
+            "id": "maarif11-kimya-u1-t12",
+            "name": "2.3. Çözünürlük Dengesi › 2.3.1. Suda Az Çözünen Tuzların Molar Çözünürlükleri"
+          },
+          {
+            "id": "maarif11-kimya-u1-t13",
+            "name": "2.3. Çözünürlük Dengesi › 2.3.2. Suda Az Çözünen Tuzların Çözünürlüğüne Etki Eden Faktörler"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Sürdürülebilirlik",
+        "topics": [
+          {
+            "id": "maarif11-kimya-u2-t0",
+            "name": "3.1. Nanoteknoloji ve Sürdürülebilirlik › 3.1.1. Yeşil Hidrojen Enerjisi"
+          },
+          {
+            "id": "maarif11-kimya-u2-t1",
+            "name": "3.1. Nanoteknoloji ve Sürdürülebilirlik › 3.1.2. Nanoteknolojik Ürünlerin Potansiyel Faydaları ve Olası Zararları"
+          },
+          {
+            "id": "maarif11-kimya-u2-t2",
+            "name": "3.1. Nanoteknoloji ve Sürdürülebilirlik › 3.1.3. Mikroplastik ve Nanoplastikler"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-biyoloji",
+    "name": "11. Sınıf Biyoloji",
+    "units": [
+      {
+        "unit": "1. Ünite: Tepki",
+        "topics": [
+          {
+            "id": "maarif11-biyoloji-u0-t0",
+            "name": "1.1. Farklı Canlıların Uyaranlara Karşı Oluşturduğu Tepki Mekanizmaları › 1.1.1. Farklı Canlıların Uyaranlara Karşı Oluşturduğu Tepkiler"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t1",
+            "name": "1.2. Bitkisel Hormonların Etkileri › 1.2.1. Bitkisel Hormonlar"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t2",
+            "name": "1.3. Bitkilerdeki Tepki Mekanizmaları › 1.3.1. Bitkilerde Tropizma ve Nasti Hareketleri"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t3",
+            "name": "1.4. Bitkilerde Yönelme Hareketleri"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t4",
+            "name": "1.5. Duyu Reseptörleri ve Duyu Organları › 1.5.1. Uyartıların Alınması"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t5",
+            "name": "1.5. Duyu Reseptörleri ve Duyu Organları › 1.5.2. Nöronların Yapısı"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t6",
+            "name": "1.5. Duyu Reseptörleri ve Duyu Organları › 1.5.3. Duyu Organları"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t7",
+            "name": "1.6. Hayvanlarda Sinir Sistemi Farklılıkları"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t8",
+            "name": "1.7. İnsanda Sinir Sistemi › 1.7.1. İnsanda Sinir Sisteminin Yapısı"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t9",
+            "name": "1.8. Refleks Mekanizması › 1.8.1. Refleksler"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t10",
+            "name": "1.9. Harekete Dayalı Tepki › 1.9.1. Kemik, Eklem ve Kasların Hareketteki Rolü"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t11",
+            "name": "1.9. Harekete Dayalı Tepki › 1.9.2. Kemik ve Kasların Birlikte Çalışma İlişkisi"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t12",
+            "name": "1.10. İskelet Kaslarının Kasılma ve Gevşeme Mekanizması › 1.10.1. Kaslarda Kasılmanın Kontrolü"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t13",
+            "name": "1.10. İskelet Kaslarının Kasılma ve Gevşeme Mekanizması › 1.10.2. Kaslarda Kasılma Mekanizması"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t14",
+            "name": "1.11. Bağışıklık Sistemi › 1.11.1. Bağışıklık"
+          },
+          {
+            "id": "maarif11-biyoloji-u0-t15",
+            "name": "1.12. Alerjik Tepkiler › 1.12.1. Alerji"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Homeostazi",
+        "topics": [
+          {
+            "id": "maarif11-biyoloji-u1-t0",
+            "name": "2.1. Homeostazinin Canlılar İçin Önemi › 2.1.1. Farklı Canlı Türlerindeki Homeostatik Yapı ve Sistemler"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t1",
+            "name": "2.2. Homeostatik Süreçler"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t2",
+            "name": "2.3. Pozitif ve Negatif Geri Bildirim"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t3",
+            "name": "2.4. Homeostazinin Sağlanmasında Sinir Sisteminin Etkileri"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t4",
+            "name": "2.5. Endokrin Sisteminin Homeostazi İşlevi"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t5",
+            "name": "2.6. Dolaşım Sistemi ve Homeostazi Arasındaki İlişki"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t6",
+            "name": "2.7. Solunum Sisteminin Homeostazinin Sağlanmasındaki Rolü"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t7",
+            "name": "2.8. Boşaltım Sisteminin Homeostazi İşlevi"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t8",
+            "name": "2.9. Homeostazinin Sağlanmasında Sistemlerin Eş Güdümlü Çalışması"
+          },
+          {
+            "id": "maarif11-biyoloji-u1-t9",
+            "name": "2.10. Homeostazinin Sağlanamadığı Durumlar › 2.10.1. Homeostazinin Sağlanmadığı Durumlarda Oluşabilecek Sağlık Problemleri"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-cografya",
+    "name": "11. Sınıf Coğrafya",
+    "units": [
+      {
+        "unit": "1. Ünite: Coğrafyanın Doğası",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u0-t0",
+            "name": "1.1. Mekânsal Sorunlar Karşısında Coğrafya Bilimi"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Mekansal Bilgi Teknolojileri",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u1-t0",
+            "name": "2.1. Web Tabanlı CBS Uygulamaları"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Doğal Sistemler ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u2-t0",
+            "name": "3.1. Su Kaynakları"
+          },
+          {
+            "id": "maarif11-cografya-u2-t1",
+            "name": "3.2. Türkiye'deki Su Kaynaklarının Etkileri"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Beşeri Sistemler ve Süreçler",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u3-t0",
+            "name": "4.1. Yerleşmelerin Mekânsal Organizasyonları"
+          },
+          {
+            "id": "maarif11-cografya-u3-t1",
+            "name": "4.2. Yerleşmelerin Etki Alanları"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Ekonomik Faaliyetler ve Etkileri",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u4-t0",
+            "name": "5.1. Tarımsal Faaliyetler ve Gıda Güvencesi"
+          },
+          {
+            "id": "maarif11-cografya-u4-t1",
+            "name": "5.2. Tarım Uygulamalarında Sürdürülebilirlik"
+          },
+          {
+            "id": "maarif11-cografya-u4-t2",
+            "name": "5.3. Stratejik ve Kritik Madenler"
+          },
+          {
+            "id": "maarif11-cografya-u4-t3",
+            "name": "5.4. Enerji Kaynakları"
+          },
+          {
+            "id": "maarif11-cografya-u4-t4",
+            "name": "5.5. Sanayileşmenin Mekânsal Etkileri"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite: Afetler ve Sürdürülebilir Çevre",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u5-t0",
+            "name": "6.1. Gezegen Sınırı"
+          },
+          {
+            "id": "maarif11-cografya-u5-t1",
+            "name": "6.2. Küresel İklim Değişikliği"
+          },
+          {
+            "id": "maarif11-cografya-u5-t2",
+            "name": "6.3. Türkiye'de Suyun Sürdürülebilir Kullanımı"
+          }
+        ]
+      },
+      {
+        "unit": "7. Ünite: Bölgeler, Ülkeler ve Küresel Bağlantılar",
+        "topics": [
+          {
+            "id": "maarif11-cografya-u6-t0",
+            "name": "7.1. Türkiye'nin Kültürel Hinterlandı"
+          },
+          {
+            "id": "maarif11-cografya-u6-t1",
+            "name": "7.2. Tarımsal Üretim: Hollanda"
+          },
+          {
+            "id": "maarif11-cografya-u6-t2",
+            "name": "7.3. Sanayileşme Süreci: Almanya ve Mısır"
+          },
+          {
+            "id": "maarif11-cografya-u6-t3",
+            "name": "7.4. Madencilik Faaliyetleri: Avustralya"
+          },
+          {
+            "id": "maarif11-cografya-u6-t4",
+            "name": "7.5. Enerji Kaynakları: Rusya ve Suudi Arabistan"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-tarih",
+    "name": "11. Sınıf Tarih",
+    "units": [
+      {
+        "unit": "1. Ünite: Değişen Dünyada Osmanlı (1683-1789)",
+        "topics": [
+          {
+            "id": "maarif11-tarih-u0-t0",
+            "name": "1.1. Osmanlı Devleti’nin 1683-1789 Yılları Arasındaki Siyasi ve Askerî Mücadeleleri"
+          },
+          {
+            "id": "maarif11-tarih-u0-t1",
+            "name": "1.2. Lale Devri’nin Devlet ve Toplum Hayatına Etkileri"
+          },
+          {
+            "id": "maarif11-tarih-u0-t2",
+            "name": "1.3. 1755 Lizbon ve 1766 İstanbul Depremlerinin Etkileri"
+          },
+          {
+            "id": "maarif11-tarih-u0-t3",
+            "name": "1.4. Sanayi Devrimi’nin Meydana Getirdiği Siyasi, Sosyal ve Ekonomik Değişim"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Dönüşüm Sürecinde Osmanlı (1789-1908)",
+        "topics": [
+          {
+            "id": "maarif11-tarih-u1-t0",
+            "name": "2.1. Fransız İhtilali’nin Devlet ve Toplum Hayatında Meydana Getirdiği Değişim"
+          },
+          {
+            "id": "maarif11-tarih-u1-t1",
+            "name": "2.2. 1789-1908 Yılları Arasında Osmanlı Devleti’nde Meydana Gelen Siyasi, Askerî ve İdari Gelişmeler"
+          },
+          {
+            "id": "maarif11-tarih-u1-t2",
+            "name": "2.3. 1789-1908 Yılları Arasında Osmanlı Devleti’nde Bilim, Sanat ve Teknoloji Alanlarında Meydana Gelen Gelişmeler"
+          },
+          {
+            "id": "maarif11-tarih-u1-t3",
+            "name": "2.4. Osmanlı Devleti’nde Sanayileşme Çabaları"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Savaşlar Sarmalında Osmanlı (1908-1918)",
+        "topics": [
+          {
+            "id": "maarif11-tarih-u2-t0",
+            "name": "3.1. 1908-1918 Yılları Arasında Osmanlı Devleti’nde Meydana Gelen Siyasi ve Askerî Gelişmeler"
+          },
+          {
+            "id": "maarif11-tarih-u2-t1",
+            "name": "3.2. 1908-1918 Yılları Arasında Yaşanan Kitlesel Göç ve Salgınlar"
+          },
+          {
+            "id": "maarif11-tarih-u2-t2",
+            "name": "3.3. Osmanlı Devleti’nin İnsanlık Tarihine Katkıları"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-turk-dili-ve-edebiyati",
+    "name": "11. Sınıf Türk Dili ve Edebiyatı",
+    "units": [
+      {
+        "unit": "1. TEMA: BİR DİYECEĞİM VAR!",
+        "topics": [
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t0",
+            "name": "1.1. Metin Tahlili (Anlama): Okuma › 1.1.1. Karagöz Oyunu (Yazıcı)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t1",
+            "name": "1.1. Metin Tahlili (Anlama): Okuma › 1.1.2. Mektup (Âli'ye Mektuplar)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t2",
+            "name": "1.1. Metin Tahlili (Anlama): Okuma › 1.1.3. Dilekçe"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t3",
+            "name": "1.2. Edebiyat Atölyesi (Anlatma): Konuşma › 1.2.1. Sözlü İletişim Engellerini Konu Alan Bir Drama Sergileyebilme"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t4",
+            "name": "1.3. Metin Tahlili (Anlama): Dinleme / İzleme › 1.3.1. Değişen İletişim Araçlarının Hayatımızdaki Yeri"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u0-t5",
+            "name": "1.4. Edebiyat Atölyesi (Anlatma): Yazma › 1.4.1. E-Posta Yazabilme"
+          }
+        ]
+      },
+      {
+        "unit": "2. TEMA: KÜLTÜR YOLCULUĞU",
+        "topics": [
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t0",
+            "name": "2.1. Metin Tahlili (Anlama): Okuma › 2.1.1. Hikâye (Oğulla Buluşma)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t1",
+            "name": "2.1. Metin Tahlili (Anlama): Okuma › 2.1.2. Anı (Eski İstanbul'dan Çizgiler)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t2",
+            "name": "2.1. Metin Tahlili (Anlama): Okuma › 2.1.3. Orhun Abideleri"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t3",
+            "name": "2.1. Metin Tahlili (Anlama): Okuma › 2.1.4. Divânu Lugâti't-Türk"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t4",
+            "name": "2.2. Edebiyat Atölyesi (Anlatma): Konuşma › 2.2.1. Türk Kültürünün Özelliklerini Yansıtan Bir Konuşma Yapabilme"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t5",
+            "name": "2.3. Metin Tahlili (Anlama): Dinleme / İzleme › 2.3.1. Âşık Atışması (Murat Çobanoğlu-Şeref Taşlıova Atışması)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u1-t6",
+            "name": "2.4. Edebiyat Atölyesi (Anlatma): Yazma › 2.4.1. Çevrim İçi Müze Gezisiyle İlgili İzlenimleri Yazabilme"
+          }
+        ]
+      },
+      {
+        "unit": "3. TEMA: YAŞAMIN İZİNDE",
+        "topics": [
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t0",
+            "name": "3.1. Metin Tahlili (Anlama): Okuma › 3.1.1. Roman (Huzur)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t1",
+            "name": "3.1. Metin Tahlili (Anlama): Okuma › 3.1.2. Biyografi (Mehmet Akif Ersoy)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t2",
+            "name": "3.1. Metin Tahlili (Anlama): Okuma › 3.1.3. Tezkire (Usûlî)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t3",
+            "name": "3.2. Edebiyat Atölyesi (Anlatma): Konuşma › 3.2.1. Mülakat (Seçilen Roman Kişisiyle Romanın Bağlamına Uygun Hayalî Bir Mülakat Yapabilme)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t4",
+            "name": "3.3. Metin Tahlili (Anlama): Dinleme / İzleme › 3.3.1. Radyo Tiyatrosu (Direnişin Ustaları)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u2-t5",
+            "name": "3.4. Edebiyat Atölyesi (Anlatma): Yazma › 3.4.1. Dinlenen/İzlenen Metinden Seçilen Bir Diyaloğu Bağlama Uygun Olarak Başka Bir Türe Dönüştürebilme"
+          }
+        ]
+      },
+      {
+        "unit": "4. TEMA: HAYATIN AYNASI",
+        "topics": [
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u3-t0",
+            "name": "4.1. Metin Tahlili (Anlama): Okuma › 4.1.1. Tiyatro (Ben, Mimar Sinan)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u3-t1",
+            "name": "4.1. Metin Tahlili (Anlama): Okuma › 4.1.2. Küçürek Hikâye (Merdiven)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u3-t2",
+            "name": "4.2. Edebiyat Atölyesi (Anlatma): Konuşma › 4.2.1. Tiyatro Metnini Canlandırarak Konuşma Becerisini Geliştirebilme"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u3-t3",
+            "name": "4.3. Metin Tahlili (Anlama): Dinleme / İzleme › 4.3.1. Belgesel (Anadolu İnsanı / Fedakârlık)"
+          },
+          {
+            "id": "maarif11-turk-dili-ve-edebiyati-u3-t4",
+            "name": "4.4. Edebiyat Atölyesi (Anlatma): Yazma › 4.4.1. Dinlenen / İzlenen Belgesele Yönelik Özgün Bir Afiş Hazırlayabilme"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "maarif11-felsefe",
+    "name": "11. Sınıf Felsefe",
+    "units": [
+      {
+        "unit": "1. Ünite: Çevre Sorunları ve Felsefe",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u0-t0",
+            "name": "1.1. Çevre ve İnsan İlişkisi"
+          },
+          {
+            "id": "maarif11-felsefe-u0-t1",
+            "name": "1.2. Çevre Etiği"
+          }
+        ]
+      },
+      {
+        "unit": "2. Ünite: Teknoloji ve Hayat",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u1-t0",
+            "name": "2.1. Teknoloji ve İnsan Hayatı"
+          },
+          {
+            "id": "maarif11-felsefe-u1-t1",
+            "name": "2.2. Teknoloji Bağlamında Ontolojik Problemler"
+          },
+          {
+            "id": "maarif11-felsefe-u1-t2",
+            "name": "2.3. Teknoloji Bağlamında Aksiyolojik Problemler"
+          }
+        ]
+      },
+      {
+        "unit": "3. Ünite: Akıl ve İnanç",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u2-t0",
+            "name": "3.1. Akıl-İnanç İlişkisine Yönelik Felsefi Sorular ve Problemler"
+          },
+          {
+            "id": "maarif11-felsefe-u2-t1",
+            "name": "3.2. Akıl-İnanç İlişkisine Yönelik Felsefi Görüş ve Argümanlar"
+          }
+        ]
+      },
+      {
+        "unit": "4. Ünite: Edebiyat ve Felsefe",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u3-t0",
+            "name": "4.1. Edebiyat-Felsefe İlişkisi"
+          },
+          {
+            "id": "maarif11-felsefe-u3-t1",
+            "name": "4.2. Edebiyat-Felsefe İlişkisi Problemleri › 4.2.1. Edebî Unsurlara Felsefi Bakış"
+          },
+          {
+            "id": "maarif11-felsefe-u3-t2",
+            "name": "4.2. Edebiyat-Felsefe İlişkisi Problemleri › 4.2.2. Edebî Unsurlarla Felsefe Yapma"
+          }
+        ]
+      },
+      {
+        "unit": "5. Ünite: Hayatın Anlamı",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u4-t0",
+            "name": "5.1. Hayatın Anlamına Yönelik Felsefi Sorular ve Problemler"
+          },
+          {
+            "id": "maarif11-felsefe-u4-t1",
+            "name": "5.2. Hayatın Anlamına Yönelik Görüş ve Argümanlar › 5.2.1. Mutluluk ve Hayat İlişkisi"
+          },
+          {
+            "id": "maarif11-felsefe-u4-t2",
+            "name": "5.2. Hayatın Anlamına Yönelik Görüş ve Argümanlar › 5.2.2. Varoluş ve Kendi Olma Problemi"
+          }
+        ]
+      },
+      {
+        "unit": "6. Ünite: Hukuk ve Felsefe",
+        "topics": [
+          {
+            "id": "maarif11-felsefe-u5-t0",
+            "name": "6.1. Hukuk ve İnsan"
+          },
+          {
+            "id": "maarif11-felsefe-u5-t1",
+            "name": "6.2. Hukukun Doğasına Yönelik Felsefi Problemler › 6.2.1. Hukukun Gereği ve Önemi"
+          },
+          {
+            "id": "maarif11-felsefe-u5-t2",
+            "name": "6.2. Hukukun Doğasına Yönelik Felsefi Problemler › 6.2.2. Hukukun Kaynağı"
+          },
+          {
+            "id": "maarif11-felsefe-u5-t3",
+            "name": "6.2. Hukukun Doğasına Yönelik Felsefi Problemler › 6.2.3. Ahlak-Hukuk İlişkisi"
+          }
+        ]
+      }
+    ]
+  }
+]

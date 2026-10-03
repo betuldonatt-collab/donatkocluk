@@ -57,8 +57,9 @@ describe("grade separation (9th vs 10th)", () => {
     expect(stripGradePrefix("10. Sınıf Din Kültürü ve Ahlak Bilgisi")).toBe("Din Kültürü ve Ahlak Bilgisi");
   });
 
-  it("11th grade has no Kaynak Takibi/Genel Deneme data yet, but resolves safely instead of crashing", () => {
-    expect(MAARIF_GRADES[11].courses).toEqual([]);
+  it("11th grade has its own Kaynak Takibi courses but no Genel Deneme subjects, and resolves safely for both", () => {
+    expect(MAARIF_GRADES[11].courses.length).toBeGreaterThan(0);
+    for (const c of MAARIF_GRADES[11].courses) expect(c.id.startsWith("maarif11-")).toBe(true);
     expect(MAARIF_GRADES[11].examSubjects).toEqual([]);
     expect(MAARIF_GRADES[11].isCourseId("maarif11-matematik")).toBe(true);
     expect(MAARIF_GRADES[11].isCourseId("maarif9-matematik")).toBe(false);

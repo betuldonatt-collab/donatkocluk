@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAARIF9_COURSES, MAARIF9_GENEL_DENEME_SUBJECTS } from "./maarif9";
 import { MAARIF10_COURSES, MAARIF10_GENEL_DENEME_SUBJECTS } from "./maarif10";
+import { MAARIF11_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { LGS_COURSES } from "./index";
 import { stripKonuNumberPrefix, stripTopicNumberPrefix, withCleanTopicNames } from "./topic-name";
@@ -45,12 +46,14 @@ describe("withCleanTopicNames", () => {
 });
 
 describe("Maarif data shows no numeric markers anywhere", () => {
-  const marker = /(^|\s›\s)\d+(\.\d+)*\.?\s/;
+  // The dot is required: a leading year ("1755 Lizbon ...") is real text.
+  const marker = /(^|\s›\s)\d+(\.\d+)*\.\s/;
   const allTopics = [
     ...MAARIF9_COURSES,
     ...MAARIF10_COURSES,
     ...MAARIF9_GENEL_DENEME_SUBJECTS,
     ...MAARIF10_GENEL_DENEME_SUBJECTS,
+    ...MAARIF11_COURSES,
     ...MAARIF_TYT_MERGED_COURSES,
   ].flatMap((c) => c.units.flatMap((u) => u.topics));
 

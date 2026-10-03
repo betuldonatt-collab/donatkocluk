@@ -1,0 +1,263 @@
+### MATEMATİK
+1.Ünite: İstatistiksel Araştırma Süreci
+1.1. İki Nicel Değişkenli Veriler
+1.2. Başkaları Tarafından Oluşturulan İki Nicel Değişkenli Verileri İnceleme
+2.Ünite: Geometrik Şekiller
+2.1. Dörtgenlerin Özellikleri
+2.2. Özel Dörtgenler Arasındaki İlişkiler
+2.3. Dışbükey Çokgenlerin Özellikleri
+2.4. Çokgenlerle İlgili Problemler
+3. Ünite: Nicelikler ve Değişimler (1)
+3.1. Trigonometrik Fonksiyonlar ve Nitel Özellikleri
+3.2. Trigonometrik Fonksiyonlarla İfade Edilebilen Denklemler İçeren Problemler
+4. Ünite: Nicelikler ve Değişimler (2)
+4.1. Üstel Fonksiyonlar ve Nitel Özellikleri
+4.2. Üstel Fonksiyonların Ters Fonksiyonları
+4.3. Logaritmik Fonksiyonlar ve Nitel Özellikleri
+4.4. Üstel ve Logaritmik Fonksiyonlarla İfade Edilebilen Denklem ve Eşitsizlikler İçeren Problemler
+5. Ünite: Nicelikler ve Değişimler (3)
+5.1. Fonksiyonların Bileşkesi
+5.2. Fonksiyonlarda Dört İşlem
+
+### FİZİK
+1.Ünite: Kuvvet ve Hareket
+1.1. Serbest Düşme
+1.1.1. Serbest Düşen Cisimler
+1.1.2. Serbest Düşme Hareketi İle İlgili Veriler
+1.2. İki Boyutta Sabit İvmeli Hareket
+1.3. Newton'ın Hareket Yasaları
+1.3.1. Bileşke Kuvvet ve Hareket Arasındaki İlişki
+1.3.2. Serbest Cisim Diyagramı
+1.4. Sürtünme Kuvveti
+1.4.1. Statik ve Kinetik Sürtünme Kuvvetleri
+1.4.2. Sürtünme Kuvvetinin Bağlı Olduğu Değişkenler
+1.5. Limit Hız
+1.6. Düzgün Çembersel Hareket
+1.6.1. Çembersel Harekette Yörünge ve Hız Kavramları
+1.6.2. Çembersel Hareketin Değişkenleri
+2.Ünite: Elektrik ve Manyetizma
+2.1. Elektriksel Kuvvet ve Elektriksel Alan
+2.1.1. Elektriksel Kuvvet
+2.1.2. Elektriksel Alan
+2.1.3. Faraday Kafesi
+2.2. Manyetik Alan ve Manyetik Kuvvet
+2.2.1. Manyetik Alan
+2.2.2. Üzerinden Akım Geçen Düz İletken Telin Manyetik Alanı
+2.2.3. Akım Makarasının Manyetik Alanı
+2.2.4. Elektromıknatısların Kullanım Alanları
+2.2.5. Manyetik Alanda Üzerinden Akım Geçen Düz Bir Tele Etki Eden Kuvvet
+2.2.6. Manyetik Alanda Üzerinden Akım Geçen Dikdörtgen Telin Bir Eksen Etrafında Dönmesi
+2.3. İndüksiyon Akımı
+2.3.1. Manyetik Akı
+2.3.2. İndüksiyon Gerilimi
+2.3.3. Alternatif Akım
+2.4. Transformatörler
+3.Ünite: Optik
+3.1. Işık Şiddeti, Işık Akısı ve Aydınlanma
+3.2. Düzlem Aynalar
+3.3. Küresel Aynalar
+3.3.1. Küresel Ayna Çeşitleri ve Özellikleri
+3.3.2. Küresel Aynalarda Görüntü Oluşumu
+3.4. Kırılma
+3.5. Görünür Derinlik
+3.6. Fiber Optik
+3.7. Prizmalar
+3.8. Mercekler
+3.8.1. Merceklerin Özellikleri
+3.8.2. Merceklerde Görüntü Oluşumu
+
+### KİMYA
+1.Ünite: Etkileşim
+1.1. Enerji
+1.1.1. Tepkimelerde Meydana Gelen Enerji Değişimi
+1.1.2. Maddelerin Enerji Kaynağı Olma Potansiyeli
+1.1.3. Bağ Enerjileriyle Tepkime Entalpisinin Hesaplanması
+1.1.4. Standart Oluşum Entalpisi - Standart Tepkime Entalpisi
+1.2. Kimyasal Tepkimelerde Hız
+1.2.1. Kimyasal Tepkimelerin Gerçekleşmesi İçin Gerekli Şartlar - Çarpışma Teorisi - Aktivasyon Enerjisi
+1.2.2. Tepken ve Ürün Derişimleriyle Ortalama Tepkime Hızlarının Hesaplanması - Ortalama Tepkime Hızı
+1.2.3. Tepkime Hızına Etki Eden Faktörler
+1.2.4. Kimyasal Tepkimelerin Hız Denklemi - Çok Basamaklı Tepkimeler
+2.Ünite: Çeşitlilik
+2.1. Denge
+2.1.1. Tersinir Tepkimelerin Özellikleri
+2.1.2. Fiziksel ve Kimyasal Değişimlerde Denge
+2.1.3. Denge Sabiti İfadesinin Yazılması
+2.1.4. Tepkime Oranı
+2.1.5. Dengeyi Etkileyen Faktörler
+2.2. Asit ve Baz Çözeltilerinde Denge
+2.2.1. Saf Suyun Otoiyonizasyonu
+2.2.2. Asit-Baz Teorilerinin Karşılaştırılması
+2.2.3. Asitlerin ve Bazların Kuvveti
+2.2.4. Kuvvetli ve Zayıf Asit-Baz Sulu Çözeltilerinde pH Hesaplamaları
+2.2.5. Kuvvetli Asit ve Kuvvetli Bazların Nötralleşme Tepkimeleri
+2.2.6. Kuvvetli Asit-Kuvvetli Baz Titrasyonları
+2.2.7. Asidik ve Bazik Ürünlerin Seçiminde Dikkat Edilmesi Gerekenler
+2.3. Çözünürlük Dengesi
+2.3.1. Suda Az Çözünen Tuzların Molar Çözünürlükleri
+2.3.2. Suda Az Çözünen Tuzların Çözünürlüğüne Etki Eden Faktörler
+3.Ünite: Sürdürülebilirlik
+3.1. Nanoteknoloji ve Sürdürülebilirlik
+3.1.1. Yeşil Hidrojen Enerjisi
+3.1.2. Nanoteknolojik Ürünlerin Potansiyel Faydaları ve Olası Zararları
+3.1.3. Mikroplastik ve Nanoplastikler
+
+### BİYOLOJİ
+1.Ünite: Tepki
+1.1. Farklı Canlıların Uyaranlara Karşı Oluşturduğu Tepki Mekanizmaları
+1.1.1. Farklı Canlıların Uyaranlara Karşı Oluşturduğu Tepkiler
+1.2. Bitkisel Hormonların Etkileri
+1.2.1. Bitkisel Hormonlar
+1.3. Bitkilerdeki Tepki Mekanizmaları
+1.3.1. Bitkilerde Tropizma ve Nasti Hareketleri
+1.4. Bitkilerde Yönelme Hareketleri
+1.5. Duyu Reseptörleri ve Duyu Organları
+1.5.1. Uyartıların Alınması
+1.5.2. Nöronların Yapısı
+1.5.3. Duyu Organları
+1.6. Hayvanlarda Sinir Sistemi Farklılıkları
+1.7. İnsanda Sinir Sistemi
+1.7.1. İnsanda Sinir Sisteminin Yapısı
+1.8. Refleks Mekanizması
+1.8.1. Refleksler
+1.9. Harekete Dayalı Tepki
+1.9.1. Kemik, Eklem ve Kasların Hareketteki Rolü
+1.9.2. Kemik ve Kasların Birlikte Çalışma İlişkisi
+1.10. İskelet Kaslarının Kasılma ve Gevşeme Mekanizması
+1.10.1. Kaslarda Kasılmanın Kontrolü
+1.10.2. Kaslarda Kasılma Mekanizması
+1.11. Bağışıklık Sistemi
+1.11.1. Bağışıklık
+1.12. Alerjik Tepkiler
+1.12.1. Alerji
+2.Ünite: Homeostazi
+2.1. Homeostazinin Canlılar İçin Önemi
+2.1.1. Farklı Canlı Türlerindeki Homeostatik Yapı ve Sistemler
+2.2. Homeostatik Süreçler
+2.3. Pozitif ve Negatif Geri Bildirim
+2.4. Homeostazinin Sağlanmasında Sinir Sisteminin Etkileri
+2.5. Endokrin Sisteminin Homeostazi İşlevi
+2.6. Dolaşım Sistemi ve Homeostazi Arasındaki İlişki
+2.7. Solunum Sisteminin Homeostazinin Sağlanmasındaki Rolü
+2.8. Boşaltım Sisteminin Homeostazi İşlevi
+2.9. Homeostazinin Sağlanmasında Sistemlerin Eş Güdümlü Çalışması
+2.10. Homeostazinin Sağlanamadığı Durumlar
+2.10.1. Homeostazinin Sağlanmadığı Durumlarda Oluşabilecek Sağlık Problemleri
+
+### COĞRAFYA
+1. Ünite: Coğrafyanın Doğası
+1.1. Mekânsal Sorunlar Karşısında Coğrafya Bilimi
+2. Ünite: Mekansal Bilgi Teknolojileri
+2.1. Web Tabanlı CBS Uygulamaları
+3. Ünite: Doğal Sistemler ve Süreçler
+3.1. Su Kaynakları
+3.2. Türkiye'deki Su Kaynaklarının Etkileri
+4. Ünite: Beşeri Sistemler ve Süreçler
+4.1. Yerleşmelerin Mekânsal Organizasyonları
+4.2. Yerleşmelerin Etki Alanları
+5. Ünite: Ekonomik Faaliyetler ve Etkileri
+5.1. Tarımsal Faaliyetler ve Gıda Güvencesi
+5.2. Tarım Uygulamalarında Sürdürülebilirlik
+5.3. Stratejik ve Kritik Madenler
+5.4. Enerji Kaynakları
+5.5. Sanayileşmenin Mekânsal Etkileri
+6. Ünite: Afetler ve Sürdürülebilir Çevre
+6.1. Gezegen Sınırı
+6.2. Küresel İklim Değişikliği
+6.3. Türkiye'de Suyun Sürdürülebilir Kullanımı
+7. Ünite: Bölgeler, Ülkeler ve Küresel Bağlantılar
+7.1. Türkiye'nin Kültürel Hinterlandı
+7.2. Tarımsal Üretim: Hollanda
+7.3. Sanayileşme Süreci: Almanya ve Mısır
+7.4. Madencilik Faaliyetleri: Avustralya
+7.5. Enerji Kaynakları: Rusya ve Suudi Arabistan
+
+### TARİH
+1. Ünite: Değişen Dünyada Osmanlı (1683-1789)
+1.1. Osmanlı Devleti’nin 1683-1789 Yılları Arasındaki Siyasi ve Askerî Mücadeleleri
+1.2. Lale Devri’nin Devlet ve Toplum Hayatına Etkileri
+1.3. 1755 Lizbon ve 1766 İstanbul Depremlerinin Etkileri
+1.4. Sanayi Devrimi’nin Meydana Getirdiği Siyasi, Sosyal ve Ekonomik Değişim
+2. Ünite: Dönüşüm Sürecinde Osmanlı (1789-1908)
+2.1. Fransız İhtilali’nin Devlet ve Toplum Hayatında Meydana Getirdiği Değişim
+2.2. 1789-1908 Yılları Arasında Osmanlı Devleti’nde Meydana Gelen Siyasi, Askerî ve İdari Gelişmeler
+2.3. 1789-1908 Yılları Arasında Osmanlı Devleti’nde Bilim, Sanat ve Teknoloji Alanlarında Meydana Gelen Gelişmeler
+2.4. Osmanlı Devleti’nde Sanayileşme Çabaları
+3. Ünite: Savaşlar Sarmalında Osmanlı (1908-1918)
+3.1. 1908-1918 Yılları Arasında Osmanlı Devleti’nde Meydana Gelen Siyasi ve Askerî Gelişmeler
+3.2. 1908-1918 Yılları Arasında Yaşanan Kitlesel Göç ve Salgınlar
+3.3. Osmanlı Devleti’nin İnsanlık Tarihine Katkıları
+
+### TÜRK DİLİ VE EDEBİYATI
+1. TEMA: BİR DİYECEĞİM VAR!
+1.1. Metin Tahlili (Anlama): Okuma
+1.1.1. Karagöz Oyunu (Yazıcı)
+1.1.2. Mektup (Âli'ye Mektuplar)
+1.1.3. Dilekçe
+1.2. Edebiyat Atölyesi (Anlatma): Konuşma
+1.2.1. Sözlü İletişim Engellerini Konu Alan Bir Drama Sergileyebilme
+1.3. Metin Tahlili (Anlama): Dinleme / İzleme
+1.3.1. Değişen İletişim Araçlarının Hayatımızdaki Yeri
+1.4. Edebiyat Atölyesi (Anlatma): Yazma
+1.4.1. E-Posta Yazabilme
+2. TEMA: KÜLTÜR YOLCULUĞU
+2.1. Metin Tahlili (Anlama): Okuma
+2.1.1. Hikâye (Oğulla Buluşma)
+2.1.2. Anı (Eski İstanbul'dan Çizgiler)
+2.1.3. Orhun Abideleri
+2.1.4. Divânu Lugâti't-Türk
+2.2. Edebiyat Atölyesi (Anlatma): Konuşma
+2.2.1. Türk Kültürünün Özelliklerini Yansıtan Bir Konuşma Yapabilme
+2.3. Metin Tahlili (Anlama): Dinleme / İzleme
+2.3.1. Âşık Atışması (Murat Çobanoğlu-Şeref Taşlıova Atışması)
+2.4. Edebiyat Atölyesi (Anlatma): Yazma
+2.4.1. Çevrim İçi Müze Gezisiyle İlgili İzlenimleri Yazabilme
+3. TEMA: YAŞAMIN İZİNDE
+3.1. Metin Tahlili (Anlama): Okuma
+3.1.1. Roman (Huzur)
+3.1.2. Biyografi (Mehmet Akif Ersoy)
+3.1.3. Tezkire (Usûlî)
+3.2. Edebiyat Atölyesi (Anlatma): Konuşma
+3.2.1. Mülakat (Seçilen Roman Kişisiyle Romanın Bağlamına Uygun Hayalî Bir Mülakat Yapabilme)
+3.3. Metin Tahlili (Anlama): Dinleme / İzleme
+3.3.1. Radyo Tiyatrosu (Direnişin Ustaları)
+3.4. Edebiyat Atölyesi (Anlatma): Yazma
+3.4.1. Dinlenen/İzlenen Metinden Seçilen Bir Diyaloğu Bağlama Uygun Olarak Başka Bir Türe Dönüştürebilme
+4. TEMA: HAYATIN AYNASI
+4.1. Metin Tahlili (Anlama): Okuma
+4.1.1. Tiyatro (Ben, Mimar Sinan)
+4.1.2. Küçürek Hikâye (Merdiven)
+4.2. Edebiyat Atölyesi (Anlatma): Konuşma
+4.2.1. Tiyatro Metnini Canlandırarak Konuşma Becerisini Geliştirebilme
+4.3. Metin Tahlili (Anlama): Dinleme / İzleme
+4.3.1. Belgesel (Anadolu İnsanı / Fedakârlık)
+4.4. Edebiyat Atölyesi (Anlatma): Yazma
+4.4.1. Dinlenen / İzlenen Belgesele Yönelik Özgün Bir Afiş Hazırlayabilme
+
+### FELSEFE
+1. ÜNİTE: ÇEVRE SORUNLARI VE FELSEFE
+1.1. Çevre ve İnsan İlişkisi
+1.2. Çevre Etiği
+2. ÜNİTE: TEKNOLOJİ VE HAYAT
+2.1. Teknoloji ve İnsan Hayatı
+2.2. Teknoloji Bağlamında Ontolojik Problemler
+2.3. Teknoloji Bağlamında Aksiyolojik Problemler
+3. ÜNİTE: AKIL VE İNANÇ
+3.1. Akıl-İnanç İlişkisine Yönelik Felsefi Sorular ve Problemler
+3.2. Akıl-İnanç İlişkisine Yönelik Felsefi Görüş ve Argümanlar
+4. ÜNİTE: EDEBİYAT VE FELSEFE
+4.1. Edebiyat-Felsefe İlişkisi
+4.2. Edebiyat-Felsefe İlişkisi Problemleri
+4.2.1. Edebî Unsurlara Felsefi Bakış
+4.2.2. Edebî Unsurlarla Felsefe Yapma
+5. ÜNİTE: HAYATIN ANLAMI
+5.1. Hayatın Anlamına Yönelik Felsefi Sorular ve Problemler
+5.2. Hayatın Anlamına Yönelik Görüş ve Argümanlar
+5.2.1. Mutluluk ve Hayat İlişkisi
+5.2.2. Varoluş ve Kendi Olma Problemi
+6. ÜNİTE: HUKUK VE FELSEFE
+6.1. Hukuk ve İnsan
+6.2. Hukukun Doğasına Yönelik Felsefi Problemler
+6.2.1. Hukukun Gereği ve Önemi
+6.2.2. Hukukun Kaynağı
+6.2.3. Ahlak-Hukuk İlişkisi
