@@ -37,7 +37,7 @@ describe("maarif9 curriculum data", () => {
 
   it("merges deeper headings into the topic name", () => {
     const tde = MAARIF9_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
-    expect(tde.units[0].unit).toBe("TEMA 1: SÖZÜN İNCELİĞİ");
+    expect(tde.units[0].unit).toBe("1. Tema: Sözün İnceliği");
     expect(tde.units[0].topics.map((t) => t.name)).toContain("Metin Türleri › Deneme");
     const bio = MAARIF9_COURSES.find((c) => c.id === "maarif9-biyoloji")!;
     expect(bio.units[0].topics.map((t) => t.name)).toContain(

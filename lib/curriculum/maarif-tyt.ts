@@ -36,11 +36,23 @@ const MERGE_PAIRS: MergePair[] = [
 ];
 
 // Prefixed so the merged table's own Ünite column still shows which grade
-// each unit came from -- the two grades' own unit-label conventions already
-// look different enough in practice (9th: "TEMA 1: ...", 10th: "1. Ünite:
-// ...") but this makes the boundary explicit rather than relying on that.
+// each unit came from. The "(9. Sınıf) " tag is part of the unit label (the
+// only field a unit has), so the tag format lives here, in one place:
+// splitUnitGradeTag reads it back so the table can put the grade on its own
+// line above the unit's name.
 function taggedUnits(units: Unit[], gradeLabel: string): Unit[] {
   return units.map((u) => ({ ...u, unit: `(${gradeLabel}) ${u.unit}` }));
+}
+
+const GRADE_TAG = /^\((\d+\. Sınıf)\)\s*(.*)$/;
+
+// "(10. Sınıf) 1. Ünite: Sözün Ezgisi" -> { grade: "10. Sınıf", title: "1. Ünite:
+// Sözün Ezgisi" }. A unit with no label of its own (İngilizce has no unit
+// level) is just the tag, so its title is "". A label with no tag (every
+// non-merged course) comes back whole, with grade null.
+export function splitUnitGradeTag(label: string): { grade: string | null; title: string } {
+  const m = GRADE_TAG.exec(label);
+  return m ? { grade: m[1], title: m[2] } : { grade: null, title: label };
 }
 
 export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, m9Id, m10Id }) => {

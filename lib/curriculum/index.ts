@@ -286,40 +286,6 @@ export function normalizeTr(s: string): string {
     .replace(/ç/g, "c");
 }
 
-// Short Turkish connector words that stay lowercase in Title Case unless
-// they open the string -- "ve" in "Mevsimler ve İklim" reads odd as "Ve".
-const TR_TITLE_CASE_LOWERCASE_WORDS = new Set(["ve", "ile", "de", "da", "mı", "mi", "mu", "mü", "ya", "veya", "ki"]);
-
-// Turkish-correct Title Case ("1. ÜNİTE: MEVSİMLER VE İKLİM" -> "1. Ünite:
-// Mevsimler ve İklim"). Plain JS .toUpperCase()/.toLowerCase() get
-// Turkish's dotted/dotless İ/I/ı/i wrong (English lowercases "I" to "i",
-// Turkish needs "ı") -- always .toLocaleLowerCase/.toLocaleUpperCase("tr-TR")
-// instead. Curriculum text (lib/curriculum/lgs.json) mixes real ALL CAPS
-// unit headings with topic names that already read fine in mixed case, so
-// this is applied only where a caller has confirmed the raw text is
-// shouting (see lgs-selection.ts), not blanket over every string.
-//
-// Splits on whitespace and recases each token independently, so internal
-// punctuation (":", "()", "1.") rides along unchanged: a token starting
-// with a digit ("10'un") is left as the lowercase pass produced it --
-// capitalizing a grammatical suffix after a number would be wrong -- and
-// every other token gets its first LETTER (wherever punctuation like "("
-// puts it) capitalized, unless it's a short connector word and not the
-// string's first word.
-export function toTurkishTitleCase(s: string): string {
-  const lower = s.toLocaleLowerCase("tr-TR");
-  let seenWord = false;
-  return lower
-    .split(" ")
-    .map((token) => {
-      if (/^\d/.test(token)) return token;
-      const letterIndex = token.search(/\p{L}/u);
-      if (letterIndex === -1) return token;
-      const isFirstWord = !seenWord;
-      seenWord = true;
-      const bareWord = token.replace(/[^\p{L}]/gu, "");
-      if (!isFirstWord && TR_TITLE_CASE_LOWERCASE_WORDS.has(bareWord)) return token;
-      return token.slice(0, letterIndex) + token.charAt(letterIndex).toLocaleUpperCase("tr-TR") + token.slice(letterIndex + 1);
-    })
-    .join(" ");
-}
+// toTurkishTitleCase lives in ./topic-name (it is needed while the Maarif data
+// loads, before this module has finished evaluating) and is re-exported here.
+export { toTurkishTitleCase } from "./topic-name";

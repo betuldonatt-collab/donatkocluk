@@ -6,14 +6,14 @@
 // Same shape and conventions as ./maarif9 and ./maarif10 (Course/Unit/Topic;
 // deeper headings merged into the topic name with " › "). The JSON keeps the
 // list's hierarchy numbers ("1.1. Serbest Düşme › 1.1.1. Serbest Düşen
-// Cisimler") because they carry the ordering; withCleanTopicNames strips them
+// Cisimler") because they carry the ordering; withCleanNames strips them
 // here so no screen shows them (see ./topic-name).
 //
 // There is no 11th-grade Genel Deneme data (MAARIF_GRADES[11].examSubjects
 // stays empty), only this Kaynak Takibi list.
 import type { Course } from "./index";
 import kaynakTakibiJson from "./maarif11.json";
-import { withCleanTopicNames } from "./topic-name";
+import { withCleanNames } from "./topic-name";
 
 export type Maarif11Track = "sayisal" | "ea" | "sozel";
 
@@ -21,7 +21,7 @@ export type Maarif11Topic = { id: string; name: string };
 export type Maarif11Unit = { unit: string; topics: Maarif11Topic[] };
 export type Maarif11Course = { id: string; name: string; units: Maarif11Unit[] };
 
-export const MAARIF11_COURSES: Maarif11Course[] = withCleanTopicNames(kaynakTakibiJson as Maarif11Course[]);
+export const MAARIF11_COURSES: Maarif11Course[] = withCleanNames(kaynakTakibiJson as Maarif11Course[]);
 
 export const MAARIF11_KAYNAK_COURSES: Course[] = MAARIF11_COURSES;
 

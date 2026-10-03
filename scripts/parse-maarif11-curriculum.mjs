@@ -48,8 +48,9 @@ const notes = [];
 const note = (msg) => notes.push(msg);
 
 // "1.Ünite: X", "1. ÜNİTE: X" -> "1. Ünite: X" (an ALL-CAPS title is Title
-// Cased; Felsefe's units arrive that way). "1. TEMA: X" is kept as written,
-// like the 9th grade's TEMA labels.
+// Cased; Felsefe's units arrive that way). "1. TEMA: X" is kept as written
+// here; the app normalises every Maarif unit label to Title Case when it
+// loads the data (normalizeUnitLabel in lib/curriculum/topic-name.ts).
 const UNIT_RE = /^(\d+)\.\s*(Ünite|ÜNİTE|TEMA)(?=\s|:|$)\s*:?\s*(.*)$/;
 function unitLabel(m, subject) {
   const [, n, kind, rest] = m;

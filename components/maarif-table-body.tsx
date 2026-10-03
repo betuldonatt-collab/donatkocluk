@@ -4,6 +4,7 @@ import { Fragment } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
 import type { SelectionRow } from "@/lib/curriculum/rows";
 import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,20 @@ function sumStats(byTopic: Record<string, Stat>, topicIds: string[]): Stat {
       return s ? { total: acc.total + s.total, correct: acc.correct + s.correct, wrong: acc.wrong + s.wrong, empty: acc.empty + s.empty } : acc;
     },
     { total: 0, correct: 0, wrong: 0, empty: 0 },
+  );
+}
+
+// The merged "Maarif TYT" tab tags each unit with its grade ("(10. Sınıf) 1.
+// Ünite: Sözün Ezgisi"): the grade sits on its own line above the unit's
+// name. Every other course's label has no tag and renders as plain text.
+function UnitLabel({ label }: { label: string }) {
+  const { grade, title } = splitUnitGradeTag(label);
+  if (!grade) return <>{title}</>;
+  return (
+    <>
+      <span className="text-muted-foreground mb-0.5 block text-xs font-semibold">{grade}</span>
+      {title}
+    </>
   );
 }
 
@@ -118,7 +133,7 @@ export function MaarifTableBody({
                     MAARIF_UNIT_COL_CLASS,
                   )}
                 >
-                  {row.label}
+                  <UnitLabel label={row.label} />
                 </TableCell>
               )}
               <TableCell

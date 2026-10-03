@@ -78,7 +78,7 @@ describe("maarif11 curriculum data", () => {
       "5. Ünite: Nicelikler ve Değişimler (3)",
     ]);
     expect(course("maarif11-felsefe").units[0].unit).toBe("1. Ünite: Çevre Sorunları ve Felsefe");
-    expect(course("maarif11-turk-dili-ve-edebiyati").units[0].unit).toBe("1. TEMA: BİR DİYECEĞİM VAR!");
+    expect(course("maarif11-turk-dili-ve-edebiyati").units[0].unit).toBe("1. Tema: Bir Diyeceğim Var!");
     expect(course("maarif11-turk-dili-ve-edebiyati").units[0].topics[0].name).toBe("Metin Tahlili (Anlama): Okuma › Karagöz Oyunu (Yazıcı)");
   });
 });

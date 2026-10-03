@@ -15,7 +15,7 @@
 import type { Course } from "./index";
 import genelDenemeJson from "./maarif9-genel-deneme.json";
 import kaynakTakibiJson from "./maarif9.json";
-import { withCleanTopicNames } from "./topic-name";
+import { withCleanNames } from "./topic-name";
 
 export type Maarif9Topic = { id: string; name: string };
 export type Maarif9Unit = { unit: string | null; topics: Maarif9Topic[] };
@@ -24,14 +24,14 @@ export type Maarif9Unit = { unit: string | null; topics: Maarif9Topic[] };
 // sheet's hierarchy numbers ("1.2. Metin Türleri › Deneme") for ordering;
 // they are stripped here ("Metin Türleri › Deneme") so no screen shows them.
 export type Maarif9Course = { id: string; name: string; units: Maarif9Unit[] };
-export const MAARIF9_COURSES: Maarif9Course[] = withCleanTopicNames(kaynakTakibiJson as Maarif9Course[]);
+export const MAARIF9_COURSES: Maarif9Course[] = withCleanNames(kaynakTakibiJson as Maarif9Course[]);
 
 // "9. Sınıf Genel Deneme Analizi" -- the sheet's own, separate structure
 // (grouped TÜRKÇE / SOSYAL BİLİMLER / MATEMATİK / FEN BİLİMLERİ; Coğrafya
 // units carry one topic each and Din Kültürü is units only, exactly as the
 // sheet lists them; no İngilizce).
 export type Maarif9GenelDenemeSubject = { id: string; group: string; name: string; units: Maarif9Unit[] };
-export const MAARIF9_GENEL_DENEME_SUBJECTS: Maarif9GenelDenemeSubject[] = withCleanTopicNames(
+export const MAARIF9_GENEL_DENEME_SUBJECTS: Maarif9GenelDenemeSubject[] = withCleanNames(
   genelDenemeJson as Maarif9GenelDenemeSubject[],
 );
 
