@@ -125,11 +125,15 @@ describe("maarif11 integration", () => {
     expect(isMaarifCourseId("maarif11-fizik")).toBe(true);
   });
 
-  it("collapses to one Kaynak Takibi row per unit, keeping every subtopic as a member", () => {
+  it("splits into one Kaynak Takibi row per heading group, keeping every subtopic as a member", () => {
     const fizik = course("maarif11-fizik");
     const rows = flattenSelectionRows(fizik);
-    expect(rows).toHaveLength(fizik.units.length);
+    // Unit 1 alone has 6 headings (Serbest Düşme, İki Boyutta..., Newton'ın..., Sürtünme..., Limit Hız, Düzgün Çembersel Hareket).
+    expect(rows.filter((r) => r.unitLabel === fizik.units[0].unit)).toHaveLength(6);
+    expect(rows.length).toBeGreaterThan(fizik.units.length);
     expect(rows.flatMap((r) => r.memberTopicIds)).toEqual(fizik.units.flatMap((u) => u.topics.map((t) => t.id)));
+    expect(rows[0].label).toBe("Serbest Düşme");
+    expect(rows[0].memberTopicIds).toHaveLength(2);
   });
 
   it("an 11th grader can tick its pipeline steps (incl. Okul İlerlemesi); a 10th grader can't", () => {

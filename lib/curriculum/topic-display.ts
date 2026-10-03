@@ -66,3 +66,22 @@ export function topicLinesForUnit(topics: { id: string; name: string }[]): Topic
   }
   return lines;
 }
+
+// A unit split into its tracking groups: consecutive topics that share the
+// same top-level heading ("Gazlar › ...", "Kimyasal Tepkimeler › ...") are one
+// group, and so is a run of consecutive topics with no heading at all (a unit
+// with no headings is one group -- the whole unit). Everything tracked per
+// group (Konu Çalışması, Çıkmış Sorular, the resource ticks, the question
+// stats) belongs to the group's section of the table; only Okul İlerlemesi is
+// ticked per topic.
+export function topicGroupsForUnit<T extends { name: string }>(topics: T[]): { heading: string | null; topics: T[] }[] {
+  const groups: { heading: string | null; topics: T[] }[] = [];
+  for (const topic of topics) {
+    const parts = topic.name.split(SEP);
+    const heading = parts.length > 1 ? parts[0] : null;
+    const last = groups[groups.length - 1];
+    if (last && last.heading === heading) last.topics.push(topic);
+    else groups.push({ heading, topics: [topic] });
+  }
+  return groups;
+}

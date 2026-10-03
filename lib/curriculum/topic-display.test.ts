@@ -4,7 +4,7 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
-import { coreTopicTitle, topicLinesForUnit } from "./topic-display";
+import { coreTopicTitle, topicGroupsForUnit, topicLinesForUnit } from "./topic-display";
 
 const t = (id: string, name: string) => ({ id, name });
 
@@ -126,6 +126,41 @@ describe("every Maarif subject", () => {
     for (const course of all) {
       for (const unit of course.units) {
         for (const l of topicLinesForUnit(unit.topics)) expect(l.text).not.toContain(" › ");
+      }
+    }
+  });
+});
+
+describe("topicGroupsForUnit", () => {
+  it("groups consecutive topics by their top-level heading", () => {
+    const groups = topicGroupsForUnit([t("a", "Kimyasal Tepkimeler › x"), t("b", "Kimyasal Tepkimeler › y"), t("c", "Gazlar › z"), t("d", "Gazlar › w")]);
+    expect(groups.map((g) => [g.heading, g.topics.map((x) => x.id)])).toEqual([
+      ["Kimyasal Tepkimeler", ["a", "b"]],
+      ["Gazlar", ["c", "d"]],
+    ]);
+  });
+
+  it("groups by the TOP heading only: deeper levels stay inside their group", () => {
+    const groups = topicGroupsForUnit([t("a", "Organik › Vitaminler › A"), t("b", "Organik › Vitaminler › B"), t("c", "Organik › Enzimler")]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].topics).toHaveLength(3);
+  });
+
+  it("a unit with no headings is one group; a run of untitled topics stays together", () => {
+    expect(topicGroupsForUnit([t("a", "A"), t("b", "B"), t("c", "C")])).toEqual([{ heading: null, topics: [t("a", "A"), t("b", "B"), t("c", "C")] }]);
+    const mixed = topicGroupsForUnit([t("a", "A"), t("b", "H › x"), t("c", "C"), t("d", "D")]);
+    expect(mixed.map((g) => [g.heading, g.topics.length])).toEqual([[null, 1], ["H", 1], [null, 2]]);
+  });
+
+  it("the same heading coming back later is a new group (order is preserved)", () => {
+    expect(topicGroupsForUnit([t("a", "H › x"), t("b", "G › y"), t("c", "H › z")]).map((g) => g.heading)).toEqual(["H", "G", "H"]);
+  });
+
+  it("never loses a topic", () => {
+    expect(topicGroupsForUnit([])).toEqual([]);
+    for (const course of [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES, ...MAARIF11_KAYNAK_COURSES]) {
+      for (const unit of course.units) {
+        expect(topicGroupsForUnit(unit.topics).flatMap((g) => g.topics.map((x) => x.id))).toEqual(unit.topics.map((x) => x.id));
       }
     }
   });

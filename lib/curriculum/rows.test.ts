@@ -101,23 +101,54 @@ describe("flattenSelectionRows", () => {
     }
   });
 
-  it("collapses a Maarif course to one row per unit, spanning the Ünite column across itself", () => {
-    const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
+  it("splits a Maarif unit into one row per heading group, with the Ünite cell spanning all of them", () => {
+    const course: Course = {
+      id: "maarif10-kimya",
+      name: "Kimya",
+      units: [
+        {
+          unit: "1. Ünite",
+          topics: [
+            { id: "a", name: "Kimyasal Tepkimeler › Oluşumu" },
+            { id: "b", name: "Kimyasal Tepkimeler › Türleri" },
+            { id: "c", name: "Gazlar › Özellikleri" },
+          ],
+        },
+        { unit: "2. Ünite", topics: [{ id: "d", name: "Çözeltiler › Sınıflandırma" }] },
+      ],
+    };
     const rows = flattenSelectionRows(course);
-    expect(rows).toHaveLength(course.units.length);
-    rows.forEach((row, i) => {
-      expect(row.unitLabel).toBe(course.units[i].unit);
-      expect(row.unitRowSpan).toBe(1); // every Maarif unit is its own single selectable row
-      expect(row.readOnlyNames).toEqual(course.units[i].topics.map((t) => t.name));
-      expect(row.id).toBe(course.units[i].topics[0].id);
-    });
+    expect(rows.map((r) => [r.id, r.label, r.unitLabel, r.unitRowSpan])).toEqual([
+      ["a", "Kimyasal Tepkimeler", "1. Ünite", 2], // the unit's first group: its Ünite cell spans both groups
+      ["c", "Gazlar", "1. Ünite", null],
+      ["d", "Çözeltiler", "2. Ünite", 1],
+    ]);
   });
 
-  it("collapses the merged 'Maarif TYT' course the same way, across both grades' units", () => {
-    const course = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-matematik")!;
+  it("a real Maarif course gets one row per heading group, and a unit with no headings stays one row", () => {
+    const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-cografya")!;
     const rows = flattenSelectionRows(course);
+    // Every Coğrafya unit has exactly one heading ("Coğrafya Bilimi", "Harita Okuryazarlığı", ...).
     expect(rows).toHaveLength(course.units.length);
-    expect(rows.every((r) => r.unitRowSpan === 1)).toBe(true);
+    expect(rows.map((r) => r.label)).toEqual([
+      "Coğrafya Bilimi",
+      "Harita Okuryazarlığı",
+      "İklim Sistemini Anlamak",
+      "Nüfus Dinamikleri",
+      "Ekonomik Faaliyetleri Etkileyen Coğrafi Faktörler",
+      "Afetler",
+      "Bölge ve Bölge Sınırı",
+    ]);
+    const matematik = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
+    expect(flattenSelectionRows(matematik)).toHaveLength(matematik.units.length);
+  });
+
+  it("collapses the merged 'Maarif TYT' course per group too, across both grades' units", () => {
+    const course = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-cografya")!;
+    const rows = flattenSelectionRows(course);
+    expect(rows.length).toBeGreaterThanOrEqual(course.units.length);
+    // Each unit's first group carries the Ünite span; together they cover every group.
+    expect(rows.reduce((n, r) => n + (r.unitRowSpan ?? 0), 0)).toBe(rows.length);
   });
 
   it("never drops a topic for Maarif courses either, including the merged Maarif TYT ones", () => {

@@ -5,20 +5,23 @@ import { Fragment } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
-import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
 import type { SelectionRow } from "@/lib/curriculum/rows";
+import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
 import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
 
 // Maarif (9th/10th/11th grade) Kaynak Takibi body, laid out like a
-// spreadsheet with merged cells: every SUBTOPIC is its own <tr> (with each
-// shared heading written once as a muted group row above its topics), the unit's
-// title is written once as a rowSpan cell on the left, "Okul İlerlemesi"
-// (the one subtopic-level step) gets a checkbox per subtopic row, and every
-// unit-level column (Soru Dağılımı, Konu Çalışması, Çıkmış Sorular, and each
-// resource's Soru Çözümü / Kaynak Taraması) is a single rowSpan cell
-// spanning the whole unit. Shared by the student's and the coach's tables so both read
-// identically; the header row stays in each table (it's the same columns).
+// spreadsheet with merged cells. The unit's title is written once as a
+// rowSpan cell on the left. Under it the unit falls into GROUPS -- one per
+// heading ("Kimyasal Tepkimeler", "Gazlar"), each shown as a muted heading
+// row with its topics on a line of their own beneath it (a unit with no
+// headings is a single group). Every group is its own tracked section:
+// Soru Dağılımı, Konu Çalışması, Çıkmış Sorular and each resource's Soru
+// Çözümü / Kaynak Taraması are rowSpan cells spanning just that group, never
+// across the next heading. Only "Okul İlerlemesi" is ticked per topic.
+// Each `row` here is one group (lib/curriculum/maarif-selection.ts).
+// Shared by the student's and the coach's tables so both read identically;
+// the header row stays in each table (it's the same columns).
 
 // The Ünite column's fixed width, shared with the tables' own sticky header
 // cells so the sticky Konu column's `left` offset always matches it.
@@ -29,7 +32,7 @@ export const MAARIF_STAT_HEAD_CLASSES = { total: "w-11 min-w-11 px-0.5 text-[11p
 type Stat = { total: number; correct: number; wrong: number; empty: number };
 
 // Deliberately tiny -- the least horizontal space of any column. In the body
-// it is one rowSpan block per unit (question stats are tracked per unit);
+// it is one rowSpan block per group (question stats are tracked per group);
 // the Karma row passes no rowSpan.
 export function MaarifStatCells({ stat, rowSpan }: { stat: Stat | undefined; rowSpan?: number }) {
   const hasData = !!stat && stat.total > 0;
@@ -44,7 +47,7 @@ export function MaarifStatCells({ stat, rowSpan }: { stat: Stat | undefined; row
   );
 }
 
-// A unit's stat = the sum over every real subtopic id it rolls up.
+// A group's stat = the sum over every real subtopic id it rolls up.
 function sumStats(byTopic: Record<string, Stat>, topicIds: string[]): Stat {
   return topicIds.reduce(
     (acc, id) => {
@@ -69,6 +72,8 @@ function UnitLabel({ label }: { label: string }) {
   );
 }
 
+type PreparedGroup = { row: SelectionRow; lines: TopicLine[]; fullNames: Map<string, string> };
+
 export function MaarifTableBody({
   courseName,
   rows,
@@ -86,14 +91,25 @@ export function MaarifTableBody({
   topicStats: Record<string, Stat>;
   // `pipeline.map` is the RAW per-topic map (Okul İlerlemesi reads it by each
   // subtopic's own id); `collapsedMap` is the same data folded onto each
-  // unit's representative id (row.id) for the unit-level steps.
+  // group's representative id (row.id) for the group-level steps.
   pipeline: PipelineBinding;
   collapsedMap: PipelineMap;
   onToggleProgress: (topicId: string, resourceId: string, field: "solved" | "reviewed") => void;
 }) {
-  // One Okul İlerlemesi cell per row of the unit. A heading line has no topic
-  // of its own, so its cell is left blank.
-  function stepCell(step: PipelineStep, stepIndex: number, row: SelectionRow, line: TopicLine, fullName: string, isFirstRow: boolean, rowSpan: number) {
+  // Every group as display lines: its heading once (if it has one), then its
+  // topics on clean lines beneath (lib/curriculum/topic-display.ts).
+  const groups: PreparedGroup[] = rows.map((row) => {
+    const fullNames = new Map(row.memberTopicIds.map((id, i) => [id, row.readOnlyNames[i] ?? row.label]));
+    const lines = topicLinesForUnit(row.memberTopicIds.map((id) => ({ id, name: fullNames.get(id)! })));
+    return { row, lines, fullNames };
+  });
+
+  // One Okul İlerlemesi cell per line of the group. A heading line has no
+  // topic of its own, so its cell is left blank. Every other step is ONE
+  // merged cell on the group's first line, spanning the whole group.
+  function stepCell(step: PipelineStep, stepIndex: number, group: PreparedGroup, line: TopicLine, isFirstLine: boolean) {
+    const { row, lines, fullNames } = group;
+    const scope = row.label === row.unitLabel ? row.label : `${row.unitLabel} - ${row.label}`;
     const border = stepIndex === 0 && "border-l";
     if (step.key === "okul_ilerlemesi") {
       if (line.kind === "heading") return <TableCell key={step.key} className={cn("bg-muted/40 px-3 py-1", border)} />;
@@ -102,18 +118,18 @@ export function MaarifTableBody({
           <Checkbox
             checked={pipeline.map[line.topicId]?.okul_ilerlemesi ?? false}
             onCheckedChange={() => pipeline.onToggle(line.topicId, "okul_ilerlemesi")}
-            aria-label={`${courseName} - ${row.label} - ${fullName} - ${step.label}`}
+            aria-label={`${courseName} - ${scope} - ${fullNames.get(line.topicId)} - ${step.label}`}
           />
         </TableCell>
       );
     }
-    if (!isFirstRow) return null;
+    if (!isFirstLine) return null;
     return (
-      <TableCell key={step.key} rowSpan={rowSpan} className={cn("text-center", border)}>
+      <TableCell key={step.key} rowSpan={lines.length} className={cn("text-center", border)}>
         <Checkbox
           checked={collapsedMap[row.id]?.[step.key] ?? false}
           onCheckedChange={() => pipeline.onToggle(row.id, step.key)}
-          aria-label={`${courseName} - ${row.label} - ${step.label}`}
+          aria-label={`${courseName} - ${scope} - ${step.label}`}
         />
       </TableCell>
     );
@@ -121,30 +137,33 @@ export function MaarifTableBody({
 
   return (
     <>
-      {rows.map((row) => {
-        // The unit's topics as display lines: each heading once, its topics
-        // on clean lines beneath it (lib/curriculum/topic-display.ts). Every
-        // merged unit-level cell spans ALL of these lines, headings included.
-        const fullNames = new Map(row.memberTopicIds.map((id, i) => [id, row.readOnlyNames[i] ?? row.label]));
-        const lines = topicLinesForUnit(row.memberTopicIds.map((id) => ({ id, name: fullNames.get(id)! })));
+      {groups.map((group, gi) => {
+        const { row, lines } = group;
         const count = lines.length;
+        const scope = row.label === row.unitLabel ? row.label : `${row.unitLabel} - ${row.label}`;
+        // The unit title spans every line of every group in its unit: the
+        // first group of a unit carries it (unitRowSpan = how many groups).
+        const unitLines =
+          row.unitRowSpan === null ? 0 : groups.slice(gi, gi + row.unitRowSpan).reduce((n, g) => n + g.lines.length, 0);
         return lines.map((line, li) => {
-          const isFirstRow = li === 0;
-          const isLastRow = li === count - 1;
+          const isFirstLine = li === 0;
+          const isLastLine = li === count - 1;
           const isHeading = line.kind === "heading";
-          const fullName = line.kind === "topic" ? fullNames.get(line.topicId)! : line.text;
           return (
-            <TableRow key={line.kind === "topic" ? line.topicId : `${row.id}-heading-${li}`} className={cn(!isLastRow && "border-border/40")}>
-              {isFirstRow && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
-              {isFirstRow && (
+            <TableRow
+              key={line.kind === "topic" ? line.topicId : `${row.id}-heading-${li}`}
+              className={cn(!isLastLine && "border-border/40")}
+            >
+              {isFirstLine && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
+              {isFirstLine && row.unitRowSpan !== null && (
                 <TableCell
-                  rowSpan={count}
+                  rowSpan={unitLines}
                   className={cn(
                     "bg-card sticky left-0 z-10 border-r border-l px-3 py-2 text-sm font-medium whitespace-normal",
                     MAARIF_UNIT_COL_CLASS,
                   )}
                 >
-                  <UnitLabel label={row.label} />
+                  <UnitLabel label={row.unitLabel} />
                 </TableCell>
               )}
               <TableCell
@@ -157,8 +176,8 @@ export function MaarifTableBody({
               >
                 {line.text}
               </TableCell>
-              {pipeline.config.start.map((step, si) => stepCell(step, si, row, line, fullName, isFirstRow, count))}
-              {isFirstRow &&
+              {pipeline.config.start.map((step, si) => stepCell(step, si, group, line, isFirstLine))}
+              {isFirstLine &&
                 resources.map((resource) => {
                   const solved = row.memberTopicIds.some((id) => progress[`${id}::${resource.id}`]?.solved);
                   const reviewed = row.memberTopicIds.some((id) => progress[`${id}::${resource.id}`]?.reviewed);
@@ -168,20 +187,20 @@ export function MaarifTableBody({
                         <Checkbox
                           checked={solved}
                           onCheckedChange={() => onToggleProgress(row.id, resource.id, "solved")}
-                          aria-label={`${courseName} - ${row.label} - ${resource.name} - Soru Çözümü`}
+                          aria-label={`${courseName} - ${scope} - ${resource.name} - Soru Çözümü`}
                         />
                       </TableCell>
                       <TableCell rowSpan={count} className="text-center">
                         <Checkbox
                           checked={reviewed}
                           onCheckedChange={() => onToggleProgress(row.id, resource.id, "reviewed")}
-                          aria-label={`${courseName} - ${row.label} - ${resource.name} - Kaynak Taraması Yapıldı`}
+                          aria-label={`${courseName} - ${scope} - ${resource.name} - Kaynak Taraması Yapıldı`}
                         />
                       </TableCell>
                     </Fragment>
                   );
                 })}
-              {pipeline.config.end.map((step, si) => stepCell(step, si, row, line, fullName, isFirstRow, count))}
+              {pipeline.config.end.map((step, si) => stepCell(step, si, group, line, isFirstLine))}
             </TableRow>
           );
         });
