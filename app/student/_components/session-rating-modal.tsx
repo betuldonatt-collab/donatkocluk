@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -50,7 +51,7 @@ export function SessionRatingModal({
       onSubmitted();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }

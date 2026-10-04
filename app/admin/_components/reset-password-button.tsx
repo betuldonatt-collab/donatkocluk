@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { manualResetPassword } from "../actions";
@@ -26,7 +27,7 @@ export function ResetPasswordButton({ userId }: { userId: string }) {
       await manualResetPassword(userId, RESET_PASSWORD);
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setResetting(false);
     }

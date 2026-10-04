@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { AlertTriangle, CalendarIcon, CheckCircle2, ChevronDown, ChevronUp, Clock, Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
@@ -99,7 +100,7 @@ export function KarnelerTab({
       setCycles((prev) => [created, ...prev]);
       setExpandedId(created.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Karne oluşturulamadı.");
+      setError(friendlyError(e, "Karne oluşturulamadı."));
     } finally {
       setGenerating(false);
     }
@@ -482,7 +483,7 @@ function ReportCardReview({
       const updated = (await approveReportCard(cycle.id, note)) as CoachReportCardRow;
       onApproved(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Onaylanamadı, tekrar dene.");
+      setError(friendlyError(e, "Onaylanamadı, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -496,7 +497,7 @@ function ReportCardReview({
       setDeleteConfirmOpen(false);
       onDeleted(cycle.id);
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Silinemedi, tekrar dene.");
+      setDeleteError(friendlyError(e, "Silinemedi, tekrar dene."));
     } finally {
       setDeleting(false);
     }

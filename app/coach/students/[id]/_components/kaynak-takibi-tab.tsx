@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { toast } from "sonner";
 
 import { CourseTabs } from "@/components/course-tabs";
@@ -117,7 +118,7 @@ export function KaynakTakibiTab({
       await archiveStudentResource(studentId, resourceId);
     } catch (e) {
       setBranchExamResourceActive(courseId, resourceId, true);
-      toast.error(e instanceof Error ? e.message : "Kaynak arşivlenemedi, geri alındı.");
+      toast.error(friendlyError(e, "Kaynak arşivlenemedi, geri alındı."));
     }
   }
 
@@ -127,7 +128,7 @@ export function KaynakTakibiTab({
       await reactivateStudentResource(studentId, resourceId);
     } catch (e) {
       setBranchExamResourceActive(courseId, resourceId, false);
-      toast.error(e instanceof Error ? e.message : "Kaynak etkinleştirilemedi, geri alındı.");
+      toast.error(friendlyError(e, "Kaynak etkinleştirilemedi, geri alındı."));
     }
   }
 
@@ -135,7 +136,7 @@ export function KaynakTakibiTab({
     try {
       await deleteStudentResource(studentId, resourceId);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaynak silinemedi.");
+      toast.error(friendlyError(e, "Kaynak silinemedi."));
       return;
     }
     setData((prev) => {
@@ -166,7 +167,7 @@ export function KaynakTakibiTab({
       await archiveStudentResource(studentId, resourceId);
     } catch (e) {
       setResourceActive(courseId, resourceId, true);
-      toast.error(e instanceof Error ? e.message : "Kaynak arşivlenemedi, geri alındı.");
+      toast.error(friendlyError(e, "Kaynak arşivlenemedi, geri alındı."));
     }
   }
 
@@ -176,7 +177,7 @@ export function KaynakTakibiTab({
       await reactivateStudentResource(studentId, resourceId);
     } catch (e) {
       setResourceActive(courseId, resourceId, false);
-      toast.error(e instanceof Error ? e.message : "Kaynak etkinleştirilemedi, geri alındı.");
+      toast.error(friendlyError(e, "Kaynak etkinleştirilemedi, geri alındı."));
     }
   }
 
@@ -184,7 +185,7 @@ export function KaynakTakibiTab({
     try {
       await deleteStudentResource(studentId, resourceId);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaynak silinemedi.");
+      toast.error(friendlyError(e, "Kaynak silinemedi."));
       return;
     }
     setData((prev) => {
@@ -244,7 +245,7 @@ export function KaynakTakibiTab({
       reviewed: nextState.reviewed,
     }).catch((e) => {
       setData(previousData);
-      toast.error(e instanceof Error ? e.message : "İlerleme kaydedilemedi, geri alındı.");
+      toast.error(friendlyError(e, "İlerleme kaydedilemedi, geri alındı."));
     });
   }
 

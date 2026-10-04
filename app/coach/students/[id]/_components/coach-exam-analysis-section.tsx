@@ -1,6 +1,7 @@
 "use client";
 
 import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { friendlyError } from "@/lib/friendly-error";
 import { isMaarif11GeneralExamTitle, MAARIF_GRADES } from "@/lib/maarif-grade";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -208,7 +209,7 @@ export function CoachExamAnalysisSection({
     setExams((prev) => prev.filter((e) => e.id !== taskId));
     deleteAssignedTask(studentId, taskId).catch((e) => {
       setExams(previousExams);
-      toast.error(e instanceof Error ? e.message : "Deneme silinemedi, geri getirildi.");
+      toast.error(friendlyError(e, "Deneme silinemedi, geri getirildi."));
     });
   }
 

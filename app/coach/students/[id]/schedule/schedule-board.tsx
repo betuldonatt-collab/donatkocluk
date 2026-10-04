@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import {
   DndContext,
   DragOverlay,
@@ -387,7 +388,7 @@ export function ScheduleBoard({
     setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, is_locked: next } : e)));
     setEventLocked(studentId, event.id, next).catch((e) => {
       setEvents((prev) => prev.map((ev) => (ev.id === event.id ? { ...ev, is_locked: event.is_locked } : ev)));
-      toast.error(e instanceof Error ? e.message : "Kilit durumu değiştirilemedi.");
+      toast.error(friendlyError(e, "Kilit durumu değiştirilemedi."));
     });
   }
 
@@ -396,7 +397,7 @@ export function ScheduleBoard({
     setEvents((prev) => prev.filter((e) => e.id !== event.id));
     deleteStudentEvent(studentId, event.id).catch((e) => {
       setEvents(previousEvents);
-      toast.error(e instanceof Error ? e.message : "Zaman bloğu silinemedi, geri getirildi.");
+      toast.error(friendlyError(e, "Zaman bloğu silinemedi, geri getirildi."));
     });
   }
 
@@ -598,7 +599,7 @@ export function ScheduleBoard({
     runCalls().catch((e) => {
       setTasks(previousTasks);
       setEvents(previousEvents);
-      toast.error(e instanceof Error ? e.message : "Sıralama kaydedilemedi, geri alındı.");
+      toast.error(friendlyError(e, "Sıralama kaydedilemedi, geri alındı."));
     });
   }
 
@@ -637,7 +638,7 @@ export function ScheduleBoard({
     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_locked: next } : t)));
     setTaskLocked(studentId, task.id, next).catch((e) => {
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, is_locked: task.is_locked } : t)));
-      toast.error(e instanceof Error ? e.message : "Kilit durumu değiştirilemedi.");
+      toast.error(friendlyError(e, "Kilit durumu değiştirilemedi."));
     });
   }
 
@@ -646,7 +647,7 @@ export function ScheduleBoard({
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
     deleteAssignedTask(studentId, task.id).catch((e) => {
       setTasks(previousTasks);
-      toast.error(e instanceof Error ? e.message : "Görev silinemedi, geri getirildi.");
+      toast.error(friendlyError(e, "Görev silinemedi, geri getirildi."));
     });
   }
 
@@ -655,7 +656,7 @@ export function ScheduleBoard({
     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status } : t)));
     updateAssignedTaskStatus(studentId, task.id, status).catch((e) => {
       setTasks(previousTasks);
-      toast.error(e instanceof Error ? e.message : "Durum güncellenemedi, geri alındı.");
+      toast.error(friendlyError(e, "Durum güncellenemedi, geri alındı."));
     });
   }
 

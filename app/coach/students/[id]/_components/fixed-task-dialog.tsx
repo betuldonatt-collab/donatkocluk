@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -74,7 +75,7 @@ export function FixedTaskDialog({
       }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi.");
+      setError(friendlyError(e, "Kaydedilemedi."));
     } finally {
       setSaving(false);
     }
@@ -89,7 +90,7 @@ export function FixedTaskDialog({
       onDeleted(state.task.id);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Silinemedi.");
+      setError(friendlyError(e, "Silinemedi."));
       setDeleting(false);
     }
   }

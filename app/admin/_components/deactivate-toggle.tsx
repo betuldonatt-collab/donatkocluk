@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { setUserActive } from "../actions";
@@ -26,7 +27,7 @@ export function DeactivateToggle({ userId, isActive }: { userId: string; isActiv
       await setUserActive(userId, next);
       setActive(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

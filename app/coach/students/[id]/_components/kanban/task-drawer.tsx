@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -293,7 +294,7 @@ export function TaskDrawer({
       }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

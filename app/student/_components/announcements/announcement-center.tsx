@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ function AnnouncementCard({
       await submitAnnouncementRsvp(announcement.id, response, response === "not_attending" ? declineReason.trim() : null);
       onResponded(announcement.id, response);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Yanıt gönderilemedi, tekrar dene.");
+      setError(friendlyError(e, "Yanıt gönderilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }

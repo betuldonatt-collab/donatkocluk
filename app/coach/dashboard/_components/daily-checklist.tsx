@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import {
   DndContext,
   KeyboardSensor,
@@ -112,7 +113,7 @@ export function DailyChecklist({
     );
 
     moveCoachTask(activeId, targetDay, orderById.get(activeId)!).catch((e) => {
-      toast.error(e instanceof Error ? e.message : "Görev taşınamadı, tekrar dene.");
+      toast.error(friendlyError(e, "Görev taşınamadı, tekrar dene."));
       onTasksChange((prev) =>
         prev.map((t) => (t.id === activeId ? { ...t, task_date: sourceDay, postponed_count: movedTask.postponed_count } : t)),
       );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -90,7 +91,7 @@ export function CreateEventDialog({
       reset();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Eklenemedi.");
+      toast.error(friendlyError(e, "Eklenemedi."));
     } finally {
       setSaving(false);
     }
@@ -228,7 +229,7 @@ export function SessionDetailDialog({
       onDeleted(session!.id);
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Görüşme iptal edilemedi.");
+      toast.error(friendlyError(e, "Görüşme iptal edilemedi."));
     } finally {
       setDeleting(false);
     }
@@ -240,7 +241,7 @@ export function SessionDetailDialog({
       const updated = await updateSessionPaymentStatus(session!.id, !session!.is_paid);
       onUpdated(updated as CoachingSession);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ödeme durumu güncellenemedi.");
+      toast.error(friendlyError(e, "Ödeme durumu güncellenemedi."));
     } finally {
       setTogglingPaid(false);
     }
@@ -341,7 +342,7 @@ export function BlockDetailDialog({
       onDeleted(block!.id);
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Blok silinemedi.");
+      toast.error(friendlyError(e, "Blok silinemedi."));
     } finally {
       setDeleting(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ export function PasswordForm() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

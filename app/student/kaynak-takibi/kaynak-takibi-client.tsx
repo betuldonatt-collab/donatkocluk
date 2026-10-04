@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { toast } from "sonner";
 
 import { CourseTabs } from "@/components/course-tabs";
@@ -60,7 +61,7 @@ export function KaynakTakibiClient({
       });
       toast.success("Kaynak eklendi.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaynak eklenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Kaynak eklenemedi, tekrar dene."));
       throw e;
     }
   }
@@ -91,7 +92,7 @@ export function KaynakTakibiClient({
       solved: nextState.solved,
       reviewed: nextState.reviewed,
     }).catch((e) => {
-      toast.error(e instanceof Error ? e.message : "Güncellenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Güncellenemedi, tekrar dene."));
       // Roll back the optimistic flip so the UI matches what's actually saved.
       setCourseData((prev) => {
         const c = prev[courseId] ?? EMPTY_COURSE_DATA;
@@ -132,7 +133,7 @@ export function KaynakTakibiClient({
       });
       toast.success("Branş denemesi eklendi.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Eklenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Eklenemedi, tekrar dene."));
       throw e;
     }
   }
@@ -154,7 +155,7 @@ export function KaynakTakibiClient({
     });
 
     updateOwnBranchExamStock(resourceId, totalStock, remainingStock).catch((e) => {
-      toast.error(e instanceof Error ? e.message : "Stok güncellenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Stok güncellenemedi, tekrar dene."));
       if (!previous) return;
       setCourseData((prev) => {
         const current = prev[courseId] ?? EMPTY_COURSE_DATA;

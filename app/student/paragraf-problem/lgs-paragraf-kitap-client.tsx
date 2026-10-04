@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { useRouter } from "next/navigation";
 import { BookOpen, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -129,7 +130,7 @@ export function LgsParagrafKitapClient({
       setParagraf(EMPTY_PARAGRAF);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSavingParagraf(false);
     }
@@ -156,7 +157,7 @@ export function LgsParagrafKitapClient({
       setKitap(EMPTY_KITAP);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSavingKitap(false);
     }

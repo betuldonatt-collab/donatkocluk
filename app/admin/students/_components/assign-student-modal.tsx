@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -159,7 +160,7 @@ export function AssignStudentModal({
       await assignStudentFromPool(student.id, coachId, parentId || null);
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

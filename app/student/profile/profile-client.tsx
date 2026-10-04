@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -147,7 +148,7 @@ export function ProfileClient({ initialProfile }: { initialProfile: ProfileData 
       // Previously an out-of-range value made the save reject with nothing
       // shown at all -- surface the (Turkish, user-safe) reason.
       setSavedAt(null);
-      toast.error(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }

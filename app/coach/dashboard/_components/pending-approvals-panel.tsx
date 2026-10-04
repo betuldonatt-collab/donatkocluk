@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import Link from "next/link";
 import { Camera, ChevronDown, ClipboardCheck, X } from "lucide-react";
 import { toast } from "sonner";
@@ -245,7 +246,7 @@ function ApprovalsDialog({
         }
       } catch (e) {
         onRestore(task);
-        toast.error(e instanceof Error ? e.message : type === "approve" ? "Onaylanamadı, tekrar dene." : "Reddedilemedi, tekrar dene.");
+        toast.error(friendlyError(e, type === "approve" ? "Onaylanamadı, tekrar dene." : "Reddedilemedi, tekrar dene."));
       } finally {
         setActingId(null);
         setActingType(null);

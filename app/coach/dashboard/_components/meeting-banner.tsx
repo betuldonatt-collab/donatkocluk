@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import Link from "next/link";
 import { Calendar, CheckCircle2, Video, XCircle } from "lucide-react";
 
@@ -150,7 +151,7 @@ function HappenedDialog({
       onOpenChange(false);
       setNotes("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

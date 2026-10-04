@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { checkQuestionBankSave, hasWatchedVideo } from "@/lib/question-bank-validation";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Languages, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
@@ -101,14 +104,36 @@ export function TaskModal({
           be drawn over. */}
       <DialogContent className={cn("flex max-h-[90dvh] flex-col overflow-hidden", needsWideModal && "sm:max-w-lg")}>
         {task && (
-          <TaskModalBody
+          // A render error inside the form shows this panel instead of taking
+          // the whole page down (and is reported, never shown as a stack).
+          <ErrorBoundary
             key={`${task.id}:${initialStep}:${openKey ?? 0}`}
-            task={task}
-            onOpenChange={onOpenChange}
-            onSaved={onSaved}
-            initialStep={initialStep}
-            examType={examType}
-          />
+            context="task-modal"
+            fallback={(reset) => (
+              <div className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle>{task.title}</DialogTitle>
+                  <DialogDescription>Bu görev ekranı gösterilirken bir sorun oluştu. Tekrar dene; sorun sürerse sayfayı yenile ya da koçuna haber ver.</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={reset}>
+                    Tekrar Dene
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Kapat
+                  </Button>
+                </div>
+              </div>
+            )}
+          >
+            <TaskModalBody
+              task={task}
+              onOpenChange={onOpenChange}
+              onSaved={onSaved}
+              initialStep={initialStep}
+              examType={examType}
+            />
+          </ErrorBoundary>
         )}
       </DialogContent>
     </Dialog>
@@ -129,6 +154,7 @@ function Field({
   onChange,
   className,
   invalid,
+  disabled,
 }: {
   label: string;
   value: string;
@@ -136,6 +162,7 @@ function Field({
   className?: string;
   // A required box left empty after a failed save attempt -- red outline.
   invalid?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className={cn("min-w-0 space-y-1.5", className)}>
@@ -147,7 +174,8 @@ function Field({
         value={value}
         onChange={(e) => onChange(sanitizeDigits(e.target.value))}
         aria-invalid={invalid || undefined}
-        className={cn("bg-background", invalid && "border-destructive focus-visible:ring-destructive/30")}
+        disabled={disabled}
+        className={cn("bg-background", disabled && "opacity-50", invalid && "border-destructive focus-visible:ring-destructive/30")}
       />
     </div>
   );
@@ -304,6 +332,19 @@ function TaskModalBody({
   const [startPage, setStartPage] = useState(task.start_page?.toString() ?? "");
   const [endPage, setEndPage] = useState(task.end_page?.toString() ?? "");
   const [durationMinutes, setDurationMinutes] = useState(task.duration_minutes?.toString() ?? "");
+  // Soru Çözümü only -- "Soruları çözmedim": a student who just watched the
+  // video solutions saves with Doğru/Yanlış/Boş empty (lib/question-bank-
+  // validation.ts). Not stored as such: a question_bank task that was saved
+  // "Yarım Yapıldı" with all three counts empty IS that state, so reopening it
+  // starts with the box ticked.
+  const [noQuestionsSolved, setNoQuestionsSolved] = useState(
+    () =>
+      task.task_type === "question_bank" &&
+      task.status === "half_done" &&
+      task.correct_count === null &&
+      task.wrong_count === null &&
+      task.empty_count === null,
+  );
   // A video link created before this feature shipped has no `watched` key
   // at all in its stored jsonb -- normalized to false here so Checkbox
   // below always gets a real boolean, never undefined.
@@ -317,11 +358,16 @@ function TaskModalBody({
     const previous = videoLinks;
     setVideoLinks((prev) => prev.map((l) => (l.url === url ? { ...l, watched } : l)));
     try {
-      const updated = await setVideoLinkWatched(task.id, url, watched);
-      onSaved(updated as StudentTask);
+      const result = await setVideoLinkWatched(task.id, url, watched);
+      if (!result.ok) {
+        setVideoLinks(previous);
+        setError(result.error);
+        return;
+      }
+      onSaved(result.data as unknown as StudentTask);
     } catch (e) {
       setVideoLinks(previous);
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     }
   }
 
@@ -434,6 +480,11 @@ function TaskModalBody({
       isReading) &&
     !isDurationOnlyTarget;
   const showManualButtons = !isPureCountType;
+  // The video-only box: Soru Çözümü with a question-count target, for every
+  // cohort but LGS (whose completion rules need the counts). Branş Denemesi and
+  // Genel Deneme never get it.
+  const showNoQuestionsBox = task.task_type === "question_bank" && !isDurationOnlyTarget && examType !== "LGS";
+  const noQuestionsActive = showNoQuestionsBox && noQuestionsSolved;
   const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
   // Reading's own, simpler 2-field block (Sayfa Hedefi + Okunan Sayfa)
   // instead of the 4-field Toplam/Doğru/Yanlış/Boş grid -- there's no
@@ -538,11 +589,23 @@ function TaskModalBody({
   // numeric target to derive one from), so it simplifies to exactly
   // manualStatus -- never auto-completed from counts alone. Every other
   // type is just the plain count-based preview, unchanged from before.
-  const overallStatusPreview: DualPartStatus | null = needsManualStatusSelector
+  const overallStatusPreview: DualPartStatus | null = noQuestionsActive
+    ? "half_done"
+    : needsManualStatusSelector
     ? manualStatus && countStatus
       ? mergeDualTaskStatus(manualStatus, countStatus)
       : (manualStatus ?? countStatus)
     : countStatus;
+
+  function handleNoQuestionsChange(checked: boolean) {
+    setNoQuestionsSolved(checked);
+    if (checked) {
+      setCorrectCount("");
+      setWrongCount("");
+      setEmptyCount("");
+    }
+    setError(null);
+  }
 
   // If exactly 3 of Toplam/Doğru/Yanlış/Boş are filled, auto-fills the 4th
   // (lib/count-fields.ts) so the student doesn't have to do the arithmetic.
@@ -597,6 +660,12 @@ function TaskModalBody({
       patch.wrong_count = toNumberOrNull(wrongCount);
       patch.empty_count = toNumberOrNull(emptyCount);
       if (isTytBranchExam) patch.duration_minutes = toNumberOrNull(durationMinutes);
+      if (noQuestionsActive) {
+        patch.correct_count = null;
+        patch.wrong_count = null;
+        patch.empty_count = null;
+        patch.no_questions_solved = true;
+      }
       // No explicit status here for a pure count type -- updateTaskProgress
       // computes it itself from these same counts (computeAutoTaskStatus),
       // the same rule the live hint below previews. A task that needs the
@@ -680,6 +749,23 @@ function TaskModalBody({
     return true;
   }
 
+  // Soru Çözümü: counts, or the "Soruları çözmedim" box with a watched video
+  // (lib/question-bank-validation.ts, re-checked by updateTaskProgress).
+  function blockedByQuestionBankRule(): boolean {
+    if (task.task_type !== "question_bank" || isDurationOnlyTarget || examType === "LGS") return false;
+    const problem = checkQuestionBankSave({
+      correct: toNumberOrNull(correctCount),
+      wrong: toNumberOrNull(wrongCount),
+      empty: toNumberOrNull(emptyCount),
+      noQuestionsSolved: noQuestionsActive,
+      watchedVideo: hasWatchedVideo(videoLinks),
+      isLgs: false,
+    });
+    if (!problem) return false;
+    setError(problem);
+    return true;
+  }
+
   // Kitap Okuma's Başlangıç/Bitiş Sayfası -- the same rule
   // updateTaskProgress re-checks server-side, caught here first so an
   // invalid range never even leaves a round trip before showing the inline
@@ -693,7 +779,7 @@ function TaskModalBody({
   }
 
   async function handleSaveSimple() {
-    if (blockedWithoutManualStatus() || blockedByMissingExamScores() || blockedByPageRange()) return;
+    if (blockedWithoutManualStatus() || blockedByMissingExamScores() || blockedByPageRange() || blockedByQuestionBankRule()) return;
     setSaving(true);
     setError(null);
     try {
@@ -707,7 +793,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -733,7 +819,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -755,7 +841,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       setStep("analysis");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -776,7 +862,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -794,7 +880,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -812,7 +898,7 @@ function TaskModalBody({
       onSaved(result.data as StudentTask);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kaydedilemedi, tekrar dene.");
+      setError(friendlyError(e, "Kaydedilemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }
@@ -1151,20 +1237,39 @@ function TaskModalBody({
               label="Doğru"
               value={correctCount}
               onChange={(v) => handleCountFieldChange("correct", v)}
+              disabled={noQuestionsActive}
               invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(correctCount)}
             />
             <Field
               label="Yanlış"
               value={wrongCount}
               onChange={(v) => handleCountFieldChange("wrong", v)}
+              disabled={noQuestionsActive}
               invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(wrongCount)}
             />
             <Field
               label="Boş"
               value={emptyCount}
               onChange={(v) => handleCountFieldChange("empty", v)}
+              disabled={noQuestionsActive}
               invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(emptyCount)}
             />
+            {showNoQuestionsBox && (
+              <div className="col-span-2 flex items-start gap-2 sm:col-span-4">
+                <Checkbox
+                  id="no-questions-solved"
+                  checked={noQuestionsSolved}
+                  onCheckedChange={(v) => handleNoQuestionsChange(v === true)}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="no-questions-solved" className="flex-col items-start gap-0.5 font-normal">
+                  <span className="text-foreground text-sm font-medium">Soruları çözmedim</span>
+                  <span className="text-muted-foreground text-xs">
+                    Sadece videoyu izlediysen işaretle; doğru / yanlış / boş girmen gerekmez. Görev “Yarım Yapıldı” olarak kaydedilir.
+                  </span>
+                </Label>
+              </div>
+            )}
             {isTytBranchExam && (
               <Field
                 label="Süre (dk)"

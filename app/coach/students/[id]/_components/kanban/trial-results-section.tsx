@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,8 +47,7 @@ import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selecto
 // digest text either way if it happens; this keeps that from ever
 // reaching the coach as raw framework output.
 function friendlySaveError(e: unknown): string {
-  if (e instanceof Error && !/minified react error/i.test(e.message)) return e.message;
-  return "Kaydedilemedi ya da sonuç belirsiz kaldı. Listeye dönüp bu denemenin hâlâ \"Analiz Bekliyor\" durumunda olup olmadığını kontrol et, gerekirse tekrar dene.";
+  return friendlyError(e, "Kaydedilemedi ya da sonuç belirsiz kaldı. Listeye dönüp bu denemenin hâlâ \"Analiz Bekliyor\" durumunda olup olmadığını kontrol et, gerekirse tekrar dene.");
 }
 
 // Mirrors task-modal.tsx's own parseGeneralExamTitle track-recovery

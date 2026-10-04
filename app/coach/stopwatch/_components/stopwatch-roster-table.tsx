@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -115,7 +116,7 @@ export function StopwatchRosterTable({
       setGroups((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "tr")));
       setNewGroupName("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Grup oluşturulamadı.");
+      toast.error(friendlyError(e, "Grup oluşturulamadı."));
     } finally {
       setCreatingGroup(false);
     }
@@ -135,7 +136,7 @@ export function StopwatchRosterTable({
     } catch (e) {
       setGroups(previousGroups);
       setRoster(previousRoster);
-      toast.error(e instanceof Error ? e.message : "Grup silinemedi, geri getirildi.");
+      toast.error(friendlyError(e, "Grup silinemedi, geri getirildi."));
     }
   }
 
@@ -148,7 +149,7 @@ export function StopwatchRosterTable({
     );
     setStudentCompetitionGroup(studentId, nextGroupId).catch((e) => {
       setRoster(previousRoster);
-      toast.error(e instanceof Error ? e.message : "Grup ataması kaydedilemedi, geri alındı.");
+      toast.error(friendlyError(e, "Grup ataması kaydedilemedi, geri alındı."));
     });
   }
 
@@ -158,7 +159,7 @@ export function StopwatchRosterTable({
     setRoster((prev) => prev.map((r) => (r.studentId === studentId ? { ...r, competitionStatus: next } : r)));
     setStudentCompetitionStatus(studentId, next).catch((e) => {
       setRoster(previousRoster);
-      toast.error(e instanceof Error ? e.message : "Durum güncellenemedi, geri alındı.");
+      toast.error(friendlyError(e, "Durum güncellenemedi, geri alındı."));
     });
   }
 

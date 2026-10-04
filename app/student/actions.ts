@@ -19,6 +19,7 @@ import {
   isGeneralExamScoresIncomplete,
 } from "@/lib/exam-results-validation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
+import { checkQuestionBankSave, hasWatchedVideo } from "@/lib/question-bank-validation";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
@@ -60,6 +61,10 @@ export type TaskProgressPatch = Partial<{
   duration_minutes: number | null;
   subject_scores: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null;
   completed: boolean;
+  // Soru Çözümü only: the student ticked "Soruları çözmedim" (video-only) --
+  // see lib/question-bank-validation.ts. Never stored; it just changes how the
+  // empty counts are judged and forces the status to half_done.
+  no_questions_solved: boolean;
   analysis_pending: boolean;
   status: "pending" | "done" | "half_done" | "not_done";
   reason: string | null;
@@ -131,6 +136,7 @@ const taskProgressPatchSchema = z
     duration_minutes: z.number().int().min(0).max(1440).nullable().optional(),
     subject_scores: z.record(z.string(), subjectScoreSchema).nullable().optional(),
     completed: z.boolean().optional(),
+    no_questions_solved: z.boolean().optional(),
     analysis_pending: z.boolean().optional(),
     status: z.enum(["pending", "done", "half_done", "not_done"]).optional(),
     reason: z.string().trim().max(1000).nullable().optional(),
@@ -211,13 +217,49 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
     .select(
-      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count, subject_scores",
+      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count, subject_scores, video_links",
     )
     .eq("id", taskIdV)
     .maybeSingle();
   if (fetchError) throw dbError(fetchError);
   if (!existing || existing.student_id !== user.id) {
     throw new Error("Bu görev sana ait değil.");
+  }
+
+  // Soru Çözümü: Doğru/Yanlış/Boş may only be left empty through the explicit
+  // "Soruları çözmedim" (video-only) box, which needs a watched video and is
+  // saved as Yarım Yapıldı -- lib/question-bank-validation.ts. Branş / Genel
+  // Deneme have their own, stricter rule just below and never get this bypass.
+  const noQuestionsSolved = existing.task_type === "question_bank" && patchV.no_questions_solved === true;
+  delete patchV.no_questions_solved;
+  if (existing.task_type === "question_bank") {
+    const savesCounts = "correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV;
+    const target = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
+    if (noQuestionsSolved || (savesCounts && target !== null)) {
+      const finalCorrect = "correct_count" in patchV ? (patchV.correct_count ?? null) : existing.correct_count;
+      const finalWrong = "wrong_count" in patchV ? (patchV.wrong_count ?? null) : existing.wrong_count;
+      const finalEmpty = "empty_count" in patchV ? (patchV.empty_count ?? null) : existing.empty_count;
+      const allBlank = finalCorrect === null && finalWrong === null && finalEmpty === null;
+      // An LGS student keeps the existing LGS completion rules (below), so the
+      // "counts required" check is not applied to them without the box.
+      const isLgs = noQuestionsSolved || allBlank ? await isLgsStudent(supabase, user.id) : false;
+      if (noQuestionsSolved || !isLgs) {
+        const problem = checkQuestionBankSave({
+          correct: finalCorrect,
+          wrong: finalWrong,
+          empty: finalEmpty,
+          noQuestionsSolved,
+          watchedVideo: hasWatchedVideo(existing.video_links as { watched?: boolean }[] | null),
+          isLgs,
+        });
+        if (problem) throw new Error(problem);
+      }
+    }
+    if (noQuestionsSolved) {
+      patchV.correct_count = null;
+      patchV.wrong_count = null;
+      patchV.empty_count = null;
+    }
   }
 
   // Genel / Branş Denemesi results: every Doğru/Yanlış/Boş box is required
@@ -323,6 +365,13 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
     if (countStatus) {
       patchV.status = dualManualStatus ? mergeDualTaskStatus(dualManualStatus, countStatus) : countStatus;
     }
+  }
+  // Video only: never "Yapıldı", whatever the target (a Toplam of 5 or less
+  // would otherwise count the empty counts as done), and never less than the
+  // video that was actually watched.
+  if (noQuestionsSolved) {
+    patchV.status = "half_done";
+    patchV.completed = false;
   }
 
   // Kanıt Fotoğrafı: a task that carries photos is not completed on the
@@ -462,7 +511,26 @@ const setVideoLinkWatchedSchema = z.object({
 // whole video_links array from their own form, which doesn't carry a
 // watched flag -- any watched state a student had already set would be
 // lost if a coach edits the same task's links afterward.
-export async function setVideoLinkWatched(taskId: string, url: string, watched: boolean) {
+//
+// Returns a result instead of throwing: a thrown message is replaced by the
+// opaque "Minified React error #441" in production (see updateTaskProgress),
+// which the task modal used to print straight to the student.
+export type SetVideoLinkWatchedResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
+
+export async function setVideoLinkWatched(taskId: string, url: string, watched: boolean): Promise<SetVideoLinkWatchedResult> {
+  try {
+    return { ok: true, data: await setVideoLinkWatchedInternal(taskId, url, watched) };
+  } catch (e) {
+    if (!(e instanceof Error)) {
+      console.error("[setVideoLinkWatched] non-Error thrown:", e);
+      Sentry.captureException(e, { extra: { taskId } });
+      return { ok: false, error: GENERIC_DB_ERROR };
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
+async function setVideoLinkWatchedInternal(taskId: string, url: string, watched: boolean) {
   await assertNotImpersonating();
   const v = parseInput(setVideoLinkWatchedSchema, { taskId, url, watched });
   const supabase = await createClient();

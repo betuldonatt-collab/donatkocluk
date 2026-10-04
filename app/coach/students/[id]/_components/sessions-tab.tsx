@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { BookOpen, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -78,7 +79,7 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
       setEditingId(null);
       toast.success("Görüşme tarihi güncellendi.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Tarih güncellenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Tarih güncellenemedi, tekrar dene."));
     } finally {
       setSavingEdit(false);
     }
@@ -94,7 +95,7 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
       const updated = await updateSessionPaymentStatus(session.id, !session.is_paid);
       setSessions((prev) => prev.map((s) => (s.id === session.id ? { ...s, is_paid: (updated as { is_paid: boolean }).is_paid } : s)));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ödeme durumu güncellenemedi.");
+      toast.error(friendlyError(e, "Ödeme durumu güncellenemedi."));
     } finally {
       setTogglingId(null);
     }
@@ -109,7 +110,7 @@ export function SessionsTab({ studentId, initialSessions }: { studentId: string;
       setPendingDelete(null);
       toast.success("Görüşme silindi.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Görüşme silinemedi.");
+      toast.error(friendlyError(e, "Görüşme silinemedi."));
     } finally {
       setDeleting(false);
     }

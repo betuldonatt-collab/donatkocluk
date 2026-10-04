@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -116,7 +117,7 @@ export function EditableCourseTable({
       // unconditional hard delete -- an error here means a real failure
       // (network, RLS rejection), not the old "has data" guard, which no
       // longer exists.
-      setDeleteError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setDeleteError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setDeleting(false);
     }

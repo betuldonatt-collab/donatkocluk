@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 export type RowHeights = {
   heightOf: (rowIndex: number) => number;
@@ -84,7 +85,7 @@ export function useRowHeights(
       })
       .catch((e) => {
         setHeights(savedRef.current);
-        onError(e instanceof Error ? e.message : "Satır yüksekliği kaydedilemedi.");
+        onError(friendlyError(e, "Satır yüksekliği kaydedilemedi."));
       });
   }
 

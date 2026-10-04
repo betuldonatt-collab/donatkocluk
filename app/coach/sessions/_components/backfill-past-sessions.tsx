@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { History, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,7 +72,7 @@ export function BackfillPastSessions({ roster }: { roster: RosterStudent[] }) {
       // row so the next student's dates start clean.
       setRows([emptyRow(true)]);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Eklenemedi, tekrar dene.");
+      toast.error(friendlyError(e, "Eklenemedi, tekrar dene."));
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export function BranchExamStockTable({
       await onDelete(pendingDeleteId);
       setPendingDeleteId(null);
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setDeleteError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setDeleting(false);
     }

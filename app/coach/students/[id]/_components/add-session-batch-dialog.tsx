@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -82,7 +83,7 @@ export function AddSessionBatchDialog({
       onOpenChange(false);
       toast.success(`${sessions.length} görüşme ${isPaid ? "ödendi" : "ödeme bekliyor"} olarak eklendi.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Görüşmeler eklenemedi.");
+      toast.error(friendlyError(e, "Görüşmeler eklenemedi."));
     } finally {
       setSaving(false);
     }

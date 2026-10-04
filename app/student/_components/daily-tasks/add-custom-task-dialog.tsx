@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 import { Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -435,7 +436,7 @@ export function AddCustomTaskDialog({
       setValue(initialFormState(examType, maarifGrade));
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }

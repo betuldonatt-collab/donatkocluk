@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { friendlyError } from "@/lib/friendly-error";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -124,7 +125,7 @@ export function EditProfileDialog({
       onSaved(updated as EditableProfileFields);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Bir hata oluştu.");
+      setError(friendlyError(e, "Bir hata oluştu."));
     } finally {
       setSaving(false);
     }
