@@ -142,15 +142,13 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
         ],
       },
       {
-        // The 5th topic of 10th grade's unit 2 (Osmanlı Devleti'nin İlim ve
-        // İrfan Geleneği) is in none of the coach's buckets: it is kept, as
-        // its own entry (Kaynak Takibi) / in the "Diğer" row (Deneme Analizi).
         label: "5. Ünite: Beylikten Devlete Osmanlı (1299 - 1453)",
         buckets: [
           { label: "Osmanlı Devleti'nin Kuruluşuna Dair Görüşler", from: [{ course: "maarif10-tarih", unit: 2, topics: [1] }] },
           { label: "Beylikten Devlete Siyasi ve Askerî Gelişmeler", from: [{ course: "maarif10-tarih", unit: 2, topics: [2] }] },
           { label: "Osmanlı Devleti'nin İskân ve İstimâlet Politikası", from: [{ course: "maarif10-tarih", unit: 2, topics: [4] }] },
           { label: "Osmanlı Devleti'nde Ordu, Hukuk ve Toprak Sistemi", from: [{ course: "maarif10-tarih", unit: 2, topics: [3] }] },
+          { label: "Osmanlı Devleti'nin İlim ve İrfan Geleneği", from: [{ course: "maarif10-tarih", unit: 2, topics: [5] }] },
         ],
       },
       {

@@ -45,6 +45,7 @@ describe("Tarih structure", () => {
           "Beylikten Devlete Siyasi ve Askerî Gelişmeler",
           "Osmanlı Devleti'nin İskân ve İstimâlet Politikası",
           "Osmanlı Devleti'nde Ordu, Hukuk ve Toprak Sistemi",
+          "Osmanlı Devleti'nin İlim ve İrfan Geleneği",
         ],
       ],
       [
@@ -78,15 +79,23 @@ describe("Tarih structure", () => {
     expect(bucket("Osmanlı Devleti'nde Bilim, Kültür, Eğitim ve Sanat")).toEqual(["maarif10-tarih-u2-t4"]);
   });
 
-  it("keeps the one topic no bucket claims in the Diğer row -- nothing is lost or counted twice", () => {
+  it("gives Osmanlı Devleti'nin İlim ve İrfan Geleneği its own bucket in Ünite 5", () => {
+    const unit5 = mapping.units[4];
+    expect(unit5.label).toBe("5. Ünite: Beylikten Devlete Osmanlı (1299 - 1453)");
+    expect(unit5.buckets).toHaveLength(5);
+    expect(unit5.buckets[4]).toMatchObject({ label: "Osmanlı Devleti'nin İlim ve İrfan Geleneği", topicIds: ["maarif10-tarih-u1-t4"] });
+  });
+
+  it("claims every raw 9th/10th Tarih topic exactly once -- nothing lost or counted twice, nothing left for Diğer", () => {
     const claimed = mapping.units.flatMap((u) => u.buckets.flatMap((b) => b.topicIds));
     expect(new Set(claimed).size).toBe(claimed.length);
-    expect(mapping.otherTopicIds).toEqual(["maarif10-tarih-u1-t4"]); // Osmanlı Devleti'nin İlim ve İrfan Geleneği
-    expect([...claimed, ...mapping.otherTopicIds].sort()).toEqual(rawIds.slice().sort());
+    expect(claimed.slice().sort()).toEqual(rawIds.slice().sort());
+    expect(rawIds).toHaveLength(27); // 13 (9th) + 14 (10th)
+    expect(mapping.otherTopicIds).toEqual([]);
     const rows = denemeRowsFor(mapping);
-    expect(rows).toHaveLength(25 + 1); // 25 buckets + the Diğer row
-    expect(rows[rows.length - 1]).toMatchObject({ label: DENEME_OTHER_LABEL, memberTopicIds: ["maarif10-tarih-u1-t4"] });
-    expect(rows.slice(0, -1).map((r) => r.unitRowSpan)).toEqual([3, null, null, 5, null, null, null, null, 4, null, null, null, 4, null, null, null, 4, null, null, null, 5, null, null, null, null]);
+    expect(rows).toHaveLength(26); // 26 buckets, no Diğer row
+    expect(rows.some((r) => r.label === DENEME_OTHER_LABEL)).toBe(false);
+    expect(rows.map((r) => r.unitRowSpan)).toEqual([3, null, null, 5, null, null, null, null, 4, null, null, null, 4, null, null, null, 5, null, null, null, null, 5, null, null, null, null]);
   });
 
   it("an extra spec gap becomes a Diğer row too (the fallback is per subject)", () => {
@@ -127,10 +136,33 @@ describe("Tarih in Kaynak Takibi (the merged Maarif TYT course)", () => {
     expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([3, 5, 4, 4, 5, 5]);
   });
 
-  it("keeps the topic no bucket names, as its own entry at the end of its unit", () => {
+  it("Ünite 5 carries the İlim ve İrfan Geleneği bucket as its fifth tracking row", () => {
     const unit5 = tarih.units.filter((u) => u.unit.startsWith("5. Ünite"));
     expect(unit5).toHaveLength(5);
     expect(unit5[4].topics).toEqual([{ id: "maarif10-tarih-u1-t4", name: "Osmanlı Devleti'nin İlim ve İrfan Geleneği" }]);
+  });
+
+  it("a topic a spec does not name is still kept (own entry in its unit; under Diğer when no unit uses it)", () => {
+    const partial = alignedUnits({
+      units: [
+        {
+          label: "U1",
+          buckets: [{ label: "Only this", from: [{ course: "maarif10-tarih", unit: 2, topics: [1] }] }],
+        },
+      ],
+    });
+    const ids = partial.flatMap((u) => u.topics.map((t) => t.id));
+    expect(ids.slice().sort()).toEqual(rawIds.filter((id) => id.startsWith("maarif10-tarih")).slice().sort());
+    // Same unit as the bucket: the 4 other topics of 10th grade's unit 2 follow it under "U1".
+    expect(partial.filter((u) => u.unit === "U1").flatMap((u) => u.topics.map((t) => t.id))).toEqual([
+      "maarif10-tarih-u1-t0",
+      "maarif10-tarih-u1-t1",
+      "maarif10-tarih-u1-t2",
+      "maarif10-tarih-u1-t3",
+      "maarif10-tarih-u1-t4",
+    ]);
+    // Units no spec unit draws from land under "Diğer".
+    expect(partial.filter((u) => u.unit === "Diğer")).toHaveLength(9);
   });
 });
 

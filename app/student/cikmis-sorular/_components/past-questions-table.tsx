@@ -168,6 +168,20 @@ function flattenRows(course: Course): Row[] {
       });
     }
   }
+  // A course laid out in buckets (the 11th grader's merged Tarih) has several
+  // consecutive entries under ONE unit name: show the name once, spanning them
+  // all, instead of repeating it on every entry.
+  let blockStart = -1;
+  rows.forEach((row, i) => {
+    if (row.unitRowSpan === null) return;
+    const block = blockStart >= 0 ? rows[blockStart] : null;
+    if (block && row.unitLabel !== "-" && block.unitLabel === row.unitLabel) {
+      block.unitRowSpan = (block.unitRowSpan ?? 0) + row.unitRowSpan;
+      row.unitRowSpan = null;
+    } else {
+      blockStart = i;
+    }
+  });
   return rows;
 }
 

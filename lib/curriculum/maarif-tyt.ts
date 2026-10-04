@@ -61,6 +61,8 @@ export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, 
   // 10th's -- see maarif-tyt-structure.ts. Its units are numbered across both
   // grades (1-6), so they carry no per-grade tag. Everything else is merged
   // as before.
+  // (MERGE_PAIRS holds only merged ids; the 11th grade's own maarif11-* courses
+  // are built elsewhere (maarif11.ts) and never read SUBJECT_SPECS.)
   const spec = SUBJECT_SPECS[id];
   if (spec?.alignKaynakTakibi) return { id, name, units: alignedUnits(spec) };
   const c9 = m9Id ? MAARIF9_KAYNAK_COURSES.find((c) => c.id === m9Id) : undefined;

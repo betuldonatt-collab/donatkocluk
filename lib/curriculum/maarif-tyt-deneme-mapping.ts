@@ -17,7 +17,7 @@
 // topic that doesn't fit (or one added to the data later) is still shown
 // instead of silently disappearing.
 import type { Course } from "./index";
-import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
+import { isMaarifTytMergedCourseId, MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { resolveSpec, SUBJECT_SPECS, type SubjectSpec } from "./maarif-tyt-structure";
 import type { SelectionRow } from "./rows";
 
@@ -55,6 +55,9 @@ const cache = new Map<string, DenemeMapping | null>();
 // The bucketed view of a merged "Maarif TYT" course, or null when its subject
 // has no mapping yet (the table then keeps its plain per-topic rows).
 export function maarifTytDenemeMappingFor(courseId: string): DenemeMapping | null {
+  // Merged "Maarif TYT" courses only -- the 11th grade's own "11. Sınıf" courses
+  // (maarif11-*) and every other course never get a bucketed view.
+  if (!isMaarifTytMergedCourseId(courseId)) return null;
   if (cache.has(courseId)) return cache.get(courseId)!;
   const course = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === courseId);
   const spec = SUBJECT_SPECS[courseId];
