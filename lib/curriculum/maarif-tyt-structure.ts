@@ -27,6 +27,11 @@ export type BucketSpec = { label: string; from: Source[] };
 export type UnitSpec = { label: string; buckets: BucketSpec[] };
 export type SubjectSpec = {
   units: UnitSpec[];
+  // Raw topics the coach's list has no place for, left OUT of the structure on
+  // purpose (never shown, never tracked). Everything else a bucket does not
+  // claim is still kept, as a leaf of its own (see alignedUnits) -- so a topic
+  // only disappears when it is named here.
+  excluded?: Source[];
 };
 
 export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
@@ -162,17 +167,16 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
   },
 
   // Biyoloji: Tema 1-2 are 9th grade's two themes, Tema 3-4 are 10th grade's two units.
-  // Topics are picked by 1-based position in the raw unit. Where the coach's list is finer
-  // or coarser than the raw topics, the nearest raw topics were attached:
-  //  - Tema 1: "Ökaryotlar" (raw 19) sits with Canlıların Sınıflandırılması; "Hayvanlar" (23)
-  //    with Omurgasız Hayvanlar; the biodiversity database topic (26) with the last bucket.
-  //  - Tema 2: "Organik Moleküllerin Tayininde Kullanılan Ayıraçlar" (10) rides with Karbohidratlar;
-  //    Hücre ve Alt Birimleri - I = prokaryot/ökaryot + yapısal bileşenler (11-12), - II =
-  //    organeller + doku/organ/sistem organizasyonu (13, 16).
-  //  - Tema 3: "Fotosentezde Kullanılan ve Üretilen Maddeler" (3) goes with Fotosentez Reaksiyonları.
-  //  - Tema 4: Komünite and Popülasyon Ekolojisi are ONE raw topic ("Komünitelerde ve
-  //    Popülasyonlarda Görülen Etkileşimler ve Değişimler"), and a bucket needs a real topic id of its
-  //    own, so they are a single bucket.
+  // Topics are picked by 1-based position in the raw unit, and ONLY ones that match a
+  // bucket of the coach's list are placed. The raw topics the list has no place for are
+  // `excluded` below -- dropped from the structure, not attached to a nearby bucket.
+  //  - Komünite and Popülasyon Ekolojisi are ONE raw topic ("Komünitelerde ve Popülasyonlarda
+  //    Görülen Etkileşimler ve Değişimler"), and a bucket needs a real topic id of its own, so
+  //    they are a single bucket (approved).
+  //  - Kept on purpose: "Canlılık İçin Enerjinin Önemi" is the only raw topic for Enerji Molekülü
+  //    ATP (without it that bucket would have nothing to track); "Fotosentezde Kullanılan ve
+  //    Üretilen Maddeler" is part of Fotosentez Reaksiyonları; "Canlıların Biyolojik Çeşitlilik
+  //    Veri Tabanı" is biodiversity content (the last bucket).
   "maarif-tyt-biyoloji": {
     units: [
       {
@@ -181,11 +185,11 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
           { label: "Biyoloji Bilimi ve Bilimsel Araştırma Süreçleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [1, 2, 3] }] },
           { label: "Canlıların Ortak Özellikleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] }] },
           { label: "Virüsler", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [15] }] },
-          { label: "Canlıların Sınıflandırılması", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [16, 19] }] },
+          { label: "Canlıların Sınıflandırılması", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [16] }] },
           { label: "Bakteri ve Arke Âlemleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [17, 18] }] },
           { label: "Protista ve Bitki Âlemleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [20, 21] }] },
           { label: "Mantarlar Âlemi", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [22] }] },
-          { label: "Omurgasız Hayvanlar", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [23, 24] }] },
+          { label: "Omurgasız Hayvanlar", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [24] }] },
           { label: "Omurgalı Hayvanlar ve Biyoçeşitlilik", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [25, 26, 27] }] },
         ],
       },
@@ -193,14 +197,14 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
         label: "2. Tema: Organizasyon",
         buckets: [
           { label: "İnorganik Moleküller", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [1, 2] }] },
-          { label: "Karbohidratlar", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [3, 10] }] },
+          { label: "Karbohidratlar", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [3] }] },
           { label: "Lipitler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [4] }] },
           { label: "Proteinler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [5] }] },
           { label: "Enzimler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [6] }] },
           { label: "Nükleik Asitler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [7] }] },
           { label: "Vitaminler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [8, 9] }] },
           { label: "Hücre ve Alt Birimleri - I", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [11, 12] }] },
-          { label: "Hücre ve Alt Birimleri - II", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [13, 16] }] },
+          { label: "Hücre ve Alt Birimleri - II", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [13] }] },
           { label: "Difüzyon ve Ozmoz", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [15] }] },
           { label: "Aktif Taşıma, Endositoz ve Ekzositoz", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [14] }] },
         ],
@@ -214,7 +218,7 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
           { label: "Canlılarda Sindirim", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [5] }] },
           { label: "İnsanda Sindirim", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [6] }] },
           { label: "Oksijenli Solunum", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [7, 8] }] },
-          { label: "Fermantasyon ve Beslenme", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [9, 10] }] },
+          { label: "Fermantasyon ve Beslenme", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [9] }] },
         ],
       },
       {
@@ -227,6 +231,16 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
           { label: "Ekolojik Sürdürülebilirlik", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [5, 6, 7, 8, 9] }] },
         ],
       },
+    ],
+    excluded: [
+      // 9th grade, 1. Tema: "Sınıflandırmada Üç Üst Âlem Sistemi › Biyolojik Sınıflandırma Sistemi › Ökaryotlar" (19)
+      // and "... › Ökaryotik Canlıların Sınıflandırılması › Hayvanlar" (23)
+      { course: "maarif9-biyoloji", unit: 1, topics: [19, 23] },
+      // 9th grade, 2. Tema: "Organik Moleküllerin Tayininde Kullanılan Ayıraçlar" (10) and
+      // "Hücre, Doku, Organ ve Sistemlerin Organizasyonu" (16)
+      { course: "maarif9-biyoloji", unit: 2, topics: [10, 16] },
+      // 10th grade, Enerji: "Besinlerden Enerjiye › Enerji-Metabolizma İlişkisi" (10)
+      { course: "maarif10-biyoloji", unit: 1, topics: [10] },
     ],
   },
 };
@@ -241,6 +255,8 @@ export type ResolvedBucket = { label: string; topics: Topic[] };
 export type ResolvedUnit = { label: string; buckets: ResolvedBucket[] };
 export type ResolvedSpec = {
   units: ResolvedUnit[];
+  // The raw topics the spec deliberately leaves out.
+  excluded: Topic[];
   // Spec entries that matched nothing (a typo, or the data changed) --
   // surfaced for the tests, never thrown at runtime.
   unresolved: string[];
@@ -276,7 +292,8 @@ export function resolveSpec(spec: SubjectSpec): ResolvedSpec {
       return { label: bucket.label, topics };
     }),
   }));
-  return { units, unresolved };
+  const excluded = (spec.excluded ?? []).flatMap((source) => resolveSource(source, unresolved));
+  return { units, excluded, unresolved };
 }
 
 // True when a merged "Maarif TYT" course has a bucket structure (and so is
@@ -296,7 +313,10 @@ export function hasBucketedStructure(courseId: string | null | undefined): boole
 // uses that source unit.
 export function alignedUnits(spec: SubjectSpec): Unit[] {
   const resolved = resolveSpec(spec);
-  const claimed = new Set(resolved.units.flatMap((u) => u.buckets.flatMap((b) => b.topics.map((t) => t.id))));
+  const claimed = new Set([
+    ...resolved.units.flatMap((u) => u.buckets.flatMap((b) => b.topics.map((t) => t.id))),
+    ...resolved.excluded.map((t) => t.id),
+  ]);
   const used = new Set(spec.units.flatMap((u) => u.buckets.flatMap((b) => b.from.map((s) => s.course))));
 
   const leftoversBySourceUnit = new Map<string, Topic[]>();

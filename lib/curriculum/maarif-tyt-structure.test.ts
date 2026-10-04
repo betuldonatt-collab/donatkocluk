@@ -211,7 +211,7 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     ]);
   });
 
-  it("shows only bucket leaves and keeps all 62 raw 9th/10th topics as hidden members, each exactly once", () => {
+  it("shows only bucket leaves; the raw topics are hidden members, each exactly once, and only the 5 the list has no place for are left out", () => {
     const rows = flattenSelectionRows(biyoloji);
     expect(rows).toHaveLength(32);
     expect(rows.every((r) => r.readOnlyNames.length === 0)).toBe(true);
@@ -220,8 +220,20 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-biyoloji"]).unresolved).toEqual([]);
     const ids = rows.flatMap((r) => r.memberTopicIds);
     expect(rawBiyoloji).toHaveLength(62); // 27 + 16 (9th) + 10 + 9 (10th)
-    expect(ids.slice().sort()).toEqual(rawBiyoloji.slice().sort());
+    const excludedIds = [
+      "maarif9-biyoloji-u0-t18", // Ökaryotlar
+      "maarif9-biyoloji-u0-t22", // Hayvanlar
+      "maarif9-biyoloji-u1-t9", // Organik Moleküllerin Tayininde Kullanılan Ayıraçlar
+      "maarif9-biyoloji-u1-t15", // Hücre, Doku, Organ ve Sistemlerin Organizasyonu
+      "maarif10-biyoloji-u0-t9", // Enerji-Metabolizma İlişkisi
+    ];
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-biyoloji"]).excluded.map((t) => t.id).sort()).toEqual(excludedIds.slice().sort());
+    expect(ids).toHaveLength(57);
+    expect(ids.slice().sort()).toEqual(rawBiyoloji.filter((id) => !excludedIds.includes(id)).sort());
     expect(new Set(ids).size).toBe(ids.length);
+    // Dropped for good: not a bucket member, not a leaf of its own, not under Diğer.
+    const everyId = biyoloji.units.flatMap((u) => u.topics.map((t) => t.id));
+    for (const id of excludedIds) expect(everyId).not.toContain(id);
     expect(biyoloji.units.some((u) => u.unit === "Diğer")).toBe(false);
     expect(biyoloji.units.some((u) => /^(d+. Sınıf)/.test(u.unit))).toBe(false);
   });
@@ -230,6 +242,12 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     const members = (label: string) => flattenSelectionRows(biyoloji).find((r) => r.label === label)!.memberTopicIds;
     expect(members("Canlıların Ortak Özellikleri")).toHaveLength(11);
     expect(members("Virüsler")).toEqual(["maarif9-biyoloji-u0-t14"]);
+    // The strictly-matching topics only: nothing unlisted was shoved in.
+    expect(members("Canlıların Sınıflandırılması")).toEqual(["maarif9-biyoloji-u0-t15"]);
+    expect(members("Omurgasız Hayvanlar")).toEqual(["maarif9-biyoloji-u0-t23"]);
+    expect(members("Karbohidratlar")).toEqual(["maarif9-biyoloji-u1-t2"]);
+    expect(members("Hücre ve Alt Birimleri - II")).toEqual(["maarif9-biyoloji-u1-t12"]);
+    expect(members("Fermantasyon ve Beslenme")).toEqual(["maarif10-biyoloji-u0-t8"]);
     expect(members("Bakteri ve Arke Âlemleri")).toEqual(["maarif9-biyoloji-u0-t16", "maarif9-biyoloji-u0-t17"]);
     expect(members("Vitaminler")).toEqual(["maarif9-biyoloji-u1-t7", "maarif9-biyoloji-u1-t8"]);
     expect(members("Difüzyon ve Ozmoz")).toEqual(["maarif9-biyoloji-u1-t14"]);
