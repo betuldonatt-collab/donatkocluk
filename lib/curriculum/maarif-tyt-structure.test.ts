@@ -18,6 +18,8 @@ const raw = (prefix: string) =>
     .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
 const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
 const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
+const fizik = merged("maarif-tyt-fizik");
+const rawFizik = raw("maarif9-fizik").concat(raw("maarif10-fizik"));
 const kimya = merged("maarif-tyt-kimya");
 const rawKimya = raw("maarif9-kimya").concat(raw("maarif10-kimya"));
 const biyoloji = merged("maarif-tyt-biyoloji");
@@ -267,6 +269,71 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
   });
 });
 
+describe("Fizik: Ünite -> Bölüm leaf (two levels, no groups)", () => {
+  it("has the coach's 8 units and their bölümler, in order", () => {
+    expect(unitsAndBuckets("maarif-tyt-fizik")).toEqual([
+      ["1. Ünite: Fizik Bilimi ve Kariyer Keşfi", ["Fizik Bilimi ve Fiziğin Alt Dalları", "Fiziğe Yön Verenler ve Fizik Bilimi ile İlgili Kariyer Keşfi"]],
+      ["2. Ünite: Kuvvet ve Hareket - 1", ["Fiziksel Niceliklerin Sınıflandırılması", "Vektörler", "Doğadaki Temel Kuvvetler", "Hareket ve Hareket Türleri"]],
+      ["3. Ünite: Akışkanlar", ["Katı Basıncı", "Sıvı Basıncı", "Açık Hava Basıncı", "Kaldırma Kuvveti", "Bernoulli İlkesi"]],
+      [
+        "4. Ünite: Enerji - 1",
+        ["Isı, Sıcaklık ve İç Enerji", "Öz Isı ve Isı Sığası", "Hâl Değişimi", "Isı Alışverişi ve Isıl Denge", "Isının Aktarım Yolları ve Isı İletim Hızı"],
+      ],
+      ["5. Ünite: Kuvvet ve Hareket - 2", ["Sabit Hızlı Hareket", "Bir Boyutta Sabit İvmeli Hareket", "Serbest Düşme", "İki Boyutta Sabit İvmeli Hareket"]],
+      ["6. Ünite: Enerji - 2", ["İş, Enerji ve Güç", "Enerji Biçimleri", "Mekanik Enerji", "Enerji Kaynakları"]],
+      [
+        "7. Ünite: Elektrik",
+        [
+          "Basit Elektrik Devreleri ve Elektrik Akımı",
+          "Ohm Yasası ve Dirençlerin Bağlanması",
+          "Üreteçlerin Bağlanması",
+          "Elektrik Akımının Oluşturabileceği Tehlikelere Karşı Alınması Gereken Önlemler ve Topraklamanın Önemi",
+        ],
+      ],
+      [
+        "8. Ünite: Dalgalar",
+        [
+          "Dalgaların Temel Kavramları",
+          "Dalgaların Sınıflandırılması ve Dalgaların Yayılma Süratini Etkileyen Etmenler",
+          "Periyodik Hareketler",
+          "Su Dalgalarında Yansıma ve Kırılma",
+          "Rezonans ve Deprem",
+        ],
+      ],
+    ]);
+  });
+
+  it("shows 33 leaf rows with no group headings; all 45 raw topics are hidden members, each once, none excluded", () => {
+    const rows = flattenSelectionRows(fizik);
+    expect(rows).toHaveLength(33);
+    expect(rows.every((r) => r.readOnlyNames.length === 0 && r.groupLabel === undefined)).toBe(true);
+    expect(withGroupHeadings(rows).every((h) => h.kind === "row")).toBe(true);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([2, 4, 5, 5, 4, 4, 4, 5]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-fizik"]).unresolved).toEqual([]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-fizik"]).excluded).toEqual([]);
+    expect(rawFizik).toHaveLength(45); // 24 (9th) + 21 (10th)
+    const ids = rows.flatMap((r) => r.memberTopicIds);
+    expect(ids.slice().sort()).toEqual(rawFizik.slice().sort());
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(fizik.units.some((u) => u.unit === "Diğer" || /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
+  });
+
+  it("rolls the raw topics into the right bölüm", () => {
+    const members = (label: string) => flattenSelectionRows(fizik).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Vektörler")).toHaveLength(3);
+    expect(members("Katı Basıncı")).toEqual(["maarif9-fizik-u2-t0"]);
+    expect(members("Isı, Sıcaklık ve İç Enerji")).toEqual(["maarif9-fizik-u3-t0", "maarif9-fizik-u3-t1"]);
+    expect(members("Isı Alışverişi ve Isıl Denge")).toEqual(["maarif9-fizik-u3-t4"]);
+    expect(members("Ohm Yasası ve Dirençlerin Bağlanması")).toEqual(["maarif10-fizik-u2-t2", "maarif10-fizik-u2-t3"]);
+    expect(members("Rezonans ve Deprem")).toEqual(["maarif10-fizik-u3-t5"]);
+  });
+
+  it("the 11th grade's own Fizik (the 11. Sınıf tab) is untouched", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-fizik")!;
+    expect(courseHasBuckets(own)).toBe(false);
+  });
+});
+
 describe("Kimya: Tema -> intermediate group -> bucket leaf", () => {
   // unit -> group -> buckets, as the UI shows them
   const tree = () => {
@@ -453,7 +520,9 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik"]);
+    expect(hasBucketedStructure("maarif-tyt-fizik")).toBe(true);
+    expect(hasBucketedStructure("maarif11-fizik")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-kimya")).toBe(true);
     expect(hasBucketedStructure("maarif11-kimya")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-biyoloji")).toBe(true);

@@ -326,6 +326,89 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       { course: "maarif9-kimya", unit: 3, topics: [3] },
     ],
   },
+
+  // Fizik: Ünite 1-4 are 9th grade's four units, Ünite 5-8 are 10th grade's four. Two levels only
+  // (Ünite -> Bölüm leaf), no intermediate groups. Topics are picked by 1-based position in the raw
+  // unit; every raw topic found a strictly matching bölüm, so nothing is excluded.
+  //  - 9th "Basınç" is Katı Basıncı; "Termometreler" (under Isı/Öz Isı/Isı Sığası/Sıcaklık Farkı) is
+  //    placed with Isı, Sıcaklık ve İç Enerji since it is about measuring sıcaklık.
+  "maarif-tyt-fizik": {
+    units: [
+      {
+        label: "1. Ünite: Fizik Bilimi ve Kariyer Keşfi",
+        buckets: [
+          { label: "Fizik Bilimi ve Fiziğin Alt Dalları", from: [{ course: "maarif9-fizik", unit: 1, topics: [1, 2] }] },
+          { label: "Fiziğe Yön Verenler ve Fizik Bilimi ile İlgili Kariyer Keşfi", from: [{ course: "maarif9-fizik", unit: 1, topics: [3, 4] }] },
+        ],
+      },
+      {
+        label: "2. Ünite: Kuvvet ve Hareket - 1",
+        buckets: [
+          { label: "Fiziksel Niceliklerin Sınıflandırılması", from: [{ course: "maarif9-fizik", unit: 2, topics: [1, 2] }] },
+          { label: "Vektörler", from: [{ course: "maarif9-fizik", unit: 2, topics: [3, 4, 5] }] },
+          { label: "Doğadaki Temel Kuvvetler", from: [{ course: "maarif9-fizik", unit: 2, topics: [6] }] },
+          { label: "Hareket ve Hareket Türleri", from: [{ course: "maarif9-fizik", unit: 2, topics: [7, 8] }] },
+        ],
+      },
+      {
+        label: "3. Ünite: Akışkanlar",
+        buckets: [
+          { label: "Katı Basıncı", from: [{ course: "maarif9-fizik", unit: 3, topics: [1] }] },
+          { label: "Sıvı Basıncı", from: [{ course: "maarif9-fizik", unit: 3, topics: [2] }] },
+          { label: "Açık Hava Basıncı", from: [{ course: "maarif9-fizik", unit: 3, topics: [3] }] },
+          { label: "Kaldırma Kuvveti", from: [{ course: "maarif9-fizik", unit: 3, topics: [4] }] },
+          { label: "Bernoulli İlkesi", from: [{ course: "maarif9-fizik", unit: 3, topics: [5] }] },
+        ],
+      },
+      {
+        label: "4. Ünite: Enerji - 1",
+        buckets: [
+          { label: "Isı, Sıcaklık ve İç Enerji", from: [{ course: "maarif9-fizik", unit: 4, topics: [1, 2] }] },
+          { label: "Öz Isı ve Isı Sığası", from: [{ course: "maarif9-fizik", unit: 4, topics: [3] }] },
+          { label: "Hâl Değişimi", from: [{ course: "maarif9-fizik", unit: 4, topics: [4] }] },
+          { label: "Isı Alışverişi ve Isıl Denge", from: [{ course: "maarif9-fizik", unit: 4, topics: [5] }] },
+          { label: "Isının Aktarım Yolları ve Isı İletim Hızı", from: [{ course: "maarif9-fizik", unit: 4, topics: [6, 7] }] },
+        ],
+      },
+      {
+        label: "5. Ünite: Kuvvet ve Hareket - 2",
+        buckets: [
+          { label: "Sabit Hızlı Hareket", from: [{ course: "maarif10-fizik", unit: 1, topics: [1] }] },
+          { label: "Bir Boyutta Sabit İvmeli Hareket", from: [{ course: "maarif10-fizik", unit: 1, topics: [2] }] },
+          { label: "Serbest Düşme", from: [{ course: "maarif10-fizik", unit: 1, topics: [3] }] },
+          { label: "İki Boyutta Sabit İvmeli Hareket", from: [{ course: "maarif10-fizik", unit: 1, topics: [4] }] },
+        ],
+      },
+      {
+        label: "6. Ünite: Enerji - 2",
+        buckets: [
+          { label: "İş, Enerji ve Güç", from: [{ course: "maarif10-fizik", unit: 2, topics: [1] }] },
+          { label: "Enerji Biçimleri", from: [{ course: "maarif10-fizik", unit: 2, topics: [2] }] },
+          { label: "Mekanik Enerji", from: [{ course: "maarif10-fizik", unit: 2, topics: [3] }] },
+          { label: "Enerji Kaynakları", from: [{ course: "maarif10-fizik", unit: 2, topics: [4] }] },
+        ],
+      },
+      {
+        label: "7. Ünite: Elektrik",
+        buckets: [
+          { label: "Basit Elektrik Devreleri ve Elektrik Akımı", from: [{ course: "maarif10-fizik", unit: 3, topics: [1, 2] }] },
+          { label: "Ohm Yasası ve Dirençlerin Bağlanması", from: [{ course: "maarif10-fizik", unit: 3, topics: [3, 4] }] },
+          { label: "Üreteçlerin Bağlanması", from: [{ course: "maarif10-fizik", unit: 3, topics: [5] }] },
+          { label: "Elektrik Akımının Oluşturabileceği Tehlikelere Karşı Alınması Gereken Önlemler ve Topraklamanın Önemi", from: [{ course: "maarif10-fizik", unit: 3, topics: [6, 7] }] },
+        ],
+      },
+      {
+        label: "8. Ünite: Dalgalar",
+        buckets: [
+          { label: "Dalgaların Temel Kavramları", from: [{ course: "maarif10-fizik", unit: 4, topics: [1] }] },
+          { label: "Dalgaların Sınıflandırılması ve Dalgaların Yayılma Süratini Etkileyen Etmenler", from: [{ course: "maarif10-fizik", unit: 4, topics: [2, 3] }] },
+          { label: "Periyodik Hareketler", from: [{ course: "maarif10-fizik", unit: 4, topics: [4] }] },
+          { label: "Su Dalgalarında Yansıma ve Kırılma", from: [{ course: "maarif10-fizik", unit: 4, topics: [5] }] },
+          { label: "Rezonans ve Deprem", from: [{ course: "maarif10-fizik", unit: 4, topics: [6] }] },
+        ],
+      },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];
