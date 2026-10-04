@@ -11,6 +11,7 @@ import {
   Home,
   Languages,
   Library,
+  NotebookPen,
   Settings,
   Target,
   UserCircle,
@@ -21,6 +22,7 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { LogoutButton } from "@/components/logout-button";
 import { YksCountdown } from "@/components/ui/yks-countdown";
+import { isStudentNavItemVisible } from "@/lib/student-nav";
 import { STUDENT_LANDING_PATH, STUDENT_NAV_ITEMS, STUDENT_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -32,22 +34,21 @@ const NAV_ITEMS = [
   { href: "/student/kaynak-takibi", label: "Kaynak Takibi", icon: BookOpenCheck },
   { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", icon: CalendarClock },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", icon: BarChart3 },
+  { href: "/student/yazililar", label: "Yazılılar", icon: NotebookPen },
   { href: "/student/ingilizce-quiz", label: "İngilizce Quiz", icon: Languages },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", icon: Library },
   { href: "/student/profile", label: "Profilim", icon: UserCircle },
   { href: "/student/settings", label: "Ayarlar", icon: Settings },
 ];
 
-// Only the YKS past-questions page stays hidden for 9th graders.
-const MAARIF9_HIDDEN_HREFS = new Set(["/student/cikmis-sorular"]);
-// İngilizce Quiz is LGS-only -- a YKS (or Maarif 9th/10th/11th grade)
-// student never sees it at all.
-const LGS_ONLY_HREFS = new Set(["/student/ingilizce-quiz"]);
+// Which items each student sees (Çıkmış Sorular hidden for Maarif grades, İngilizce Quiz
+// LGS-only, Yazılılar hidden for graduates) is one pure rule: lib/student-nav.ts.
 
 export function StudentSidebar({
   fullName = null,
   examType = "YKS",
   isMaarif9 = false,
+  isGraduate = false,
 }: {
   fullName?: string | null;
   examType?: "YKS" | "LGS";
@@ -56,6 +57,8 @@ export function StudentSidebar({
   // entirely inside Kaynak Takibi (components/course-tabs.tsx), not a
   // separate nav entry -- the sidebar looks identical for every YKS cohort.
   isMaarif9?: boolean;
+  // Mezun (profiles.is_graduate): takes no school exams, so no "Yazılılar" item.
+  isGraduate?: boolean;
 }) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
@@ -65,14 +68,11 @@ export function StudentSidebar({
   // LGS students get every page a YKS student does, PLUS İngilizce Quiz
   // (LGS-only); only the Paragraf/Problem page is renamed (it is Paragraf
   // / Kitap Okuma for them).
-  const navItems = NAV_ITEMS.filter(
-    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
-  ).map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
+  const navContext = { examType, isMaarif: isMaarif9, isGraduate };
+  const navItems = NAV_ITEMS.filter((item) => isStudentNavItemVisible(item.href, navContext)).map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
 
   // The guided tour walks the same list -- same rename.
-  const tourItems = STUDENT_NAV_ITEMS.filter(
-    (item) => !(isMaarif9 && MAARIF9_HIDDEN_HREFS.has(item.href)) && !(examType !== "LGS" && LGS_ONLY_HREFS.has(item.href)),
-  ).map((item) =>
+  const tourItems = STUDENT_NAV_ITEMS.filter((item) => isStudentNavItemVisible(item.href, navContext)).map((item) =>
     examType === "LGS" && item.href === "/student/paragraf-problem"
       ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
       : item,

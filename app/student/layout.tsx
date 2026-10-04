@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
+import { fetchIsGraduate } from "@/lib/graduate";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { ImpersonationLockStyles } from "@/components/impersonation-lock-styles";
 import { getDailyStopwatchRanking, type DailyStopwatchRanking } from "./actions";
@@ -59,6 +60,9 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
   ]);
   const fullName = profile?.full_name ?? null;
   const maarifGrade = await createClient().then((supabase) => fetchMaarifGrade(supabase, view.effectiveUserId));
+  // Mezun (migration 0117): no "Yazılılar" in the menu. Tolerant of the column not
+  // existing yet (then nobody is a graduate).
+  const isGraduate = await createClient().then((supabase) => fetchIsGraduate(supabase, view.effectiveUserId));
   const examType = profile?.exam_type ?? "YKS";
   const announcements = isImpersonating ? [] : await fetchStudentAnnouncements(view.effectiveUserId);
   // get_daily_stopwatch_ranking() resolves auth.uid() from the real
@@ -78,7 +82,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={maarifGrade !== null} />}>
+      <DashboardShell sidebar={<StudentSidebar fullName={fullName} examType={examType} isMaarif9={maarifGrade !== null} isGraduate={isGraduate} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />

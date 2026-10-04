@@ -6,12 +6,12 @@ import { friendlyError } from "@/lib/friendly-error";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes, updateMaarifGrade } from "../../actions";
+import { assignStudentFromPool, updateAcademicTrack, updateAdminNotes, updateGraduate, updateMaarifGrade } from "../../actions";
 import { ResetPasswordButton } from "../../_components/reset-password-button";
 import { SendToPoolButton } from "../../_components/send-to-pool-button";
 
 type Person = { id: string; full_name: string | null };
-type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | 11 | null };
+type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | 11 | null; is_graduate?: boolean };
 type PoolCoach = Person & { activeCount: number; maxStudents: number };
 
 const TRACK_OPTIONS: { value: string; label: string }[] = [
@@ -70,7 +70,7 @@ function AdminNotesField({ studentId, initialNotes }: { studentId: string; initi
 // Maarif grade -- switches the student's panel and the coach's forms to that grade's
 // curriculum (no YKS countdown / TYT-AYT tabs). 9th and 10th grade are mutually
 // exclusive (one select; the database also enforces it).
-function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 9 | 10 | 11 | null }) {
+function MaarifGradeField({ studentId, initial, onGradeChange }: { studentId: string; initial: 9 | 10 | 11 | null; onGradeChange?: (grade: 9 | 10 | 11 | null) => void }) {
   const [grade, setGrade] = useState<9 | 10 | 11 | null>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +83,7 @@ function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 
     setError(null);
     try {
       await updateMaarifGrade(studentId, next);
+      onGradeChange?.(next);
     } catch {
       setGrade(previous);
       setError("Kaydedilemedi. Migration 0114 uygulandı mı?");
@@ -103,6 +104,75 @@ function MaarifGradeField({ studentId, initial }: { studentId: string; initial: 
       <p className="text-muted-foreground text-xs">Seçilen sınıfın müfredatı görünür; YKS geri sayımı ve TYT/AYT sekmeleri gizlenir.</p>
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
+  );
+}
+
+// Mezun (graduate): hides the "Yazılılar" menu item for the student. A graduate is a plain
+// YKS student, so ticking this clears any Maarif grade (and an LGS student is refused).
+function GraduateField({ studentId, checked, disabledReason, onChange }: { studentId: string; checked: boolean; disabledReason?: string | null; onChange: (next: boolean) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(next: boolean) {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await updateGraduate(studentId, next);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onChange(next);
+    } catch {
+      setError("Kaydedilemedi. Migration 0117 uygulandı mı?");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-foreground flex items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={checked} onChange={(e) => handleChange(e.target.checked)} disabled={saving || !!disabledReason} className="size-4" />
+        Mezun
+      </label>
+      <p className="text-muted-foreground text-xs">
+        {disabledReason ?? "İşaretlenirse öğrenci panelinde \"Yazılılar\" menüsü gizlenir (mezunlar okul yazılısı yapmaz). Maarif sınıfı seçiliyse temizlenir."}
+      </p>
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </div>
+  );
+}
+
+// Maarif grade + Mezun together: they exclude each other (a graduate is not in a Maarif grade).
+function GradeFields({ studentId, initialGrade, initialGraduate }: { studentId: string; initialGrade: 9 | 10 | 11 | null; initialGraduate: boolean }) {
+  const [graduate, setGraduate] = useState(initialGraduate);
+  // Remount the grade select when a graduate flag clears it, so it shows "Yok".
+  const [gradeKey, setGradeKey] = useState(0);
+  const [grade, setGrade] = useState(initialGrade);
+  return (
+    <>
+      <MaarifGradeField
+        key={gradeKey}
+        studentId={studentId}
+        initial={grade}
+        onGradeChange={(next) => {
+          setGrade(next);
+          if (next !== null) setGraduate(false);
+        }}
+      />
+      <GraduateField
+        studentId={studentId}
+        checked={graduate}
+        onChange={(next) => {
+          setGraduate(next);
+          if (next) {
+            setGrade(null);
+            setGradeKey((k) => k + 1);
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -185,7 +255,7 @@ export function AssignStudentModal({
           <ResetPasswordButton userId={student.id} />
 
           <AcademicTrackField studentId={student.id} initialTrack={student.academic_track} />
-          <MaarifGradeField studentId={student.id} initial={student.maarif_grade ?? null} />
+          <GradeFields studentId={student.id} initialGrade={student.maarif_grade ?? null} initialGraduate={student.is_graduate ?? false} />
           <AdminNotesField studentId={student.id} initialNotes={student.admin_notes} />
 
           <div className="border-border space-y-4 border-t pt-4">

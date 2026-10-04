@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 
 import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
+import { fetchGraduateIds } from "@/lib/graduate";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -94,6 +95,8 @@ async function fetchDirectoryData(page: number) {
   // Maarif grade (migrations 0096 / 0099), read separately and tolerant of the
   // columns not existing yet -- any error just means nobody is flagged.
   const gradeById = await fetchMaarifGradesByIds(supabase, "profiles", (students ?? []).map((st) => st.id));
+  // Mezun flag (migration 0117), same tolerant read.
+  const graduateIds = await fetchGraduateIds(supabase, "profiles", (students ?? []).map((st) => st.id));
 
   const coachIdByStudent = new Map((coachLinks ?? []).map((l) => [l.student_id, l.coach_id]));
   const coachNameById = new Map((coaches ?? []).map((c) => [c.id, c.full_name]));
@@ -118,6 +121,7 @@ async function fetchDirectoryData(page: number) {
     return {
       ...s,
       maarifGrade: gradeById.get(s.id) ?? null,
+      isGraduate: graduateIds.has(s.id),
       coachId,
       coachName: coachId ? (coachNameById.get(coachId) ?? "(İsimsiz)") : null,
       isOnline: s.last_active_at ? Date.now() - new Date(s.last_active_at).getTime() < ONLINE_WINDOW_MS : false,
@@ -224,7 +228,7 @@ export default async function StudentDirectoryPage({
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <AssignStudentModal
-                        student={{ id: student.id, full_name: student.full_name, admin_notes: student.admin_notes, academic_track: student.academic_track, maarif_grade: student.maarifGrade }}
+                        student={{ id: student.id, full_name: student.full_name, admin_notes: student.admin_notes, academic_track: student.academic_track, maarif_grade: student.maarifGrade, is_graduate: student.isGraduate }}
                         coaches={availableCoaches}
                         parents={parents}
                         assignedCoachName={student.coachName}

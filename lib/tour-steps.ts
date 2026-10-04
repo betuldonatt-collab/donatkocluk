@@ -114,6 +114,7 @@ export const STUDENT_NAV_ITEMS: TourNavItem[] = [
   { href: "/student/kaynak-takibi", label: "Kaynak Takibi", blurb: "Ders kaynaklarındaki ilerlemeni konu konu buradan işaretlersin." },
   { href: "/student/cikmis-sorular", label: "Çıkmış Sorular", blurb: "Yıllara göre çıkmış soru dağılımını buradan inceleyebilirsin." },
   { href: "/student/deneme-analizleri", label: "Deneme Analizleri", blurb: "Girdiğin denemelerin konu bazlı analizlerini burada görürsün." },
+  { href: "/student/yazililar", label: "Yazılılar", blurb: "Okul yazılılarını ve notlarını buradan takip edeceksin." },
   { href: "/student/ingilizce-quiz", label: "İngilizce Quiz", blurb: "Ünite ünite İngilizce kelime tekrarı yaparsın." },
   { href: "/student/kaynak-kutuphanesi", label: "Kaynak Kütüphanesi", blurb: "Kullandığın tüm kaynakların listesi burada." },
   { href: "/student/profile", label: "Profilim", blurb: "Kendi profil bilgilerini buradan güncelleyebilirsin." },

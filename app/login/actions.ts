@@ -190,12 +190,16 @@ export async function submitSignupRequest(
   const isMaarif9 = role === "student" && examTypeRaw === "MAARIF9";
   const isMaarif10 = role === "student" && examTypeRaw === "MAARIF10";
   const isMaarif11 = role === "student" && examTypeRaw === "MAARIF11";
+  // "Mezun" (graduate): also not an exam_type -- a YKS student carrying profiles
+  // .is_graduate (carried as signup_requests.is_graduate, migration 0117). Never
+  // together with a Maarif grade.
+  const isGraduate = role === "student" && examTypeRaw === "MEZUN";
   // "9./10./11. Sınıf (Maarif)" are not exam_types: those students stay on
   // the YKS default and are marked by profiles.is_maarif9 / is_maarif10 /
   // is_maarif11 (carried as the matching signup_requests columns). The
   // three are pairwise mutually exclusive.
   const examType =
-    role === "student" ? (isMaarif9 || isMaarif10 || isMaarif11 ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
+    role === "student" ? (isMaarif9 || isMaarif10 || isMaarif11 || isGraduate ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -211,6 +215,7 @@ export async function submitSignupRequest(
       ...(isMaarif9 ? { is_maarif9: true } : {}),
       ...(isMaarif10 ? { is_maarif10: true } : {}),
       ...(isMaarif11 ? { is_maarif11: true } : {}),
+      ...(isGraduate ? { is_graduate: true } : {}),
     });
 
   if (error) {

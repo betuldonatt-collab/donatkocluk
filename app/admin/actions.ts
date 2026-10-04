@@ -1,6 +1,7 @@
 "use server";
 
 import { fetchRequestedMaarifGrade } from "@/lib/maarif-grade";
+import { fetchIsGraduate, fetchRequestedGraduate } from "@/lib/graduate";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -245,14 +246,52 @@ export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | 11 | 
   const studentIdV = parseInput(uuidSchema, studentId);
   const gradeV = parseInput(z.union([z.literal(9), z.literal(10), z.literal(11)]).nullable(), grade);
   const supabase = await createClient();
+  // A graduate (Mezun) is not in a Maarif grade (a CHECK constraint, migration 0117):
+  // choosing a grade clears the flag. Only written when it is set, so this keeps
+  // working before that migration is applied.
+  const clearGraduate = gradeV !== null && (await fetchIsGraduate(supabase, studentIdV));
   const { error } = await supabase
     .from("profiles")
-    .update({ is_maarif9: gradeV === 9, is_maarif10: gradeV === 10, is_maarif11: gradeV === 11 })
+    .update({
+      is_maarif9: gradeV === 9,
+      is_maarif10: gradeV === 10,
+      is_maarif11: gradeV === 11,
+      ...(clearGraduate ? { is_graduate: false } : {}),
+    })
     .eq("id", studentIdV)
     .eq("role", "student");
   if (error) throw dbError(error);
 
   revalidatePath("/admin/students");
+}
+
+// Mezun (graduate): profiles.is_graduate (0117). A graduate is a plain YKS student --
+// not LGS and not in a Maarif grade -- so marking one clears any Maarif grade, and an
+// LGS student is refused. Admin-only (the profiles guard trigger enforces it in the
+// database too). Returns a result instead of throwing so the reason reaches the admin.
+export async function updateGraduate(studentId: string, isGraduate: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireAdmin();
+    const studentIdV = parseInput(uuidSchema, studentId);
+    const isGraduateV = parseInput(z.boolean(), isGraduate);
+    const supabase = await createClient();
+    if (isGraduateV) {
+      const { data: profile, error: readError } = await supabase.from("profiles").select("exam_type").eq("id", studentIdV).eq("role", "student").maybeSingle();
+      if (readError) throw dbError(readError);
+      if (!profile) return { ok: false, error: "Öğrenci bulunamadı." };
+      if (profile.exam_type === "LGS") return { ok: false, error: "LGS öğrencisi mezun olarak işaretlenemez." };
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update(isGraduateV ? { is_graduate: true, is_maarif9: false, is_maarif10: false, is_maarif11: false } : { is_graduate: false })
+      .eq("id", studentIdV)
+      .eq("role", "student");
+    if (error) throw dbError(error);
+    revalidatePath("/admin/students");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Kaydedilemedi. Migration 0117 uygulandı mı?" };
+  }
 }
 
 // A typo'd Ad Soyadı, caught either before or after approval -- neither the
@@ -545,6 +584,8 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
   // Maarif grade of the request (migrations 0097 / 0099), read separately and
   // tolerant of columns not existing yet -- any error just means "ordinary".
   const requestedGrade = await fetchRequestedMaarifGrade(supabase, requestIdV);
+  // "Mezun" signup choice (migration 0117), read the same tolerant way.
+  const requestedGraduate = await fetchRequestedGraduate(supabase, requestIdV);
 
   const tempPassword = generateTempPassword();
   const adminClient = createAdminClient();
@@ -583,6 +624,7 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
       ...(request.requested_role === "student" && requestedGrade !== null
         ? { is_maarif9: requestedGrade === 9, is_maarif10: requestedGrade === 10, is_maarif11: requestedGrade === 11 }
         : {}),
+      ...(request.requested_role === "student" && requestedGraduate ? { is_graduate: true } : {}),
     })
     .eq("id", createData.user.id);
   if (roleFixError) throw dbError(roleFixError);

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
+import { fetchGraduateIds } from "@/lib/graduate";
 import { AnnouncementsAdmin } from "./announcements-admin";
 import { CoachAlerts } from "./_components/coach-alerts";
 import { RenewalRadar } from "./_components/renewal-radar";
@@ -122,7 +123,12 @@ export default async function AdminPage() {
   // Maarif grade of each pending request (migrations 0097 / 0099), read separately
   // and tolerant of the columns not existing yet.
   const maarifGradeByRequest = await fetchMaarifGradesByIds(supabase, "signup_requests", (signupRequests ?? []).map((r) => r.id));
-  const signupRequestsWithGrade = (signupRequests ?? []).map((r) => ({ ...r, maarif_grade: maarifGradeByRequest.get(r.id) ?? null }));
+  const graduateRequestIds = await fetchGraduateIds(supabase, "signup_requests", (signupRequests ?? []).map((r) => r.id));
+  const signupRequestsWithGrade = (signupRequests ?? []).map((r) => ({
+    ...r,
+    maarif_grade: maarifGradeByRequest.get(r.id) ?? null,
+    is_graduate: graduateRequestIds.has(r.id),
+  }));
 
   const peopleById = new Map(
     [...(students ?? []), ...(coaches ?? [])].map((p) => [p.id, { id: p.id, full_name: p.full_name }]),
