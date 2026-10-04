@@ -24,7 +24,12 @@ export type Topic = { id: string; name: string; frequency?: Record<string, numbe
 // topics. Everywhere else in LGS -- and all of YKS -- Konu itself is the
 // leaf and this stays undefined, so every existing consumer that only
 // reads `unit`/`topics` keeps working unchanged.
-export type Unit = { unit: string; konu?: string; topics: Topic[] };
+// `bucket` marks a unit entry that is ONE tracked leaf in the UI (the 11th
+// grade's "Maarif TYT" Coğrafya/Tarih, lib/curriculum/maarif-tyt-structure.ts):
+// the tables show only this label, never the raw `topics` it rolls up -- those
+// stay here (real ids, real names) purely so progress and mistakes can still be
+// saved and aggregated against them.
+export type Unit = { unit: string; konu?: string; bucket?: string; topics: Topic[] };
 export type Course = { id: string; name: string; units: Unit[] };
 
 export const TYT_COURSES: Course[] = tytJson as Course[];

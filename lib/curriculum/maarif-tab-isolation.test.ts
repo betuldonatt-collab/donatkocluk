@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import { MAARIF_GRADES } from "../maarif-grade";
 import { MAARIF11_KAYNAK_COURSES, isMaarif11CourseId } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES, isMaarifTytMergedCourseId } from "./maarif-tyt";
-import { maarifTytDenemeMappingFor } from "./maarif-tyt-deneme-mapping";
-import { SUBJECT_SPECS } from "./maarif-tyt-structure";
+import { courseHasBuckets } from "./maarif-selection";
+import { hasBucketedStructure, SUBJECT_SPECS } from "./maarif-tyt-structure";
 
 const native = (id: string) => MAARIF11_KAYNAK_COURSES.find((c) => c.id === id)!;
 const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
@@ -82,11 +82,13 @@ describe("Maarif TYT and 11. Sınıf share nothing", () => {
     }
   });
 
-  it("the bucketed Deneme view never applies to native 11th-grade courses", () => {
-    expect(maarifTytDenemeMappingFor("maarif11-cografya")).toBeNull();
-    expect(maarifTytDenemeMappingFor("maarif11-tarih")).toBeNull();
-    expect(maarifTytDenemeMappingFor("maarif-tyt-cografya")).not.toBeNull();
-    expect(maarifTytDenemeMappingFor("maarif-tyt-tarih")).not.toBeNull();
+  it("the bucket layout never applies to native 11th-grade courses", () => {
+    for (const c of MAARIF11_KAYNAK_COURSES) {
+      expect(hasBucketedStructure(c.id)).toBe(false);
+      expect(courseHasBuckets(c)).toBe(false);
+    }
+    expect(hasBucketedStructure("maarif-tyt-cografya")).toBe(true);
+    expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);
   });
 
   it("the merged Tarih is the bucketed layout and the native Tarih is not", () => {

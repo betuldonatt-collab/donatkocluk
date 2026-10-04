@@ -18,20 +18,44 @@ import type { LgsSelectionNode } from "./lgs-selection";
 import type { Course } from "./index";
 import { topicGroupsForUnit } from "./topic-display";
 
+// True for a course laid out in buckets (Unit.bucket) -- every one of its
+// units is a leaf the UI shows by its bucket label alone.
+export function courseHasBuckets(course: Course): boolean {
+  return course.units.some((u) => u.bucket !== undefined);
+}
+
 export function maarifSelectionNodes(course: Course): LgsSelectionNode[] {
-  return course.units.flatMap((unit) =>
-    topicGroupsForUnit(unit.topics).map((group) => {
-      const [first] = group.topics;
-      const single = group.topics.length === 1;
-      return {
-        id: first.id,
-        // A headed group is named by its heading; a lone untitled topic by its
-        // own name (nothing left to list under it); an untitled run by the unit.
-        label: group.heading ?? (single ? first.name : unit.unit),
-        unitLabel: unit.unit,
-        readOnlyNames: group.heading === null && single ? [] : group.topics.map((t) => t.name),
-        memberTopicIds: group.topics.map((t) => t.id),
-      };
-    }),
-  );
+  return course.units.flatMap((unit): LgsSelectionNode[] => {
+    // A bucket is one leaf: the label alone, nothing listed beneath it. Its raw
+    // topics are only its members (ids) -- the first one is the real id that
+    // tracking is saved against.
+    if (unit.bucket !== undefined && unit.topics.length > 0) {
+      return [
+        {
+          id: unit.topics[0].id,
+          label: unit.bucket,
+          unitLabel: unit.unit,
+          readOnlyNames: [],
+          memberTopicIds: unit.topics.map((t) => t.id),
+        },
+      ];
+    }
+    return maarifGroupNodes(unit);
+  });
+}
+
+function maarifGroupNodes(unit: Course["units"][number]): LgsSelectionNode[] {
+  return topicGroupsForUnit(unit.topics).map((group) => {
+    const [first] = group.topics;
+    const single = group.topics.length === 1;
+    return {
+      id: first.id,
+      // A headed group is named by its heading; a lone untitled topic by its
+      // own name (nothing left to list under it); an untitled run by the unit.
+      label: group.heading ?? (single ? first.name : unit.unit),
+      unitLabel: unit.unit,
+      readOnlyNames: group.heading === null && single ? [] : group.topics.map((t) => t.name),
+      memberTopicIds: group.topics.map((t) => t.id),
+    };
+  });
 }

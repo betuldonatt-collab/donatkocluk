@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
+import { courseHasBuckets, maarifSelectionNodes } from "@/lib/curriculum/maarif-selection";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import { weekDates } from "@/lib/date";
@@ -477,7 +478,9 @@ async function fetchStudentDetail(studentId: string) {
     // non-LGS course keeps its existing one-row-per-topic behavior.
     const nodes = isLgsCourseId(courseId)
       ? lgsSelectionNodes(course)
-      : course.units.flatMap((u) =>
+      : courseHasBuckets(course)
+        ? maarifSelectionNodes(course)
+        : course.units.flatMap((u) =>
           u.topics.map((t) => ({
             id: t.id,
             // LGS's Konu level is part of the name so same-named Alt Konu rows

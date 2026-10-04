@@ -5,21 +5,34 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
-import { buildDenemeMapping, DENEME_OTHER_LABEL, denemeRowsFor, maarifTytDenemeMappingFor } from "./maarif-tyt-deneme-mapping";
-import { alignedUnits, resolveSpec, SUBJECT_SPECS } from "./maarif-tyt-structure";
-import { maarifSelectionNodes } from "./maarif-selection";
+import { alignedUnits, hasBucketedStructure, resolveSpec, SUBJECT_SPECS } from "./maarif-tyt-structure";
+import { courseHasBuckets, maarifSelectionNodes } from "./maarif-selection";
 import { flattenSelectionRows } from "./rows";
 
-const tarih = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-tarih")!;
-const mapping = maarifTytDenemeMappingFor("maarif-tyt-tarih")!;
-const raw9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-tarih")!;
-const raw10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-tarih")!;
-const rawIds = [...raw9.units, ...raw10.units].flatMap((u) => u.topics.map((t) => t.id));
-const bucketLabels = mapping.units.map((u) => [u.label, u.buckets.map((b) => b.label)]);
+const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
+const tarih = merged("maarif-tyt-tarih");
+const cografya = merged("maarif-tyt-cografya");
+const raw = (prefix: string) =>
+  [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES]
+    .filter((c) => c.id.startsWith(prefix))
+    .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
+const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
+const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
 
-describe("Tarih structure", () => {
+// What the UI is allowed to show: unit label + bucket label per row.
+const unitsAndBuckets = (courseId: string) => {
+  const out: [string, string[]][] = [];
+  for (const row of flattenSelectionRows(merged(courseId))) {
+    const last = out[out.length - 1];
+    if (last && last[0] === row.unitLabel) last[1].push(row.label);
+    else out.push([row.unitLabel, [row.label]]);
+  }
+  return out;
+};
+
+describe("Tarih: the buckets are the only thing shown", () => {
   it("has the coach's 6 units and their buckets, in order", () => {
-    expect(bucketLabels).toEqual([
+    expect(unitsAndBuckets("maarif-tyt-tarih")).toEqual([
       ["1. Ünite: Geçmişin İnşa Sürecinde Tarih", ["Tarih Öğrenmenin Faydaları", "Tarihin Doğası", "Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm"]],
       [
         "2. Ünite: Eski Çağ Medeniyetleri",
@@ -61,99 +74,91 @@ describe("Tarih structure", () => {
     ]);
   });
 
-  it("resolves every spec entry against the real 9th/10th topics", () => {
+  it("shows exactly 26 rows: every row is a bucket leaf with nothing listed beneath it", () => {
+    const rows = flattenSelectionRows(tarih);
+    expect(rows).toHaveLength(26);
+    expect(rows.every((r) => r.readOnlyNames.length === 0)).toBe(true);
+    expect(rows.some((r) => r.label.includes(" › "))).toBe(false);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([3, 5, 4, 4, 5, 5]);
+    expect(courseHasBuckets(tarih)).toBe(true);
+    expect(tarih.units.every((u) => u.bucket !== undefined)).toBe(true);
+  });
+
+  it("resolves every spec entry and claims every raw topic exactly once (nothing left for Diğer)", () => {
     expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-tarih"]).unresolved).toEqual([]);
-    expect(mapping.unresolved).toEqual([]);
-  });
-
-  it("rolls the right grade's topics into each bucket", () => {
-    const bucket = (label: string) => mapping.units.flatMap((u) => u.buckets).find((b) => b.label === label)!.topicIds;
-    // 9th grade's two topics about historical knowledge and digitalisation form ONE bucket.
-    expect(bucket("Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm")).toEqual(["maarif9-tarih-u0-t2", "maarif9-tarih-u0-t3"]);
-    expect(bucket("Tarihin Doğası")).toEqual(["maarif9-tarih-u0-t1"]);
-    expect(bucket("Türklerde Konargöçer Yaşam")).toEqual(["maarif9-tarih-u1-t4"]);
-    expect(bucket("Önemli Askeri Mücadelelerin Türk Tarihinin Seyrine Etkileri")).toEqual(["maarif10-tarih-u0-t0"]);
-    // The coach's order puts İskân ve İstimâlet before Ordu/Hukuk/Toprak (raw topics 4 and 3).
-    expect(bucket("Osmanlı Devleti'nin İskân ve İstimâlet Politikası")).toEqual(["maarif10-tarih-u1-t3"]);
-    expect(bucket("Osmanlı Devleti'nde Ordu, Hukuk ve Toprak Sistemi")).toEqual(["maarif10-tarih-u1-t2"]);
-    expect(bucket("Osmanlı Devleti'nde Bilim, Kültür, Eğitim ve Sanat")).toEqual(["maarif10-tarih-u2-t4"]);
-  });
-
-  it("gives Osmanlı Devleti'nin İlim ve İrfan Geleneği its own bucket in Ünite 5", () => {
-    const unit5 = mapping.units[4];
-    expect(unit5.label).toBe("5. Ünite: Beylikten Devlete Osmanlı (1299 - 1453)");
-    expect(unit5.buckets).toHaveLength(5);
-    expect(unit5.buckets[4]).toMatchObject({ label: "Osmanlı Devleti'nin İlim ve İrfan Geleneği", topicIds: ["maarif10-tarih-u1-t4"] });
-  });
-
-  it("claims every raw 9th/10th Tarih topic exactly once -- nothing lost or counted twice, nothing left for Diğer", () => {
-    const claimed = mapping.units.flatMap((u) => u.buckets.flatMap((b) => b.topicIds));
-    expect(new Set(claimed).size).toBe(claimed.length);
-    expect(claimed.slice().sort()).toEqual(rawIds.slice().sort());
-    expect(rawIds).toHaveLength(27); // 13 (9th) + 14 (10th)
-    expect(mapping.otherTopicIds).toEqual([]);
-    const rows = denemeRowsFor(mapping);
-    expect(rows).toHaveLength(26); // 26 buckets, no Diğer row
-    expect(rows.some((r) => r.label === DENEME_OTHER_LABEL)).toBe(false);
-    expect(rows.map((r) => r.unitRowSpan)).toEqual([3, null, null, 5, null, null, null, null, 4, null, null, null, 4, null, null, null, 5, null, null, null, null, 5, null, null, null, null]);
-  });
-
-  it("an extra spec gap becomes a Diğer row too (the fallback is per subject)", () => {
-    const partial = buildDenemeMapping(tarih, { units: SUBJECT_SPECS["maarif-tyt-tarih"].units.slice(0, 1) });
-    expect(partial.otherTopicIds).toHaveLength(rawIds.length - 4);
-  });
-});
-
-describe("Tarih in Kaynak Takibi (the merged Maarif TYT course)", () => {
-  it("is laid out in the coach's six numbered units, with no per-grade tag", () => {
-    const labels = [...new Set(tarih.units.map((u) => u.unit))];
-    expect(labels).toEqual(mapping.units.map((u) => u.label));
-    expect(tarih.units.some((u) => /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
-  });
-
-  it("keeps every raw 9th/10th Tarih topic id exactly once", () => {
     const ids = tarih.units.flatMap((u) => u.topics.map((t) => t.id));
-    expect(ids.slice().sort()).toEqual(rawIds.slice().sort());
+    expect(ids.slice().sort()).toEqual(rawTarih.slice().sort());
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(rawTarih).toHaveLength(27); // 13 (9th) + 14 (10th)
+    expect(tarih.units.some((u) => u.unit === "Diğer")).toBe(false);
     expect(findCourseById("maarif-tyt-tarih")).toBe(tarih);
   });
 
-  it("gives each bucket its own tracking row, so cells align with the buckets", () => {
-    const nodes = maarifSelectionNodes(tarih);
-    // 26 buckets/entries: one node each (a one-topic bucket is a lone leaf named by the bucket).
-    expect(nodes).toHaveLength(26);
-    expect(nodes.find((n) => n.label === "Tarihin Doğası")).toMatchObject({ id: "maarif9-tarih-u0-t1", memberTopicIds: ["maarif9-tarih-u0-t1"], readOnlyNames: [] });
-    // The two-topic bucket is a heading group over its two topics.
-    const grouped = nodes.find((n) => n.label === "Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm")!;
-    expect(grouped.memberTopicIds).toEqual(["maarif9-tarih-u0-t2", "maarif9-tarih-u0-t3"]);
-    expect(grouped.readOnlyNames).toEqual([
-      "Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm › Tarihsel Bilginin Üretim Süreci",
-      "Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm › Tarih Araştırma ve Yazımında Dijital Dönüşüm",
+  it("hides the raw topics behind each bucket but keeps their real ids as members", () => {
+    const node = (label: string) => maarifSelectionNodes(tarih).find((n) => n.label === label)!;
+    // Two raw topics, ONE leaf: saved against the first, read from both.
+    expect(node("Tarihsel Bilginin Üretim Süreci ve Dijital Dönüşüm")).toMatchObject({
+      id: "maarif9-tarih-u0-t2",
+      memberTopicIds: ["maarif9-tarih-u0-t2", "maarif9-tarih-u0-t3"],
+      readOnlyNames: [],
+    });
+    expect(node("Tarihin Doğası")).toMatchObject({ id: "maarif9-tarih-u0-t1", memberTopicIds: ["maarif9-tarih-u0-t1"], readOnlyNames: [] });
+    expect(node("Osmanlı Devleti'nin İskân ve İstimâlet Politikası").memberTopicIds).toEqual(["maarif10-tarih-u1-t3"]);
+    expect(node("Osmanlı Devleti'nin İlim ve İrfan Geleneği").memberTopicIds).toEqual(["maarif10-tarih-u1-t4"]);
+  });
+
+  it("is laid out with no per-grade tag", () => {
+    expect(tarih.units.some((u) => /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
+  });
+});
+
+describe("Coğrafya: the buckets are the only thing shown", () => {
+  it("has the coach's 7 units with two buckets each, in order", () => {
+    expect(unitsAndBuckets("maarif-tyt-cografya")).toEqual([
+      ["1. Ünite: Coğrafyanın Doğası", ["Coğrafya Bilimi", "Coğrafi Bakış"]],
+      ["2. Ünite: Mekânsal Bilgi Teknolojileri", ["Harita Okuryazarlığı", "Mekânsal Bilgi Teknolojilerinin Bileşenleri ve Uygulama Alanları"]],
+      ["3. Ünite: Doğal Sistemler ve Süreçler", ["İklim Sistemi", "Yeryüzünün Şekillenmesi"]],
+      ["4. Ünite: Beşerî Sistemler ve Süreçler", ["Nüfus Dinamikleri", "Yerleşme"]],
+      ["5. Ünite: Ekonomik Faaliyetler ve Etkileri", ["Ekonomik Faaliyetleri Etkileyen Coğrafi Faktörler", "Ekonomik Faaliyetler ve Sektörel Yapı"]],
+      ["6. Ünite: Afetler ve Sürdürülebilir Çevre", ["Afetler", "Afetlerle Mücadele"]],
+      ["7. Ünite: Bölgeler, Ülkeler ve Küresel Bağlantılar", ["Bölge ve Bölge Sınırı", "Türk Kültürünün Mekânsal Özellikleri"]],
     ]);
   });
 
-  it("shares one merged Ünite cell across a unit's buckets", () => {
-    const rows = flattenSelectionRows(tarih);
-    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([3, 5, 4, 4, 5, 5]);
+  it("shows 14 leaf rows and keeps all 40 raw topics as hidden members, each once", () => {
+    const rows = flattenSelectionRows(cografya);
+    expect(rows).toHaveLength(14);
+    expect(rows.every((r) => r.readOnlyNames.length === 0)).toBe(true);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([2, 2, 2, 2, 2, 2, 2]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-cografya"]).unresolved).toEqual([]);
+    const ids = rows.flatMap((r) => r.memberTopicIds);
+    expect(rawCografya).toHaveLength(40); // 22 (9th) + 18 (10th)
+    expect(ids.slice().sort()).toEqual(rawCografya.slice().sort());
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("Ünite 5 carries the İlim ve İrfan Geleneği bucket as its fifth tracking row", () => {
-    const unit5 = tarih.units.filter((u) => u.unit.startsWith("5. Ünite"));
-    expect(unit5).toHaveLength(5);
-    expect(unit5[4].topics).toEqual([{ id: "maarif10-tarih-u1-t4", name: "Osmanlı Devleti'nin İlim ve İrfan Geleneği" }]);
+  it("rolls each bucket up from the right grade's topics", () => {
+    const members = (label: string) => flattenSelectionRows(cografya).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Coğrafya Bilimi")).toHaveLength(3);
+    expect(members("Coğrafi Bakış")).toEqual(["maarif10-cografya-u0-t0"]);
+    expect(members("Harita Okuryazarlığı")).toEqual(["maarif9-cografya-u1-t0", "maarif9-cografya-u1-t1"]);
+    expect(members("Mekânsal Bilgi Teknolojilerinin Bileşenleri ve Uygulama Alanları")).toEqual([
+      "maarif9-cografya-u1-t2",
+      "maarif10-cografya-u1-t0",
+      "maarif10-cografya-u1-t1",
+    ]);
+    expect(members("Yeryüzünün Şekillenmesi").every((id) => id.startsWith("maarif10-cografya"))).toBe(true);
   });
+});
 
-  it("a topic a spec does not name is still kept (own entry in its unit; under Diğer when no unit uses it)", () => {
+describe("a topic no bucket claims is kept as a leaf of its own", () => {
+  it("stays in its unit (named by itself); units no spec unit uses go under Diğer", () => {
     const partial = alignedUnits({
-      units: [
-        {
-          label: "U1",
-          buckets: [{ label: "Only this", from: [{ course: "maarif10-tarih", unit: 2, topics: [1] }] }],
-        },
-      ],
+      units: [{ label: "U1", buckets: [{ label: "Only this", from: [{ course: "maarif10-tarih", unit: 2, topics: [1] }] }] }],
     });
+    expect(partial.every((u) => u.bucket !== undefined)).toBe(true);
     const ids = partial.flatMap((u) => u.topics.map((t) => t.id));
-    expect(ids.slice().sort()).toEqual(rawIds.filter((id) => id.startsWith("maarif10-tarih")).slice().sort());
-    // Same unit as the bucket: the 4 other topics of 10th grade's unit 2 follow it under "U1".
+    expect(ids.slice().sort()).toEqual(raw("maarif10-tarih").slice().sort());
     expect(partial.filter((u) => u.unit === "U1").flatMap((u) => u.topics.map((t) => t.id))).toEqual([
       "maarif10-tarih-u1-t0",
       "maarif10-tarih-u1-t1",
@@ -161,32 +166,64 @@ describe("Tarih in Kaynak Takibi (the merged Maarif TYT course)", () => {
       "maarif10-tarih-u1-t3",
       "maarif10-tarih-u1-t4",
     ]);
-    // Units no spec unit draws from land under "Diğer".
     expect(partial.filter((u) => u.unit === "Diğer")).toHaveLength(9);
+  });
+
+  it("a bucket never steals a topic an earlier bucket already claimed", () => {
+    const dup = resolveSpec({
+      units: [
+        {
+          label: "U",
+          buckets: [
+            { label: "A", from: [{ course: "maarif9-cografya", unit: 1 }] },
+            { label: "B", from: [{ course: "maarif9-cografya", unit: 1 }] },
+          ],
+        },
+      ],
+    });
+    expect(dup.units[0].buckets[0].topics).toHaveLength(3);
+    expect(dup.units[0].buckets[1].topics).toEqual([]);
+  });
+
+  it("reports a spec entry that matches nothing instead of throwing", () => {
+    const bad = resolveSpec({
+      units: [{ label: "U", buckets: [{ label: "A", from: [{ course: "maarif9-cografya", unit: 99 }, { course: "maarif9-cografya", unit: 1, topics: ["No Such Topic"] }] }] }],
+    });
+    expect(bad.unresolved).toHaveLength(2);
+  });
+});
+
+describe("only the subjects with a spec are bucketed", () => {
+  it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih"]);
+    expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);
+    expect(hasBucketedStructure("maarif-tyt-matematik")).toBe(false);
+    expect(hasBucketedStructure("maarif11-tarih")).toBe(false);
+    expect(hasBucketedStructure("toString")).toBe(false);
+    const mat = merged("maarif-tyt-matematik");
+    expect(courseHasBuckets(mat)).toBe(false);
+    expect(mat.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
   });
 });
 
 describe("what stays untouched", () => {
   it("the 9th and 10th graders' own Tarih courses keep their grade-and-unit structure", () => {
+    const raw9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-tarih")!;
+    const raw10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-tarih")!;
     expect(raw9.units.map((u) => u.topics.length)).toEqual([4, 5, 4]);
     expect(raw10.units.map((u) => u.topics.length)).toEqual([4, 5, 5]);
-    expect(raw9.units[0].unit).toBe("1. Ünite: Geçmişin İnşa Sürecinde Tarih");
-    expect(raw10.units[0].unit).toBe("1. Ünite: Türkistan'dan Türkiye'ye");
+    expect(courseHasBuckets(raw9)).toBe(false);
+    expect(courseHasBuckets(raw10)).toBe(false);
     expect(findCourseById("maarif9-tarih")).toBe(raw9);
   });
 
   it("the 11th grade's own Tarih (the 11. Sınıf tab) is a different course and is unchanged", () => {
     const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-tarih")!;
+    expect(courseHasBuckets(own)).toBe(false);
     expect(own.units.map((u) => u.unit)).toEqual([
       "1. Ünite: Değişen Dünyada Osmanlı (1683-1789)",
       "2. Ünite: Dönüşüm Sürecinde Osmanlı (1789-1908)",
       "3. Ünite: Savaşlar Sarmalında Osmanlı (1908-1918)",
     ]);
-  });
-
-  it("the other merged subjects are still 9th's units followed by 10th's, grade-tagged", () => {
-    const mat = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-matematik")!;
-    expect(mat.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
-    expect(alignedUnits.length).toBeGreaterThan(0);
   });
 });

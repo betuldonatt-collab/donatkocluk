@@ -72,6 +72,8 @@ function UnitLabel({ label }: { label: string }) {
   );
 }
 
+const isBucket = (row: SelectionRow) => row.readOnlyNames.length === 0 && row.memberTopicIds.length > 1;
+
 type PreparedGroup = { row: SelectionRow; lines: TopicLine[]; fullNames: Map<string, string> };
 
 export function MaarifTableBody({
@@ -99,6 +101,11 @@ export function MaarifTableBody({
   // Every group as display lines: its heading once (if it has one), then its
   // topics on clean lines beneath (lib/curriculum/topic-display.ts).
   const groups: PreparedGroup[] = rows.map((row) => {
+    // A bucket (readOnlyNames empty, several hidden members) is ONE leaf line,
+    // named by the bucket: its member topics are never listed.
+    if (row.readOnlyNames.length === 0 && row.memberTopicIds.length > 1) {
+      return { row, lines: [{ kind: "topic", topicId: row.id, text: row.label, depth: 0 }], fullNames: new Map([[row.id, row.label]]) };
+    }
     const fullNames = new Map(row.memberTopicIds.map((id, i) => [id, row.readOnlyNames[i] ?? row.label]));
     const lines = topicLinesForUnit(row.memberTopicIds.map((id) => ({ id, name: fullNames.get(id)! })));
     return { row, lines, fullNames };
@@ -111,6 +118,24 @@ export function MaarifTableBody({
     const { row, lines, fullNames } = group;
     const scope = row.label === row.unitLabel ? row.label : `${row.unitLabel} - ${row.label}`;
     const border = stepIndex === 0 && "border-l";
+    if (step.key === "okul_ilerlemesi" && isBucket(row)) {
+      // One tick for the whole bucket: it sets (or clears) every hidden member,
+      // and reads as done only when all of them are.
+      const checked = collapsedMap[row.id]?.okul_ilerlemesi ?? false;
+      return (
+        <TableCell key={step.key} className={cn("px-3 py-1 text-center", border)}>
+          <Checkbox
+            checked={checked}
+            onCheckedChange={() => {
+              for (const id of row.memberTopicIds) {
+                if (!!pipeline.map[id]?.okul_ilerlemesi === checked) pipeline.onToggle(id, "okul_ilerlemesi");
+              }
+            }}
+            aria-label={`${courseName} - ${scope} - ${step.label}`}
+          />
+        </TableCell>
+      );
+    }
     if (step.key === "okul_ilerlemesi") {
       if (line.kind === "heading") return <TableCell key={step.key} className={cn("bg-muted/40 px-3 py-1", border)} />;
       return (

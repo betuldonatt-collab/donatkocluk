@@ -21,3 +21,20 @@ export function toggleMistake(selected: MistakeEntry[], courseId: string, topicI
   }
   return [...selected, { course_id: courseId, topic_id: topicId, status }];
 }
+
+// A bucket (lib/curriculum/maarif-tyt-structure.ts) is ONE tickable row that
+// hides several real topics. Ticking it marks its first topic (the id a row is
+// always saved against); it reads as marked when ANY of its topics is (so marks
+// made on another member earlier still show), and un-ticking clears the status
+// from every member -- otherwise a stray mark could never be removed.
+export function hasMistakeInGroup(selected: MistakeEntry[], courseId: string, topicIds: string[], status: MistakeStatus): boolean {
+  return topicIds.some((id) => hasMistake(selected, courseId, id, status));
+}
+
+export function toggleMistakeInGroup(selected: MistakeEntry[], courseId: string, topicIds: string[], status: MistakeStatus): MistakeEntry[] {
+  if (hasMistakeInGroup(selected, courseId, topicIds, status)) {
+    const ids = new Set(topicIds);
+    return selected.filter((m) => !(m.course_id === courseId && m.status === status && ids.has(m.topic_id)));
+  }
+  return [...selected, { course_id: courseId, topic_id: topicIds[0], status }];
+}

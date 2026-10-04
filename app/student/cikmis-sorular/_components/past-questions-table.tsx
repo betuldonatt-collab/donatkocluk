@@ -150,6 +150,12 @@ function isGroupedUnitName(course: Course, unitName: string): boolean {
 function flattenRows(course: Course): Row[] {
   const rows: Row[] = [];
   for (const group of course.units) {
+    // A bucket (the 11th grader's merged Coğrafya/Tarih) is one row named by
+    // the bucket; the raw topics it rolls up are never listed.
+    if (group.bucket !== undefined && group.topics.length > 0) {
+      rows.push({ topic: { id: group.topics[0].id, name: group.bucket }, unitLabel: group.unit, unitRowSpan: 1, group: null });
+      continue;
+    }
     const isGroupedUnit = group.unit !== "-" && isGroupedUnitName(course, group.unit);
     const members = isGroupedUnit ? group.topics.map((t) => t.id) : null;
 

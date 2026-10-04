@@ -56,15 +56,14 @@ export function splitUnitGradeTag(label: string): { grade: string | null; title:
 }
 
 export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, m9Id, m10Id }) => {
-  // A subject whose structure also drives Kaynak Takibi (e.g. Tarih) is laid
-  // out in the coach's units and buckets instead of 9th's units followed by
-  // 10th's -- see maarif-tyt-structure.ts. Its units are numbered across both
-  // grades (1-6), so they carry no per-grade tag. Everything else is merged
-  // as before.
+  // A subject with a bucket structure (maarif-tyt-structure.ts) is laid out in
+  // its buckets -- each one a single leaf, raw topics hidden -- instead of 9th's
+  // units followed by 10th's. Its units are numbered across both grades, so
+  // they carry no per-grade tag. Everything else is merged as before.
   // (MERGE_PAIRS holds only merged ids; the 11th grade's own maarif11-* courses
   // are built elsewhere (maarif11.ts) and never read SUBJECT_SPECS.)
   const spec = SUBJECT_SPECS[id];
-  if (spec?.alignKaynakTakibi) return { id, name, units: alignedUnits(spec) };
+  if (spec) return { id, name, units: alignedUnits(spec) };
   const c9 = m9Id ? MAARIF9_KAYNAK_COURSES.find((c) => c.id === m9Id) : undefined;
   const c10 = m10Id ? MAARIF10_KAYNAK_COURSES.find((c) => c.id === m10Id) : undefined;
   return {

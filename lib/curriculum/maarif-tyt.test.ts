@@ -73,8 +73,8 @@ describe("splitUnitGradeTag", () => {
   });
 
   it("round-trips every merged unit: each is tagged with its grade, with a clean title after it", () => {
-    // Tarih is laid out in the coach's own numbered units (1-6), so it carries no per-grade tag.
-    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => c.id !== "maarif-tyt-tarih")) {
+    // Coğrafya and Tarih are laid out in the coach's own numbered units, so they carry no per-grade tag.
+    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => !["maarif-tyt-tarih", "maarif-tyt-cografya"].includes(c.id))) {
       for (const u of c.units) {
         const { grade, title } = splitUnitGradeTag(u.unit);
         expect(["9. Sınıf", "10. Sınıf"]).toContain(grade);

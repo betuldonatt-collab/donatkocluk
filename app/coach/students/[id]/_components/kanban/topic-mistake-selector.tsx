@@ -5,8 +5,9 @@ import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import { TopicLevelMistakeList } from "@/components/topic-level-mistake-list";
-import { hasMistake, toggleMistake } from "@/lib/topic-mistakes";
+import { hasMistake, hasMistakeInGroup, toggleMistake, toggleMistakeInGroup } from "@/lib/topic-mistakes";
 import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
+import { hasBucketedStructure } from "@/lib/curriculum/maarif-tyt-structure";
 
 export type TopicMistakeStatus = "wrong" | "blank";
 export type TopicMistake = { course_id: string; topic_id: string; status: TopicMistakeStatus };
@@ -44,6 +45,13 @@ export function TopicMistakeSelector({
     onChange(toggleMistake(selected, courseId, topicId, status));
   }
 
+  // A row may roll up several hidden topics (a bucket): see lib/topic-mistakes.ts.
+  const hasRow = (courseId: string, row: SelectionRow, status: TopicMistakeStatus) =>
+    hasMistakeInGroup(selected, courseId, row.memberTopicIds, status);
+  function toggleRow(courseId: string, row: SelectionRow, status: TopicMistakeStatus) {
+    onChange(toggleMistakeInGroup(selected, courseId, row.memberTopicIds, status));
+  }
+
   return (
     <div className="max-h-80 space-y-5 overflow-y-auto pr-1">
       {groups.map((group) => (
@@ -56,9 +64,10 @@ export function TopicMistakeSelector({
               {group.courses.length > 1 && (
                 <p className="text-foreground text-sm font-medium">{course.name}</p>
               )}
-              {/* A merged 9th+10th "Maarif TYT" course (an 11th grader's exam)
-                  is ticked per raw topic, so the analysis can count missed topics. */}
-              {isMaarifTytMergedCourseId(course.id) ? (
+              {/* A merged 9th+10th "Maarif TYT" course WITHOUT a bucket structure yet
+                  (an 11th grader's exam) is ticked per raw topic. One WITH a
+                  structure (Coğrafya, Tarih) lists only its buckets, below. */}
+              {isMaarifTytMergedCourseId(course.id) && !hasBucketedStructure(course.id) ? (
                 <TopicLevelMistakeList course={course} has={has} onToggle={toggle} />
               ) : (
                 selectionBlocks(course).map((block, blockIndex) => (
@@ -69,8 +78,8 @@ export function TopicMistakeSelector({
                   <p className="text-muted-foreground text-xs">{block.unitLabel}</p>
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
                     {block.rows.map((row) => {
-                      const isWrong = has(course.id, row.id, "wrong");
-                      const isBlank = has(course.id, row.id, "blank");
+                      const isWrong = hasRow(course.id, row, "wrong");
+                      const isBlank = hasRow(course.id, row, "blank");
                       return (
                         <div
                           key={row.id}
@@ -82,7 +91,7 @@ export function TopicMistakeSelector({
                           </span>
                           <button
                             type="button"
-                            onClick={() => toggle(course.id, row.id, "wrong")}
+                            onClick={() => toggleRow(course.id, row, "wrong")}
                             aria-pressed={isWrong}
                             title="Yanlış"
                             className={cn(
@@ -94,7 +103,7 @@ export function TopicMistakeSelector({
                           </button>
                           <button
                             type="button"
-                            onClick={() => toggle(course.id, row.id, "blank")}
+                            onClick={() => toggleRow(course.id, row, "blank")}
                             aria-pressed={isBlank}
                             title="Boş"
                             className={cn(

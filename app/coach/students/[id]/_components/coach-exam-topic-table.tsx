@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
-import { denemeRowsFor, maarifTytDenemeMappingFor } from "@/lib/curriculum/maarif-tyt-deneme-mapping";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { DetailTask } from "../types";
 
@@ -46,12 +45,11 @@ export function CoachExamTopicTable({
   // Konu/Ünite level here (see lib/curriculum/lgs-selection.ts), so a
   // mistake mark shows on the group even if it was tagged against one of
   // its now-hidden members.
-  // An 11th grader's merged "Maarif TYT" course with a mapping gets the bucketed
-  // view (lib/curriculum/maarif-tyt-deneme-mapping.ts): holistic buckets under
-  // their unit, marked with an X when any of the bucket's topics was missed.
-  // Every other course lists its own rows.
-  const mapping = maarifTytDenemeMappingFor(course.id);
-  const rows = mapping ? denemeRowsFor(mapping) : flattenSelectionRows(course);
+  // An 11th grader's merged "Maarif TYT" course with a bucket structure
+  // (lib/curriculum/maarif-tyt-structure.ts) comes out of the same call as one
+  // row per bucket -- marked with an X when any of the bucket's hidden topics
+  // was missed; its raw topics are never listed.
+  const rows = flattenSelectionRows(course);
 
   return (
     <Card>

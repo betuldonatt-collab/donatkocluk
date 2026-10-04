@@ -1,18 +1,19 @@
 // The coach's holistic structure for the 11th grade's "Maarif TYT" subjects:
 // units, and under each unit its buckets, each bucket rolled up from the raw
-// 9th/10th grade topics. One spec per subject, read by two views that must
-// never drift apart:
+// 9th/10th grade topics. One spec per subject.
 //
-//   - the Deneme Analizi table (maarif-tyt-deneme-mapping.ts) shows the
-//     buckets as rows, marked with an X when one of their topics was missed;
-//   - for a subject marked `alignKaynakTakibi`, the merged "Maarif TYT" course
-//     itself (maarif-tyt.ts) is laid out in this structure, so Kaynak
-//     Takibi's tracking cells line up with the same buckets.
+// THE BUCKETS ARE THE LEAVES. A subject with a spec is laid out in its buckets
+// everywhere an 11th grader (or their coach) sees it -- Kaynak Takibi, the
+// Deneme/Branş analysis tables and mistake picker, Çıkmış Sorular: each bucket
+// is one row with one set of checkboxes / one X, and the raw 9th/10th topics
+// inside it are never listed. They only live on as the bucket's hidden members
+// (Unit.topics, real ids) so what is saved still lands on real topic ids: a
+// bucket's tracking is written against its first member's id, and read back
+// from all of them.
 //
 // It only READS the 9th/10th data (maarif9.json / maarif10.json are never
-// modified, nor are the 9th/10th graders' own courses); topic ids are always
-// the real ones. A topic no bucket claims is never dropped: Deneme Analizi
-// shows it in a "Diğer" row and Kaynak Takibi keeps it as its own entry.
+// modified, nor are the 9th/10th graders' own courses). A topic no bucket claims
+// is never dropped: it becomes a leaf of its own (see alignedUnits).
 import type { Course, Topic, Unit } from "./index";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
@@ -26,9 +27,6 @@ export type BucketSpec = { label: string; from: Source[] };
 export type UnitSpec = { label: string; buckets: BucketSpec[] };
 export type SubjectSpec = {
   units: UnitSpec[];
-  // True when the merged course should ALSO be laid out in this structure in
-  // Kaynak Takibi (see alignedUnits), not only in Deneme Analizi.
-  alignKaynakTakibi?: boolean;
 };
 
 export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
@@ -99,7 +97,6 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
   // by position (the coach's wording differs slightly from the raw titles);
   // the raw title is noted beside each. The structure is also Kaynak Takibi's.
   "maarif-tyt-tarih": {
-    alignKaynakTakibi: true,
     units: [
       {
         label: "1. Ünite: Geçmişin İnşa Sürecinde Tarih",
@@ -213,14 +210,21 @@ export function resolveSpec(spec: SubjectSpec): ResolvedSpec {
   return { units, unresolved };
 }
 
-// The merged course's units for a subject whose spec drives Kaynak Takibi.
-// Each bucket becomes its OWN unit entry under its spec unit's label (so the
-// table gives it its own tracking cells, and consecutive same-label entries
-// still share one merged Ünite cell): a bucket with one topic is that topic
-// named by the bucket, one with several is a heading group
-// ("Bucket › topic"). Raw topic ids are kept. A topic no bucket claims is
-// kept too, as its own entry at the end of the unit it came from (or under
-// "Diğer" when no spec unit uses that source unit).
+// True when a merged "Maarif TYT" course has a bucket structure (and so is
+// laid out in buckets everywhere -- see alignedUnits).
+export function hasBucketedStructure(courseId: string | null | undefined): boolean {
+  return !!courseId && Object.prototype.hasOwnProperty.call(SUBJECT_SPECS, courseId);
+}
+
+// The merged course's units for a subject with a spec. Each bucket becomes its
+// OWN unit entry under its spec unit's label (consecutive same-label entries
+// still share one merged Ünite cell), marked as a leaf (Unit.bucket): the UI
+// shows the bucket's name and nothing beneath it. The raw 9th/10th topics stay
+// in `topics` -- real ids, real names -- only as the bucket's hidden members,
+// so progress and mistakes can still be saved and read against them. A topic no
+// bucket claims is never dropped: it becomes a leaf of its own (named by itself)
+// at the end of the unit it came from, or under "Diğer" when no spec unit
+// uses that source unit.
 export function alignedUnits(spec: SubjectSpec): Unit[] {
   const resolved = resolveSpec(spec);
   const claimed = new Set(resolved.units.flatMap((u) => u.buckets.flatMap((b) => b.topics.map((t) => t.id))));
@@ -234,27 +238,33 @@ export function alignedUnits(spec: SubjectSpec): Unit[] {
     });
   }
 
+  const leftoverLeaf = (unit: string, topic: Topic): Unit => ({
+    unit,
+    bucket: leafTitle(topic.name),
+    topics: [{ id: topic.id, name: topic.name }],
+  });
+
   const taken = new Set<string>();
   const units: Unit[] = [];
   spec.units.forEach((unitSpec, ui) => {
     resolved.units[ui].buckets.forEach((bucket) => {
       if (bucket.topics.length === 0) return;
-      const single = bucket.topics.length === 1;
       units.push({
         unit: unitSpec.label,
-        topics: bucket.topics.map((t) => ({ id: t.id, name: single ? bucket.label : `${bucket.label} › ${t.name}` })),
+        bucket: bucket.label,
+        topics: bucket.topics.map((t) => ({ id: t.id, name: t.name })),
       });
     });
     const sourceKeys = new Set(unitSpec.buckets.flatMap((b) => b.from.map((s) => `${s.course}#${s.unit}`)));
     for (const key of sourceKeys) {
       if (taken.has(key)) continue;
       taken.add(key);
-      for (const topic of leftoversBySourceUnit.get(key) ?? []) units.push({ unit: unitSpec.label, topics: [{ id: topic.id, name: topic.name }] });
+      for (const topic of leftoversBySourceUnit.get(key) ?? []) units.push(leftoverLeaf(unitSpec.label, topic));
     }
   });
   for (const [key, topics] of leftoversBySourceUnit) {
     if (taken.has(key)) continue;
-    for (const topic of topics) units.push({ unit: "Diğer", topics: [{ id: topic.id, name: topic.name }] });
+    for (const topic of topics) units.push(leftoverLeaf("Diğer", topic));
   }
   return units;
 }

@@ -7,6 +7,7 @@
 // the coach and student literally see different colors for the same data.
 import { findCourseById, isLgsCourseId } from "./curriculum";
 import { lgsSelectionNodes } from "./curriculum/lgs-selection";
+import { courseHasBuckets, maarifSelectionNodes } from "./curriculum/maarif-selection";
 import { LGS_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 
 export type GelisimHaritasiRow = {
@@ -112,7 +113,9 @@ export function computeGelisimHaritasi(
     // non-LGS course keeps reporting one row per raw topic, unchanged.
     const nodes = isLgsCourseId(courseId)
       ? lgsSelectionNodes(course)
-      : course.units.flatMap((u) =>
+      : courseHasBuckets(course)
+        ? maarifSelectionNodes(course)
+        : course.units.flatMap((u) =>
           u.topics.map((t) => ({
             id: t.id,
             // An LGS Alt Konu ("EKOK") means nothing without its Konu --
