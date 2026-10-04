@@ -160,6 +160,75 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       },
     ],
   },
+
+  // Biyoloji: Tema 1-2 are 9th grade's two themes, Tema 3-4 are 10th grade's two units.
+  // Topics are picked by 1-based position in the raw unit. Where the coach's list is finer
+  // or coarser than the raw topics, the nearest raw topics were attached:
+  //  - Tema 1: "Ökaryotlar" (raw 19) sits with Canlıların Sınıflandırılması; "Hayvanlar" (23)
+  //    with Omurgasız Hayvanlar; the biodiversity database topic (26) with the last bucket.
+  //  - Tema 2: "Organik Moleküllerin Tayininde Kullanılan Ayıraçlar" (10) rides with Karbohidratlar;
+  //    Hücre ve Alt Birimleri - I = prokaryot/ökaryot + yapısal bileşenler (11-12), - II =
+  //    organeller + doku/organ/sistem organizasyonu (13, 16).
+  //  - Tema 3: "Fotosentezde Kullanılan ve Üretilen Maddeler" (3) goes with Fotosentez Reaksiyonları.
+  //  - Tema 4: Komünite and Popülasyon Ekolojisi are ONE raw topic ("Komünitelerde ve
+  //    Popülasyonlarda Görülen Etkileşimler ve Değişimler"), and a bucket needs a real topic id of its
+  //    own, so they are a single bucket.
+  "maarif-tyt-biyoloji": {
+    units: [
+      {
+        label: "1. Tema: Yaşam",
+        buckets: [
+          { label: "Biyoloji Bilimi ve Bilimsel Araştırma Süreçleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [1, 2, 3] }] },
+          { label: "Canlıların Ortak Özellikleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] }] },
+          { label: "Virüsler", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [15] }] },
+          { label: "Canlıların Sınıflandırılması", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [16, 19] }] },
+          { label: "Bakteri ve Arke Âlemleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [17, 18] }] },
+          { label: "Protista ve Bitki Âlemleri", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [20, 21] }] },
+          { label: "Mantarlar Âlemi", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [22] }] },
+          { label: "Omurgasız Hayvanlar", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [23, 24] }] },
+          { label: "Omurgalı Hayvanlar ve Biyoçeşitlilik", from: [{ course: "maarif9-biyoloji", unit: 1, topics: [25, 26, 27] }] },
+        ],
+      },
+      {
+        label: "2. Tema: Organizasyon",
+        buckets: [
+          { label: "İnorganik Moleküller", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [1, 2] }] },
+          { label: "Karbohidratlar", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [3, 10] }] },
+          { label: "Lipitler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [4] }] },
+          { label: "Proteinler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [5] }] },
+          { label: "Enzimler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [6] }] },
+          { label: "Nükleik Asitler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [7] }] },
+          { label: "Vitaminler", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [8, 9] }] },
+          { label: "Hücre ve Alt Birimleri - I", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [11, 12] }] },
+          { label: "Hücre ve Alt Birimleri - II", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [13, 16] }] },
+          { label: "Difüzyon ve Ozmoz", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [15] }] },
+          { label: "Aktif Taşıma, Endositoz ve Ekzositoz", from: [{ course: "maarif9-biyoloji", unit: 2, topics: [14] }] },
+        ],
+      },
+      {
+        label: "3. Tema: Enerji",
+        buckets: [
+          { label: "Enerji Molekülü ATP", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [1] }] },
+          { label: "Fotosentez Reaksiyonları", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [2, 3] }] },
+          { label: "Fotosentez Hızını Etkileyen Faktörler ve Kemosentez", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [4] }] },
+          { label: "Canlılarda Sindirim", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [5] }] },
+          { label: "İnsanda Sindirim", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [6] }] },
+          { label: "Oksijenli Solunum", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [7, 8] }] },
+          { label: "Fermantasyon ve Beslenme", from: [{ course: "maarif10-biyoloji", unit: 1, topics: [9, 10] }] },
+        ],
+      },
+      {
+        label: "4. Tema: Ekoloji",
+        buckets: [
+          { label: "Ekosistemin Bileşenleri", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [1] }] },
+          { label: "Komünite ve Popülasyon Ekolojisi", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [2] }] },
+          { label: "Ekosistemde Madde ve Enerji Akışı", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [3] }] },
+          { label: "Madde Döngüleri", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [4] }] },
+          { label: "Ekolojik Sürdürülebilirlik", from: [{ course: "maarif10-biyoloji", unit: 2, topics: [5, 6, 7, 8, 9] }] },
+        ],
+      },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];

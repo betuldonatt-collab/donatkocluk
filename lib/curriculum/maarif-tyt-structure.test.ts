@@ -18,6 +18,8 @@ const raw = (prefix: string) =>
     .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
 const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
 const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
+const biyoloji = merged("maarif-tyt-biyoloji");
+const rawBiyoloji = raw("maarif9-biyoloji").concat(raw("maarif10-biyoloji"));
 
 // What the UI is allowed to show: unit label + bucket label per row.
 const unitsAndBuckets = (courseId: string) => {
@@ -151,6 +153,100 @@ describe("Coğrafya: the buckets are the only thing shown", () => {
   });
 });
 
+describe("Biyoloji: the buckets are the only thing shown", () => {
+  it("has the coach's 4 themes and their buckets, in order", () => {
+    expect(unitsAndBuckets("maarif-tyt-biyoloji")).toEqual([
+      [
+        "1. Tema: Yaşam",
+        [
+          "Biyoloji Bilimi ve Bilimsel Araştırma Süreçleri",
+          "Canlıların Ortak Özellikleri",
+          "Virüsler",
+          "Canlıların Sınıflandırılması",
+          "Bakteri ve Arke Âlemleri",
+          "Protista ve Bitki Âlemleri",
+          "Mantarlar Âlemi",
+          "Omurgasız Hayvanlar",
+          "Omurgalı Hayvanlar ve Biyoçeşitlilik",
+        ],
+      ],
+      [
+        "2. Tema: Organizasyon",
+        [
+          "İnorganik Moleküller",
+          "Karbohidratlar",
+          "Lipitler",
+          "Proteinler",
+          "Enzimler",
+          "Nükleik Asitler",
+          "Vitaminler",
+          "Hücre ve Alt Birimleri - I",
+          "Hücre ve Alt Birimleri - II",
+          "Difüzyon ve Ozmoz",
+          "Aktif Taşıma, Endositoz ve Ekzositoz",
+        ],
+      ],
+      [
+        "3. Tema: Enerji",
+        [
+          "Enerji Molekülü ATP",
+          "Fotosentez Reaksiyonları",
+          "Fotosentez Hızını Etkileyen Faktörler ve Kemosentez",
+          "Canlılarda Sindirim",
+          "İnsanda Sindirim",
+          "Oksijenli Solunum",
+          "Fermantasyon ve Beslenme",
+        ],
+      ],
+      [
+        "4. Tema: Ekoloji",
+        [
+          "Ekosistemin Bileşenleri",
+          "Komünite ve Popülasyon Ekolojisi",
+          "Ekosistemde Madde ve Enerji Akışı",
+          "Madde Döngüleri",
+          "Ekolojik Sürdürülebilirlik",
+        ],
+      ],
+    ]);
+  });
+
+  it("shows only bucket leaves and keeps all 62 raw 9th/10th topics as hidden members, each exactly once", () => {
+    const rows = flattenSelectionRows(biyoloji);
+    expect(rows).toHaveLength(32);
+    expect(rows.every((r) => r.readOnlyNames.length === 0)).toBe(true);
+    expect(rows.some((r) => r.label.includes(" › "))).toBe(false);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([9, 11, 7, 5]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-biyoloji"]).unresolved).toEqual([]);
+    const ids = rows.flatMap((r) => r.memberTopicIds);
+    expect(rawBiyoloji).toHaveLength(62); // 27 + 16 (9th) + 10 + 9 (10th)
+    expect(ids.slice().sort()).toEqual(rawBiyoloji.slice().sort());
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(biyoloji.units.some((u) => u.unit === "Diğer")).toBe(false);
+    expect(biyoloji.units.some((u) => /^(d+. Sınıf)/.test(u.unit))).toBe(false);
+  });
+
+  it("rolls the raw topics into the right grade's buckets", () => {
+    const members = (label: string) => flattenSelectionRows(biyoloji).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Canlıların Ortak Özellikleri")).toHaveLength(11);
+    expect(members("Virüsler")).toEqual(["maarif9-biyoloji-u0-t14"]);
+    expect(members("Bakteri ve Arke Âlemleri")).toEqual(["maarif9-biyoloji-u0-t16", "maarif9-biyoloji-u0-t17"]);
+    expect(members("Vitaminler")).toEqual(["maarif9-biyoloji-u1-t7", "maarif9-biyoloji-u1-t8"]);
+    expect(members("Difüzyon ve Ozmoz")).toEqual(["maarif9-biyoloji-u1-t14"]);
+    expect(members("Aktif Taşıma, Endositoz ve Ekzositoz")).toEqual(["maarif9-biyoloji-u1-t13"]);
+    expect(members("Fotosentez Reaksiyonları")).toEqual(["maarif10-biyoloji-u0-t1", "maarif10-biyoloji-u0-t2"]);
+    expect(members("Ekolojik Sürdürülebilirlik")).toHaveLength(5);
+    expect(members("Ekolojik Sürdürülebilirlik").every((id) => id.startsWith("maarif10-biyoloji-u1"))).toBe(true);
+  });
+
+  it("the 11th grade's own Biyoloji (the 11. Sınıf tab) is untouched", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-biyoloji")!;
+    expect(courseHasBuckets(own)).toBe(false);
+    expect(own.units.map((u) => u.unit)).toEqual(["1. Ünite: Tepki", "2. Ünite: Homeostazi"]);
+    expect(own.units.map((u) => u.topics.length)).toEqual([16, 10]);
+  });
+});
+
 describe("a topic no bucket claims is kept as a leaf of its own", () => {
   it("stays in its unit (named by itself); units no spec unit uses go under Diğer", () => {
     const partial = alignedUnits({
@@ -195,7 +291,9 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji"]);
+    expect(hasBucketedStructure("maarif-tyt-biyoloji")).toBe(true);
+    expect(hasBucketedStructure("maarif11-biyoloji")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);
     expect(hasBucketedStructure("maarif-tyt-matematik")).toBe(false);
     expect(hasBucketedStructure("maarif11-tarih")).toBe(false);
