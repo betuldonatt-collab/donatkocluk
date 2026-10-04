@@ -25,7 +25,9 @@ export function TopicLevelMistakeList({
     <>
       {course.units.map((unit, unitIndex) => (
         <div key={`${unit.unit}-${unitIndex}`} className="space-y-1 pl-1">
-          <p className="text-muted-foreground text-xs">{unit.unit}</p>
+          {/* A course laid out in buckets (Tarih) has several entries under one
+              unit name -- print the name once, not before every entry. */}
+          {unit.unit !== course.units[unitIndex - 1]?.unit && <p className="text-muted-foreground text-xs">{unit.unit}</p>}
           <div className="space-y-0.5">
             {topicLinesForUnit(unit.topics).map((line, i) => {
               if (line.kind === "heading") {

@@ -64,7 +64,7 @@ describe("Coğrafya deneme mapping", () => {
 
 describe("maarifTytDenemeMappingFor", () => {
   it("exists only for subjects that have a mapping; every other course keeps its plain table", () => {
-    expect(MAARIF_TYT_DENEME_MAPPED_COURSE_IDS).toEqual(["maarif-tyt-cografya"]);
+    expect(MAARIF_TYT_DENEME_MAPPED_COURSE_IDS).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih"]);
     expect(maarifTytDenemeMappingFor("maarif-tyt-matematik")).toBeNull();
     expect(maarifTytDenemeMappingFor("maarif9-cografya")).toBeNull(); // 9th/10th graders keep their own analysis
     expect(maarifTytDenemeMappingFor("maarif11-cografya")).toBeNull();
