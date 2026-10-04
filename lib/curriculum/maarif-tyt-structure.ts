@@ -458,6 +458,90 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       { course: "maarif9-matematik", unit: 4, topics: [5] },
     ],
   },
+
+  // Matematik: only the PURE MATH units of the 9th/10th Matematik courses -- the geometry units (9th Tema 3
+  // + 4, 10th Ünite 1 + 6) belong to the separate Geometri spec above, so `onlyListedUnits` ignores them.
+  // Two levels (Tema -> Bölüm leaf). The coach's list is finer than the raw topics in several places, and a
+  // bucket needs a raw topic id of its own, so (same compromise as Komünite/Popülasyon and Geometri):
+  //  - Üslü + Köklü Gösterimler = ONE raw topic -> one bucket;
+  //  - Doğrusal Fonksiyonlarla ... Denklem + Eşitsizlik Problemleri = ONE raw topic -> one bucket;
+  //  - Tema 5 Eşitsizlikler + Denklemler = ONE raw topic -> one bucket;
+  //  - Tema 7 Sayma: the four listed bölümler are ONE raw topic ("Sayma Stratejileri") -> one bucket;
+  //  - "Temel İşlem Yeteneği" has NO raw topic at all, so it cannot be tracked and is left out;
+  //  - excluded: 9th "Olayların Olasılığına İlişkin Tümevarımsal Akıl Yürütme", not on the list.
+  "maarif-tyt-matematik": {
+    onlyListedUnits: true,
+    units: [
+      {
+        label: "1. Tema: Sayılar",
+        buckets: [
+          { label: "Gerçek Sayıların Üslü ve Köklü Gösterimleri ile Yapılan İşlemler", from: [{ course: "maarif9-matematik", unit: 1, topics: [1] }] },
+          { label: "Gerçek Sayı Aralıklarının Gösterimi ve Aralıklarla İlgili İşlemler", from: [{ course: "maarif9-matematik", unit: 1, topics: [2] }] },
+          { label: "Sayı Kümelerinin Özellikleri ve Gerçek Sayıların İşlem Özellikleri", from: [{ course: "maarif9-matematik", unit: 1, topics: [3, 4] }] },
+        ],
+      },
+      {
+        label: "2. Tema: Nicelikler ve Değişimler",
+        buckets: [
+          { label: "Doğrusal Fonksiyonlar ve Nitel Özellikleri", from: [{ course: "maarif9-matematik", unit: 2, topics: [1] }] },
+          { label: "Mutlak Değer Fonksiyonları ve Nitel Özellikleri", from: [{ course: "maarif9-matematik", unit: 2, topics: [2] }] },
+          { label: "Doğrusal Fonksiyonlarla İfade Edilebilen Denklem ve Eşitsizlik Problemleri", from: [{ course: "maarif9-matematik", unit: 2, topics: [3] }] },
+        ],
+      },
+      {
+        label: "3. Tema: Sayılar",
+        buckets: [
+          { label: "Bir Doğal Sayı ile Asal Çarpanları ve Bölenleri Arasındaki İlişkiler", from: [{ course: "maarif10-matematik", unit: 3, topics: [1] }] },
+          { label: "En Büyük Ortak Bölen (EBOB) ve En Küçük Ortak Kat (EKOK)", from: [{ course: "maarif10-matematik", unit: 3, topics: [2] }] },
+          { label: "Bölünebilme Özelliklerini Kullanarak Kalan Bulma", from: [{ course: "maarif10-matematik", unit: 3, topics: [3] }] },
+        ],
+      },
+      {
+        label: "4. Tema: Algoritma ve Bilişim",
+        buckets: [
+          { label: "Algoritma Temelli Yaklaşımlarla Problem Çözme", from: [{ course: "maarif9-matematik", unit: 5, topics: [1] }] },
+          { label: "Algoritmik Yapılar İçerisindeki Mantık Bağlaçları ve Niceleyiciler", from: [{ course: "maarif9-matematik", unit: 5, topics: [2] }] },
+          { label: "Algoritmalarda ve Matematiksel İspatlarda Mantık Bağlaçları ve Niceleyiciler", from: [{ course: "maarif9-matematik", unit: 5, topics: [3] }] },
+          { label: "Cebirsel İşlemlerin Algoritmik Yapısı", from: [{ course: "maarif10-matematik", unit: 5, topics: [2] }] },
+        ],
+      },
+      {
+        label: "5. Tema: Nicelikler ve Değişimler",
+        buckets: [
+          { label: "Gerçek Sayılarda Tanımlı Fonksiyonların Nitel Özellikleri", from: [{ course: "maarif10-matematik", unit: 4, topics: [1] }] },
+          { label: "Gerçek Sayılarda Tanımlı Karesel Fonksiyonlar ve Nitel Özellikleri", from: [{ course: "maarif10-matematik", unit: 4, topics: [2] }] },
+          { label: "Gerçek Sayılarda Tanımlı Karekök Fonksiyonlar ve Nitel Özellikleri", from: [{ course: "maarif10-matematik", unit: 4, topics: [3] }] },
+          { label: "Gerçek Sayılarda Tanımlı Rasyonel Fonksiyonlar ve Nitel Özellikleri", from: [{ course: "maarif10-matematik", unit: 4, topics: [4] }] },
+          { label: "Doğrusal, Karesel, Karekök ve Rasyonel Referans Fonksiyonlar ile Bu Fonksiyonlardan Türetilebilen Fonksiyonların Ters Fonksiyonları", from: [{ course: "maarif10-matematik", unit: 4, topics: [5] }] },
+          { label: "Doğrusal, Karesel, Karekök ve Rasyonel Fonksiyonlardan Türetilebilen Eşitsizlikler ve Denklemler", from: [{ course: "maarif10-matematik", unit: 4, topics: [6] }] },
+        ],
+      },
+      {
+        label: "6. Tema: İstatistiksel Araştırma Süreci",
+        buckets: [
+          { label: "Tek Nicel Değişkenli Veri Dağılımları ile Çalışma ve Veriye Dayalı Karar Verme", from: [{ course: "maarif9-matematik", unit: 6, topics: [1, 2] }] },
+          { label: "İki Kategorik Değişkenli Verilerle Çalışma, İlişkililik Analizi Yapma ve Yorumlama", from: [{ course: "maarif10-matematik", unit: 2, topics: [1, 2] }] },
+        ],
+      },
+      {
+        label: "7. Tema: Sayma",
+        buckets: [
+          { label: "Sayma Stratejileri, Sayma Çeşitleri, Faktöriyel, Sıralama Sayısı, Seçme Sayısı, Pascal (Paskal) Üçgeni, Güvercin Yuvası İlkesi", from: [{ course: "maarif10-matematik", unit: 5, topics: [1] }] },
+        ],
+      },
+      {
+        label: "8. Tema: Veriden Olasılığa",
+        buckets: [
+          { label: "Olayların Olasılığını Gözleme Dayalı Tahmin Etme", from: [{ course: "maarif9-matematik", unit: 7, topics: [1] }] },
+          { label: "Koşullu Olasılık, Bayes Teoremi ve Uygulamaları", from: [{ course: "maarif10-matematik", unit: 7, topics: [1, 2] }] },
+        ],
+      },
+    ],
+    excluded: [
+      // 9th grade, 7. Tema: "Olayların Olasılığına İlişkin Tümevarımsal Akıl Yürütme" (2)
+      { course: "maarif9-matematik", unit: 7, topics: [2] },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];

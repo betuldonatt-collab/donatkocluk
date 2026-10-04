@@ -18,32 +18,20 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
   });
 
   it("concatenates 9th grade's units before 10th grade's, tagging each with its grade", () => {
-    const math = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-matematik")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-matematik")!;
-    // Without the geometry units (they live in the separate Geometri course): 9th Tema 3 + 4, 10th Ünite 1 + 6.
-    expect(math.units).toHaveLength(m9.units.length + m10.units.length - 4);
-    const nine = math.units.filter((u) => u.unit.startsWith("(9. Sınıf) "));
-    const ten = math.units.filter((u) => u.unit.startsWith("(10. Sınıf) "));
-    expect(nine).toHaveLength(m9.units.length - 2);
-    expect(ten).toHaveLength(m10.units.length - 2);
-    expect(math.units.map((u) => u.unit)).toEqual([...nine, ...ten].map((u) => u.unit)); // 9th first, then 10th
+    const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
+    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
+    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-turk-dili-ve-edebiyati")!;
+    expect(tde.units).toHaveLength(m9.units.length + m10.units.length);
+    expect(tde.units.slice(0, m9.units.length).every((u) => u.unit.startsWith("(9. Sınıf) "))).toBe(true);
+    expect(tde.units.slice(m9.units.length).every((u) => u.unit.startsWith("(10. Sınıf) "))).toBe(true);
   });
 
   it("keeps every original topic id untouched, just concatenated (no synthetic ids)", () => {
-    const math = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-matematik")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-matematik")!;
-    const mergedTopicIds = math.units.flatMap((u) => u.topics.map((t) => t.id));
-    // Every source topic except the 12 geometry ones, in the original order.
-    const geometryIds = new Set(
-      [
-        ...m9.units.filter((_, i) => i === 2 || i === 3),
-        ...m10.units.filter((_, i) => i === 0 || i === 5),
-      ].flatMap((u) => u.topics.map((t) => t.id)),
-    );
-    expect(geometryIds.size).toBe(12);
-    const sourceTopicIds = [...m9.units, ...m10.units].flatMap((u) => u.topics.map((t) => t.id)).filter((id) => !geometryIds.has(id));
+    const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
+    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
+    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-turk-dili-ve-edebiyati")!;
+    const mergedTopicIds = tde.units.flatMap((u) => u.topics.map((t) => t.id));
+    const sourceTopicIds = [...m9.units, ...m10.units].flatMap((u) => u.topics.map((t) => t.id));
     expect(mergedTopicIds).toEqual(sourceTopicIds);
   });
 
@@ -86,7 +74,7 @@ describe("splitUnitGradeTag", () => {
 
   it("round-trips every merged unit: each is tagged with its grade, with a clean title after it", () => {
     // Coğrafya, Tarih and Biyoloji are laid out in the coach's own numbered units, so they carry no per-grade tag.
-    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => !["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri"].includes(c.id))) {
+    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => !["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik"].includes(c.id))) {
       for (const u of c.units) {
         const { grade, title } = splitUnitGradeTag(u.unit);
         expect(["9. Sınıf", "10. Sınıf"]).toContain(grade);

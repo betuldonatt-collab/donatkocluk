@@ -272,6 +272,100 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
   });
 });
 
+describe("Matematik: the pure-math units, Tema -> Bölüm leaf", () => {
+  const excludedId = "maarif9-matematik-u6-t1"; // Olayların Olasılığına İlişkin Tümevarımsal Akıl Yürütme
+
+  it("has the coach's 8 temas and their bölümler, in order", () => {
+    expect(unitsAndBuckets("maarif-tyt-matematik")).toEqual([
+      [
+        "1. Tema: Sayılar",
+        [
+          "Gerçek Sayıların Üslü ve Köklü Gösterimleri ile Yapılan İşlemler",
+          "Gerçek Sayı Aralıklarının Gösterimi ve Aralıklarla İlgili İşlemler",
+          "Sayı Kümelerinin Özellikleri ve Gerçek Sayıların İşlem Özellikleri",
+        ],
+      ],
+      [
+        "2. Tema: Nicelikler ve Değişimler",
+        [
+          "Doğrusal Fonksiyonlar ve Nitel Özellikleri",
+          "Mutlak Değer Fonksiyonları ve Nitel Özellikleri",
+          "Doğrusal Fonksiyonlarla İfade Edilebilen Denklem ve Eşitsizlik Problemleri",
+        ],
+      ],
+      [
+        "3. Tema: Sayılar",
+        [
+          "Bir Doğal Sayı ile Asal Çarpanları ve Bölenleri Arasındaki İlişkiler",
+          "En Büyük Ortak Bölen (EBOB) ve En Küçük Ortak Kat (EKOK)",
+          "Bölünebilme Özelliklerini Kullanarak Kalan Bulma",
+        ],
+      ],
+      [
+        "4. Tema: Algoritma ve Bilişim",
+        [
+          "Algoritma Temelli Yaklaşımlarla Problem Çözme",
+          "Algoritmik Yapılar İçerisindeki Mantık Bağlaçları ve Niceleyiciler",
+          "Algoritmalarda ve Matematiksel İspatlarda Mantık Bağlaçları ve Niceleyiciler",
+          "Cebirsel İşlemlerin Algoritmik Yapısı",
+        ],
+      ],
+      [
+        "5. Tema: Nicelikler ve Değişimler",
+        [
+          "Gerçek Sayılarda Tanımlı Fonksiyonların Nitel Özellikleri",
+          "Gerçek Sayılarda Tanımlı Karesel Fonksiyonlar ve Nitel Özellikleri",
+          "Gerçek Sayılarda Tanımlı Karekök Fonksiyonlar ve Nitel Özellikleri",
+          "Gerçek Sayılarda Tanımlı Rasyonel Fonksiyonlar ve Nitel Özellikleri",
+          "Doğrusal, Karesel, Karekök ve Rasyonel Referans Fonksiyonlar ile Bu Fonksiyonlardan Türetilebilen Fonksiyonların Ters Fonksiyonları",
+          "Doğrusal, Karesel, Karekök ve Rasyonel Fonksiyonlardan Türetilebilen Eşitsizlikler ve Denklemler",
+        ],
+      ],
+      [
+        "6. Tema: İstatistiksel Araştırma Süreci",
+        [
+          "Tek Nicel Değişkenli Veri Dağılımları ile Çalışma ve Veriye Dayalı Karar Verme",
+          "İki Kategorik Değişkenli Verilerle Çalışma, İlişkililik Analizi Yapma ve Yorumlama",
+        ],
+      ],
+      ["7. Tema: Sayma", ["Sayma Stratejileri, Sayma Çeşitleri, Faktöriyel, Sıralama Sayısı, Seçme Sayısı, Pascal (Paskal) Üçgeni, Güvercin Yuvası İlkesi"]],
+      ["8. Tema: Veriden Olasılığa", ["Olayların Olasılığını Gözleme Dayalı Tahmin Etme", "Koşullu Olasılık, Bayes Teoremi ve Uygulamaları"]],
+    ]);
+  });
+
+  it("shows 24 leaf rows; 28 of the 29 pure-math raw topics are hidden members, 1 is excluded, and no geometry unit leaks in", () => {
+    const rows = flattenSelectionRows(matematik);
+    expect(rows).toHaveLength(24);
+    expect(rows.every((r) => r.readOnlyNames.length === 0 && r.groupLabel === undefined)).toBe(true);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([3, 3, 3, 4, 6, 2, 1, 2]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-matematik"]).unresolved).toEqual([]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-matematik"]).excluded.map((t) => t.id)).toEqual([excludedId]);
+    const ids = rows.flatMap((r) => r.memberTopicIds);
+    expect(ids).toHaveLength(28);
+    expect(new Set(ids).size).toBe(28);
+    expect(ids).not.toContain(excludedId);
+    expect(matematik.units.some((u) => u.unit === "Diğer" || /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
+    // Nothing from the geometry units (9th unit 3 + 4, 10th unit 1 + 6) is in here.
+    const geometryIds = geometri.units.flatMap((u) => u.topics.map((t) => t.id));
+    for (const id of geometryIds) expect(ids).not.toContain(id);
+  });
+
+  it("keeps the merged buckets' raw topics as hidden members", () => {
+    const members = (label: string) => flattenSelectionRows(matematik).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Gerçek Sayıların Üslü ve Köklü Gösterimleri ile Yapılan İşlemler")).toEqual(["maarif9-matematik-u0-t0"]);
+    expect(members("Sayı Kümelerinin Özellikleri ve Gerçek Sayıların İşlem Özellikleri")).toEqual(["maarif9-matematik-u0-t2", "maarif9-matematik-u0-t3"]);
+    expect(members("Cebirsel İşlemlerin Algoritmik Yapısı")).toEqual(["maarif10-matematik-u4-t1"]);
+    expect(members("Koşullu Olasılık, Bayes Teoremi ve Uygulamaları")).toEqual(["maarif10-matematik-u6-t0", "maarif10-matematik-u6-t1"]);
+    expect(members("Tek Nicel Değişkenli Veri Dağılımları ile Çalışma ve Veriye Dayalı Karar Verme")).toEqual(["maarif9-matematik-u5-t0", "maarif9-matematik-u5-t1"]);
+  });
+
+  it("the 11th grade's own Matematik (the 11. Sınıf tab) is untouched", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-matematik")!;
+    expect(courseHasBuckets(own)).toBe(false);
+    expect(own.units).toHaveLength(5);
+  });
+});
+
 describe("Geometri: a separate course built from the Matematik courses' geometry units", () => {
   const excludedId = "maarif9-matematik-u3-t4"; // Eşlik ve Benzerlikle İlgili Problemler
 
@@ -312,14 +406,13 @@ describe("Geometri: a separate course built from the Matematik courses' geometry
     expect(members("Doğrunun Analitik İncelenmesi")).toEqual(["maarif10-matematik-u5-t1"]);
   });
 
-  it("no overlap: Matematik no longer lists any geometry unit, and shares no topic id with Geometri", () => {
-    const mathIds = new Set(matematik.units.flatMap((u) => u.topics.map((t) => t.id)));
-    for (const id of geometri.units.flatMap((u) => u.topics.map((t) => t.id))) expect(mathIds.has(id)).toBe(false);
+  it("no overlap: Matematik and Geometri share no raw topic, and together they cover the Matematik courses minus the 2 excluded topics", () => {
+    const mathIds = matematik.units.flatMap((u) => u.topics.map((t) => t.id));
+    const geoIds = new Set(geometri.units.flatMap((u) => u.topics.map((t) => t.id)));
+    for (const id of mathIds) expect(geoIds.has(id)).toBe(false);
+    expect(mathIds.length + geoIds.size).toBe(rawMatematik.length - 2); // 29 + 11 of 42
     const labels = matematik.units.map((u) => u.unit);
-    expect(labels.some((l) => /Geometrik Şekiller|Eşlik ve Benzerlik|Analitik İnceleme/.test(l))).toBe(false);
-    // Everything else of 9th/10th Matematik is still there: 12 geometry topics out of the total.
-    expect(mathIds.size).toBe(rawMatematik.length - 12);
-    expect(matematik.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
+    expect(labels.some((l) => /Geometrik Şekiller|Eşlik ve Benzerlik|Analitik İnceleme|Üçgenler/.test(l))).toBe(false);
   });
 
   it("the 11th grade's own Matematik (the 11. Sınıf tab) keeps its Geometrik Şekiller unit", () => {
@@ -580,7 +673,10 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik"]);
+    expect(hasBucketedStructure("maarif-tyt-matematik")).toBe(true);
+    expect(hasBucketedStructure("maarif11-matematik")).toBe(false);
+    expect(hasBucketedStructure("maarif-tyt-turk-dili-ve-edebiyati")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-geometri")).toBe(true);
     expect(hasBucketedStructure("maarif11-geometri")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-fizik")).toBe(true);
@@ -590,12 +686,11 @@ describe("only the subjects with a spec are bucketed", () => {
     expect(hasBucketedStructure("maarif-tyt-biyoloji")).toBe(true);
     expect(hasBucketedStructure("maarif11-biyoloji")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);
-    expect(hasBucketedStructure("maarif-tyt-matematik")).toBe(false);
     expect(hasBucketedStructure("maarif11-tarih")).toBe(false);
     expect(hasBucketedStructure("toString")).toBe(false);
-    const mat = merged("maarif-tyt-matematik");
-    expect(courseHasBuckets(mat)).toBe(false);
-    expect(mat.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
+    const tde = merged("maarif-tyt-turk-dili-ve-edebiyati");
+    expect(courseHasBuckets(tde)).toBe(false);
+    expect(tde.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
   });
 });
 
