@@ -1,5 +1,7 @@
 "use client";
 
+import { Fragment } from "react";
+
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
@@ -74,12 +76,15 @@ export function TopicMistakeSelector({
                 <div key={`${block.unitLabel}-${blockIndex}`} className="space-y-1 pl-1">
                   <p className="text-muted-foreground text-xs">{block.unitLabel}</p>
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
-                    {block.rows.map((row) => {
+                    {block.rows.map((row, rowIndex) => {
                       const isWrong = hasRow(course.id, row, "wrong");
                       const isBlank = hasRow(course.id, row, "blank");
+                      // An intermediate group heading (Kimya: "Kimya Hayattır") once above its buckets.
+                      const showGroup = row.groupLabel !== undefined && row.groupLabel !== block.rows[rowIndex - 1]?.groupLabel;
                       return (
+                        <Fragment key={row.id}>
+                        {showGroup && <p className="text-foreground col-span-full pt-1 text-xs font-semibold">{row.groupLabel}</p>}
                         <div
-                          key={row.id}
                           className="hover:bg-accent/40 flex items-start gap-2 rounded-md px-2 py-1 text-sm"
                         >
                           <span className="text-foreground min-w-0 flex-1">
@@ -114,6 +119,7 @@ export function TopicMistakeSelector({
                             B
                           </button>
                         </div>
+                        </Fragment>
                       );
                     })}
                   </div>

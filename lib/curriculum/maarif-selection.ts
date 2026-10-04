@@ -35,6 +35,7 @@ export function maarifSelectionNodes(course: Course): LgsSelectionNode[] {
           id: unit.topics[0].id,
           label: unit.bucket,
           unitLabel: unit.unit,
+          ...(unit.group !== undefined ? { groupLabel: unit.group } : {}),
           readOnlyNames: [],
           memberTopicIds: unit.topics.map((t) => t.id),
         },

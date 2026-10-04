@@ -7,7 +7,7 @@ import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { alignedUnits, hasBucketedStructure, resolveSpec, SUBJECT_SPECS } from "./maarif-tyt-structure";
 import { courseHasBuckets, maarifSelectionNodes } from "./maarif-selection";
-import { flattenSelectionRows } from "./rows";
+import { flattenSelectionRows, withGroupHeadings } from "./rows";
 
 const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
 const tarih = merged("maarif-tyt-tarih");
@@ -18,6 +18,8 @@ const raw = (prefix: string) =>
     .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
 const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
 const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
+const kimya = merged("maarif-tyt-kimya");
+const rawKimya = raw("maarif9-kimya").concat(raw("maarif10-kimya"));
 const biyoloji = merged("maarif-tyt-biyoloji");
 const rawBiyoloji = raw("maarif9-biyoloji").concat(raw("maarif10-biyoloji"));
 
@@ -265,6 +267,148 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
   });
 });
 
+describe("Kimya: Tema -> intermediate group -> bucket leaf", () => {
+  // unit -> group -> buckets, as the UI shows them
+  const tree = () => {
+    const out: [string, [string, string[]][]][] = [];
+    for (const row of flattenSelectionRows(kimya)) {
+      let unit = out[out.length - 1];
+      if (!unit || unit[0] !== row.unitLabel) {
+        unit = [row.unitLabel, []];
+        out.push(unit);
+      }
+      const group = unit[1][unit[1].length - 1];
+      if (group && group[0] === row.groupLabel) group[1].push(row.label);
+      else unit[1].push([row.groupLabel ?? "", [row.label]]);
+    }
+    return out;
+  };
+
+  it("has the coach's 6 themes, their intermediate groups and buckets, in order", () => {
+    expect(tree()).toEqual([
+      [
+        "1. Tema: Etkileşim",
+        [
+          ["Kimya Hayattır", ["Günlük Hayatta Kimya", "Kimyanın Alt Disiplinleri", "Kimyasal Maddelerin Kullanımı ve Güvenlik"]],
+          ["Atomdan Periyodik Tabloya", ["Atom Teorileri, Atomun Yapısı", "Atom Orbitalleri ve Elektron Dizilimi", "Periyodik Tabloda Yer Bulma", "Periyodik Özellikler"]],
+        ],
+      ],
+      [
+        "2. Tema: Çeşitlilik",
+        [
+          ["Etkileşimler", ["Metalik Bağ", "İyonik Bağ", "Kovalent Bağ", "Lewis Nokta Yapısı", "Molekül Polarlığı ve Apolarlığı", "Bileşiklerin Adlandırılması"]],
+          ["Etkileşimden Maddeye", ["Moleküller Arası Etkileşimler", "Katılar ve Özellikleri", "Sıvılar ve Özellikleri"]],
+        ],
+      ],
+      ["3. Tema: Sürdürülebilirlik", [["Nanoparçacıklar ve Ekolojik Sürdürülebilirlik", ["Metal Nanoparçacıklar", "Yeşil Kimyanın Atık Önleme İlkesi"]]]],
+      [
+        "4. Tema: Etkileşim",
+        [
+          [
+            "Kimyasal Tepkimeler",
+            [
+              "Kimyasal Tepkimelerin Oluşumu",
+              "Kimyasal Tepkime Türleri (Çökelme Tepkimeleri)",
+              "Mol Kavramı",
+              "Kimyasal Tepkime Denklemlerinin Denkleştirilmesi",
+              "Kimyasal (Stokiyometrik) Hesaplamalar",
+            ],
+          ],
+          ["Gazlar", ["Gazların Özellikleri ve Gaz Yasaları", "İdeal Gaz Yasası", "Gazların Kinetik Moleküler Teorisi, Difüzyon ve Efüzyon Yasası"]],
+        ],
+      ],
+      [
+        "5. Tema: Çeşitlilik",
+        [
+          [
+            "Çözeltiler",
+            [
+              "Çözünme Süreci",
+              "Maddelerin Birbiri İçinde Çözünebilirliği",
+              "Çözünme Olayının Sınıflandırılması",
+              "Çözeltilerde Derişim",
+              "Çözünürlük",
+              "Çözünürlüğe Etki Eden Faktörler",
+              "Çözeltilerin Sınıflandırılması",
+              "Koligatif Özellikler",
+            ],
+          ],
+        ],
+      ],
+      [
+        "6. Tema: Sürdürülebilirlik",
+        [["Yeşil Kimya, Çevresel ve Ekolojik Sürdürülebilirlik", ["Makro ve Mikro Ölçekli Deneyler, Atmosferdeki Tepkimeler ve Küresel Sorunlar"]]],
+      ],
+    ]);
+  });
+
+  it("shows 35 leaf rows; the raw topics are hidden members; only the 2 unlisted ones are left out", () => {
+    const rows = flattenSelectionRows(kimya);
+    expect(rows).toHaveLength(35);
+    expect(rows.every((r) => r.readOnlyNames.length === 0)).toBe(true);
+    expect(rows.some((r) => r.label.includes(" › "))).toBe(false);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-kimya"]).unresolved).toEqual([]);
+    expect(rawKimya).toHaveLength(38); // 20 (9th) + 18 (10th)
+    const excludedIds = [
+      "maarif9-kimya-u0-t2", // Kimya Alanında Kariyer Olanakları
+      "maarif9-kimya-u2-t2", // Metal, Alaşım ve Metal Nanoparçacıkların Çevreye Etkisi
+    ];
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-kimya"]).excluded.map((t) => t.id).sort()).toEqual(excludedIds.slice().sort());
+    const ids = rows.flatMap((r) => r.memberTopicIds);
+    expect(ids).toHaveLength(36);
+    expect(ids.slice().sort()).toEqual(rawKimya.filter((id) => !excludedIds.includes(id)).sort());
+    expect(new Set(ids).size).toBe(ids.length);
+    const everyId = kimya.units.flatMap((u) => u.topics.map((t) => t.id));
+    for (const id of excludedIds) expect(everyId).not.toContain(id);
+    expect(kimya.units.some((u) => u.unit === "Diğer" || /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
+  });
+
+  it("the Gazlar bucket with two raw topics saves against the first and reads from both", () => {
+    const row = flattenSelectionRows(kimya).find((r) => r.label.startsWith("Gazların Kinetik"))!;
+    expect(row.memberTopicIds).toEqual(["maarif10-kimya-u0-t6", "maarif10-kimya-u0-t8"]);
+    expect(row.id).toBe("maarif10-kimya-u0-t6");
+  });
+
+  it("splices one heading row per group into the table and extends each unit's span over them", () => {
+    const headed = withGroupHeadings(flattenSelectionRows(kimya));
+    expect(headed).toHaveLength(35 + 9); // 9 group headings
+    expect(headed.filter((h) => h.kind === "heading").map((h) => (h.kind === "heading" ? h.label : ""))).toEqual([
+      "Kimya Hayattır",
+      "Atomdan Periyodik Tabloya",
+      "Etkileşimler",
+      "Etkileşimden Maddeye",
+      "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik",
+      "Kimyasal Tepkimeler",
+      "Gazlar",
+      "Çözeltiler",
+      "Yeşil Kimya, Çevresel ve Ekolojik Sürdürülebilirlik",
+    ]);
+    expect(headed.filter((h) => h.unitRowSpan !== null).map((h) => h.unitRowSpan)).toEqual([9, 11, 3, 10, 9, 2]);
+    // The unit cell sits on the first item of the unit, which is its first heading.
+    expect(headed[0].kind).toBe("heading");
+    expect(headed[0].unitRowSpan).toBe(9);
+    // Spans add up to every item, so no row is left uncovered.
+    expect(headed.reduce((n, h) => n + (h.unitRowSpan ?? 0), 0)).toBe(headed.length);
+  });
+
+  it("the 11th grade's own Kimya (the 11. Sınıf tab) is untouched", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-kimya")!;
+    expect(courseHasBuckets(own)).toBe(false);
+    expect(own.units.some((u) => u.group !== undefined)).toBe(false);
+  });
+});
+
+describe("withGroupHeadings leaves every group-less course exactly as it is", () => {
+  it("Tarih, Coğrafya and Biyoloji get no heading rows and keep their own spans", () => {
+    for (const course of [tarih, cografya, biyoloji]) {
+      const rows = flattenSelectionRows(course);
+      const headed = withGroupHeadings(rows);
+      expect(headed.every((h) => h.kind === "row")).toBe(true);
+      expect(headed.map((h) => h.unitRowSpan)).toEqual(rows.map((r) => r.unitRowSpan));
+    }
+  });
+});
+
 describe("a topic no bucket claims is kept as a leaf of its own", () => {
   it("stays in its unit (named by itself); units no spec unit uses go under Diğer", () => {
     const partial = alignedUnits({
@@ -309,7 +453,9 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya"]);
+    expect(hasBucketedStructure("maarif-tyt-kimya")).toBe(true);
+    expect(hasBucketedStructure("maarif11-kimya")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-biyoloji")).toBe(true);
     expect(hasBucketedStructure("maarif11-biyoloji")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);

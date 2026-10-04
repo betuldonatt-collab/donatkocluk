@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
-import type { SelectionRow } from "@/lib/curriculum/rows";
+import { withGroupHeadings, type SelectionRow } from "@/lib/curriculum/rows";
 import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
 import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
@@ -160,16 +160,46 @@ export function MaarifTableBody({
     );
   }
 
+  // Rows with their intermediate group headings (Kimya: "Kimya Hayattır") spliced
+  // in as heading rows; units without groups pass through unchanged.
+  const items = withGroupHeadings(rows);
+  const preparedById = new Map(groups.map((g) => [g.row.id, g]));
+  const linesOf = (item: (typeof items)[number]) => (item.kind === "heading" ? 1 : preparedById.get(item.row.id)!.lines.length);
+  // Columns a heading row has to fill after its own text: every pipeline step and
+  // resource column that follows the Konu column.
+  const fillerCols = pipeline.config.start.length + resources.length * 2 + pipeline.config.end.length;
+
   return (
     <>
-      {groups.map((group, gi) => {
+      {items.map((item, ii) => {
+        // The unit title spans every line of every row (and heading) in its unit:
+        // the first item of a unit carries it.
+        const unitLines = item.unitRowSpan === null ? 0 : items.slice(ii, ii + item.unitRowSpan).reduce((n, it) => n + linesOf(it), 0);
+        if (item.kind === "heading") {
+          return (
+            <TableRow key={item.key} className="border-border/40">
+              <TableCell colSpan={4} className="bg-muted/40 p-0" />
+              {item.unitRowSpan !== null && (
+                <TableCell
+                  rowSpan={unitLines}
+                  className={cn("bg-card sticky left-0 z-10 border-r border-l px-3 py-2 text-sm font-medium whitespace-normal", MAARIF_UNIT_COL_CLASS)}
+                >
+                  <UnitLabel label={item.unitLabel} />
+                </TableCell>
+              )}
+              <TableCell
+                className={cn("bg-muted text-foreground sticky z-10 min-w-56 border-r px-3 py-1.5 text-xs font-semibold whitespace-normal", MAARIF_KONU_STICKY_LEFT_CLASS)}
+              >
+                {item.label}
+              </TableCell>
+              {fillerCols > 0 && <TableCell colSpan={fillerCols} className="bg-muted/40 p-0" />}
+            </TableRow>
+          );
+        }
+        const group = preparedById.get(item.row.id)!;
         const { row, lines } = group;
         const count = lines.length;
         const scope = row.label === row.unitLabel ? row.label : `${row.unitLabel} - ${row.label}`;
-        // The unit title spans every line of every group in its unit: the
-        // first group of a unit carries it (unitRowSpan = how many groups).
-        const unitLines =
-          row.unitRowSpan === null ? 0 : groups.slice(gi, gi + row.unitRowSpan).reduce((n, g) => n + g.lines.length, 0);
         return lines.map((line, li) => {
           const isFirstLine = li === 0;
           const isLastLine = li === count - 1;
@@ -180,7 +210,7 @@ export function MaarifTableBody({
               className={cn(!isLastLine && "border-border/40")}
             >
               {isFirstLine && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
-              {isFirstLine && row.unitRowSpan !== null && (
+              {isFirstLine && item.unitRowSpan !== null && (
                 <TableCell
                   rowSpan={unitLines}
                   className={cn(

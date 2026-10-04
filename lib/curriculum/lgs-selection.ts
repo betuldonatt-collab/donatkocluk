@@ -36,6 +36,8 @@ export type LgsSelectionNode = {
   // The literal unit text this node belongs under (for the table's own
   // Ünite grouping) -- not shown directly, callers render it themselves.
   unitLabel: string;
+  // A Maarif TYT bucket's intermediate heading within its unit (Unit.group), if any.
+  groupLabel?: string;
   // Names of every topic this node rolls up, to show as read-only context
   // under `label`. Empty means this node IS a real, individually
   // selectable topic (no rollup happened for it) -- e.g. İngilizce, a Fen

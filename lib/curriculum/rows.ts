@@ -85,6 +85,9 @@ export type SelectionRow = {
   label: string;
   unitLabel: string;
   unitRowSpan: number | null;
+  // A Maarif TYT bucket's intermediate heading within its unit; undefined for
+  // every other course. See withGroupHeadings.
+  groupLabel?: string;
   readOnlyNames: string[];
   memberTopicIds: string[];
 };
@@ -102,6 +105,7 @@ function rowsFromNodes(nodes: LgsSelectionNode[]): SelectionRow[] {
         label: node.label,
         unitLabel: node.unitLabel,
         unitRowSpan: idx === 0 ? block.length : null,
+        ...(node.groupLabel !== undefined ? { groupLabel: node.groupLabel } : {}),
         readOnlyNames: node.readOnlyNames,
         memberTopicIds: node.memberTopicIds,
       });
@@ -109,6 +113,42 @@ function rowsFromNodes(nodes: LgsSelectionNode[]): SelectionRow[] {
     i = j;
   }
   return rows;
+}
+
+// Rows with their intermediate group headings spliced in. A unit whose rows
+// carry a groupLabel (Kimya: Tema -> "Kimya Hayattır" -> bucket) gets one
+// heading row at the start of each group, and its unit cell spans the headings
+// too; every other unit passes through exactly as it is. Tables render this
+// instead of the bare rows.
+export type HeadedRow =
+  | { kind: "heading"; key: string; label: string; unitLabel: string; unitRowSpan: number | null }
+  | { kind: "row"; row: SelectionRow; unitRowSpan: number | null };
+
+export function withGroupHeadings(rows: SelectionRow[]): HeadedRow[] {
+  const out: HeadedRow[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    let j = i + 1;
+    while (j < rows.length && rows[j].unitRowSpan === null) j++;
+    const block = rows.slice(i, j);
+    if (!block.some((r) => r.groupLabel !== undefined)) {
+      for (const row of block) out.push({ kind: "row", row, unitRowSpan: row.unitRowSpan });
+    } else {
+      const items: HeadedRow[] = [];
+      let previous: string | undefined;
+      block.forEach((row, idx) => {
+        if (row.groupLabel !== undefined && row.groupLabel !== previous) {
+          items.push({ kind: "heading", key: `${row.unitLabel}::${idx}::${row.groupLabel}`, label: row.groupLabel, unitLabel: row.unitLabel, unitRowSpan: null });
+        }
+        previous = row.groupLabel;
+        items.push({ kind: "row", row, unitRowSpan: null });
+      });
+      items[0].unitRowSpan = items.length;
+      out.push(...items);
+    }
+    i = j;
+  }
+  return out;
 }
 
 export function flattenSelectionRows(course: Course): SelectionRow[] {

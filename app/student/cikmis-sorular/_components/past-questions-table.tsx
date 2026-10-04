@@ -115,6 +115,9 @@ type Row = {
   konuLabel?: string | null;
   konuRowSpan?: number | null;
   group: { members: string[]; isFirst: boolean } | null;
+  // Set on a row that is just an intermediate group heading (Kimya: "Kimya
+  // Hayattır") -- spans the Konu and year columns and carries no data of its own.
+  heading?: string;
 };
 
 // LGS's workbook records a question count once per frequency group (e.g.
@@ -153,6 +156,16 @@ function flattenRows(course: Course): Row[] {
     // A bucket (the 11th grader's merged Coğrafya/Tarih) is one row named by
     // the bucket; the raw topics it rolls up are never listed.
     if (group.bucket !== undefined && group.topics.length > 0) {
+      const previousUnit = course.units[course.units.indexOf(group) - 1];
+      if (group.group !== undefined && !(previousUnit?.unit === group.unit && previousUnit.group === group.group)) {
+        rows.push({
+          topic: { id: `heading::${group.unit}::${group.group}`, name: group.group },
+          unitLabel: group.unit,
+          unitRowSpan: 1,
+          group: null,
+          heading: group.group,
+        });
+      }
       rows.push({ topic: { id: group.topics[0].id, name: group.bucket }, unitLabel: group.unit, unitRowSpan: 1, group: null });
       continue;
     }
@@ -254,7 +267,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.topic.id}>
+              <TableRow key={row.topic.id} className={row.heading !== undefined ? "bg-muted/50" : undefined}>
                 {row.unitRowSpan !== null && (
                   <TableCell
                     rowSpan={row.unitRowSpan}
@@ -271,20 +284,27 @@ export function PastQuestionsTable({ course }: { course: Course }) {
                     )}
                   </TableCell>
                 )}
-                {hasKonu && row.konuRowSpan != null && (
+                {row.heading !== undefined ? (
+                  <TableCell colSpan={(hasKonu ? 2 : 1) + years.length} className="text-xs font-semibold whitespace-normal">
+                    {row.heading}
+                  </TableCell>
+                ) : null}
+                {row.heading === undefined && hasKonu && row.konuRowSpan != null && (
                   <TableCell rowSpan={row.konuRowSpan} className="border-r align-middle font-medium whitespace-normal">
                     {row.konuLabel}
                   </TableCell>
                 )}
-                <TableCell
-                  // A topic with no Konu of its own inside a course that has
-                  // some spans both columns rather than leaving one empty.
-                  colSpan={hasKonu && row.konuLabel == null ? 2 : 1}
-                  className="font-medium whitespace-normal"
-                >
-                  {row.topic.name}
-                </TableCell>
-                {years.map((year) => {
+                {row.heading === undefined && (
+                  <TableCell
+                    // A topic with no Konu of its own inside a course that has
+                    // some spans both columns rather than leaving one empty.
+                    colSpan={hasKonu && row.konuLabel == null ? 2 : 1}
+                    className="font-medium whitespace-normal"
+                  >
+                    {row.topic.name}
+                  </TableCell>
+                )}
+                {row.heading === undefined && years.map((year) => {
                   if (row.group && !row.group.isFirst) return null; // covered by the group's spanning cell above
                   const count = row.group
                     ? sumFrequency(allTopics, row.group.members, year)

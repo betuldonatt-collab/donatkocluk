@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
-import { flattenSelectionRows } from "@/lib/curriculum/rows";
+import { flattenSelectionRows, withGroupHeadings } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { StudentTask } from "../../_components/daily-tasks/types";
 
@@ -88,41 +88,55 @@ export function ExamTopicTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.unitRowSpan !== null && (
-                    <TableCell
-                      rowSpan={row.unitRowSpan}
-                      className={cn(
-                        "bg-card sticky left-0 z-10 border-r p-0 text-center align-middle",
-                        row.unitRowSpan === 1 && "text-muted-foreground",
-                      )}
-                    >
-                      {row.unitLabel === "-" ? (
-                        "-"
-                      ) : (
-                        <div className="flex h-full items-center justify-center py-2">
-                          <span className="[writing-mode:vertical-rl] rotate-180 font-medium">
-                            {row.unitLabel}
-                          </span>
-                        </div>
-                      )}
-                    </TableCell>
-                  )}
-                  <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
-                    {row.label}
-                    <ReadOnlySubtopics names={row.readOnlyNames} />
+              {withGroupHeadings(rows).map((item) => {
+                const unitLabel = item.kind === "heading" ? item.unitLabel : item.row.unitLabel;
+                const unitCell = item.unitRowSpan !== null && (
+                  <TableCell
+                    rowSpan={item.unitRowSpan}
+                    className={cn(
+                      "bg-card sticky left-0 z-10 border-r p-0 text-center align-middle",
+                      item.unitRowSpan === 1 && "text-muted-foreground",
+                    )}
+                  >
+                    {unitLabel === "-" ? (
+                      "-"
+                    ) : (
+                      <div className="flex h-full items-center justify-center py-2">
+                        <span className="[writing-mode:vertical-rl] rotate-180 font-medium">{unitLabel}</span>
+                      </div>
+                    )}
                   </TableCell>
-                  {exams.map((exam) => {
-                    const missed = row.memberTopicIds.some((id) => mistakesByExam[exam.id]?.has(id));
-                    return (
-                      <TableCell key={exam.id} className="border-l text-center">
-                        {missed && <X className="mx-auto size-4 text-rose-500" />}
+                );
+                // An intermediate group heading (Kimya: "Kimya Hayattır"): one full-width row.
+                if (item.kind === "heading") {
+                  return (
+                    <TableRow key={item.key}>
+                      {unitCell}
+                      <TableCell colSpan={1 + exams.length} className="bg-muted/60 text-xs font-semibold whitespace-normal">
+                        {item.label}
                       </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
+                    </TableRow>
+                  );
+                }
+                const row = item.row;
+                return (
+                  <TableRow key={row.id}>
+                    {unitCell}
+                    <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
+                      {row.label}
+                      <ReadOnlySubtopics names={row.readOnlyNames} />
+                    </TableCell>
+                    {exams.map((exam) => {
+                      const missed = row.memberTopicIds.some((id) => mistakesByExam[exam.id]?.has(id));
+                      return (
+                        <TableCell key={exam.id} className="border-l text-center">
+                          {missed && <X className="mx-auto size-4 text-rose-500" />}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

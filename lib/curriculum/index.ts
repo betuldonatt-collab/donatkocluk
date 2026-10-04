@@ -29,7 +29,9 @@ export type Topic = { id: string; name: string; frequency?: Record<string, numbe
 // the tables show only this label, never the raw `topics` it rolls up -- those
 // stay here (real ids, real names) purely so progress and mistakes can still be
 // saved and aggregated against them.
-export type Unit = { unit: string; konu?: string; bucket?: string; topics: Topic[] };
+// `group` is a bucket's INTERMEDIATE heading inside its unit (Kimya: Tema ->
+// "Kimya Hayattır" -> bucket): shown once as a heading row above its buckets.
+export type Unit = { unit: string; konu?: string; bucket?: string; group?: string; topics: Topic[] };
 export type Course = { id: string; name: string; units: Unit[] };
 
 export const TYT_COURSES: Course[] = tytJson as Course[];

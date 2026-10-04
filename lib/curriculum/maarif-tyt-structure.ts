@@ -23,7 +23,9 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 // topics, named by title (the last " › " part of the topic's name) or by
 // 1-based position in that unit.
 export type Source = { course: string; unit: number; topics?: (string | number)[] };
-export type BucketSpec = { label: string; from: Source[] };
+// `group` is the bucket's intermediate heading within its unit (consecutive
+// buckets with the same group share one heading row).
+export type BucketSpec = { label: string; from: Source[]; group?: string };
 export type UnitSpec = { label: string; buckets: BucketSpec[] };
 export type SubjectSpec = {
   units: UnitSpec[];
@@ -243,6 +245,87 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       { course: "maarif10-biyoloji", unit: 1, topics: [10] },
     ],
   },
+
+  // Kimya: Tema 1-3 are 9th grade's three themes, Tema 4-6 are 10th grade's three units.
+  // Three levels: Tema -> intermediate group ("Kimya Hayattır", ...) -> bucket (the leaf).
+  // Topics are picked by 1-based position in the raw unit and ONLY ones that match a bucket of
+  // the coach's list are placed; the rest are `excluded` (dropped, never attached nearby).
+  //  - Tema 4 "Kinetik Moleküler Teori, Difüzyon ve Efüzyon" takes both raw Gazlar topics (7, 9).
+  "maarif-tyt-kimya": {
+    units: [
+      {
+        label: "1. Tema: Etkileşim",
+        buckets: [
+          { label: "Günlük Hayatta Kimya", group: "Kimya Hayattır", from: [{ course: "maarif9-kimya", unit: 1, topics: [1] }] },
+          { label: "Kimyanın Alt Disiplinleri", group: "Kimya Hayattır", from: [{ course: "maarif9-kimya", unit: 1, topics: [2] }] },
+          { label: "Kimyasal Maddelerin Kullanımı ve Güvenlik", group: "Kimya Hayattır", from: [{ course: "maarif9-kimya", unit: 1, topics: [4] }] },
+          { label: "Atom Teorileri, Atomun Yapısı", group: "Atomdan Periyodik Tabloya", from: [{ course: "maarif9-kimya", unit: 1, topics: [5] }] },
+          { label: "Atom Orbitalleri ve Elektron Dizilimi", group: "Atomdan Periyodik Tabloya", from: [{ course: "maarif9-kimya", unit: 1, topics: [6] }] },
+          { label: "Periyodik Tabloda Yer Bulma", group: "Atomdan Periyodik Tabloya", from: [{ course: "maarif9-kimya", unit: 1, topics: [7] }] },
+          { label: "Periyodik Özellikler", group: "Atomdan Periyodik Tabloya", from: [{ course: "maarif9-kimya", unit: 1, topics: [8] }] },
+        ],
+      },
+      {
+        label: "2. Tema: Çeşitlilik",
+        buckets: [
+          { label: "Metalik Bağ", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [1] }] },
+          { label: "İyonik Bağ", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [2] }] },
+          { label: "Kovalent Bağ", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [3] }] },
+          { label: "Lewis Nokta Yapısı", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [4] }] },
+          { label: "Molekül Polarlığı ve Apolarlığı", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [5] }] },
+          { label: "Bileşiklerin Adlandırılması", group: "Etkileşimler", from: [{ course: "maarif9-kimya", unit: 2, topics: [6] }] },
+          { label: "Moleküller Arası Etkileşimler", group: "Etkileşimden Maddeye", from: [{ course: "maarif9-kimya", unit: 2, topics: [7] }] },
+          { label: "Katılar ve Özellikleri", group: "Etkileşimden Maddeye", from: [{ course: "maarif9-kimya", unit: 2, topics: [8] }] },
+          { label: "Sıvılar ve Özellikleri", group: "Etkileşimden Maddeye", from: [{ course: "maarif9-kimya", unit: 2, topics: [9] }] },
+        ],
+      },
+      {
+        label: "3. Tema: Sürdürülebilirlik",
+        buckets: [
+          { label: "Metal Nanoparçacıklar", group: "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik", from: [{ course: "maarif9-kimya", unit: 3, topics: [1] }] },
+          { label: "Yeşil Kimyanın Atık Önleme İlkesi", group: "Nanoparçacıklar ve Ekolojik Sürdürülebilirlik", from: [{ course: "maarif9-kimya", unit: 3, topics: [2] }] },
+        ],
+      },
+      {
+        label: "4. Tema: Etkileşim",
+        buckets: [
+          { label: "Kimyasal Tepkimelerin Oluşumu", group: "Kimyasal Tepkimeler", from: [{ course: "maarif10-kimya", unit: 1, topics: [1] }] },
+          { label: "Kimyasal Tepkime Türleri (Çökelme Tepkimeleri)", group: "Kimyasal Tepkimeler", from: [{ course: "maarif10-kimya", unit: 1, topics: [2] }] },
+          { label: "Mol Kavramı", group: "Kimyasal Tepkimeler", from: [{ course: "maarif10-kimya", unit: 1, topics: [3] }] },
+          { label: "Kimyasal Tepkime Denklemlerinin Denkleştirilmesi", group: "Kimyasal Tepkimeler", from: [{ course: "maarif10-kimya", unit: 1, topics: [4] }] },
+          { label: "Kimyasal (Stokiyometrik) Hesaplamalar", group: "Kimyasal Tepkimeler", from: [{ course: "maarif10-kimya", unit: 1, topics: [5] }] },
+          { label: "Gazların Özellikleri ve Gaz Yasaları", group: "Gazlar", from: [{ course: "maarif10-kimya", unit: 1, topics: [6] }] },
+          { label: "İdeal Gaz Yasası", group: "Gazlar", from: [{ course: "maarif10-kimya", unit: 1, topics: [8] }] },
+          { label: "Gazların Kinetik Moleküler Teorisi, Difüzyon ve Efüzyon Yasası", group: "Gazlar", from: [{ course: "maarif10-kimya", unit: 1, topics: [7, 9] }] },
+        ],
+      },
+      {
+        label: "5. Tema: Çeşitlilik",
+        buckets: [
+          { label: "Çözünme Süreci", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [1] }] },
+          { label: "Maddelerin Birbiri İçinde Çözünebilirliği", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [2] }] },
+          { label: "Çözünme Olayının Sınıflandırılması", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [3] }] },
+          { label: "Çözeltilerde Derişim", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [4] }] },
+          { label: "Çözünürlük", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [5] }] },
+          { label: "Çözünürlüğe Etki Eden Faktörler", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [6] }] },
+          { label: "Çözeltilerin Sınıflandırılması", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [7] }] },
+          { label: "Koligatif Özellikler", group: "Çözeltiler", from: [{ course: "maarif10-kimya", unit: 2, topics: [8] }] },
+        ],
+      },
+      {
+        label: "6. Tema: Sürdürülebilirlik",
+        buckets: [
+          { label: "Makro ve Mikro Ölçekli Deneyler, Atmosferdeki Tepkimeler ve Küresel Sorunlar", group: "Yeşil Kimya, Çevresel ve Ekolojik Sürdürülebilirlik", from: [{ course: "maarif10-kimya", unit: 3, topics: [1] }] },
+        ],
+      },
+    ],
+    excluded: [
+      // 9th grade, 1. Tema: "Kimya Hayattır › Kimya Alanında Kariyer Olanakları" (3)
+      { course: "maarif9-kimya", unit: 1, topics: [3] },
+      // 9th grade, 3. Tema: "... › Metal, Alaşım ve Metal Nanoparçacıkların Çevreye Etkisi" (3)
+      { course: "maarif9-kimya", unit: 3, topics: [3] },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];
@@ -251,7 +334,7 @@ const leafTitle = (name: string) => name.split(" › ").pop()!;
 // Apostrophes and spacing differ between the coach's wording and the sheet's.
 const norm = (s: string) => s.replace(/[’‘´`]/g, "'").replace(/\s+/g, " ").trim().toLocaleLowerCase("tr-TR");
 
-export type ResolvedBucket = { label: string; topics: Topic[] };
+export type ResolvedBucket = { label: string; topics: Topic[]; group?: string };
 export type ResolvedUnit = { label: string; buckets: ResolvedBucket[] };
 export type ResolvedSpec = {
   units: ResolvedUnit[];
@@ -289,7 +372,7 @@ export function resolveSpec(spec: SubjectSpec): ResolvedSpec {
     buckets: unit.buckets.map((bucket) => {
       const topics = bucket.from.flatMap((source) => resolveSource(source, unresolved)).filter((t) => !claimed.has(t.id));
       topics.forEach((t) => claimed.add(t.id));
-      return { label: bucket.label, topics };
+      return { label: bucket.label, topics, ...(bucket.group !== undefined ? { group: bucket.group } : {}) };
     }),
   }));
   const excluded = (spec.excluded ?? []).flatMap((source) => resolveSource(source, unresolved));
@@ -341,6 +424,7 @@ export function alignedUnits(spec: SubjectSpec): Unit[] {
       units.push({
         unit: unitSpec.label,
         bucket: bucket.label,
+        ...(bucket.group !== undefined ? { group: bucket.group } : {}),
         topics: bucket.topics.map((t) => ({ id: t.id, name: t.name })),
       });
     });
