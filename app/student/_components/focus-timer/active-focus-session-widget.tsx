@@ -8,13 +8,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { subscribeTick } from "@/lib/background-ticker";
-import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
-import { focusEndingStore, focusModalStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
-import { resolvePraiseMessage } from "@/lib/focus-praise";
+import { markKeepRunning, markOwner, needsOtherDeviceQuestion } from "@/lib/focus-device";
+import { runEndFlow } from "@/lib/focus-end-flow";
+import { focusEndingStore, focusFailedEndStore, focusModalStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
 import { closePip, isPipSupported, openPip, pipStore, updatePip } from "@/lib/focus-pip";
 import { formatTimerClock, formatTimerTitle, setTimerTitle } from "@/lib/focus-title";
 import {
-  endFocusSession,
   getRunningFocusSessions,
   heartbeatFocusSession,
   pauseFocusSession,
@@ -22,6 +21,7 @@ import {
   sendFocusHeartbeat,
   type RunningFocusSession,
 } from "../../actions";
+import { OtherDeviceSessionPrompt } from "./other-device-session-prompt";
 import { StillStudyingPrompt, useStillStudyingPrompt } from "./still-studying-prompt";
 
 const HEARTBEAT_INTERVAL_MS = 20_000;
@@ -95,6 +95,14 @@ export function ActiveFocusSessionWidget() {
     focusOptimisticSessionStore.getSnapshot,
     focusOptimisticSessionStore.getServerSnapshot,
   );
+  // Sessions whose Bitir failed for good: their card turns red with "Tekrar dene".
+  const failedKey = useSyncExternalStore(
+    focusFailedEndStore.subscribe,
+    focusFailedEndStore.getSnapshot,
+    focusFailedEndStore.getServerSnapshot,
+  );
+  // Bumped when the student answers the other-device question, so it re-evaluates.
+  const [, setAnswered] = useState(0);
   const mergedSessions =
     optimisticSession && !sessions.some((s) => s.taskId === optimisticSession.taskId)
       ? [optimisticSession, ...sessions]
@@ -181,13 +189,50 @@ export function ActiveFocusSessionWidget() {
     };
   }, [refresh]);
 
+  // A RUNNING session this browser did not start (another phone / tablet): ask
+  // what to do with it -- never close it for the student, never just show it.
+  // Only sessions read from the server are asked about (the optimistic entry is
+  // always this device's own), and not while the fullscreen timer is open.
+  const elsewhere = modalOpen
+    ? undefined
+    : visibleSessions.find((s) => s.status === "running" && sessions.some((x) => x.taskId === s.taskId) && needsOtherDeviceQuestion(s.taskId));
+
   return (
     <>
+      {elsewhere && (
+        <OtherDeviceSessionPrompt
+          taskTitle={elsewhere.taskTitle}
+          elapsedSeconds={elsewhere.elapsedSeconds}
+          onStop={() => {
+            const target = elsewhere;
+            // Counts as this device's decision: stop it like any Bitir.
+            markOwner(target.taskId);
+            runEndFlow({
+              taskId: target.taskId,
+              clientSeconds: Math.round(elapsedNow(target, Date.now())),
+              goalHit: false,
+              onSuccess: () => refresh().catch(() => {}),
+            });
+            setAnswered((n) => n + 1);
+          }}
+          onKeep={() => {
+            markKeepRunning(elsewhere.taskId);
+            setAnswered((n) => n + 1);
+          }}
+        />
+      )}
       <PipDriver sessions={visibleSessions} active={pipOpen} onResync={refresh} />
       {!modalOpen && visibleSessions.length > 0 && (
         <div className="fixed right-4 bottom-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
           {visibleSessions.map((session, index) => (
-            <RunningSessionCard key={session.taskId} session={session} ownsTitle={index === 0} pipOpen={pipOpen} onChanged={refresh} />
+            <RunningSessionCard
+              key={session.taskId}
+              session={session}
+              ownsTitle={index === 0}
+              pipOpen={pipOpen}
+              onChanged={refresh}
+              endFailed={failedKey.split(",").includes(session.taskId)}
+            />
           ))}
         </div>
       )}
@@ -237,8 +282,11 @@ function RunningSessionCard({
   ownsTitle,
   pipOpen,
   onChanged,
+  endFailed,
 }: {
   session: LiveSession;
+  // The last Bitir failed even after the automatic retries: show it red.
+  endFailed: boolean;
   // Only one card drives the browser-tab title (with several sessions the
   // title would otherwise flip between them).
   ownsTitle: boolean;
@@ -290,6 +338,7 @@ function RunningSessionCard({
   // disabled, then the parent's fresh read (onChanged) takes over ticking.
   function handleResumeClick() {
     setResuming(true);
+    markOwner(session.taskId);
     resumeFocusSession(session.taskId)
       .then((result) => {
         if (!result) {
@@ -335,46 +384,21 @@ function RunningSessionCard({
 
   // Bitir is OPTIMISTIC: the card disappears the instant it's clicked (the
   // session is added to the "ending" set, which the widget hides) and the save
-  // finishes in the background behind a "Süren kaydediliyor…" toast. If the save
-  // fails, the session is still running on the server, so it comes back here.
+  // finishes in the background (lib/focus-end-flow.ts: timeout, automatic
+  // retries, a red "Tekrar dene" card if it still fails, and a message built
+  // from what the server really banked).
   function handleEnd(creditedSeconds?: number) {
-    const taskId = session.taskId;
-    const savedSeconds = creditedSeconds ?? Math.round(elapsedSeconds);
     const goalHit =
       session.mode === "countdown" &&
       session.countdownTargetSeconds !== null &&
       elapsedSeconds >= session.countdownTargetSeconds;
-    focusEndingStore.begin(taskId);
-    const toastId = toast.loading("Süren kaydediliyor…");
-
-    endFocusSession(taskId, creditedSeconds)
-      .then((ended) => {
-        if (!ended.ok) {
-          toast.error(ended.error, { id: toastId });
-          return;
-        }
-        clearConfirmedMultiple(taskId);
-        const clock = formatTimerClock(savedSeconds);
-        if (ended.pendingApproval) {
-          toast.warning(`${clock} çok uzun olduğu için koç onayına gönderildi.`, { id: toastId });
-        } else if (savedSeconds > 0) {
-          toast.success(`${resolvePraiseMessage(savedSeconds, goalHit)} ${clock} boyunca odaklandın, göreve kaydedildi.`, {
-            id: toastId,
-          });
-        } else {
-          toast.dismiss(toastId);
-        }
-        router.refresh();
-      })
-      .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
-      .finally(() => {
-        focusOptimisticSessionStore.clear(taskId);
-        // Lifting this doesn't by itself risk a flash of stale data: the
-        // "settling" effect below (shared with FocusTimerTrigger's own
-        // Bitir) keeps this taskId hidden until a fresh read has actually
-        // confirmed it either way.
-        focusEndingStore.end(taskId);
-      });
+    runEndFlow({
+      taskId: session.taskId,
+      clientSeconds: creditedSeconds ?? Math.round(elapsedSeconds),
+      creditedSeconds,
+      goalHit,
+      onSuccess: () => router.refresh(),
+    });
   }
 
   async function handlePip() {
@@ -389,7 +413,13 @@ function RunningSessionCard({
 
   return (
     <>
-      <div className={cn("border-border bg-card flex w-72 flex-col gap-2 rounded-lg border p-3 shadow-lg", isPaused && "border-amber-500/40")}>
+      <div className={cn(
+          "border-border bg-card flex w-72 flex-col gap-2 rounded-lg border p-3 shadow-lg",
+          isPaused && "border-amber-500/40",
+          endFailed && "border-destructive bg-destructive/5",
+        )}
+        role={endFailed ? "alert" : undefined}
+      >
         <div className="flex items-center gap-2">
           {isPaused ? (
             <span className="relative flex size-2.5 shrink-0">
@@ -409,8 +439,13 @@ function RunningSessionCard({
         <div className="flex items-end justify-between gap-2">
           <div>
             <p className="text-foreground text-2xl font-bold tabular-nums">{formatTimerClock(shownSeconds)}</p>
-            <p className={cn("text-[11px]", isPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
-              {modeLabel(session, now)}
+            <p
+              className={cn(
+                "text-[11px]",
+                endFailed ? "text-destructive font-semibold" : isPaused ? "font-medium text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+              )}
+            >
+              {endFailed ? "Kaydedilemedi — sayaç hâlâ çalışıyor" : modeLabel(session, now)}
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -438,8 +473,13 @@ function RunningSessionCard({
                 Mola
               </Button>
             )}
-            <Button type="button" size="sm" variant={isPaused ? "outline" : "default"} onClick={() => handleEnd()}>
-              Bitir
+            <Button
+              type="button"
+              size="sm"
+              variant={endFailed ? "destructive" : isPaused ? "outline" : "default"}
+              onClick={() => handleEnd(endFailed ? focusFailedEndStore.credited(session.taskId) : undefined)}
+            >
+              {endFailed ? "Tekrar dene" : "Bitir"}
             </Button>
           </div>
         </div>

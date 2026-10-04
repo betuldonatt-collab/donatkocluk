@@ -230,11 +230,19 @@ export function FocusTimerModal({
 
   // Bitir: hand off IMMEDIATELY. The parent closes this screen on the spot and
   // saves in the background, so the click always feels instant.
+  // The reading is taken from the wall clock at the click, not from the last
+  // display tick (which can be stale right after the phone wakes up), so what
+  // the student is told about the saved time compares like with like.
+  function liveElapsedSeconds() {
+    return startedAtRef.current !== null ? (Date.now() - startedAtRef.current) / 1000 : elapsedSeconds;
+  }
+
   function handleFinish() {
     setRunning(false);
+    const seconds = liveElapsedSeconds();
     // A countdown ended early via Bitir (before its target was reached)
     // doesn't count as "hitting the goal" -- only countdownDone does.
-    onFinish({ mode, seconds: Math.round(elapsedSeconds), goalHit: countdownDone });
+    onFinish({ mode, seconds: Math.round(seconds), goalHit: mode === "countdown" && seconds >= totalSeconds });
   }
 
   // "Hayır, bitir" on the check-in: credits either the full elapsed time
@@ -243,7 +251,7 @@ export function FocusTimerModal({
     setRunning(false);
     onFinish({
       mode,
-      seconds: creditedSeconds ?? Math.round(elapsedSeconds),
+      seconds: creditedSeconds ?? Math.round(liveElapsedSeconds()),
       goalHit: false,
       creditedSeconds,
     });

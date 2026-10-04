@@ -96,7 +96,8 @@ describe("endFocusSession", () => {
   it("ends a normal session and reports it as saved", async () => {
     const { endFocusSession } = await import("../app/student/actions");
     const result = await endFocusSession(TASK);
-    expect(result).toEqual({ ok: true, totalSeconds: 90, pendingApproval: false });
+    expect(result).toMatchObject({ ok: true, totalSeconds: 90, pendingApproval: false, hadSession: true });
+    if (result.ok) expect(result.bankedSeconds).toBeGreaterThanOrEqual(0);
     expect(state.rpcCalls[0].fn).toBe("end_focus_session");
   });
 
@@ -221,12 +222,13 @@ describe("openFocusSessionForTask", () => {
     expect(state.rpcCalls).toHaveLength(0); // nothing was ended
   });
 
-  it("banks a running session whose page went quiet (tab closed), through NOW -- the time away is not dropped", async () => {
+  it("attaches to a running session whose page went quiet -- never closed on the system's say-so (a locked phone stops heartbeating)", async () => {
     const { openFocusSessionForTask } = await import("../app/student/actions");
     state.session = sessionWith({ last_heartbeat_at: minutesAgo(40), run_started_at: minutesAgo(45) });
     const result = await openFocusSessionForTask(TASK);
-    expect(result.kind).toBe("banked");
-    if (result.kind === "banked") expect(result.seconds).toBeGreaterThanOrEqual(45 * 60);
+    expect(result.kind).toBe("attach");
+    if (result.kind === "attach") expect(result.elapsedSeconds).toBeGreaterThanOrEqual(45 * 60);
+    expect(state.rpcCalls).toHaveLength(0); // nothing was ended
   });
 
   it("shows a quiet session past 3 hours (so the check-in can ask) instead of crediting it unseen", async () => {

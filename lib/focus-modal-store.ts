@@ -141,3 +141,36 @@ export const focusOptimisticSessionStore = {
     }
   },
 };
+
+// Sessions whose Bitir FAILED for good (every automatic retry included). The
+// session is still running on the server, so the floating widget shows its card
+// in a red "Kaydedilemedi" state with a "Tekrar dene" button instead of
+// quietly going back to looking like an ordinary running timer. `credited` is
+// the shortened figure from the "still studying?" check-in, if that is how it
+// was ended, so the retry ends it the same way.
+const failedEnd = new Map<string, { credited?: number }>();
+const failedEndListeners = new Set<() => void>();
+
+function emitFailedEnd() {
+  for (const listener of failedEndListeners) listener();
+}
+
+export const focusFailedEndStore = {
+  subscribe(listener: () => void) {
+    failedEndListeners.add(listener);
+    return () => {
+      failedEndListeners.delete(listener);
+    };
+  },
+  // Comma-joined ids: a primitive snapshot so useSyncExternalStore compares by value.
+  getSnapshot: () => [...failedEnd.keys()].sort().join(","),
+  getServerSnapshot: () => "",
+  credited: (taskId: string) => failedEnd.get(taskId)?.credited,
+  set(taskId: string, credited?: number) {
+    failedEnd.set(taskId, { credited });
+    emitFailedEnd();
+  },
+  clear(taskId: string) {
+    if (failedEnd.delete(taskId)) emitFailedEnd();
+  },
+};

@@ -1656,8 +1656,11 @@ function focusActionError(label: string, e: unknown): string {
   return e instanceof Error ? e.message : GENERIC_DB_ERROR;
 }
 
+// bankedSeconds is what the server really credited (0 when there was no session
+// to end -- hadSession false), so the client can tell the student the truth
+// instead of repeating what its own timer showed.
 export type EndFocusSessionResult =
-  | { ok: true; totalSeconds: number | null; pendingApproval: boolean }
+  | { ok: true; totalSeconds: number | null; pendingApproval: boolean; bankedSeconds: number; hadSession: boolean }
   | { ok: false; error: string };
 
 // creditedSeconds is optional; null is accepted as "not given" too, since an
@@ -1675,7 +1678,13 @@ export async function endFocusSession(taskId: string, creditedSeconds?: number |
 
     const session = await getOwnFocusSession(supabase, user.id, taskIdV);
     const banked = await bankFocusSession(supabase, user.id, taskIdV, session, creditedV);
-    return { ok: true, totalSeconds: banked.totalSeconds, pendingApproval: banked.pendingApproval };
+    return {
+      ok: true,
+      totalSeconds: banked.totalSeconds,
+      pendingApproval: banked.pendingApproval,
+      bankedSeconds: banked.bankedSeconds,
+      hadSession: session !== null,
+    };
   } catch (e) {
     return { ok: false, error: focusActionError("endFocusSession", e) };
   }
@@ -1716,11 +1725,7 @@ export async function openFocusSessionForTask(taskId: string): Promise<OpenFocus
     if (!session) return { kind: "none" };
 
     const elapsedSeconds = liveElapsedSeconds(session);
-    const decision = decideOpenAction({
-      status: session.status,
-      lastHeartbeatAt: session.last_heartbeat_at,
-      elapsedSeconds,
-    });
+    const decision = decideOpenAction({ status: session.status });
 
     if (decision === "attach") {
       const { data: task } = await supabase

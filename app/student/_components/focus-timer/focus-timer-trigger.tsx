@@ -7,11 +7,9 @@ import { Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { clearConfirmedMultiple } from "@/lib/focus-confirmation";
-import { focusEndingStore, focusOptimisticSessionStore } from "@/lib/focus-modal-store";
-import { resolvePraiseMessage } from "@/lib/focus-praise";
-import { formatTimerClock } from "@/lib/focus-title";
+import { markKeepRunning, markOwner, needsOtherDeviceQuestion } from "@/lib/focus-device";
+import { runEndFlow } from "@/lib/focus-end-flow";
 import {
-  endFocusSession,
   heartbeatFocusSession,
   openFocusSessionForTask,
   pauseFocusSession,
@@ -27,6 +25,7 @@ import {
   type CloseState,
   type FocusTimerMode,
 } from "./focus-timer-modal";
+import { OtherDeviceSessionPrompt } from "./other-device-session-prompt";
 
 // Per-task Focus Mode entry point -- opens the same fullscreen timer for
 // whichever task this button is rendered next to. Persistence is entirely
@@ -41,6 +40,9 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   const [checking, setChecking] = useState(false);
   const [attachSession, setAttachSession] = useState<AttachedFocusSession | null>(null);
   const [bankedNotice, setBankedNotice] = useState<BankedNotice | null>(null);
+  // A session running on a DIFFERENT device (one this browser did not start):
+  // the student is asked what to do with it before the timer opens.
+  const [elsewhere, setElsewhere] = useState<AttachedFocusSession | null>(null);
   // What the fullscreen timer's stopwatch display should count UP FROM --
   // seconds already banked on this task from earlier, already-ended
   // sessions, so a student who took a Mola and comes back sees the clock
@@ -71,16 +73,23 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
     setChecking(true);
     setAttachSession(null);
     setBankedNotice(null);
+    let openAfter = true;
     setPriorTrackedSeconds(task.tracked_duration_seconds ?? 0);
     try {
       const result = await openFocusSessionForTask(task.id);
       if (result.kind === "attach") {
-        setAttachSession({
+        const attached = {
           mode: result.mode,
           countdownTargetSeconds: result.countdownTargetSeconds,
           elapsedSeconds: result.elapsedSeconds,
-        });
+        };
+        setAttachSession(attached);
         setPriorTrackedSeconds(result.priorTrackedSeconds);
+        if (needsOtherDeviceQuestion(task.id)) {
+          // Don't open the timer yet -- ask first (see OtherDeviceSessionPrompt).
+          setElsewhere(attached);
+          openAfter = false;
+        }
       } else if (result.kind === "banked") {
         clearConfirmedMultiple(task.id);
         if (result.seconds > 0) setBankedNotice({ seconds: result.seconds, pendingApproval: result.pendingApproval });
@@ -92,44 +101,22 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
       // Fall through: open the timer regardless.
     } finally {
       setChecking(false);
-      setOpen(true);
+      if (openAfter) setOpen(true);
     }
   }
 
   // Bitir is OPTIMISTIC: the timer closes the instant it's clicked and the save
-  // finishes in the background, with a "Süren kaydediliyor…" toast that turns
-  // into the result. While it's in flight the floating widget hides this
-  // session (focusEndingStore); if the save fails the session is still running
-  // on the server, so it reappears there and can be ended again.
+  // finishes in the background (lib/focus-end-flow.ts: 15 s timeout, two
+  // automatic retries, a loud red "Tekrar dene" state if it still fails, and a
+  // message built from what the server really banked).
   function handleFinish(result: { mode: FocusTimerMode; seconds: number; goalHit: boolean; creditedSeconds?: number }) {
     setOpen(false);
-    focusEndingStore.begin(task.id);
-    const toastId = toast.loading("Süren kaydediliyor…");
-
-    endFocusSession(task.id, result.creditedSeconds)
-      .then((ended) => {
-        if (!ended.ok) {
-          toast.error(ended.error, { id: toastId });
-          return;
-        }
-        clearConfirmedMultiple(task.id);
-        const clock = formatTimerClock(result.seconds);
-        if (ended.pendingApproval) {
-          toast.warning(`${clock} çok uzun olduğu için koç onayına gönderildi.`, { id: toastId });
-        } else if (result.seconds > 0) {
-          toast.success(
-            `${resolvePraiseMessage(result.seconds, result.goalHit)} ${clock} boyunca odaklandın, göreve kaydedildi.`,
-            { id: toastId },
-          );
-        } else {
-          toast.dismiss(toastId);
-        }
-      })
-      .catch(() => toast.error("Odak süresi kaydedilemedi, tekrar dene.", { id: toastId }))
-      .finally(() => {
-        focusOptimisticSessionStore.clear(task.id);
-        focusEndingStore.end(task.id);
-      });
+    runEndFlow({
+      taskId: task.id,
+      clientSeconds: result.seconds,
+      creditedSeconds: result.creditedSeconds,
+      goalHit: result.goalHit,
+    });
   }
 
   // The X / Escape / the green button. Closing NEVER discards time: a running
@@ -145,6 +132,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   }
 
   function handleStart(mode: FocusTimerMode, countdownTargetSeconds: number | null) {
+    markOwner(task.id);
     startFocusSession(task.id, mode, countdownTargetSeconds).catch(() => {
       toast.error("Süre senkronize edilemedi ama sayaç çalışmaya devam ediyor.");
     });
@@ -155,6 +143,7 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
   }
 
   function handleResumeSession() {
+    markOwner(task.id);
     return resumeFocusSession(task.id);
   }
 
@@ -194,6 +183,24 @@ export function FocusTimerTrigger({ task, className }: { task: StudentTask; clas
           Süre Tut
         </Button>
       </div>
+
+      {elsewhere && (
+        <OtherDeviceSessionPrompt
+          taskTitle={task.title}
+          elapsedSeconds={elsewhere.elapsedSeconds}
+          onStop={() => {
+            const seconds = elsewhere.elapsedSeconds;
+            setElsewhere(null);
+            setAttachSession(null);
+            runEndFlow({ taskId: task.id, clientSeconds: seconds, goalHit: false });
+          }}
+          onKeep={() => {
+            markKeepRunning(task.id);
+            setElsewhere(null);
+            setOpen(true);
+          }}
+        />
+      )}
 
       {open && (
         <FocusTimerModal
