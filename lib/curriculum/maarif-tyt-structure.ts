@@ -34,6 +34,10 @@ export type SubjectSpec = {
   // claim is still kept, as a leaf of its own (see alignedUnits) -- so a topic
   // only disappears when it is named here.
   excluded?: Source[];
+  // True for a subject cut out of a bigger course (Geometri, from Matematik): the
+  // spec names the units it takes and ignores the rest of the source courses,
+  // instead of keeping every other topic of those courses as a leftover leaf.
+  onlyListedUnits?: boolean;
 };
 
 export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
@@ -409,6 +413,51 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       },
     ],
   },
+
+  // Geometri has no course of its own in the 9th/10th data: its topics are units of the Matematik
+  // courses (9th Tema 3 "Geometrik Şekiller" + Tema 4 "Eşlik ve Benzerlik", 10th Ünite 1 "Geometrik
+  // Şekiller" + Ünite 6 "Analitik İnceleme"). This spec builds the separate Geometri course from them,
+  // and the merged Matematik course no longer lists those units (see maarif-tyt.ts) -- each raw topic
+  // is tracked in exactly one place. Two levels (Tema -> Bölüm leaf), no groups.
+  // Approved compromises where the coach's list is finer than the raw topics (a bucket needs a raw
+  // topic id of its own): "Doğruda ve Üçgende Açılar" + "Üçgende Açı Kenar Bağıntıları" are ONE bucket,
+  // and so are "Üçgende Açıortay" + "Kenarortay" + "Kenar Orta Dikme ve Yükseklik". The raw topic
+  // "Eşlik ve Benzerlikle İlgili Problemler" fits neither Eşlik nor Benzerlik alone, so it is excluded.
+  "maarif-tyt-geometri": {
+    onlyListedUnits: true,
+    units: [
+      {
+        label: "1. Tema: Üçgenler (9. Sınıf)",
+        buckets: [
+          { label: "Doğruda ve Üçgende Açılar, Üçgende Açı Kenar Bağıntıları", from: [{ course: "maarif9-matematik", unit: 3, topics: [1] }] },
+          { label: "Geometrik Dönüşümler", from: [{ course: "maarif9-matematik", unit: 4, topics: [1] }] },
+          { label: "Üçgende Eşlik", from: [{ course: "maarif9-matematik", unit: 4, topics: [2] }] },
+          { label: "Üçgenlerde Benzerlik", from: [{ course: "maarif9-matematik", unit: 4, topics: [3] }] },
+          { label: "Dik Üçgen", from: [{ course: "maarif9-matematik", unit: 4, topics: [4] }] },
+        ],
+      },
+      {
+        label: "1. Tema: Üçgenler (10. Sınıf)",
+        buckets: [
+          { label: "Trigonometrik Oranlar ve Özdeşlikler", from: [{ course: "maarif10-matematik", unit: 1, topics: [1] }] },
+          { label: "Üçgende Açıortay, Kenarortay, Kenar Orta Dikme ve Yükseklik", from: [{ course: "maarif10-matematik", unit: 1, topics: [2] }] },
+          { label: "Üçgende Alan", from: [{ course: "maarif10-matematik", unit: 1, topics: [3] }] },
+          { label: "Sinüs ve Kosinüs Teoremleri", from: [{ course: "maarif10-matematik", unit: 1, topics: [4] }] },
+        ],
+      },
+      {
+        label: "2. Tema: Analitik İnceleme",
+        buckets: [
+          { label: "Noktanın Analitik İncelenmesi", from: [{ course: "maarif10-matematik", unit: 6, topics: [1] }] },
+          { label: "Doğrunun Analitik İncelenmesi", from: [{ course: "maarif10-matematik", unit: 6, topics: [2] }] },
+        ],
+      },
+    ],
+    excluded: [
+      // 9th grade, 4. Tema: "Eşlik ve Benzerlikle İlgili Problemler" (5)
+      { course: "maarif9-matematik", unit: 4, topics: [5] },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];
@@ -462,6 +511,16 @@ export function resolveSpec(spec: SubjectSpec): ResolvedSpec {
   return { units, excluded, unresolved };
 }
 
+// The source units ("course#unit", unit 1-based) a spec draws from or excludes.
+// A course built from another course's units (Geometri, from Matematik) uses this
+// to take them out of the course they came from.
+export function specSourceUnits(spec: SubjectSpec): Set<string> {
+  const keys = new Set<string>();
+  for (const u of spec.units) for (const b of u.buckets) for (const f of b.from) keys.add(`${f.course}#${f.unit}`);
+  for (const f of spec.excluded ?? []) keys.add(`${f.course}#${f.unit}`);
+  return keys;
+}
+
 // True when a merged "Maarif TYT" course has a bucket structure (and so is
 // laid out in buckets everywhere -- see alignedUnits).
 export function hasBucketedStructure(courseId: string | null | undefined): boolean {
@@ -486,8 +545,10 @@ export function alignedUnits(spec: SubjectSpec): Unit[] {
   const used = new Set(spec.units.flatMap((u) => u.buckets.flatMap((b) => b.from.map((s) => s.course))));
 
   const leftoversBySourceUnit = new Map<string, Topic[]>();
+  const listedUnits = specSourceUnits(spec);
   for (const course of SOURCE_COURSES.filter((c) => used.has(c.id))) {
     course.units.forEach((unit, ui) => {
+      if (spec.onlyListedUnits && !listedUnits.has(`${course.id}#${ui + 1}`)) return;
       const rest = unit.topics.filter((t) => !claimed.has(t.id));
       if (rest.length > 0) leftoversBySourceUnit.set(`${course.id}#${ui + 1}`, rest);
     });

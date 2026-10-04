@@ -110,7 +110,7 @@ export function overCapGroup<T extends { key: string; questions: number }>(
 const MAARIF_TYT_COURSE_IDS_BY_GROUP: Record<SubjectGroupKey, string[]> = {
   turkce: ["maarif-tyt-turk-dili-ve-edebiyati"],
   sosyal: ["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-felsefe", "maarif-tyt-din-kulturu"],
-  matematik: ["maarif-tyt-matematik"],
+  matematik: ["maarif-tyt-matematik", "maarif-tyt-geometri"],
   fen: ["maarif-tyt-fizik", "maarif-tyt-kimya", "maarif-tyt-biyoloji"],
 };
 

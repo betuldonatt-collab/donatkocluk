@@ -18,6 +18,9 @@ const raw = (prefix: string) =>
     .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
 const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
 const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
+const geometri = merged("maarif-tyt-geometri");
+const matematik = merged("maarif-tyt-matematik");
+const rawMatematik = raw("maarif9-matematik").concat(raw("maarif10-matematik"));
 const fizik = merged("maarif-tyt-fizik");
 const rawFizik = raw("maarif9-fizik").concat(raw("maarif10-fizik"));
 const kimya = merged("maarif-tyt-kimya");
@@ -266,6 +269,63 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     expect(courseHasBuckets(own)).toBe(false);
     expect(own.units.map((u) => u.unit)).toEqual(["1. Ünite: Tepki", "2. Ünite: Homeostazi"]);
     expect(own.units.map((u) => u.topics.length)).toEqual([16, 10]);
+  });
+});
+
+describe("Geometri: a separate course built from the Matematik courses' geometry units", () => {
+  const excludedId = "maarif9-matematik-u3-t4"; // Eşlik ve Benzerlikle İlgili Problemler
+
+  it("has the coach's 3 groups and their 11 leaf rows, in order", () => {
+    expect(unitsAndBuckets("maarif-tyt-geometri")).toEqual([
+      [
+        "1. Tema: Üçgenler (9. Sınıf)",
+        ["Doğruda ve Üçgende Açılar, Üçgende Açı Kenar Bağıntıları", "Geometrik Dönüşümler", "Üçgende Eşlik", "Üçgenlerde Benzerlik", "Dik Üçgen"],
+      ],
+      [
+        "1. Tema: Üçgenler (10. Sınıf)",
+        ["Trigonometrik Oranlar ve Özdeşlikler", "Üçgende Açıortay, Kenarortay, Kenar Orta Dikme ve Yükseklik", "Üçgende Alan", "Sinüs ve Kosinüs Teoremleri"],
+      ],
+      ["2. Tema: Analitik İnceleme", ["Noktanın Analitik İncelenmesi", "Doğrunun Analitik İncelenmesi"]],
+    ]);
+    const rows = flattenSelectionRows(geometri);
+    expect(rows).toHaveLength(11);
+    expect(rows.every((r) => r.readOnlyNames.length === 0 && r.groupLabel === undefined)).toBe(true);
+    expect(rows.filter((r) => r.unitRowSpan !== null).map((r) => r.unitRowSpan)).toEqual([5, 4, 2]);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-geometri"]).unresolved).toEqual([]);
+  });
+
+  it("claims 11 of the 12 raw geometry topics; the 12th is excluded and shown nowhere", () => {
+    const ids = flattenSelectionRows(geometri).flatMap((r) => r.memberTopicIds);
+    expect(ids).toHaveLength(11);
+    expect(new Set(ids).size).toBe(11);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-geometri"]).excluded.map((t) => t.id)).toEqual([excludedId]);
+    expect(ids).not.toContain(excludedId);
+    expect(matematik.units.flatMap((u) => u.topics.map((t) => t.id))).not.toContain(excludedId);
+    expect(geometri.units.flatMap((u) => u.topics.map((t) => t.id))).not.toContain(excludedId);
+  });
+
+  it("keeps the merged buckets' raw topics as hidden members", () => {
+    const members = (label: string) => flattenSelectionRows(geometri).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Doğruda ve Üçgende Açılar, Üçgende Açı Kenar Bağıntıları")).toEqual(["maarif9-matematik-u2-t0"]);
+    expect(members("Üçgende Açıortay, Kenarortay, Kenar Orta Dikme ve Yükseklik")).toEqual(["maarif10-matematik-u0-t1"]);
+    expect(members("Dik Üçgen")).toEqual(["maarif9-matematik-u3-t3"]);
+    expect(members("Doğrunun Analitik İncelenmesi")).toEqual(["maarif10-matematik-u5-t1"]);
+  });
+
+  it("no overlap: Matematik no longer lists any geometry unit, and shares no topic id with Geometri", () => {
+    const mathIds = new Set(matematik.units.flatMap((u) => u.topics.map((t) => t.id)));
+    for (const id of geometri.units.flatMap((u) => u.topics.map((t) => t.id))) expect(mathIds.has(id)).toBe(false);
+    const labels = matematik.units.map((u) => u.unit);
+    expect(labels.some((l) => /Geometrik Şekiller|Eşlik ve Benzerlik|Analitik İnceleme/.test(l))).toBe(false);
+    // Everything else of 9th/10th Matematik is still there: 12 geometry topics out of the total.
+    expect(mathIds.size).toBe(rawMatematik.length - 12);
+    expect(matematik.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
+  });
+
+  it("the 11th grade's own Matematik (the 11. Sınıf tab) keeps its Geometrik Şekiller unit", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-matematik")!;
+    expect(courseHasBuckets(own)).toBe(false);
+    expect(own.units.some((u) => u.unit === "2. Ünite: Geometrik Şekiller")).toBe(true);
   });
 });
 
@@ -520,7 +580,9 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri"]);
+    expect(hasBucketedStructure("maarif-tyt-geometri")).toBe(true);
+    expect(hasBucketedStructure("maarif11-geometri")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-fizik")).toBe(true);
     expect(hasBucketedStructure("maarif11-fizik")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-kimya")).toBe(true);

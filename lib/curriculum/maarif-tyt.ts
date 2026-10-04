@@ -19,13 +19,25 @@
 import type { Course, Unit } from "./index";
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
-import { alignedUnits, SUBJECT_SPECS } from "./maarif-tyt-structure";
+import { alignedUnits, specSourceUnits, SUBJECT_SPECS } from "./maarif-tyt-structure";
 
-type MergePair = { id: string; name: string; m9Id: string | null; m10Id: string | null };
+type MergePair = {
+  id: string;
+  name: string;
+  m9Id: string | null;
+  m10Id: string | null;
+  // The id of a bucket-structured course built from units of THIS pair's source
+  // courses (Geometri, from Matematik): those units are left out here so every
+  // raw topic is tracked in exactly one place.
+  without?: string;
+};
 
 const MERGE_PAIRS: MergePair[] = [
   { id: "maarif-tyt-turk-dili-ve-edebiyati", name: "Türk Dili ve Edebiyatı", m9Id: "maarif9-turk-dili-ve-edebiyati", m10Id: "maarif10-turk-dili-ve-edebiyati" },
-  { id: "maarif-tyt-matematik", name: "Matematik", m9Id: "maarif9-matematik", m10Id: "maarif10-matematik" },
+  { id: "maarif-tyt-matematik", name: "Matematik", m9Id: "maarif9-matematik", m10Id: "maarif10-matematik", without: "maarif-tyt-geometri" },
+  // Geometri has no course of its own in the 9th/10th data -- the spec in
+  // maarif-tyt-structure.ts builds it out of the Matematik courses' geometry units.
+  { id: "maarif-tyt-geometri", name: "Geometri", m9Id: "maarif9-matematik", m10Id: "maarif10-matematik" },
   { id: "maarif-tyt-cografya", name: "Coğrafya", m9Id: "maarif9-cografya", m10Id: "maarif10-cografya" },
   { id: "maarif-tyt-fizik", name: "Fizik", m9Id: "maarif9-fizik", m10Id: "maarif10-fizik" },
   { id: "maarif-tyt-kimya", name: "Kimya", m9Id: "maarif9-kimya", m10Id: "maarif10-kimya" },
@@ -55,7 +67,7 @@ export function splitUnitGradeTag(label: string): { grade: string | null; title:
   return m ? { grade: m[1], title: m[2] } : { grade: null, title: label };
 }
 
-export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, m9Id, m10Id }) => {
+export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, m9Id, m10Id, without }) => {
   // A subject with a bucket structure (maarif-tyt-structure.ts) is laid out in
   // its buckets -- each one a single leaf, raw topics hidden -- instead of 9th's
   // units followed by 10th's. Its units are numbered across both grades, so
@@ -66,10 +78,12 @@ export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, 
   if (spec) return { id, name, units: alignedUnits(spec) };
   const c9 = m9Id ? MAARIF9_KAYNAK_COURSES.find((c) => c.id === m9Id) : undefined;
   const c10 = m10Id ? MAARIF10_KAYNAK_COURSES.find((c) => c.id === m10Id) : undefined;
+  const taken = without && SUBJECT_SPECS[without] ? specSourceUnits(SUBJECT_SPECS[without]) : new Set<string>();
+  const keep = (course: Course | undefined) => (course ? course.units.filter((_, i) => !taken.has(`${course.id}#${i + 1}`)) : []);
   return {
     id,
     name,
-    units: [...(c9 ? taggedUnits(c9.units, "9. Sınıf") : []), ...(c10 ? taggedUnits(c10.units, "10. Sınıf") : [])],
+    units: [...(c9 ? taggedUnits(keep(c9), "9. Sınıf") : []), ...(c10 ? taggedUnits(keep(c10), "10. Sınıf") : [])],
   };
 });
 
