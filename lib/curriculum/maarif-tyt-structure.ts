@@ -25,7 +25,15 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 export type Source = { course: string; unit: number; topics?: (string | number)[] };
 // `group` is the bucket's intermediate heading within its unit (consecutive
 // buckets with the same group share one heading row).
-export type BucketSpec = { label: string; from: Source[]; group?: string };
+// `virtualId`: the bucket has NO raw 9th/10th topic behind it (the coach's list is
+// wider than the curriculum data), so it gets a topic of its own -- a "virtual
+// topic" with this id, named by the bucket -- that lives in the merged course's
+// units like any other topic. Ticks, resource progress, mistakes and stats are
+// saved against that id exactly as for a raw topic (the database columns are
+// plain text, no foreign key to a topic table), and every "is this a topic of
+// this course" check passes because the topic IS in the course. Used only when
+// `from` yields no raw topic.
+export type BucketSpec = { label: string; from: Source[]; group?: string; virtualId?: string };
 export type UnitSpec = { label: string; buckets: BucketSpec[] };
 export type SubjectSpec = {
   units: UnitSpec[];
@@ -543,25 +551,29 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
     ],
   },
 
-  // Türkçe (= the Türk Dili ve Edebiyatı courses): a FLAT list -- one unit with the empty label (FLAT_UNIT_LABEL),
-  // so every table drops its Ünite column and shows only the bölüm rows. Only the grammar / paragraph topics
-  // that strictly fit one of the coach's 14 buckets are placed; every literature topic (şiir, hikâye, roman,
-  // tiyatro, destan, edebî sanatlar, ...) and every other non-matching raw topic is `excluded`.
-  //  - "Cümle Anlamı" covers every sentence-level raw topic (here: "Cümle Türleri").
-  //  - "Fiil, Ek-Fiil" takes Fiiller and Fiilimsiler (fiilimsiler are taught under fiil).
-  //  - Six of the 14 listed buckets (Sözcük Anlamı, Anlatım Teknikleri, Paragrafın Yapısı, Paragrafta Yardımcı
-  //    Düşünceler, Ekler, Sözcük Yapısı) have NO raw topic in the 9th/10th data, so they cannot be tracked and
-  //    are left out.
+  // Türkçe (= the Türk Dili ve Edebiyatı courses): a FLAT list of the coach's 14 bölümler -- one unit with the
+  // empty label (FLAT_UNIT_LABEL), so every table drops its Ünite column and shows only the bölüm rows.
+  // Only the grammar / paragraph raw topics that strictly fit a bölüm are placed; every literature topic and
+  // every other non-matching raw topic (incl. "Fiilimsiler" and "Cümle Türleri", which are different from
+  // "Fiil, Ek-Fiil" and "Cümle Anlamı") is `excluded`.
+  // Seven of the 14 bölümler have NO raw topic in the 9th/10th data. They are kept, as virtual topics (see
+  // BucketSpec.virtualId), so that all 14 rows are visible and trackable independently.
   "maarif-tyt-turk-dili-ve-edebiyati": {
     units: [
       {
         label: "",
         buckets: [
-          { label: "Cümle Anlamı", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [7] }] },
+          { label: "Sözcük Anlamı", from: [], virtualId: "maarif-tyt-turkce-v-sozcuk-anlami" },
+          { label: "Cümle Anlamı", from: [], virtualId: "maarif-tyt-turkce-v-cumle-anlami" },
+          { label: "Anlatım Teknikleri", from: [], virtualId: "maarif-tyt-turkce-v-anlatim-teknikleri" },
           { label: "Paragrafta Konu-Ana Düşünce", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 2, topics: [6, 7] }] },
+          { label: "Paragrafın Yapısı", from: [], virtualId: "maarif-tyt-turkce-v-paragrafin-yapisi" },
+          { label: "Paragrafta Yardımcı Düşünceler", from: [], virtualId: "maarif-tyt-turkce-v-paragrafta-yardimci-dusunceler" },
           { label: "Sözcük Türleri", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [5] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 2, topics: [4, 5] }, { course: "maarif9-turk-dili-ve-edebiyati", unit: 4, topics: [4, 5] }] },
           { label: "Tamlamalar", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [6] }] },
-          { label: "Fiil, Ek-Fiil", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [4, 5] }] },
+          { label: "Fiil, Ek-Fiil", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [4] }] },
+          { label: "Ekler", from: [], virtualId: "maarif-tyt-turkce-v-ekler" },
+          { label: "Sözcük Yapısı", from: [], virtualId: "maarif-tyt-turkce-v-sozcuk-yapisi" },
           { label: "Ses Bilgisi", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [4] }] },
           { label: "Yazım Kuralları", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [5] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [8] }] },
           { label: "Noktalama İşaretleri", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [6] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [9] }] },
@@ -581,10 +593,10 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       { course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [1, 2, 3, 4] },
       // 10th Ünite 2: divan şiiri, edebî sanatlar, saf şiir
       { course: "maarif10-turk-dili-ve-edebiyati", unit: 2, topics: [1, 2, 3] },
-      // 10th Ünite 3: destanlar, halk hikâyeleri, mesneviler
-      { course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [1, 2, 3] },
-      // 10th Ünite 4: Dede Korkut, geçiş dönemi, Milli Edebiyat hikâyesi, roman/tiyatro/anı, haber metni, akımlar
-      { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [1, 2, 3, 4, 5, 6] },
+      // 10th Ünite 3: destanlar, halk hikâyeleri, mesneviler; Fiilimsiler (5)
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [1, 2, 3, 5] },
+      // 10th Ünite 4: Dede Korkut, geçiş dönemi, Milli Edebiyat hikâyesi, roman/tiyatro/anı, haber metni, akımlar; Cümle Türleri (7)
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [1, 2, 3, 4, 5, 6, 7] },
     ],
   },
 };
@@ -595,7 +607,7 @@ const leafTitle = (name: string) => name.split(" › ").pop()!;
 // Apostrophes and spacing differ between the coach's wording and the sheet's.
 const norm = (s: string) => s.replace(/[’‘´`]/g, "'").replace(/\s+/g, " ").trim().toLocaleLowerCase("tr-TR");
 
-export type ResolvedBucket = { label: string; topics: Topic[]; group?: string };
+export type ResolvedBucket = { label: string; topics: Topic[]; group?: string; virtual?: boolean };
 export type ResolvedUnit = { label: string; buckets: ResolvedBucket[] };
 export type ResolvedSpec = {
   units: ResolvedUnit[];
@@ -631,9 +643,17 @@ export function resolveSpec(spec: SubjectSpec): ResolvedSpec {
   const units = spec.units.map((unit) => ({
     label: unit.label,
     buckets: unit.buckets.map((bucket) => {
-      const topics = bucket.from.flatMap((source) => resolveSource(source, unresolved)).filter((t) => !claimed.has(t.id));
-      topics.forEach((t) => claimed.add(t.id));
-      return { label: bucket.label, topics, ...(bucket.group !== undefined ? { group: bucket.group } : {}) };
+      const raw = bucket.from.flatMap((source) => resolveSource(source, unresolved)).filter((t) => !claimed.has(t.id));
+      raw.forEach((t) => claimed.add(t.id));
+      // A bucket with no raw topic gets its virtual one (see BucketSpec.virtualId).
+      const isVirtual = raw.length === 0 && bucket.virtualId !== undefined;
+      const topics: Topic[] = isVirtual ? [{ id: bucket.virtualId!, name: bucket.label }] : raw;
+      return {
+        label: bucket.label,
+        topics,
+        ...(bucket.group !== undefined ? { group: bucket.group } : {}),
+        ...(isVirtual ? { virtual: true } : {}),
+      };
     }),
   }));
   const excluded = (spec.excluded ?? []).flatMap((source) => resolveSource(source, unresolved));

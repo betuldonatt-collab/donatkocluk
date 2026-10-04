@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { findCourseById } from "./index";
+import { findCourseById, findTopicById } from "./index";
+import { validatePipelineStep } from "../topic-pipeline";
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
@@ -274,20 +275,29 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
   });
 });
 
-describe("Türkçe: a flat list of grammar / paragraph bölümler (no Ünite level)", () => {
-  it("is named Türkçe and has exactly the 8 bölümler that have raw topics, in the coach's order, with no unit label", () => {
+describe("Türkçe: the flat list of 14 bölümler (no Ünite level), 7 of them virtual topics", () => {
+  const P = "maarif-tyt-turkce-v-";
+  const labels14 = [
+    "Sözcük Anlamı",
+    "Cümle Anlamı",
+    "Anlatım Teknikleri",
+    "Paragrafta Konu-Ana Düşünce",
+    "Paragrafın Yapısı",
+    "Paragrafta Yardımcı Düşünceler",
+    "Sözcük Türleri",
+    "Tamlamalar",
+    "Fiil, Ek-Fiil",
+    "Ekler",
+    "Sözcük Yapısı",
+    "Ses Bilgisi",
+    "Yazım Kuralları",
+    "Noktalama İşaretleri",
+  ];
+
+  it("is named Türkçe and shows EXACTLY the coach's 14 rows, in order, with no unit label", () => {
     expect(turkce.name).toBe("Türkçe");
     const rows = flattenSelectionRows(turkce);
-    expect(rows.map((r) => r.label)).toEqual([
-      "Cümle Anlamı",
-      "Paragrafta Konu-Ana Düşünce",
-      "Sözcük Türleri",
-      "Tamlamalar",
-      "Fiil, Ek-Fiil",
-      "Ses Bilgisi",
-      "Yazım Kuralları",
-      "Noktalama İşaretleri",
-    ]);
+    expect(rows.map((r) => r.label)).toEqual(labels14);
     expect(rows.every((r) => r.unitLabel === "" && r.groupLabel === undefined && r.readOnlyNames.length === 0)).toBe(true);
     expect(isFlatRows(rows)).toBe(true);
     expect(withGroupHeadings(rows).every((h) => h.kind === "row")).toBe(true);
@@ -298,37 +308,77 @@ describe("Türkçe: a flat list of grammar / paragraph bölümler (no Ünite lev
     for (const c of [tarih, cografya, biyoloji, kimya, fizik, geometri, matematik]) expect(isFlatRows(flattenSelectionRows(c))).toBe(false);
   });
 
-  it("places 16 grammar/paragraph raw topics and excludes the other 32 (all literature), each accounted for once", () => {
+  it("the 7 bölümler without a raw topic each have their own virtual topic", () => {
     const rows = flattenSelectionRows(turkce);
-    const placed = rows.flatMap((r) => r.memberTopicIds);
+    const virtual = rows.filter((r) => r.memberTopicIds.length === 1 && r.memberTopicIds[0].startsWith(P));
+    expect(virtual.map((r) => r.label)).toEqual([
+      "Sözcük Anlamı",
+      "Cümle Anlamı",
+      "Anlatım Teknikleri",
+      "Paragrafın Yapısı",
+      "Paragrafta Yardımcı Düşünceler",
+      "Ekler",
+      "Sözcük Yapısı",
+    ]);
+    const ids = virtual.map((r) => r.id);
+    expect(new Set(ids).size).toBe(7);
+    for (const id of ids) {
+      expect(id.length).toBeLessThanOrEqual(60); // the shortest topicId cap in the server actions (mistakes, tasks)
+      expect(rawTurkce).not.toContain(id); // never collides with a raw id
+    }
+    // A virtual row saves against its own id, and that id is a real topic OF the course.
+    const row = rows.find((r) => r.label === "Ekler")!;
+    expect(row.id).toBe(P + "ekler");
+    expect(findTopicById("maarif-tyt-turk-dili-ve-edebiyati", row.id)).toEqual({ id: row.id, name: "Ekler" });
+    expect(findTopicById("maarif-tyt-turk-dili-ve-edebiyati", "no-such")).toBeNull();
+  });
+
+  it("a virtual topic passes the same server checks as a raw one (a 11th grader's Kaynak Takibi tick)", () => {
+    const step = (topicId: string) => ({ courseId: "maarif-tyt-turk-dili-ve-edebiyati", topicId, step: "konu_calismasi" as const, value: true });
+    expect(() => validatePipelineStep("YKS", step(P + "sozcuk-yapisi"), 11)).not.toThrow();
+    expect(() => validatePipelineStep("YKS", step("maarif9-turk-dili-ve-edebiyati-u0-t3"), 11)).not.toThrow(); // a raw one, for comparison
+    // ...and still refused for anyone else / for an id that is not in the course.
+    expect(() => validatePipelineStep("YKS", step(P + "sozcuk-yapisi"), 9)).toThrow();
+    expect(() => validatePipelineStep("YKS", step(P + "nope"), 11)).toThrow();
+  });
+
+  it("places 14 grammar/paragraph raw topics and excludes the other 34, each accounted for once", () => {
+    const rows = flattenSelectionRows(turkce);
+    const placedRaw = rows.flatMap((r) => r.memberTopicIds).filter((id) => !id.startsWith(P));
     expect(rawTurkce).toHaveLength(48); // 23 (9th) + 25 (10th)
-    expect(placed).toHaveLength(16);
+    expect(placedRaw).toHaveLength(14);
     const excluded = resolveSpec(SUBJECT_SPECS["maarif-tyt-turk-dili-ve-edebiyati"]).excluded.map((t) => t.id);
-    expect(excluded).toHaveLength(32);
-    expect([...placed, ...excluded].sort()).toEqual(rawTurkce.slice().sort());
-    expect(new Set([...placed, ...excluded]).size).toBe(48);
-    // The excluded ones are shown nowhere.
+    expect(excluded).toHaveLength(34);
+    expect([...placedRaw, ...excluded].sort()).toEqual(rawTurkce.slice().sort());
     const everyId = turkce.units.flatMap((u) => u.topics.map((t) => t.id));
     for (const id of excluded) expect(everyId).not.toContain(id);
     expect(turkce.units.some((u) => u.unit === "Diğer" || /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
   });
 
-  it("rolls the grammar topics into the right bölüm; Cümle Anlamı takes the sentence-level topic", () => {
+  it("Fiilimsiler and Cümle Türleri are excluded, not merged into Fiil, Ek-Fiil / Cümle Anlamı", () => {
+    const excluded = resolveSpec(SUBJECT_SPECS["maarif-tyt-turk-dili-ve-edebiyati"]).excluded.map((t) => t.id);
+    expect(excluded).toContain("maarif10-turk-dili-ve-edebiyati-u2-t4"); // Fiilimsiler
+    expect(excluded).toContain("maarif10-turk-dili-ve-edebiyati-u3-t6"); // Cümle Türleri
     const members = (label: string) => flattenSelectionRows(turkce).find((r) => r.label === label)!.memberTopicIds;
-    expect(members("Cümle Anlamı")).toEqual(["maarif10-turk-dili-ve-edebiyati-u3-t6"]); // Cümle Türleri
+    expect(members("Fiil, Ek-Fiil")).toEqual(["maarif10-turk-dili-ve-edebiyati-u2-t3"]); // Fiiller only
+    expect(members("Cümle Anlamı")).toEqual([P + "cumle-anlami"]);
+  });
+
+  it("rolls the remaining grammar topics into the right bölüm", () => {
+    const members = (label: string) => flattenSelectionRows(turkce).find((r) => r.label === label)!.memberTopicIds;
     expect(members("Paragrafta Konu-Ana Düşünce")).toEqual(["maarif9-turk-dili-ve-edebiyati-u1-t5", "maarif9-turk-dili-ve-edebiyati-u1-t6"]);
-    expect(members("Sözcük Türleri")).toHaveLength(5); // isimler, zamirler, edat/bağlaç/ünlem, sıfatlar, zarflar
+    expect(members("Sözcük Türleri")).toHaveLength(5);
     expect(members("Tamlamalar")).toEqual(["maarif10-turk-dili-ve-edebiyati-u0-t5"]);
-    expect(members("Fiil, Ek-Fiil")).toEqual(["maarif10-turk-dili-ve-edebiyati-u2-t3", "maarif10-turk-dili-ve-edebiyati-u2-t4"]);
     expect(members("Yazım Kuralları")).toHaveLength(2);
     expect(members("Noktalama İşaretleri")).toHaveLength(2);
   });
 
-  it("the 11th grade's own Türk Dili ve Edebiyatı (the 11. Sınıf tab) is untouched", () => {
+  it("the 11th grade's own Türk Dili ve Edebiyatı (the 11. Sınıf tab) is untouched and has no virtual topics", () => {
     const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-turk-dili-ve-edebiyati")!;
     expect(courseHasBuckets(own)).toBe(false);
     expect(own.name).toBe("11. Sınıf Türk Dili ve Edebiyatı");
     expect(own.units[0].unit).toBe("1. Tema: Bir Diyeceğim Var!");
+    expect(own.units.flatMap((u) => u.topics).some((t) => t.id.includes("-v-"))).toBe(false);
   });
 });
 
