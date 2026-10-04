@@ -9,6 +9,7 @@ import {
   type PendingFocusReview,
   type PendingStudentTask,
 } from "../actions";
+import { getPendingCourseRemovals } from "../school-exam-actions";
 import { DashboardClient } from "./dashboard-client";
 import { WeekNavigator } from "./_components/week-navigator";
 import type {
@@ -372,6 +373,10 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
     }
   }
 
+  // Students asking to drop a school course (Yazılılar): best-effort, [] if migration 0118
+  // is not applied yet.
+  const courseRemovals = view ? await getPendingCourseRemovals() : [];
+
   // Notification-side echo of the pending-approvals card above -- see
   // syncPendingApprovalNotifications' own comment (app/coach/actions.ts).
   // Generating notifications is a write, so (matching every other write
@@ -396,7 +401,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
           useState, which only runs on mount -- keying on the viewed
           week's Monday forces a fresh mount (and fresh local state) each
           time the coach navigates to a different week. */}
-      <DashboardClient key={weekDays[0].date} today={today} weekDays={weekDays} pendingApprovals={pendingApprovals} focusReviews={focusReviews} {...data} />
+      <DashboardClient key={weekDays[0].date} today={today} weekDays={weekDays} pendingApprovals={pendingApprovals} focusReviews={focusReviews} courseRemovals={courseRemovals} {...data} />
     </div>
   );
 }

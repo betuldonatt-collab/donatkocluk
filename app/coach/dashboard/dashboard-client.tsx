@@ -8,6 +8,7 @@ import { MeetingBanner } from "./_components/meeting-banner";
 import { WeeklyCalendar } from "./_components/weekly-calendar";
 import type { CalendarBlock, CoachAlerts, CoachingSession, CoachTask, RosterStudent } from "./types";
 import type { PendingFocusReview, PendingStudentTask } from "../actions";
+import type { PendingCourseRemoval } from "../school-exam-actions";
 
 export function DashboardClient({
   today,
@@ -20,6 +21,7 @@ export function DashboardClient({
   alerts,
   pendingApprovals,
   focusReviews,
+  courseRemovals,
 }: {
   today: string;
   weekDays: { date: string; label: string }[];
@@ -31,6 +33,7 @@ export function DashboardClient({
   alerts: CoachAlerts;
   pendingApprovals: (PendingStudentTask & { studentId: string; studentName: string | null })[];
   focusReviews: PendingFocusReview[];
+  courseRemovals: PendingCourseRemoval[];
 }) {
   const [banner, setBanner] = useState(bannerSession);
   const [sessions, setSessions] = useState(weekSessions);
@@ -62,7 +65,7 @@ export function DashboardClient({
     <div className="space-y-6">
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Kuşbakışı</h2>
-        <AlertPanel alerts={alerts} pendingApprovals={pendingApprovals} focusReviews={focusReviews} />
+        <AlertPanel alerts={alerts} pendingApprovals={pendingApprovals} focusReviews={focusReviews} courseRemovals={courseRemovals} />
       </div>
 
       <MeetingBanner session={banner} roster={roster} onEvaluated={handleEvaluated} />

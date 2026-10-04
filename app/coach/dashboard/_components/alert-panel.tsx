@@ -3,10 +3,12 @@ import { AlertTriangle, ClipboardCheck, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
+import type { PendingCourseRemoval } from "../../school-exam-actions";
 import type { CoachAlerts } from "../types";
 import { LgsMissingTasksPanel } from "./lgs-missing-tasks-panel";
 import { MissingExamAnalysisPanel } from "./missing-exam-analysis-panel";
 import { PendingApprovalsPanel } from "./pending-approvals-panel";
+import { PendingCourseRemovalsPanel } from "./pending-course-removals-panel";
 import { PendingFocusReviewsPanel } from "./pending-focus-reviews-panel";
 
 type Item = { key: string; studentId: string; label: string; href?: string };
@@ -54,10 +56,12 @@ export function AlertPanel({
   alerts,
   pendingApprovals,
   focusReviews,
+  courseRemovals,
 }: {
   alerts: CoachAlerts;
   pendingApprovals: (PendingStudentTask & { studentId: string; studentName: string | null })[];
   focusReviews: PendingFocusReview[];
+  courseRemovals: PendingCourseRemoval[];
 }) {
   const totalAlerts =
     alerts.inactive.length +
@@ -66,7 +70,8 @@ export function AlertPanel({
     alerts.pendingReportCards.length +
     alerts.lgsMissingTasks.length +
     pendingApprovals.length +
-    focusReviews.length;
+    focusReviews.length +
+    courseRemovals.length;
 
   if (totalAlerts === 0) {
     return (
@@ -100,6 +105,7 @@ export function AlertPanel({
       />
       <MissingExamAnalysisPanel alerts={alerts.missingExams} />
       <PendingFocusReviewsPanel reviews={focusReviews} />
+      <PendingCourseRemovalsPanel requests={courseRemovals} />
       <AlertCard
         icon={ClipboardCheck}
         title="Onay Bekleyen Karneler"
