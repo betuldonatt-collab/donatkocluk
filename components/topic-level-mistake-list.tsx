@@ -7,20 +7,19 @@ import { topicLinesForUnit } from "@/lib/curriculum/topic-display";
 type Status = "wrong" | "blank";
 
 // The mistake picker's list for a merged "Maarif TYT" course (an 11th
-// grader's exam, whose analysis is shown per bucket with a COUNT of missed
-// topics -- lib/curriculum/maarif-tyt-deneme-mapping.ts). Unlike the usual
-// picker, which tags one whole selection group at a time, every raw 9th/10th
-// topic gets its own Y / B here, so the count is a real number of topics.
-// Headings are written once above their topics, as in the Kaynak Takibi
-// table. Shared by the student's and the coach's pickers.
+// grader's exam, whose analysis is shown per bucket --
+// lib/curriculum/maarif-tyt-deneme-mapping.ts). Unlike the usual picker,
+// which tags one whole selection group at a time, every raw 9th/10th topic
+// gets its own Y / B here. Headings are written once above their topics, as in
+// the Kaynak Takibi table. Shared by the student's and the coach's pickers.
 export function TopicLevelMistakeList({
   course,
-  statusOf,
-  onSet,
+  has,
+  onToggle,
 }: {
   course: Course;
-  statusOf: (courseId: string, topicId: string) => Status | null;
-  onSet: (courseId: string, topicId: string, status: Status) => void;
+  has: (courseId: string, topicId: string, status: Status) => boolean;
+  onToggle: (courseId: string, topicId: string, status: Status) => void;
 }) {
   return (
     <>
@@ -40,7 +39,8 @@ export function TopicLevelMistakeList({
                   </p>
                 );
               }
-              const status = statusOf(course.id, line.topicId);
+              const isWrong = has(course.id, line.topicId, "wrong");
+              const isBlank = has(course.id, line.topicId, "blank");
               return (
                 <div
                   key={line.topicId}
@@ -50,24 +50,24 @@ export function TopicLevelMistakeList({
                   <span className="text-foreground min-w-0 flex-1">{line.text}</span>
                   <button
                     type="button"
-                    onClick={() => onSet(course.id, line.topicId, "wrong")}
-                    aria-pressed={status === "wrong"}
+                    onClick={() => onToggle(course.id, line.topicId, "wrong")}
+                    aria-pressed={isWrong}
                     title="Yanlış"
                     className={cn(
                       "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                      status === "wrong" ? "bg-rose-500/20 text-rose-600" : "bg-muted text-muted-foreground hover:bg-accent",
+                      isWrong ? "bg-rose-500/20 text-rose-600" : "bg-muted text-muted-foreground hover:bg-accent",
                     )}
                   >
                     Y
                   </button>
                   <button
                     type="button"
-                    onClick={() => onSet(course.id, line.topicId, "blank")}
-                    aria-pressed={status === "blank"}
+                    onClick={() => onToggle(course.id, line.topicId, "blank")}
+                    aria-pressed={isBlank}
                     title="Boş"
                     className={cn(
                       "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                      status === "blank" ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground hover:bg-accent",
+                      isBlank ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground hover:bg-accent",
                     )}
                   >
                     B

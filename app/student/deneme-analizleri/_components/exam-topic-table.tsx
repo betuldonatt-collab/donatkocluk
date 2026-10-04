@@ -7,8 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows } from "@/lib/curriculum/rows";
-import { countMissedTopics, denemeRowsFor, maarifTytDenemeMappingFor } from "@/lib/curriculum/maarif-tyt-deneme-mapping";
-import { MissCount } from "@/components/miss-count";
+import { denemeRowsFor, maarifTytDenemeMappingFor } from "@/lib/curriculum/maarif-tyt-deneme-mapping";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { StudentTask } from "../../_components/daily-tasks/types";
 
@@ -46,8 +45,8 @@ export function ExamTopicTable({
   // its now-hidden members.
   // An 11th grader's merged "Maarif TYT" course with a mapping gets the bucketed
   // view (lib/curriculum/maarif-tyt-deneme-mapping.ts): holistic buckets under
-  // their unit, each cell a COUNT of missed topics. Every other course keeps
-  // the per-row marks below.
+  // their unit, marked with an X when any of the bucket's topics was missed.
+  // Every other course lists its own rows.
   const mapping = maarifTytDenemeMappingFor(course.id);
   const rows = mapping ? denemeRowsFor(mapping) : flattenSelectionRows(course);
 
@@ -117,10 +116,10 @@ export function ExamTopicTable({
                     <ReadOnlySubtopics names={row.readOnlyNames} />
                   </TableCell>
                   {exams.map((exam) => {
-                    const count = countMissedTopics(row, mistakesByExam[exam.id]);
+                    const missed = row.memberTopicIds.some((id) => mistakesByExam[exam.id]?.has(id));
                     return (
                       <TableCell key={exam.id} className="border-l text-center">
-                        {mapping ? <MissCount count={count} /> : count > 0 && <X className="mx-auto size-4 text-rose-500" />}
+                        {missed && <X className="mx-auto size-4 text-rose-500" />}
                       </TableCell>
                     );
                   })}

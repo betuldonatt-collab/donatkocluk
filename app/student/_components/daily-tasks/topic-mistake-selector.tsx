@@ -5,6 +5,7 @@ import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import { TopicLevelMistakeList } from "@/components/topic-level-mistake-list";
+import { hasMistake, toggleMistake } from "@/lib/topic-mistakes";
 import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
 import type { TopicMistake, TopicMistakeStatus } from "./types";
 
@@ -21,10 +22,10 @@ function selectionBlocks(course: Course): { unitLabel: string; rows: SelectionRo
   return blocks;
 }
 
-// One topic can carry at most one status per trial (mirrors the DB's
-// unique(task_id, course_id, topic_id) -- deliberately not two
-// independent checkboxes, to keep this a quick tag rather than a second
-// question-by-question breakdown).
+// Yanlış and Boş are independent flags: a topic can have several questions in
+// one exam, one answered wrong and another left blank, so both can be set on
+// the same topic at once (lib/topic-mistakes.ts; unique per task + course +
+// topic + status in the DB, migration 0116).
 export function TopicMistakeSelector({
   groups,
   selected,
@@ -34,16 +35,10 @@ export function TopicMistakeSelector({
   selected: TopicMistake[];
   onChange: (next: TopicMistake[]) => void;
 }) {
-  const statusOf = (courseId: string, topicId: string): TopicMistakeStatus | null =>
-    selected.find((m) => m.course_id === courseId && m.topic_id === topicId)?.status ?? null;
+  const has = (courseId: string, topicId: string, status: TopicMistakeStatus) => hasMistake(selected, courseId, topicId, status);
 
-  function setStatus(courseId: string, topicId: string, status: TopicMistakeStatus) {
-    const others = selected.filter((m) => !(m.course_id === courseId && m.topic_id === topicId));
-    if (statusOf(courseId, topicId) === status) {
-      onChange(others);
-    } else {
-      onChange([...others, { course_id: courseId, topic_id: topicId, status }]);
-    }
+  function toggle(courseId: string, topicId: string, status: TopicMistakeStatus) {
+    onChange(toggleMistake(selected, courseId, topicId, status));
   }
 
   return (
@@ -61,7 +56,7 @@ export function TopicMistakeSelector({
               {/* A merged 9th+10th "Maarif TYT" course (an 11th grader's exam)
                   is ticked per raw topic, so the analysis can count missed topics. */}
               {isMaarifTytMergedCourseId(course.id) ? (
-                <TopicLevelMistakeList course={course} statusOf={statusOf} onSet={setStatus} />
+                <TopicLevelMistakeList course={course} has={has} onToggle={toggle} />
               ) : (
                 selectionBlocks(course).map((block, blockIndex) => (
                 // Index included -- the curriculum data can have multiple
@@ -71,7 +66,8 @@ export function TopicMistakeSelector({
                   <p className="text-muted-foreground text-xs">{block.unitLabel}</p>
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
                     {block.rows.map((row) => {
-                      const status = statusOf(course.id, row.id);
+                      const isWrong = has(course.id, row.id, "wrong");
+                      const isBlank = has(course.id, row.id, "blank");
                       return (
                         <div
                           key={row.id}
@@ -86,24 +82,24 @@ export function TopicMistakeSelector({
                           </span>
                           <button
                             type="button"
-                            onClick={() => setStatus(course.id, row.id, "wrong")}
-                            aria-pressed={status === "wrong"}
+                            onClick={() => toggle(course.id, row.id, "wrong")}
+                            aria-pressed={isWrong}
                             title="Yanlış"
                             className={cn(
                               "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                              status === "wrong" ? "bg-rose-500/20 text-rose-600" : "bg-muted text-muted-foreground hover:bg-accent",
+                              isWrong ? "bg-rose-500/20 text-rose-600" : "bg-muted text-muted-foreground hover:bg-accent",
                             )}
                           >
                             Y
                           </button>
                           <button
                             type="button"
-                            onClick={() => setStatus(course.id, row.id, "blank")}
-                            aria-pressed={status === "blank"}
+                            onClick={() => toggle(course.id, row.id, "blank")}
+                            aria-pressed={isBlank}
                             title="Boş"
                             className={cn(
                               "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                              status === "blank" ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground hover:bg-accent",
+                              isBlank ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground hover:bg-accent",
                             )}
                           >
                             B

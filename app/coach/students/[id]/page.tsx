@@ -414,8 +414,14 @@ async function fetchStudentDetail(studentId: string) {
 
   const examTitleById = new Map(allExams.map((e) => [e.id, e.title]));
   const counts = new Map<string, { courseId: string; topicId: string; count: number; examTitles: string[] }>();
+  // A topic marked both Yanlış and Boş in one exam is two rows (migration
+  // 0116) but one mistake for that exam -- counted once.
+  const countedExamTopics = new Set<string>();
   for (const m of mistakeRows ?? []) {
     const key = `${m.course_id}::${m.topic_id}`;
+    const examTopicKey = `${m.task_id}::${key}`;
+    if (countedExamTopics.has(examTopicKey)) continue;
+    countedExamTopics.add(examTopicKey);
     const examTitle = examTitleById.get(m.task_id) ?? "";
     const existing = counts.get(key);
     if (existing) {

@@ -14,9 +14,12 @@ export type GelisimHaritasiRow = {
   courseName: string;
   topicId: string;
   topicName: string;
-  // count is wrongCount + blankCount, kept alongside them so heatTier's
-  // existing threshold logic (and the coach panel's own tile text,
-  // which only ever reads `count`) don't need to care about the split.
+  // How many (trial, topic) pairs carried a mistake -- a topic marked both
+  // Yanlış and Boş in ONE trial counts once here (so count/windowSize stays a
+  // share of trials), while wrongCount and blankCount each still count that
+  // trial. Kept alongside them so heatTier's threshold logic (and the coach
+  // panel's own tile text, which only ever reads `count`) don't need to care
+  // about the split.
   count: number;
   wrongCount: number;
   blankCount: number;
@@ -73,13 +76,15 @@ export function computeGelisimHaritasi(
   exams: TrialExam[],
   mistakeRows: TopicMistakeRow[],
 ): GelisimHaritasiRow[] {
-  // task_id+course_id+topic_id is unique in student_task_topic_mistakes,
-  // so at most one status per key -- a plain Map (not Map<string, Set>)
-  // is enough to hold it.
-  const mistakesByTask = new Map<string, Map<string, "wrong" | "blank">>();
+  // A topic can carry BOTH a Yanlış and a Boş mark in the same exam (one row
+  // per status, see lib/topic-mistakes.ts), so each key holds a set of statuses.
+  const mistakesByTask = new Map<string, Map<string, Set<"wrong" | "blank">>>();
   for (const m of mistakeRows) {
-    const byKey = mistakesByTask.get(m.task_id) ?? new Map<string, "wrong" | "blank">();
-    byKey.set(`${m.course_id}::${m.topic_id}`, m.status ?? "wrong");
+    const byKey = mistakesByTask.get(m.task_id) ?? new Map<string, Set<"wrong" | "blank">>();
+    const key = `${m.course_id}::${m.topic_id}`;
+    const statuses = byKey.get(key) ?? new Set<"wrong" | "blank">();
+    statuses.add(m.status ?? "wrong");
+    byKey.set(key, statuses);
     mistakesByTask.set(m.task_id, byKey);
   }
 
@@ -119,14 +124,17 @@ export function computeGelisimHaritasi(
         );
 
     for (const node of nodes) {
+      let count = 0;
       let wrongCount = 0;
       let blankCount = 0;
       for (const e of relevant) {
         const byKey = mistakesByTask.get(e.id);
         for (const memberId of node.memberTopicIds) {
-          const status = byKey?.get(`${courseId}::${memberId}`);
-          if (status === "wrong") wrongCount++;
-          else if (status === "blank") blankCount++;
+          const statuses = byKey?.get(`${courseId}::${memberId}`);
+          if (!statuses) continue;
+          count++;
+          if (statuses.has("wrong")) wrongCount++;
+          if (statuses.has("blank")) blankCount++;
         }
       }
       rows.push({
@@ -134,7 +142,7 @@ export function computeGelisimHaritasi(
         courseName: course.name,
         topicId: node.id,
         topicName: node.label,
-        count: wrongCount + blankCount,
+        count,
         wrongCount,
         blankCount,
         windowSize,

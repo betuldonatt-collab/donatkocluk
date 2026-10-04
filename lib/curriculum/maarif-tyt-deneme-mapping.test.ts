@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDenemeMapping,
-  countMissedTopics,
   DENEME_OTHER_LABEL,
   denemeRowsFor,
   MAARIF_TYT_DENEME_MAPPED_COURSE_IDS,
@@ -124,26 +123,5 @@ describe("Diğer fallback", () => {
     });
     expect(bad.unresolved).toHaveLength(2);
     expect(bad.units[0].buckets[0].topicIds).toEqual([]);
-  });
-});
-
-describe("countMissedTopics", () => {
-  const row = { memberTopicIds: ["a", "b", "c", "d"] };
-
-  it("counts how many of the bucket's topics were missed (severity), not just whether any was", () => {
-    expect(countMissedTopics(row, new Set(["a", "c", "zzz"]))).toBe(2);
-    expect(countMissedTopics(row, new Set(["a", "b", "c", "d"]))).toBe(4);
-    expect(countMissedTopics(row, new Set(["x"]))).toBe(0);
-  });
-
-  it("is 0 for an exam with no analysis recorded", () => {
-    expect(countMissedTopics(row, undefined)).toBe(0);
-    expect(countMissedTopics({ memberTopicIds: [] }, new Set(["a"]))).toBe(0);
-  });
-
-  it("works end to end on the real mapping", () => {
-    const iklim = denemeRowsFor(mapping).find((r) => r.label === "İklim Sistemi")!;
-    const missed = new Set([iklim.memberTopicIds[0], iklim.memberTopicIds[2], "maarif10-cografya-u2-t0"]);
-    expect(countMissedTopics(iklim, missed)).toBe(2); // the 10th-grade topic belongs to another bucket
   });
 });

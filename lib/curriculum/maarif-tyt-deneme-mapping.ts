@@ -5,7 +5,7 @@
 // module is the mapping layer: it rolls the raw 9th/10th topics (the ones the
 // mistakes are actually tagged on) up into the coach's holistic buckets,
 // grouped under the unit they belong to, and the analysis tables render those
-// buckets instead.
+// buckets instead (a bucket is marked when any of its topics was missed).
 //
 // VIEW ONLY. It never touches the curriculum data (maarif9.json /
 // maarif10.json), the merged "Maarif TYT" courses or Kaynak Takibi: it reads
@@ -188,13 +188,6 @@ export function denemeRowsFor(mapping: DenemeMapping): SelectionRow[] {
     });
   }
   return rows;
-}
-
-// How many of a row's topics were missed in one exam -- the number the table
-// shows (severity), where a plain table only shows a single mark.
-export function countMissedTopics(row: { memberTopicIds: string[] }, missed: Set<string> | undefined): number {
-  if (!missed) return 0;
-  return row.memberTopicIds.reduce((n, id) => n + (missed.has(id) ? 1 : 0), 0);
 }
 
 // Exposed for the tests.
