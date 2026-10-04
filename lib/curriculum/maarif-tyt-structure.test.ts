@@ -7,7 +7,7 @@ import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { alignedUnits, hasBucketedStructure, resolveSpec, SUBJECT_SPECS } from "./maarif-tyt-structure";
 import { courseHasBuckets, maarifSelectionNodes } from "./maarif-selection";
-import { flattenSelectionRows, withGroupHeadings } from "./rows";
+import { flattenSelectionRows, isFlatRows, withGroupHeadings } from "./rows";
 
 const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
 const tarih = merged("maarif-tyt-tarih");
@@ -20,6 +20,8 @@ const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
 const rawCografya = raw("maarif9-cografya").concat(raw("maarif10-cografya"));
 const geometri = merged("maarif-tyt-geometri");
 const matematik = merged("maarif-tyt-matematik");
+const turkce = merged("maarif-tyt-turk-dili-ve-edebiyati");
+const rawTurkce = raw("maarif9-turk-dili-ve-edebiyati").concat(raw("maarif10-turk-dili-ve-edebiyati"));
 const rawMatematik = raw("maarif9-matematik").concat(raw("maarif10-matematik"));
 const fizik = merged("maarif-tyt-fizik");
 const rawFizik = raw("maarif9-fizik").concat(raw("maarif10-fizik"));
@@ -269,6 +271,64 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     expect(courseHasBuckets(own)).toBe(false);
     expect(own.units.map((u) => u.unit)).toEqual(["1. Ünite: Tepki", "2. Ünite: Homeostazi"]);
     expect(own.units.map((u) => u.topics.length)).toEqual([16, 10]);
+  });
+});
+
+describe("Türkçe: a flat list of grammar / paragraph bölümler (no Ünite level)", () => {
+  it("is named Türkçe and has exactly the 8 bölümler that have raw topics, in the coach's order, with no unit label", () => {
+    expect(turkce.name).toBe("Türkçe");
+    const rows = flattenSelectionRows(turkce);
+    expect(rows.map((r) => r.label)).toEqual([
+      "Cümle Anlamı",
+      "Paragrafta Konu-Ana Düşünce",
+      "Sözcük Türleri",
+      "Tamlamalar",
+      "Fiil, Ek-Fiil",
+      "Ses Bilgisi",
+      "Yazım Kuralları",
+      "Noktalama İşaretleri",
+    ]);
+    expect(rows.every((r) => r.unitLabel === "" && r.groupLabel === undefined && r.readOnlyNames.length === 0)).toBe(true);
+    expect(isFlatRows(rows)).toBe(true);
+    expect(withGroupHeadings(rows).every((h) => h.kind === "row")).toBe(true);
+    expect(resolveSpec(SUBJECT_SPECS["maarif-tyt-turk-dili-ve-edebiyati"]).unresolved).toEqual([]);
+  });
+
+  it("only the other subjects keep a unit column", () => {
+    for (const c of [tarih, cografya, biyoloji, kimya, fizik, geometri, matematik]) expect(isFlatRows(flattenSelectionRows(c))).toBe(false);
+  });
+
+  it("places 16 grammar/paragraph raw topics and excludes the other 32 (all literature), each accounted for once", () => {
+    const rows = flattenSelectionRows(turkce);
+    const placed = rows.flatMap((r) => r.memberTopicIds);
+    expect(rawTurkce).toHaveLength(48); // 23 (9th) + 25 (10th)
+    expect(placed).toHaveLength(16);
+    const excluded = resolveSpec(SUBJECT_SPECS["maarif-tyt-turk-dili-ve-edebiyati"]).excluded.map((t) => t.id);
+    expect(excluded).toHaveLength(32);
+    expect([...placed, ...excluded].sort()).toEqual(rawTurkce.slice().sort());
+    expect(new Set([...placed, ...excluded]).size).toBe(48);
+    // The excluded ones are shown nowhere.
+    const everyId = turkce.units.flatMap((u) => u.topics.map((t) => t.id));
+    for (const id of excluded) expect(everyId).not.toContain(id);
+    expect(turkce.units.some((u) => u.unit === "Diğer" || /^\(\d+\. Sınıf\)/.test(u.unit))).toBe(false);
+  });
+
+  it("rolls the grammar topics into the right bölüm; Cümle Anlamı takes the sentence-level topic", () => {
+    const members = (label: string) => flattenSelectionRows(turkce).find((r) => r.label === label)!.memberTopicIds;
+    expect(members("Cümle Anlamı")).toEqual(["maarif10-turk-dili-ve-edebiyati-u3-t6"]); // Cümle Türleri
+    expect(members("Paragrafta Konu-Ana Düşünce")).toEqual(["maarif9-turk-dili-ve-edebiyati-u1-t5", "maarif9-turk-dili-ve-edebiyati-u1-t6"]);
+    expect(members("Sözcük Türleri")).toHaveLength(5); // isimler, zamirler, edat/bağlaç/ünlem, sıfatlar, zarflar
+    expect(members("Tamlamalar")).toEqual(["maarif10-turk-dili-ve-edebiyati-u0-t5"]);
+    expect(members("Fiil, Ek-Fiil")).toEqual(["maarif10-turk-dili-ve-edebiyati-u2-t3", "maarif10-turk-dili-ve-edebiyati-u2-t4"]);
+    expect(members("Yazım Kuralları")).toHaveLength(2);
+    expect(members("Noktalama İşaretleri")).toHaveLength(2);
+  });
+
+  it("the 11th grade's own Türk Dili ve Edebiyatı (the 11. Sınıf tab) is untouched", () => {
+    const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-turk-dili-ve-edebiyati")!;
+    expect(courseHasBuckets(own)).toBe(false);
+    expect(own.name).toBe("11. Sınıf Türk Dili ve Edebiyatı");
+    expect(own.units[0].unit).toBe("1. Tema: Bir Diyeceğim Var!");
   });
 });
 
@@ -673,10 +733,11 @@ describe("a topic no bucket claims is kept as a leaf of its own", () => {
 
 describe("only the subjects with a spec are bucketed", () => {
   it("Coğrafya and Tarih yes; every other merged subject keeps 9th's units then 10th's, grade-tagged", () => {
-    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik"]);
+    expect(Object.keys(SUBJECT_SPECS)).toEqual(["maarif-tyt-cografya", "maarif-tyt-tarih", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik", "maarif-tyt-turk-dili-ve-edebiyati"]);
+    expect(hasBucketedStructure("maarif-tyt-turk-dili-ve-edebiyati")).toBe(true);
+    expect(hasBucketedStructure("maarif11-turk-dili-ve-edebiyati")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-matematik")).toBe(true);
     expect(hasBucketedStructure("maarif11-matematik")).toBe(false);
-    expect(hasBucketedStructure("maarif-tyt-turk-dili-ve-edebiyati")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-geometri")).toBe(true);
     expect(hasBucketedStructure("maarif11-geometri")).toBe(false);
     expect(hasBucketedStructure("maarif-tyt-fizik")).toBe(true);
@@ -688,9 +749,9 @@ describe("only the subjects with a spec are bucketed", () => {
     expect(hasBucketedStructure("maarif-tyt-tarih")).toBe(true);
     expect(hasBucketedStructure("maarif11-tarih")).toBe(false);
     expect(hasBucketedStructure("toString")).toBe(false);
-    const tde = merged("maarif-tyt-turk-dili-ve-edebiyati");
-    expect(courseHasBuckets(tde)).toBe(false);
-    expect(tde.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
+    const din = merged("maarif-tyt-din-kulturu");
+    expect(courseHasBuckets(din)).toBe(false);
+    expect(din.units.every((u) => /^\((9|10)\. Sınıf\) /.test(u.unit))).toBe(true);
   });
 });
 

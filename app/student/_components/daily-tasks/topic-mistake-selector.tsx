@@ -74,7 +74,7 @@ export function TopicMistakeSelector({
                 // units literally named "-" (standalone/ungrouped
                 // topics), which previously collided on unit.unit alone.
                 <div key={`${block.unitLabel}-${blockIndex}`} className="space-y-1 pl-1">
-                  <p className="text-muted-foreground text-xs">{block.unitLabel}</p>
+                  {block.unitLabel !== "" && <p className="text-muted-foreground text-xs">{block.unitLabel}</p>}
                   <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
                     {block.rows.map((row, rowIndex) => {
                       const isWrong = hasRow(course.id, row, "wrong");

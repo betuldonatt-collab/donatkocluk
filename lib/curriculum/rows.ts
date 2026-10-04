@@ -115,6 +115,14 @@ function rowsFromNodes(nodes: LgsSelectionNode[]): SelectionRow[] {
   return rows;
 }
 
+// A course laid out as one flat list (Türkçe) has the empty string for its unit
+// label: its tables leave out the Ünite column entirely.
+export const FLAT_UNIT_LABEL = "";
+
+export function isFlatRows(rows: SelectionRow[]): boolean {
+  return rows.length > 0 && rows.every((r) => r.unitLabel === FLAT_UNIT_LABEL);
+}
+
 // Rows with their intermediate group headings spliced in. A unit whose rows
 // carry a groupLabel (Kimya: Tema -> "Kimya Hayattır" -> bucket) gets one
 // heading row at the start of each group, and its unit cell spans the headings

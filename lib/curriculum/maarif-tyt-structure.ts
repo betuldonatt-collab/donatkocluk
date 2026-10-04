@@ -542,6 +542,51 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
       { course: "maarif9-matematik", unit: 7, topics: [2] },
     ],
   },
+
+  // Türkçe (= the Türk Dili ve Edebiyatı courses): a FLAT list -- one unit with the empty label (FLAT_UNIT_LABEL),
+  // so every table drops its Ünite column and shows only the bölüm rows. Only the grammar / paragraph topics
+  // that strictly fit one of the coach's 14 buckets are placed; every literature topic (şiir, hikâye, roman,
+  // tiyatro, destan, edebî sanatlar, ...) and every other non-matching raw topic is `excluded`.
+  //  - "Cümle Anlamı" covers every sentence-level raw topic (here: "Cümle Türleri").
+  //  - "Fiil, Ek-Fiil" takes Fiiller and Fiilimsiler (fiilimsiler are taught under fiil).
+  //  - Six of the 14 listed buckets (Sözcük Anlamı, Anlatım Teknikleri, Paragrafın Yapısı, Paragrafta Yardımcı
+  //    Düşünceler, Ekler, Sözcük Yapısı) have NO raw topic in the 9th/10th data, so they cannot be tracked and
+  //    are left out.
+  "maarif-tyt-turk-dili-ve-edebiyati": {
+    units: [
+      {
+        label: "",
+        buckets: [
+          { label: "Cümle Anlamı", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [7] }] },
+          { label: "Paragrafta Konu-Ana Düşünce", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 2, topics: [6, 7] }] },
+          { label: "Sözcük Türleri", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [5] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 2, topics: [4, 5] }, { course: "maarif9-turk-dili-ve-edebiyati", unit: 4, topics: [4, 5] }] },
+          { label: "Tamlamalar", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [6] }] },
+          { label: "Fiil, Ek-Fiil", from: [{ course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [4, 5] }] },
+          { label: "Ses Bilgisi", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [4] }] },
+          { label: "Yazım Kuralları", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [5] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [8] }] },
+          { label: "Noktalama İşaretleri", from: [{ course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [6] }, { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [9] }] },
+        ],
+      },
+    ],
+    excluded: [
+      // 9th Tema 1: Edebiyat ve Dil; Metin Türleri (Deneme, Mülakat)
+      { course: "maarif9-turk-dili-ve-edebiyati", unit: 1, topics: [1, 2, 3] },
+      // 9th Tema 2: hikâye, şiir (3), anı, Metni Anlama › Ana duygu
+      { course: "maarif9-turk-dili-ve-edebiyati", unit: 2, topics: [1, 2, 3, 4, 5, 8] },
+      // 9th Tema 3: hikâye, gezi yazısı, şiir inceleme (2)
+      { course: "maarif9-turk-dili-ve-edebiyati", unit: 3, topics: [1, 2, 3, 4] },
+      // 9th Tema 4: roman, eleştiri, tiyatro
+      { course: "maarif9-turk-dili-ve-edebiyati", unit: 4, topics: [1, 2, 3] },
+      // 10th Ünite 1: halk/İslamiyet öncesi şiiri, âşık tarzı, şiir bilgisi
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 1, topics: [1, 2, 3, 4] },
+      // 10th Ünite 2: divan şiiri, edebî sanatlar, saf şiir
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 2, topics: [1, 2, 3] },
+      // 10th Ünite 3: destanlar, halk hikâyeleri, mesneviler
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 3, topics: [1, 2, 3] },
+      // 10th Ünite 4: Dede Korkut, geçiş dönemi, Milli Edebiyat hikâyesi, roman/tiyatro/anı, haber metni, akımlar
+      { course: "maarif10-turk-dili-ve-edebiyati", unit: 4, topics: [1, 2, 3, 4, 5, 6] },
+    ],
+  },
 };
 
 const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];

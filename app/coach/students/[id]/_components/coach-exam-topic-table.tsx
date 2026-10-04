@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
-import { flattenSelectionRows, withGroupHeadings } from "@/lib/curriculum/rows";
+import { flattenSelectionRows, isFlatRows, withGroupHeadings } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { DetailTask } from "../types";
 
@@ -50,6 +50,8 @@ export function CoachExamTopicTable({
   // row per bucket -- marked with an X when any of the bucket's hidden topics
   // was missed; its raw topics are never listed.
   const rows = flattenSelectionRows(course);
+  // A flat course (Türkçe) has no Ünite column.
+  const flat = isFlatRows(rows);
 
   return (
     <Card>
@@ -61,8 +63,8 @@ export function CoachExamTopicTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="bg-background sticky left-0 z-20 w-12 align-bottom">Ünite</TableHead>
-                <TableHead className="bg-background sticky left-12 z-20 border-r align-bottom">Konu</TableHead>
+                {!flat && <TableHead className="bg-background sticky left-0 z-20 w-12 align-bottom">Ünite</TableHead>}
+                <TableHead className={cn("bg-background sticky z-20 border-r align-bottom", flat ? "left-0" : "left-12")}>Konu</TableHead>
                 {exams.map((exam) => (
                   <TableHead key={exam.id} className="border-l p-0 text-center">
                     <div className="flex w-full flex-col items-center gap-1 px-2 py-2 text-center">
@@ -109,7 +111,7 @@ export function CoachExamTopicTable({
             <TableBody>
               {withGroupHeadings(rows).map((item) => {
                 const unitLabel = item.kind === "heading" ? item.unitLabel : item.row.unitLabel;
-                const unitCell = item.unitRowSpan !== null && (
+                const unitCell = !flat && item.unitRowSpan !== null && (
                   <TableCell
                     rowSpan={item.unitRowSpan}
                     className={cn(
@@ -141,7 +143,7 @@ export function CoachExamTopicTable({
                 return (
                   <TableRow key={row.id}>
                     {unitCell}
-                    <TableCell className="bg-card sticky left-12 z-10 border-r font-medium whitespace-normal">
+                    <TableCell className={cn("bg-card sticky z-10 border-r font-medium whitespace-normal", flat ? "left-0" : "left-12")}>
                       {row.label}
                       <ReadOnlySubtopics names={row.readOnlyNames} />
                     </TableCell>

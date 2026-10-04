@@ -22,7 +22,7 @@ import {
 } from "@/components/maarif-table-body";
 import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
-import { flattenSelectionRows } from "@/lib/curriculum/rows";
+import { flattenSelectionRows, isFlatRows } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
 
@@ -137,6 +137,8 @@ export function EditableCourseTable({
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
   const isMaarif = isMaarifCourseId(course.id);
+  // A flat Maarif TYT course (Türkçe) has no Ünite column.
+  const flat = isFlatRows(rows);
   // A Maarif unit's Okul İlerlemesi is ticked per subtopic, so it folds with
   // AND (unit done only when every subtopic is) for the summary bar.
   const collapsedMap = pipeline && collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? ["okul_ilerlemesi"] : []);
@@ -163,14 +165,16 @@ export function EditableCourseTable({
                 <TableHead colSpan={4} className="text-center font-semibold">
                   Soru Dağılımı
                 </TableHead>
+                {!flat && (
                 <TableHead
                   className={cn("bg-background sticky left-0 z-20 border-l align-bottom", isMaarif ? MAARIF_UNIT_COL_CLASS : "w-12")}
                   rowSpan={2}
                 >
                   Ünite
                 </TableHead>
+              )}
                 <TableHead
-                  className={cn("bg-background sticky z-20 border-r align-bottom", isMaarif ? MAARIF_KONU_STICKY_LEFT_CLASS : "left-12")}
+                  className={cn("bg-background sticky z-20 border-r align-bottom", isMaarif ? (flat ? "left-0" : MAARIF_KONU_STICKY_LEFT_CLASS) : "left-12")}
                   rowSpan={2}
                 >
                   Konu

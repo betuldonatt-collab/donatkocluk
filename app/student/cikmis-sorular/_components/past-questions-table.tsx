@@ -244,6 +244,8 @@ export function PastQuestionsTable({ course }: { course: Course }) {
   const allTopics = rows.map((r) => r.topic);
   const years = isLgs ? LGS_PAST_QUESTION_YEARS : PAST_QUESTION_YEARS;
   const hasKonu = isLgs && courseHasKonu(course);
+  // A flat Maarif TYT course (Türkçe) has no Ünite column.
+  const flat = rows.length > 0 && rows.every((r) => r.unitLabel === "");
 
   return (
     <Card>
@@ -255,7 +257,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 align-bottom">Ünite</TableHead>
+              {!flat && <TableHead className="w-12 align-bottom">Ünite</TableHead>}
               {hasKonu && <TableHead className="align-bottom">Konu</TableHead>}
               <TableHead className="align-bottom">{hasKonu ? "Alt Konu" : "Konu"}</TableHead>
               {years.map((year) => (
@@ -268,7 +270,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.topic.id} className={row.heading !== undefined ? "bg-muted/50" : undefined}>
-                {row.unitRowSpan !== null && (
+                {!flat && row.unitRowSpan !== null && (
                   <TableCell
                     rowSpan={row.unitRowSpan}
                     className={cn("border-r p-0 text-center align-middle", row.unitRowSpan === 1 && "text-muted-foreground")}

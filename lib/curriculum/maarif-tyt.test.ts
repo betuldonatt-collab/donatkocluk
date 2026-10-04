@@ -18,19 +18,19 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
   });
 
   it("concatenates 9th grade's units before 10th grade's, tagging each with its grade", () => {
-    const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-turk-dili-ve-edebiyati")!;
-    expect(tde.units).toHaveLength(m9.units.length + m10.units.length);
-    expect(tde.units.slice(0, m9.units.length).every((u) => u.unit.startsWith("(9. Sınıf) "))).toBe(true);
-    expect(tde.units.slice(m9.units.length).every((u) => u.unit.startsWith("(10. Sınıf) "))).toBe(true);
+    const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
+    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
+    expect(din.units).toHaveLength(m9.units.length + m10.units.length);
+    expect(din.units.slice(0, m9.units.length).every((u) => u.unit.startsWith("(9. Sınıf) "))).toBe(true);
+    expect(din.units.slice(m9.units.length).every((u) => u.unit.startsWith("(10. Sınıf) "))).toBe(true);
   });
 
   it("keeps every original topic id untouched, just concatenated (no synthetic ids)", () => {
-    const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-turk-dili-ve-edebiyati")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-turk-dili-ve-edebiyati")!;
-    const mergedTopicIds = tde.units.flatMap((u) => u.topics.map((t) => t.id));
+    const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
+    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
+    const mergedTopicIds = din.units.flatMap((u) => u.topics.map((t) => t.id));
     const sourceTopicIds = [...m9.units, ...m10.units].flatMap((u) => u.topics.map((t) => t.id));
     expect(mergedTopicIds).toEqual(sourceTopicIds);
   });
@@ -74,7 +74,7 @@ describe("splitUnitGradeTag", () => {
 
   it("round-trips every merged unit: each is tagged with its grade, with a clean title after it", () => {
     // Coğrafya, Tarih and Biyoloji are laid out in the coach's own numbered units, so they carry no per-grade tag.
-    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => !["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik"].includes(c.id))) {
+    for (const c of MAARIF_TYT_MERGED_COURSES.filter((c) => !["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-biyoloji", "maarif-tyt-kimya", "maarif-tyt-fizik", "maarif-tyt-geometri", "maarif-tyt-matematik", "maarif-tyt-turk-dili-ve-edebiyati"].includes(c.id))) {
       for (const u of c.units) {
         const { grade, title } = splitUnitGradeTag(u.unit);
         expect(["9. Sınıf", "10. Sınıf"]).toContain(grade);
@@ -84,9 +84,11 @@ describe("splitUnitGradeTag", () => {
     }
   });
 
-  it("the Türk Dili merge reads 9th grade's themes in Title Case", () => {
-    const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
-    expect(tde.units[0].unit).toBe("(9. Sınıf) 1. Tema: Sözün İnceliği");
+  it("an unstructured merge tags 9th grade's unit labels with the grade and keeps the title", () => {
+    const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
+    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
+    expect(din.units[0].unit).toBe(`(9. Sınıf) ${m9.units[0].unit}`);
+    expect(splitUnitGradeTag(din.units[0].unit)).toEqual({ grade: "9. Sınıf", title: m9.units[0].unit });
   });
 });
 

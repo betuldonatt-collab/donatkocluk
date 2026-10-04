@@ -29,7 +29,7 @@ type MergePair = {
 };
 
 const MERGE_PAIRS: MergePair[] = [
-  { id: "maarif-tyt-turk-dili-ve-edebiyati", name: "Türk Dili ve Edebiyatı", m9Id: "maarif9-turk-dili-ve-edebiyati", m10Id: "maarif10-turk-dili-ve-edebiyati" },
+  { id: "maarif-tyt-turk-dili-ve-edebiyati", name: "Türkçe", m9Id: "maarif9-turk-dili-ve-edebiyati", m10Id: "maarif10-turk-dili-ve-edebiyati" },
   { id: "maarif-tyt-matematik", name: "Matematik", m9Id: "maarif9-matematik", m10Id: "maarif10-matematik" },
   // Matematik and Geometri both come from the Matematik courses (Geometri has no
   // course of its own in the 9th/10th data): their specs in maarif-tyt-structure.ts

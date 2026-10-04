@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
-import { withGroupHeadings, type SelectionRow } from "@/lib/curriculum/rows";
+import { isFlatRows, withGroupHeadings, type SelectionRow } from "@/lib/curriculum/rows";
 import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
 import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
@@ -163,6 +163,9 @@ export function MaarifTableBody({
   // Rows with their intermediate group headings (Kimya: "Kimya Hayattır") spliced
   // in as heading rows; units without groups pass through unchanged.
   const items = withGroupHeadings(rows);
+  // A flat course (Türkçe) has no Ünite column: the Konu column starts at the left edge.
+  const flat = isFlatRows(rows);
+  const konuLeft = flat ? "left-0" : MAARIF_KONU_STICKY_LEFT_CLASS;
   const preparedById = new Map(groups.map((g) => [g.row.id, g]));
   const linesOf = (item: (typeof items)[number]) => (item.kind === "heading" ? 1 : preparedById.get(item.row.id)!.lines.length);
   // Columns a heading row has to fill after its own text: every pipeline step and
@@ -179,7 +182,7 @@ export function MaarifTableBody({
           return (
             <TableRow key={item.key} className="border-border/40">
               <TableCell colSpan={4} className="bg-muted/40 p-0" />
-              {item.unitRowSpan !== null && (
+              {!flat && item.unitRowSpan !== null && (
                 <TableCell
                   rowSpan={unitLines}
                   className={cn("bg-card sticky left-0 z-10 border-r border-l px-3 py-2 text-sm font-medium whitespace-normal", MAARIF_UNIT_COL_CLASS)}
@@ -188,7 +191,7 @@ export function MaarifTableBody({
                 </TableCell>
               )}
               <TableCell
-                className={cn("bg-muted text-foreground sticky z-10 min-w-56 border-r px-3 py-1.5 text-xs font-semibold whitespace-normal", MAARIF_KONU_STICKY_LEFT_CLASS)}
+                className={cn("bg-muted text-foreground sticky z-10 min-w-56 border-r px-3 py-1.5 text-xs font-semibold whitespace-normal", konuLeft)}
               >
                 {item.label}
               </TableCell>
@@ -210,7 +213,7 @@ export function MaarifTableBody({
               className={cn(!isLastLine && "border-border/40")}
             >
               {isFirstLine && <MaarifStatCells stat={sumStats(topicStats, row.memberTopicIds)} rowSpan={count} />}
-              {isFirstLine && item.unitRowSpan !== null && (
+              {isFirstLine && !flat && item.unitRowSpan !== null && (
                 <TableCell
                   rowSpan={unitLines}
                   className={cn(
@@ -225,7 +228,7 @@ export function MaarifTableBody({
                 style={{ paddingLeft: `${0.75 + line.depth * 0.9}rem` }}
                 className={cn(
                   "sticky z-10 min-w-56 border-r py-1.5 pr-3 text-sm whitespace-normal",
-                  MAARIF_KONU_STICKY_LEFT_CLASS,
+                  konuLeft,
                   isHeading ? "bg-muted text-foreground text-xs font-semibold" : "bg-card",
                 )}
               >
