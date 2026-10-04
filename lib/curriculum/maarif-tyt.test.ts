@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { findCourseById } from "./index";
+import { coursesForMaarifTytGroup } from "./subject-groups";
 import { MAARIF_TYT_MERGED_COURSES, isMaarifTytMergedCourseId, splitUnitGradeTag } from "./maarif-tyt";
 
 describe("MAARIF_TYT_MERGED_COURSES", () => {
@@ -85,6 +86,26 @@ describe("splitUnitGradeTag", () => {
   it("the Türk Dili merge reads 9th grade's themes in Title Case", () => {
     const tde = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-turk-dili-ve-edebiyati")!;
     expect(tde.units[0].unit).toBe("(9. Sınıf) 1. Tema: Sözün İnceliği");
+  });
+});
+
+describe("coursesForMaarifTytGroup (an 11th grader's TYT-structured exam)", () => {
+  it("offers the merged 9th+10th courses for each TYT section, never the TYT courses", () => {
+    expect(coursesForMaarifTytGroup("turkce").map((c) => c.id)).toEqual(["maarif-tyt-turk-dili-ve-edebiyati"]);
+    expect(coursesForMaarifTytGroup("sosyal").map((c) => c.id)).toEqual([
+      "maarif-tyt-tarih",
+      "maarif-tyt-cografya",
+      "maarif-tyt-felsefe",
+      "maarif-tyt-din-kulturu",
+    ]);
+    expect(coursesForMaarifTytGroup("matematik").map((c) => c.id)).toEqual(["maarif-tyt-matematik"]);
+    expect(coursesForMaarifTytGroup("fen").map((c) => c.id)).toEqual(["maarif-tyt-fizik", "maarif-tyt-kimya", "maarif-tyt-biyoloji"]);
+    expect(coursesForMaarifTytGroup("nope")).toEqual([]);
+  });
+
+  it("covers every merged course exactly once", () => {
+    const ids = ["turkce", "sosyal", "matematik", "fen"].flatMap((k) => coursesForMaarifTytGroup(k).map((c) => c.id));
+    expect(ids.slice().sort()).toEqual(MAARIF_TYT_MERGED_COURSES.map((c) => c.id).sort());
   });
 });
 

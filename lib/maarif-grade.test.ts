@@ -4,7 +4,7 @@ import { findCourseById } from "./curriculum";
 import { MAARIF10_EXAM_QUESTION_TOTAL, MAARIF10_EXAM_SUBJECTS, coursesForMaarif10ExamSubject } from "./curriculum/subject-groups";
 import { expectedGeneralExamKeys, findGeneralExamTotalMismatch, isGeneralExamScoresIncomplete } from "./exam-results-validation";
 import { taskWeight } from "./effort-weight";
-import { MAARIF_GRADES, gradeFromFlags, gradeOfTrack, stripGradePrefix } from "./maarif-grade";
+import { MAARIF_GRADES, gradeFromFlags, gradeOfTrack, isMaarif11GeneralExamTitle, stripGradePrefix } from "./maarif-grade";
 import { subjectBackgroundClass } from "./subject-colors";
 import { validatePipelineStep } from "./topic-pipeline";
 
@@ -134,5 +134,15 @@ describe("10th-grade colours and effort weights reuse the existing rules", () =>
     expect(w("maarif10-fizik")).toBe(150);
     expect(w("maarif10-felsefe")).toBe(100);
     expect(w("maarif10-din-kulturu-ve-ahlak-bilgisi")).toBe(100);
+  });
+});
+
+describe("isMaarif11GeneralExamTitle", () => {
+  it("recognises an 11th grader Genel Deneme, and only that", () => {
+    expect(isMaarif11GeneralExamTitle("11. SINIF Genel Deneme - 3D Yayınları")).toBe(true);
+    expect(isMaarif11GeneralExamTitle("11.SINIF Genel Deneme")).toBe(true);
+    expect(isMaarif11GeneralExamTitle("10. SINIF Genel Deneme - 3D Yayınları")).toBe(false);
+    expect(isMaarif11GeneralExamTitle("TYT Genel Deneme - 3D Yayınları")).toBe(false);
+    expect(isMaarif11GeneralExamTitle("AYT Genel Deneme")).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { MAARIF_GRADES } from "@/lib/maarif-grade";
+import { isMaarif11GeneralExamTitle, MAARIF_GRADES } from "@/lib/maarif-grade";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,6 +23,7 @@ import {
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
+  coursesForMaarifTytGroup,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { deleteAssignedTask, getTaskTopicMistakesForCoach } from "../../../actions";
@@ -120,7 +121,7 @@ export function CoachExamAnalysisSection({
     gradeCfg ? (gradeCfg.courses[0]?.id ?? "") : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
   );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    gradeCfg ? (gradeCfg.examSubjects[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    maarifGrade === 11 && !isLgs ? TYT_SUBJECT_GROUPS[0].key : gradeCfg ? (gradeCfg.examSubjects[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
@@ -148,7 +149,11 @@ export function CoachExamAnalysisSection({
     : mainTrack === "tyt"
       ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
       : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytSubTrack], ...AYT_COURSES_BY_TRACK[aytSubTrack]];
-  const genelGroups = gradeCfg
+  // 11th grade: a TYT-structured exam analysed against the merged 9th+10th courses.
+  const isMaarif11 = maarifGrade === 11 && !isLgs;
+  const genelGroups = isMaarif11
+    ? TYT_SUBJECT_GROUPS
+    : gradeCfg
     ? gradeCfg.examSubjects
     : isLgs
     ? LGS_SUBJECT_GROUPS
@@ -156,7 +161,9 @@ export function CoachExamAnalysisSection({
       ? TYT_SUBJECT_GROUPS
       : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
-  const genelCoursesInGroup = gradeCfg
+  const genelCoursesInGroup = isMaarif11
+    ? coursesForMaarifTytGroup(genelGroupKey)
+    : gradeCfg
     ? gradeCfg.coursesForExamSubject(genelGroupKey)
     : isLgs
     ? coursesForLgsGroup(genelGroupKey)
@@ -180,7 +187,9 @@ export function CoachExamAnalysisSection({
     .filter(
       (e) =>
         e.task_type === "general_exam" &&
-        (gradeCfg
+        (isMaarif11
+          ? isMaarif11GeneralExamTitle(e.title)
+          : gradeCfg
           ? parseGeneralExamTrack(e.title) === gradeCfg.track
           : isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"

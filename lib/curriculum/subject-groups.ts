@@ -5,6 +5,7 @@
 // inferAytTrackFromScores.
 import { MAARIF9_GENEL_DENEME_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES } from "./maarif10";
+import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES, type Course, type Track } from "./index";
 
 // LGS's real exam is two sessions: Sözel (Türkçe 20, İnkılap 10, Din
@@ -99,6 +100,23 @@ export function overCapGroup<T extends { key: string; questions: number }>(
     const v = inputs[g.key];
     return v ? (Number(v.correct) || 0) + (Number(v.wrong) || 0) > g.questions : false;
   });
+}
+
+// An 11th grader's Genel Deneme ("11. SINIF Genel Deneme") is scored exactly
+// like TYT -- the same four sections and question counts -- but its topics
+// are the 9th AND 10th grade curricula, so the analysis is recorded against
+// the merged "Maarif TYT" courses (lib/curriculum/maarif-tyt.ts) rather than
+// the TYT courses. Which of them sit in which section:
+const MAARIF_TYT_COURSE_IDS_BY_GROUP: Record<SubjectGroupKey, string[]> = {
+  turkce: ["maarif-tyt-turk-dili-ve-edebiyati"],
+  sosyal: ["maarif-tyt-tarih", "maarif-tyt-cografya", "maarif-tyt-felsefe", "maarif-tyt-din-kulturu"],
+  matematik: ["maarif-tyt-matematik"],
+  fen: ["maarif-tyt-fizik", "maarif-tyt-kimya", "maarif-tyt-biyoloji"],
+};
+
+export function coursesForMaarifTytGroup(key: string): Course[] {
+  const ids = MAARIF_TYT_COURSE_IDS_BY_GROUP[key as SubjectGroupKey] ?? [];
+  return ids.map((id) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }
 
 export function coursesForGroup(key: SubjectGroupKey) {

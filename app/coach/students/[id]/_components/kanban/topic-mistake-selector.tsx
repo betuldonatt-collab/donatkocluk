@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, type SelectionRow } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
+import { TopicLevelMistakeList } from "@/components/topic-level-mistake-list";
+import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
 
 export type TopicMistakeStatus = "wrong" | "blank";
 export type TopicMistake = { course_id: string; topic_id: string; status: TopicMistakeStatus };
@@ -58,7 +60,12 @@ export function TopicMistakeSelector({
               {group.courses.length > 1 && (
                 <p className="text-foreground text-sm font-medium">{course.name}</p>
               )}
-              {selectionBlocks(course).map((block, blockIndex) => (
+              {/* A merged 9th+10th "Maarif TYT" course (an 11th grader's exam)
+                  is ticked per raw topic, so the analysis can count missed topics. */}
+              {isMaarifTytMergedCourseId(course.id) ? (
+                <TopicLevelMistakeList course={course} statusOf={statusOf} onSet={setStatus} />
+              ) : (
+                selectionBlocks(course).map((block, blockIndex) => (
                 // Index included -- the curriculum data can have multiple
                 // units literally named "-" (standalone/ungrouped
                 // topics), which would otherwise collide on unit.unit alone.
@@ -105,7 +112,8 @@ export function TopicMistakeSelector({
                     })}
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
           ))}
         </div>

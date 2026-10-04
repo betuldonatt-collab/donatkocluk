@@ -15,12 +15,13 @@ import {
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
+  coursesForMaarifTytGroup,
   inferAytTrackFromScores,
   type SubjectGroupKey,
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { MAARIF_GRADES } from "@/lib/maarif-grade";
+import { isMaarif11GeneralExamTitle, MAARIF_GRADES } from "@/lib/maarif-grade";
 import { LineChart } from "../../_components/charts/line-chart";
 import { getMoreGenelExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -162,6 +163,56 @@ export function GenelAnalysisClient({
       />
     </>
   );
+
+  // 11th grade: a TYT-structured Genel Deneme (Türkçe / Sosyal / Matematik /
+  // Fen, 4 yanlış 1 doğruyu götürür) whose topics are the 9th AND 10th grade
+  // curricula. Shown per subject like TYT, but each subject's table is the
+  // holistic bucket view (lib/curriculum/maarif-tyt-deneme-mapping.ts) with a
+  // count of missed topics, not the school's grade-and-unit lists.
+  if (maarifGrade === 11 && examType !== "LGS") {
+    const m11Exams = exams
+      .filter((e) => isMaarif11GeneralExamTitle(e.title))
+      .sort((a, b) => b.task_date.localeCompare(a.task_date));
+    const m11NetChartData = netChartFor(m11Exams);
+    const m11Courses = coursesForMaarifTytGroup(groupKey);
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Genel Net Gelişimi</CardTitle>
+            <CardDescription>Tüm derslerin toplamı üzerinden 11. sınıf genel deneme (TYT formatı) net değişimi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LineChart data={m11NetChartData} />
+          </CardContent>
+        </Card>
+
+        <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1">
+          {TYT_SUBJECT_GROUPS.map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setGroupKey(g.key)}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+                groupKey === g.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          {m11Courses.map((course) => (
+            <ExamTopicTable key={course.id} course={course} exams={m11Exams} mistakesByExam={mistakesByExam} onOpenExam={openExam} />
+          ))}
+        </div>
+
+        {modalAndMore}
+      </div>
+    );
+  }
 
   // 9th grade: the 120-question Genel Deneme (per subject, 4 yanlış 1 doğruyu
   // götürür like TYT) -- no TYT/AYT tabs or charts.

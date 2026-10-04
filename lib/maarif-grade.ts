@@ -77,6 +77,14 @@ export function gradeOfTrack(track: GeneralExamTrack): MaarifGrade | null {
   return track === "m9" ? 9 : track === "m10" ? 10 : track === "m11" ? 11 : null;
 }
 
+// True for an 11th grader's Genel Deneme ("11. SINIF Genel Deneme - ..."). Its
+// scoring stays TYT's (every other screen reads the title as a TYT exam), so
+// this is checked only where the ANALYSIS course list is chosen: it is
+// recorded and shown against the merged 9th+10th "Maarif TYT" courses.
+export function isMaarif11GeneralExamTitle(title: string): boolean {
+  return /^11\.\s*SINIF\b/i.test(title);
+}
+
 // "9. Sınıf Matematik" -> "Matematik" (picker/chip labels).
 export function stripGradePrefix(name: string): string {
   return name.replace(/^\d+\.\s*Sınıf:?\s*/i, "");

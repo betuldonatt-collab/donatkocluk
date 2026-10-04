@@ -30,11 +30,13 @@ import {
   coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
+  coursesForMaarifTytGroup,
   coursesForLgsExamSubject,
   emptyForGroup,
   inferAytTrackFromScores,
   overCapGroup,
 } from "@/lib/curriculum/subject-groups";
+import { isMaarif11GeneralExamTitle } from "@/lib/maarif-grade";
 import { cn } from "@/lib/utils";
 import {
   getTaskTopicMistakes,
@@ -252,7 +254,15 @@ function subjectGroupsFor(
   return [];
 }
 
-function coursesForActiveGroup(examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10", aytTrack: Track | null, key: string): Course[] {
+// `maarif11`: an 11th grader's Genel Deneme -- scored as TYT, but analysed
+// against the merged 9th+10th "Maarif TYT" courses (see subject-groups.ts).
+function coursesForActiveGroup(
+  examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10",
+  aytTrack: Track | null,
+  key: string,
+  maarif11 = false,
+): Course[] {
+  if (examTrack === "tyt" && maarif11) return coursesForMaarifTytGroup(key);
   if (examTrack === "lgs") return coursesForLgsExamSubject(key);
   if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
   if (examTrack === "m10") return coursesForMaarif10ExamSubject(key);
@@ -477,7 +487,7 @@ function TaskModalBody({
   const analysisGroups: { label: string; courses: Course[] }[] =
     task.task_type === "general_exam"
       ? activeGroups
-          .map((g) => ({ label: g.label, courses: coursesForActiveGroup(examTrack, aytTrack, g.key) }))
+          .map((g) => ({ label: g.label, courses: coursesForActiveGroup(examTrack, aytTrack, g.key, isMaarif11GeneralExamTitle(task.title)) }))
           .filter((g) => g.courses.length > 0)
       : branchCourse
         ? [{ label: branchCourse.name, courses: [branchCourse] }]
