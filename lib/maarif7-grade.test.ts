@@ -27,7 +27,7 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler"]);
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");
@@ -215,6 +215,57 @@ describe("7th grade Fen Bilimleri (three levels: Ünite > Konu > Alt konu)", () 
 
   it("is the course the Fen Bilimleri exam subject analyses", () => {
     expect(coursesForMaarif7ExamSubject("m7_fen")).toEqual([course]);
+  });
+});
+
+describe("7th grade Din Kültürü ve Ahlak Bilgisi", () => {
+  const course = findCourseById("maarif7-din-kulturu-ve-ahlak-bilgisi")!;
+
+  it("has the five units and 20 topics exactly as supplied, in order", () => {
+    expect(course.name).toBe("7. Sınıf Din Kültürü ve Ahlak Bilgisi");
+    expect(course.units.map((u) => [u.unit, u.topics.map((t) => t.name)])).toEqual([
+      [
+        "1. Ünite: Melek ve Ahiret İnancı",
+        ["Varlıklar Âlemi", "Dünya ve Ahiret Hayatı", "Melek ve Ahiret İnancının İnsana Kazandırdıkları", "Bir Sure Öğreniyorum: Nas Suresi"],
+      ],
+      [
+        "2. Ünite: Hac, Umre ve Kurban",
+        ["Hac ve Umre İbadeti", "Kurban İbadeti", "Hac ve Kurban İbadetinin Kültürümüze Yansımaları", "Bir Sure Öğreniyorum: Kafirun Suresi"],
+      ],
+      [
+        "3. Ünite: İslam Düşüncesinde Yorumlar",
+        [
+          "Din Anlayışındaki Yorum Farklılıkları",
+          "İslam Düşüncesinde Yorum Biçimleri",
+          "Kültürümüzdeki Tasavvufi Yorumlar",
+          "Alevilik Bektaşilik ile İlgili Temel Kavramlar ve Cem Erkanları",
+        ],
+      ],
+      [
+        "4. Ünite: Peygamber Olarak Hz. Muhammed",
+        [
+          "Hz. Muhammed'in (s.a.v.) Daveti: Mekke Dönemi",
+          "Hicret",
+          "Hz. Muhammed'in (s.a.v.) Daveti: Medine Dönemi",
+          "Bir Sure Öğreniyorum: Nasr Suresi",
+        ],
+      ],
+      ["5. Ünite: Yaşayan Dünya Dinleri", ["Yahudilik", "Hristiyanlık", "Hinduizm", "Budizm"]],
+    ]);
+    expect(course.units.flatMap((u) => u.topics)).toHaveLength(20);
+  });
+
+  it("has unique ids in the 7th-grade convention; the course id is the one the exam subject points at", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(20);
+    expect(ids[0]).toBe("maarif7-din-kulturu-ve-ahlak-bilgisi-u0-t0");
+    expect(ids[ids.length - 1]).toBe("maarif7-din-kulturu-ve-ahlak-bilgisi-u4-t3");
+    expect(MAARIF7_EXAM_SUBJECTS.find((s) => s.key === "m7_din")!.courseIds).toEqual(["maarif7-din-kulturu-ve-ahlak-bilgisi"]);
+  });
+
+  it("is connected to the exam analysis: the Din Kültürü subject of the 7th-grade Genel Deneme lists it", () => {
+    expect(coursesForMaarif7ExamSubject("m7_din")).toEqual([course]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_din")).toEqual([course]);
   });
 });
 

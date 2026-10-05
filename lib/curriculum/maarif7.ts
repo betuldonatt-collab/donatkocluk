@@ -202,7 +202,51 @@ const FEN_BILIMLERI = buildCourse("maarif7-fen-bilimleri", "7. Sınıf Fen Bilim
   },
 ]);
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER];
+// The id the Din Kültürü exam subject (m7_din) analyses (MAARIF7_EXAM_SUBJECTS in ./subject-groups).
+const DIN_KULTURU = buildCourse("maarif7-din-kulturu-ve-ahlak-bilgisi", "7. Sınıf Din Kültürü ve Ahlak Bilgisi", [
+  {
+    unit: "1. Ünite: Melek ve Ahiret İnancı",
+    topics: [
+      "Varlıklar Âlemi",
+      "Dünya ve Ahiret Hayatı",
+      "Melek ve Ahiret İnancının İnsana Kazandırdıkları",
+      "Bir Sure Öğreniyorum: Nas Suresi",
+    ],
+  },
+  {
+    unit: "2. Ünite: Hac, Umre ve Kurban",
+    topics: [
+      "Hac ve Umre İbadeti",
+      "Kurban İbadeti",
+      "Hac ve Kurban İbadetinin Kültürümüze Yansımaları",
+      "Bir Sure Öğreniyorum: Kafirun Suresi",
+    ],
+  },
+  {
+    unit: "3. Ünite: İslam Düşüncesinde Yorumlar",
+    topics: [
+      "Din Anlayışındaki Yorum Farklılıkları",
+      "İslam Düşüncesinde Yorum Biçimleri",
+      "Kültürümüzdeki Tasavvufi Yorumlar",
+      "Alevilik Bektaşilik ile İlgili Temel Kavramlar ve Cem Erkanları",
+    ],
+  },
+  {
+    unit: "4. Ünite: Peygamber Olarak Hz. Muhammed",
+    topics: [
+      "Hz. Muhammed'in (s.a.v.) Daveti: Mekke Dönemi",
+      "Hicret",
+      "Hz. Muhammed'in (s.a.v.) Daveti: Medine Dönemi",
+      "Bir Sure Öğreniyorum: Nasr Suresi",
+    ],
+  },
+  {
+    unit: "5. Ünite: Yaşayan Dünya Dinleri",
+    topics: ["Yahudilik", "Hristiyanlık", "Hinduizm", "Budizm"],
+  },
+]);
+
+export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");
