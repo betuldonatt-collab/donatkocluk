@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import {
   BarChart3,
   BookOpenCheck,
@@ -69,11 +70,14 @@ export function StudentSidebar({
   // (LGS-only); only the Paragraf/Problem page is renamed (it is Paragraf
   // / Kitap Okuma for them).
   const navContext = { examType, isMaarif: isMaarif9, isGraduate };
-  const navItems = NAV_ITEMS.filter((item) => isStudentNavItemVisible(item.href, navContext)).map((item) => (examType === "LGS" && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
+  // A 7th grader's Paragraf tracker is the LGS one too (Paragraf / Kitap Okuma, no Problem).
+  const maarifGrade = useMaarifGrade();
+  const paragrafKitap = examType === "LGS" || maarifGrade === 7;
+  const navItems = NAV_ITEMS.filter((item) => isStudentNavItemVisible(item.href, navContext)).map((item) => (paragrafKitap && item.href === "/student/paragraf-problem" ? { ...item, label: "Paragraf / Kitap Okuma" } : item));
 
   // The guided tour walks the same list -- same rename.
   const tourItems = STUDENT_NAV_ITEMS.filter((item) => isStudentNavItemVisible(item.href, navContext)).map((item) =>
-    examType === "LGS" && item.href === "/student/paragraf-problem"
+    paragrafKitap && item.href === "/student/paragraf-problem"
       ? { ...item, label: "Paragraf / Kitap Okuma", blurb: "Günlük paragraf ve kitap okuma çalışmalarını buradan takip edersin." }
       : item,
   );

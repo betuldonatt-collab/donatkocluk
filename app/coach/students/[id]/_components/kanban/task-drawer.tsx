@@ -345,7 +345,7 @@ export function TaskDrawer({
             <div className="space-y-1.5">
               <Label>Rutin Türü</Label>
               <div className="flex flex-wrap gap-1.5">
-                {routineOptionsFor(examType).map((opt) => (
+                {routineOptionsFor(examType, maarifGrade).map((opt) => (
                   <button
                     key={opt.value}
                     type="button"

@@ -6,12 +6,11 @@ import { ArrowLeft } from "lucide-react";
 
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
-import { KARMA_TOPIC_ID, LGS_COURSES, findCourseById, isLgsCourseId } from "@/lib/curriculum";
-import { curriculumCourseIdsFor, MAARIF7_CURRICULUM_COURSE_IDS } from "@/lib/curriculum/cohort";
+import { KARMA_TOPIC_ID, findCourseById, isLgsCourseId } from "@/lib/curriculum";
+import { curriculumCourseIdsFor, generalExamCourseIdsForTitle } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import { courseHasBuckets, maarifSelectionNodes } from "@/lib/curriculum/maarif-selection";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
-import { TYT_SUBJECT_GROUPS } from "@/lib/curriculum/subject-groups";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
 import type { ExamType } from "@/lib/exam-type";
@@ -157,7 +156,7 @@ async function fetchStudentDetail(studentId: string) {
   // The cohort decides which curriculum the analytics below cover.
   const examType: ExamType = profile.exam_type === "LGS" ? "LGS" : "YKS";
   const maarifGrade = await fetchMaarifGrade(supabase, studentId);
-  // A 7th grader's maps (Konu Performans, Gelişim Haritası) cover the 7th grade's own six courses.
+  // A 7th/9th/10th grader's maps (Konu Performans, Gelişim Haritası) cover that grade's own courses.
   const curriculumCourseIds = curriculumCourseIdsFor(examType, maarifGrade);
   // Yazılılar: best-effort (null for a graduate; never throws), so it can't take the page down.
   const schoolExams = await fetchSchoolExams(supabase, studentId, { examType, maarifGrade });
@@ -273,8 +272,9 @@ async function fetchStudentDetail(studentId: string) {
 
   // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines (migration
   // 0087) rather than paragraf_problem_entries.
+  // A 7th grader does the same (Paragraf / Kitap Okuma, migration 0122).
   const { data: lgsRoutineRows } =
-    examType === "LGS"
+    examType === "LGS" || maarifGrade === 7
       ? await supabase
           .from("lgs_daily_routines")
           .select("id, entry_date, paragraf_correct, paragraf_wrong, paragraf_empty, paragraf_duration_minutes, book_title, book_author, book_pages_read")
@@ -448,12 +448,8 @@ async function fetchStudentDetail(studentId: string) {
     }
     if (e.task_type === "general_exam") {
       // An LGS general exam covers every LGS course; a YKS one the TYT groups.
-      // A 7th-grade general exam covers the 7th grade's six courses, like LGS's covers its own.
-      const generalCourseIds = /^LGS\b/i.test(e.title)
-        ? LGS_COURSES.map((c) => c.id)
-        : /^7\.\s*SINIF\b/i.test(e.title)
-          ? MAARIF7_CURRICULUM_COURSE_IDS
-          : TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds);
+      // A general exam counts toward the courses of ITS cohort (LGS / 7th / 9th / 10th grade / TYT).
+      const generalCourseIds = generalExamCourseIdsForTitle(e.title);
       for (const cid of generalCourseIds) {
         courseExamCounts.set(cid, (courseExamCounts.get(cid) ?? 0) + 1);
       }

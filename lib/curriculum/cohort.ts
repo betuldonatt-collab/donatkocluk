@@ -8,6 +8,9 @@ import {
 } from "./index";
 import type { ExamType } from "../exam-type";
 import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
+import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
+import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF9_EXAM_SUBJECTS, MAARIF10_EXAM_SUBJECTS, MAARIF7_EXAM_SUBJECTS, TYT_SUBJECT_GROUPS } from "./subject-groups";
 
 export const YKS_CURRICULUM_COURSE_IDS: string[] = [
   ...TYT_COURSES.map((c) => c.id),
@@ -21,10 +24,27 @@ export const LGS_CURRICULUM_COURSE_IDS: string[] = LGS_COURSES.map((c) => c.id);
 
 export const MAARIF7_CURRICULUM_COURSE_IDS: string[] = MAARIF7_KAYNAK_COURSES.map((c) => c.id);
 
-// `maarifGrade`: a 7th grader's analytics (Konu Performans Haritası, Gelişim Haritası, Karne) cover the 7th
-// grade's own six courses, not the YKS list their exam_type ('YKS') would otherwise give them. Other Maarif
-// grades keep what they had.
+export const MAARIF9_CURRICULUM_COURSE_IDS: string[] = MAARIF9_KAYNAK_COURSES.map((c) => c.id);
+export const MAARIF10_CURRICULUM_COURSE_IDS: string[] = MAARIF10_KAYNAK_COURSES.map((c) => c.id);
+
+// `maarifGrade`: a 7th, 9th or 10th grader's analytics (Konu Performans Haritası, Gelişim Haritası, Karne) cover
+// that grade's own courses, not the YKS list their exam_type ('YKS') would otherwise give them -- with it a
+// Maarif student's topic map found no rows for any of their courses ("Bu ders için konu verisi yok"). The 11th
+// grade (merged Maarif TYT courses) keeps what it had.
 export function curriculumCourseIdsFor(examType: ExamType, maarifGrade: number | null = null): string[] {
   if (maarifGrade === 7) return MAARIF7_CURRICULUM_COURSE_IDS;
+  if (maarifGrade === 9) return MAARIF9_CURRICULUM_COURSE_IDS;
+  if (maarifGrade === 10) return MAARIF10_CURRICULUM_COURSE_IDS;
   return examType === "LGS" ? LGS_CURRICULUM_COURSE_IDS : YKS_CURRICULUM_COURSE_IDS;
+}
+
+// The courses ONE general exam counts toward, read from its title (a general exam has no course_id): the
+// denominator of each course's topic map. An LGS exam covers the LGS courses, a 7th/9th/10th-grade one that
+// grade's courses, anything else the TYT groups.
+export function generalExamCourseIdsForTitle(title: string): string[] {
+  if (/^LGS\b/i.test(title)) return LGS_CURRICULUM_COURSE_IDS;
+  if (/^7\.\s*SINIF\b/i.test(title)) return MAARIF7_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
+  if (/^9\.\s*SINIF\b/i.test(title)) return MAARIF9_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
+  if (/^10\.\s*SINIF\b/i.test(title)) return MAARIF10_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
+  return TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds);
 }

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { computeNet } from "@/lib/scoring";
 import { getStudentExamType } from "@/lib/student-exam-type";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { PARAGRAF_ENTRIES_PAGE_SIZE } from "./constants";
 import { ParagrafProblemClient, type HistoryEntry } from "./paragraf-problem-client";
 import { LgsParagrafKitapClient } from "./lgs-paragraf-kitap-client";
@@ -11,9 +12,10 @@ export default async function ParagrafProblemPage() {
   const view = await getViewContext("student");
   const supabase = await createClient();
 
-  // LGS students get their own page (Paragraf with 3:1 net + Kitap Okuma,
-  // no Problem), backed by lgs_daily_routines.
-  if ((await getStudentExamType()) === "LGS") {
+  // LGS students -- and 7th graders, who follow the LGS structure for their routines -- get their own page
+  // (Paragraf with 3:1 net + Kitap Okuma, no Problem), backed by lgs_daily_routines.
+  const isSeventhGrader = view ? (await fetchMaarifGrade(supabase, view.effectiveUserId)) === 7 : false;
+  if (isSeventhGrader || (await getStudentExamType()) === "LGS") {
     const { data: lgsRows } = view
       ? await supabase
           .from("lgs_daily_routines")

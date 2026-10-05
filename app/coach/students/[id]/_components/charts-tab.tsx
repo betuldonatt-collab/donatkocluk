@@ -111,6 +111,9 @@ export function ChartsTab({
   // distribution and scoring (MAARIF_GRADES[7].lgsStyleScoring).
   const lgsStyle = isLgs || (maarifGrade !== null && MAARIF_GRADES[maarifGrade].lgsStyleScoring === true);
   const netOf = lgsStyle ? computeLgsNet : computeNet;
+  // Paragraf (3:1 net + duration) and Kitap Okuma (pages per day) come from the daily LGS routines for an LGS
+  // student and for a 7th grader (the LGS structure); every other cohort has Paragraf and Problem.
+  const lgsRoutineCards = isLgs || maarifGrade === 7;
   const [examMode, setExamMode] = useState<ExamMode>("genel");
 
   // A Maarif 9./10. Sınıf student (migration 0096/0099) never has TYT/AYT
@@ -275,11 +278,11 @@ export function ChartsTab({
             <CardDescription>Net ve süre değişimi</CardDescription>
           </CardHeader>
           <CardContent>
-            <DualMetricChart data={isLgs ? lgsParagrafSeries : paragrafSeries} labelA="Net" labelB="Süre" unitB=" dk" />
+            <DualMetricChart data={lgsRoutineCards ? lgsParagrafSeries : paragrafSeries} labelA="Net" labelB="Süre" unitB=" dk" />
           </CardContent>
         </Card>
 
-        {isLgs ? (
+        {lgsRoutineCards ? (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Kitap Okuma Gelişimi</CardTitle>
