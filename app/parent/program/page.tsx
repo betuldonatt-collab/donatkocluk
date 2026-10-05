@@ -33,7 +33,7 @@ function rangeLabel(start: string, end: string) {
   return `${fmt(start, false)} – ${fmt(end, true)}`;
 }
 
-// LGS parents only: a read-only, parent-friendly view of the student's whole
+// LGS parents and parents of 7th graders only: a read-only, parent-friendly view of the student's whole
 // week -- Sabit Görevler, Rutinler and the coach-assigned tasks with their
 // results, evidence photos and timer durations. Any other cohort (and an
 // unlinked parent) is sent back to the normal dashboard before anything is
@@ -49,7 +49,7 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
   // Name and cohort come with the linked-students query (cached -- the layout
   // already ran it), so there is no extra profile round trip here.
   const student = (await getLinkedStudents()).find((s) => s.id === studentId);
-  if (!student || !isLgsParentView(student.exam_type)) redirect("/parent");
+  if (!student || !isLgsParentView(student.exam_type, student.is_maarif7)) redirect("/parent");
 
   const today = todayISO();
   const start = mondayOf(weekParam ?? today);

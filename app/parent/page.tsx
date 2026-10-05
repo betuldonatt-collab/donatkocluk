@@ -92,7 +92,7 @@ async function fetchDashboardData() {
   // The student's own profile row rides along with the (cached) linked-students
   // lookup the layout already ran -- no second profiles read here.
   const profile = (await getLinkedStudents()).find((s) => s.id === studentId) ?? null;
-  const isLgsStudent = isLgsParentView(profile?.exam_type);
+  const isLgsStudent = isLgsParentView(profile?.exam_type, profile?.is_maarif7);
 
   // Phase 1: sessions (needed both for the session list AND to resolve the
   // student's cycle bounds below) + everything else independent of the task
@@ -207,7 +207,7 @@ async function fetchDashboardData() {
   );
 
   // Only ever populated for an LGS student (see the batch above).
-  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type) ? (dailyRowData as unknown as DailyProgressTask[]) : [];
+  const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type, profile.is_maarif7) ? (dailyRowData as unknown as DailyProgressTask[]) : [];
 
   return {
     today,
@@ -233,6 +233,8 @@ async function fetchDashboardData() {
     aytNetChartData,
     lgsNetChartData,
     examType: (profile.exam_type ?? "YKS") as "YKS" | "LGS",
+    // LGS-style program view (Dün/Bugün/Yarın bars, Tam Program): LGS students and 7th graders.
+    programView: isLgsParentView(profile.exam_type, profile.is_maarif7),
   };
 }
 
@@ -267,11 +269,12 @@ export default async function ParentPage() {
     aytNetChartData,
     lgsNetChartData,
     examType,
+    programView,
   } = data;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      {isLgsParentView(examType) && <AutoRefresh />}
+      {programView && <AutoRefresh />}
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{student.full_name ?? "Öğrenci"}</h1>
@@ -287,7 +290,7 @@ export default async function ParentPage() {
           >
             {student.is_active ? "Aktif" : "Pasif"}
           </span>
-          {!isLgsParentView(examType) && <WeeklyProgramSheet tasks={programTasks} />}
+          {!programView && <WeeklyProgramSheet tasks={programTasks} />}
         </div>
       </header>
 
@@ -301,7 +304,7 @@ export default async function ParentPage() {
           </CardContent>
         </Card>
 
-        {isLgsParentView(examType) && (
+        {programView && (
           <DailyProgressCard tasks={dailyRows} today={todayIso} />
         )}
 

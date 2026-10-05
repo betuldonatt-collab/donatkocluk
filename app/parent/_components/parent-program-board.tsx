@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Lock, Timer, XCircle } from "lucide-react";
 
 import { TaskDescription } from "@/components/task-description";
 import { isRoutineCourseId } from "@/lib/curriculum";
-import { LGS_EXAM_SUBJECTS } from "@/lib/curriculum/subject-groups";
+import { LGS_EXAM_SUBJECTS, MAARIF7_EXAM_SUBJECTS } from "@/lib/curriculum/subject-groups";
 import { completionPercent } from "@/lib/completion";
 import { weightedDayCounts } from "@/lib/effort-weight";
 import { subjectBackgroundClass } from "@/lib/subject-colors";
@@ -131,9 +131,10 @@ function dayOfWeekOf(iso: string) {
 }
 
 function StatsLine({ task }: { task: ParentProgramTask }) {
-  // LGS Genel Deneme: per-subject Doğru / Yanlış / Boş.
+  // LGS (and 7th-grade) Genel Deneme: per-subject Doğru / Yanlış / Boş. The two exams have the same six subjects
+  // under their own keys (lgs_* / m7_*).
   if (task.task_type === "general_exam" && task.subject_scores) {
-    const rows = LGS_EXAM_SUBJECTS.filter((s) => task.subject_scores?.[s.key]);
+    const rows = [...LGS_EXAM_SUBJECTS, ...MAARIF7_EXAM_SUBJECTS].filter((s) => task.subject_scores?.[s.key]);
     if (rows.length > 0) {
       return (
         <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-2">

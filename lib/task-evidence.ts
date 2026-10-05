@@ -69,6 +69,19 @@ export function shouldHoldForEvidenceReview(input: {
   );
 }
 
+// The status an APPROVAL of a task's photos applies. A task waiting for review (the student marked it done with
+// photos) is completed as the student claimed -- unless they have since taken it back (marked it "Yapılmadı"):
+// then the approval only records the verdict and never marks anything done the student no longer claims.
+export function statusAppliedByApproval(input: {
+  wasPending: boolean;
+  currentStatus: string;
+  claimed: "done" | "half_done";
+}): "done" | "half_done" | null {
+  if (!input.wasPending) return null;
+  if (input.currentStatus === "not_done") return null;
+  return input.claimed;
+}
+
 // --- Per-photo review (student_tasks.evidence_photo_status, 0089) ------------
 //
 // A map storage-path -> verdict. A path that is not in it is still waiting for

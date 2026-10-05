@@ -20,6 +20,8 @@ export type LinkedStudent = {
   is_active: boolean | null;
   total_session_quota: number;
   quota_cycle_start_at: string;
+  // A 7th grader (0119): their parent gets the LGS-style program view (0124).
+  is_maarif7?: boolean | null;
 };
 
 // Every linked child, name-sorted. Most parents have exactly one -- the
@@ -46,7 +48,7 @@ export const getLinkedStudents = cache(async (): Promise<LinkedStudent[]> => {
   // profiles_select_by_parent (0026).
   const { data: links } = await supabase
     .from("parent_students")
-    .select("profiles!student_id(id, full_name, exam_type, is_active, total_session_quota, quota_cycle_start_at)")
+    .select("profiles!student_id(id, full_name, exam_type, is_active, total_session_quota, quota_cycle_start_at, is_maarif7)")
     .eq("parent_id", user.id);
 
   const students: LinkedStudent[] = [];

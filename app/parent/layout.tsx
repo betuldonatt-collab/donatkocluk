@@ -19,7 +19,8 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
   // The "Haftalık Program" sidebar link exists only for a parent of an LGS student;
   // the cohort comes with the linked-students query that already ran (cached), so
   // no extra round trip.
-  const showProgram = isLgsParentView(students.find((s) => s.id === activeStudentId)?.exam_type);
+  const activeStudent = students.find((s) => s.id === activeStudentId);
+  const showProgram = isLgsParentView(activeStudent?.exam_type, activeStudent?.is_maarif7);
   const announcements = await fetchParentAnnouncements(activeStudentId);
   logPerf("parent layout data", perfStart);
 

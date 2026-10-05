@@ -17,6 +17,7 @@ import {
   evidenceOutcome,
   isEvidencePathFor,
   normalizePhotoStatus,
+  statusAppliedByApproval,
   type PhotoDecision,
 } from "@/lib/task-evidence";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
@@ -1973,14 +1974,16 @@ async function applyEvidenceDecisions(
   let update: Record<string, unknown> = base;
   let statusChanged = false;
   if (outcome === "approved") {
+    // Not applied when the student has taken the completion back ("Yapılmadı") since submitting the photos.
+    const appliedStatus = statusAppliedByApproval({ wasPending, currentStatus: task.status, claimed: claimed as "done" | "half_done" });
     update = {
       ...base,
       evidence_review_status: "approved",
       evidence_pending_status: null,
       evidence_review_note: null,
-      ...(wasPending ? { status: claimed, completed: claimed === "done" } : {}),
+      ...(appliedStatus ? { status: appliedStatus, completed: appliedStatus === "done" } : {}),
     };
-    statusChanged = wasPending;
+    statusChanged = appliedStatus !== null;
   } else if (outcome === "rejected") {
     update = {
       ...base,
