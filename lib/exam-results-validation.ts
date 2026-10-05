@@ -1,6 +1,7 @@
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
+  MAARIF7_EXAM_SUBJECTS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
@@ -64,7 +65,8 @@ export function expectedGeneralExamKeys(title: string, scores: Record<string, un
   if (track === "lgs") return LGS_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m11" || track === "m7") return []; // no exam-subject data yet
+  if (track === "m7") return MAARIF7_EXAM_SUBJECTS.map((s) => s.key);
+  if (track === "m11") return []; // no exam-subject data yet
   if (track === "tyt") return TYT_SUBJECT_GROUPS.map((g) => g.key);
   const aytTrack = inferAytTrackFromScores(scores);
   return aytTrack ? AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => g.key) : null;
@@ -98,7 +100,8 @@ function questionsForGeneralExamKey(
   if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m11" || track === "m7") return null; // no fixed per-subject question counts yet
+  if (track === "m7") return MAARIF7_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
+  if (track === "m11") return null; // no fixed per-subject question counts yet
   if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
   const aytTrack = inferAytTrackFromScores(scores);
   if (!aytTrack) return null;
@@ -129,6 +132,8 @@ export function findGeneralExamTotalMismatch(
       const label =
         track === "lgs"
           ? LGS_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
+          : track === "m7"
+            ? MAARIF7_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
           : track === "m10"
             ? MAARIF10_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
             : track === "m9"

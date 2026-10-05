@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { findCourseById, isMaarifCourseId } from "./curriculum";
+import { LGS_EXAM_SUBJECTS, MAARIF7_EXAM_QUESTION_TOTAL, MAARIF7_EXAM_SUBJECTS, coursesForMaarif7ExamSubject } from "./curriculum/subject-groups";
 import { isMaarif7CourseId, MAARIF7_KAYNAK_COURSES } from "./curriculum/maarif7";
-import { expectedGeneralExamKeys, isGeneralExamScoresIncomplete } from "./exam-results-validation";
+import { expectedGeneralExamKeys, findGeneralExamTotalMismatch, isGeneralExamScoresIncomplete } from "./exam-results-validation";
 import {
   fetchMaarifGrade,
   fetchMaarifGradesByIds,
@@ -24,12 +25,13 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
     expect(gradeOfTrack("m7")).toBe(7);
   });
 
-  it("is an empty placeholder: no courses and no Genel Deneme subjects yet, resolved safely", () => {
-    expect(MAARIF7_KAYNAK_COURSES).toEqual([]);
-    expect(MAARIF_GRADES[7].courses).toEqual([]);
-    expect(MAARIF_GRADES[7].examSubjects).toEqual([]);
-    expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
+  it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-sosyal-bilgiler"]);
+    expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
+    expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")).toBeNull();
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_matematik")).toEqual([]); // not supplied yet -> no topic table
+    expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
   });
 
   it("recognises only maarif7- course ids as its own, and counts them as Maarif courses", () => {
@@ -57,11 +59,122 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 });
 
-describe("7th grade exam titles", () => {
-  it("a 7th grader's Genel Deneme has no fixed subject list yet and is never judged by TYT's", () => {
-    const title = "7. SINIF Genel Deneme - Test Yayınları";
-    expect(expectedGeneralExamKeys(title, null)).toEqual([]);
-    expect(isGeneralExamScoresIncomplete(title, { matematik: { correct: 1, wrong: 0, empty: 0 } })).toBe(false);
+describe("7th grade Sosyal Bilgiler", () => {
+  const course = MAARIF7_KAYNAK_COURSES[0];
+
+  it("has the six units and 17 topics exactly as supplied, in order", () => {
+    expect(course.units.map((u) => [u.unit, u.topics.map((t) => t.name)])).toEqual([
+      [
+        "1. Ünite: Birlikte Yaşamak",
+        ["Gruplarda ve Sosyal Hayatta İletişimin Önemi", "Özel Gereksinimli Bireyler İçin Fırsat Eşitliği", "Millî Meseleler Karşısında Türk Toplumunun Tutum ve Davranışları"],
+      ],
+      ["2. Ünite: Evimiz Dünya", ["Küreselleşmenin İnsan ve Toplum Hayatına Etkisi", "Bölgesel ve Küresel Sorunların Çözümünde Ülkemizin Rolü"]],
+      [
+        "3. Ünite: Ortak Mirasımız",
+        ["Osmanlı Devleti'nin Cihan Devleti Hâline Gelmesini Sağlayan Politikalar", "Osmanlı Devleti'nin Uygulamaya Koyduğu Yenilikler", "Osmanlı Kültür ve Medeniyeti"],
+      ],
+      [
+        "4. Ünite: Yaşayan Demokrasimiz",
+        [
+          "Türkiye Cumhuriyeti'nin Nitelikleri",
+          "Türkiye Cumhuriyeti'nin Yönetim Yapısı",
+          "Ülkemizde Demokrasinin Gelişimi",
+          "Demokrasinin Uygulanma Sürecinde Karşılaşılan Sorunlar",
+        ],
+      ],
+      ["5. Ünite: Hayatımızdaki Ekonomi", ["Millî Kalkınma Hamleleri", "Ekonomik Gelişmişlik ile Üretim, Dağıtım ve Tüketim Arasındaki Döngü"]],
+      [
+        "6. Ünite: Teknoloji ve Sosyal Bilimler",
+        [
+          "Bilimsel ve Teknolojik Gelişmelerin Gelecekteki Hayata Etkisi",
+          "Sosyal Bilimlerin Çalışma Alanları",
+          "Toplumsal Hayatta Karşılaşılabilecek Problemlere Çözüm Üretme",
+        ],
+      ],
+    ]);
+    expect(course.units.flatMap((u) => u.topics)).toHaveLength(17);
+  });
+
+  it("has unique, stable ids in the other grades' convention, all 7th-grade", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids[0]).toBe("maarif7-sosyal-bilgiler-u0-t0");
+    expect(ids[ids.length - 1]).toBe("maarif7-sosyal-bilgiler-u5-t2");
+    expect(ids.every((id) => id.startsWith("maarif7-"))).toBe(true);
+  });
+
+  it("is clean text: no sheet numbering or ALL-CAPS left in any unit or topic name", () => {
+    for (const u of course.units) {
+      expect(u.unit).toMatch(/^\d\. Ünite: /);
+      for (const t of u.topics) {
+        expect(t.name).not.toMatch(/^\d+(\.\d+)*\.?\s/);
+        expect(t.name).not.toMatch(/\p{Lu}{4,}/u);
+      }
+    }
+  });
+
+  it("is the course the Sosyal Bilgiler exam subject analyses", () => {
+    expect(coursesForMaarif7ExamSubject("m7_sosyal")).toEqual([course]);
+  });
+});
+
+describe("7th grade Genel Deneme: the LGS question distribution", () => {
+  it("has six subjects with LGS's counts (20/10/10/10 Sözel, 20/20 Sayısal), 90 questions in all", () => {
+    expect(MAARIF7_EXAM_SUBJECTS.map((s) => [s.label, s.section, s.questions])).toEqual([
+      ["Türkçe", "SÖZEL", 20],
+      ["Sosyal Bilgiler", "SÖZEL", 10],
+      ["Din Kültürü", "SÖZEL", 10],
+      ["İngilizce", "SÖZEL", 10],
+      ["Matematik", "SAYISAL", 20],
+      ["Fen Bilimleri", "SAYISAL", 20],
+    ]);
+    expect(MAARIF7_EXAM_QUESTION_TOTAL).toBe(90);
+  });
+
+  it("matches LGS subject by subject (Sosyal Bilgiler takes the İnkılap slot)", () => {
+    expect(MAARIF7_EXAM_SUBJECTS.map((s) => [s.section, s.questions])).toEqual(LGS_EXAM_SUBJECTS.map((s) => [s.section, s.questions]));
+  });
+
+  it("keys are m7_-prefixed and never collide with LGS, TYT or another grade's", () => {
+    for (const s of MAARIF7_EXAM_SUBJECTS) expect(s.key.startsWith("m7_")).toBe(true);
+    const lgsKeys = new Set(LGS_EXAM_SUBJECTS.map((s) => s.key));
+    for (const s of MAARIF7_EXAM_SUBJECTS) expect(lgsKeys.has(s.key)).toBe(false);
+    expect(MAARIF_GRADES[7].examSubjects).toBe(MAARIF7_EXAM_SUBJECTS);
+    expect(MAARIF_GRADES[7].lgsStyleScoring).toBe(true);
+    expect(MAARIF_GRADES[9].lgsStyleScoring).toBeUndefined();
+  });
+
+  const TITLE = "7. SINIF Genel Deneme - Test Yayınları";
+  const row = (correct: number, wrong: number, empty: number) => ({ correct, wrong, empty });
+  const full = {
+    m7_turkce: row(15, 3, 2),
+    m7_sosyal: row(8, 1, 1),
+    m7_din: row(9, 0, 1),
+    m7_ingilizce: row(7, 2, 1),
+    m7_matematik: row(12, 4, 4),
+    m7_fen: row(10, 5, 5),
+  };
+
+  it("requires every one of the six subjects to be filled in, like LGS (a missing or blank one is incomplete)", () => {
+    expect(expectedGeneralExamKeys(TITLE, null)).toEqual(MAARIF7_EXAM_SUBJECTS.map((s) => s.key));
+    expect(isGeneralExamScoresIncomplete(TITLE, full)).toBe(false);
+    const { m7_fen, ...withoutFen } = full;
+    void m7_fen;
+    expect(isGeneralExamScoresIncomplete(TITLE, withoutFen)).toBe(true);
+    expect(isGeneralExamScoresIncomplete(TITLE, { ...full, m7_din: { correct: 9, wrong: 0, empty: null } })).toBe(true);
+  });
+
+  it("enforces each subject's own question count: Doğru+Yanlış+Boş must equal it", () => {
+    expect(findGeneralExamTotalMismatch(TITLE, full)).toBeNull();
+    const over = findGeneralExamTotalMismatch(TITLE, { ...full, m7_din: row(9, 2, 1) }); // 12 of 10
+    expect(over).not.toBeNull();
+    expect(over?.questions).toBe(10);
+    expect(findGeneralExamTotalMismatch(TITLE, { ...full, m7_turkce: row(15, 3, 1) })).not.toBeNull(); // 19 of 20
+  });
+
+  it("a 7th grader's exam is never judged by TYT's subject list", () => {
+    expect(expectedGeneralExamKeys(TITLE, null)).not.toContain("turkce");
+    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual([]); // the other empty grade is unchanged
   });
 });
 

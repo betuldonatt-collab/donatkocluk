@@ -6,8 +6,10 @@ import { MAARIF9_KAYNAK_COURSES, isMaarif9CourseId } from "./curriculum/maarif9"
 import { MAARIF10_KAYNAK_COURSES, isMaarif10CourseId } from "./curriculum/maarif10";
 import { MAARIF11_KAYNAK_COURSES, isMaarif11CourseId } from "./curriculum/maarif11";
 import {
+  MAARIF7_EXAM_SUBJECTS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
+  coursesForMaarif7ExamSubject,
   coursesForMaarif9ExamSubject,
   coursesForMaarif10ExamSubject,
 } from "./curriculum/subject-groups";
@@ -29,22 +31,25 @@ type GradeConfig = {
   track: "m7" | "m9" | "m10" | "m11";
   titlePrefix: string; // "9. SINIF" -- the general-exam title prefix
   courses: Course[]; // Kaynak Takibi courses
-  examSubjects: MaarifExamSubject[]; // Genel Deneme, 120 questions
+  examSubjects: MaarifExamSubject[]; // Genel Deneme (120 questions; 90 for the 7th grade, LGS-style)
+  // 3 yanlış 1 doğruyu götürür (LGS) instead of TYT's 4 yanlış 1 doğru -- the 7th grade only.
+  lgsStyleScoring?: boolean;
   isCourseId: (id: string | null | undefined) => boolean;
   coursesForExamSubject: (key: string) => Course[];
 };
 
 export const MAARIF_GRADES: Record<MaarifGrade, GradeConfig> = {
-  // 7th grade: a placeholder until its curriculum is supplied (lib/curriculum/maarif7.ts) --
-  // empty courses and no Genel Deneme subjects yet, handled everywhere as "nothing here yet".
+  // 7th grade: its courses arrive course by course (lib/curriculum/maarif7.ts). Its Genel Deneme has
+  // the LGS question distribution and LGS scoring.
   7: {
     label: "7. Sınıf",
     track: "m7",
     titlePrefix: "7. SINIF",
     courses: MAARIF7_KAYNAK_COURSES,
-    examSubjects: [],
+    examSubjects: MAARIF7_EXAM_SUBJECTS,
+    lgsStyleScoring: true,
     isCourseId: isMaarif7CourseId,
-    coursesForExamSubject: () => [],
+    coursesForExamSubject: coursesForMaarif7ExamSubject,
   },
   9: {
     label: "9. Sınıf",

@@ -26,10 +26,12 @@ import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/cur
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
+  MAARIF7_EXAM_SUBJECTS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
   coursesForMaarif10ExamSubject,
   TYT_SUBJECT_GROUPS,
+  coursesForMaarif7ExamSubject,
   coursesForMaarif9ExamSubject,
   coursesForAytGroup,
   coursesForGroup,
@@ -263,7 +265,8 @@ function toNumberOrNull(v: string) {
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."), the
 // same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
+  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
@@ -271,10 +274,11 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m
 }
 
 function subjectGroupsFor(
-  examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10",
+  examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10",
   aytTrack: Track | null,
 ): { key: string; label: string; courseIds: string[]; section?: string; questions: number }[] {
   if (examTrack === "lgs") return LGS_EXAM_SUBJECTS;
+  if (examTrack === "m7") return MAARIF7_EXAM_SUBJECTS;
   if (examTrack === "m9") return MAARIF9_EXAM_SUBJECTS;
   if (examTrack === "m10") return MAARIF10_EXAM_SUBJECTS;
   if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
@@ -285,13 +289,14 @@ function subjectGroupsFor(
 // `maarif11`: an 11th grader's Genel Deneme -- scored as TYT, but analysed
 // against the merged 9th+10th "Maarif TYT" courses (see subject-groups.ts).
 function coursesForActiveGroup(
-  examTrack: "tyt" | "ayt" | "lgs" | "m9" | "m10",
+  examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10",
   aytTrack: Track | null,
   key: string,
   maarif11 = false,
 ): Course[] {
   if (examTrack === "tyt" && maarif11) return coursesForMaarifTytGroup(key);
   if (examTrack === "lgs") return coursesForLgsExamSubject(key);
+  if (examTrack === "m7") return coursesForMaarif7ExamSubject(key);
   if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
   if (examTrack === "m10") return coursesForMaarif10ExamSubject(key);
   if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);

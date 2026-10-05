@@ -33,7 +33,8 @@ type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
 // General-exam tasks have no course_id -- the TYT/AYT/LGS track lives only in
 // the title text, same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
+  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^LGS\b/i.test(title)) return "lgs";
@@ -220,7 +221,8 @@ export function GenelAnalysisClient({
     const m9Exams = exams
       .filter((e) => parseGeneralExamTrack(e.title) === gradeCfg.track)
       .sort((a, b) => b.task_date.localeCompare(a.task_date));
-    const m9NetChartData = netChartFor(m9Exams);
+    const m9NetChartData = netChartFor(m9Exams, gradeCfg.lgsStyleScoring ? computeLgsNet : computeNet);
+    const questionTotal = gradeCfg.examSubjects.reduce((sum, s) => sum + s.questions, 0) || 120;
     // A grade with no Genel Deneme subject data yet (11th grade, for now)
     // has an empty examSubjects list -- examSubjects[0] would throw reading
     // .key off undefined, so this falls back to "" (no subject selected
@@ -232,7 +234,7 @@ export function GenelAnalysisClient({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Genel Net Gelişimi</CardTitle>
-            <CardDescription>Tüm derslerin toplamı üzerinden {gradeCfg.label.toLowerCase()} genel deneme (120 soru) net değişimi</CardDescription>
+            <CardDescription>Tüm derslerin toplamı üzerinden {gradeCfg.label.toLowerCase()} genel deneme ({questionTotal} soru) net değişimi{gradeCfg.lgsStyleScoring ? " (3 yanlış 1 doğruyu götürür)" : ""}</CardDescription>
           </CardHeader>
           <CardContent>
             <LineChart data={m9NetChartData} />

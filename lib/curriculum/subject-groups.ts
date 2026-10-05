@@ -3,6 +3,7 @@
 // so their track (sayisal/ea/sozel) is recovered from which of the disjoint
 // key-sets below is present in a given exam's subject_scores -- see
 // inferAytTrackFromScores.
+import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 import { MAARIF9_GENEL_DENEME_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES } from "./maarif10";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
@@ -201,6 +202,29 @@ export function inferAytTrackFromScores(scores: Record<string, unknown> | null |
     if (AYT_SUBJECT_GROUPS_BY_TRACK[track].some((g) => g.key in scores)) return track;
   }
   return null;
+}
+
+// 7th-grade (Maarif) Genel Deneme: the SAME question distribution as the LGS exam -- 90 questions in
+// two sessions (Sözel: Türkçe 20, Sosyal Bilgiler 10, Din Kültürü 10, İngilizce 10; Sayısal: Matematik 20,
+// Fen Bilimleri 20) -- with Sosyal Bilgiler in the slot LGS gives to İnkılap Tarihi. Scored per subject like
+// LGS (3 yanlış 1 doğruyu götürür). Keys are `m7_`-prefixed, never colliding with TYT's, LGS's or the other
+// grades'. `courseIds` point at the 7th grade's own courses (MAARIF7_KAYNAK_COURSES) for topic analysis;
+// a subject whose course has not been supplied yet simply has no topic table.
+export const MAARIF7_EXAM_SUBJECTS: { key: string; label: string; section: string; courseIds: string[]; questions: number }[] = [
+  { key: "m7_turkce", label: "Türkçe", section: "SÖZEL", courseIds: ["maarif7-turkce"], questions: 20 },
+  { key: "m7_sosyal", label: "Sosyal Bilgiler", section: "SÖZEL", courseIds: ["maarif7-sosyal-bilgiler"], questions: 10 },
+  { key: "m7_din", label: "Din Kültürü", section: "SÖZEL", courseIds: ["maarif7-din-kulturu-ve-ahlak-bilgisi"], questions: 10 },
+  { key: "m7_ingilizce", label: "İngilizce", section: "SÖZEL", courseIds: ["maarif7-ingilizce"], questions: 10 },
+  { key: "m7_matematik", label: "Matematik", section: "SAYISAL", courseIds: ["maarif7-matematik"], questions: 20 },
+  { key: "m7_fen", label: "Fen Bilimleri", section: "SAYISAL", courseIds: ["maarif7-fen-bilimleri"], questions: 20 },
+];
+
+export const MAARIF7_EXAM_QUESTION_TOTAL = MAARIF7_EXAM_SUBJECTS.reduce((sum, s) => sum + s.questions, 0); // 90
+
+export function coursesForMaarif7ExamSubject(key: string): Course[] {
+  const subject = MAARIF7_EXAM_SUBJECTS.find((s) => s.key === key);
+  if (!subject) return [];
+  return subject.courseIds.map((id) => MAARIF7_KAYNAK_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }
 
 // 9th-grade (Maarif) Genel Deneme: 120 questions, scored per subject like
