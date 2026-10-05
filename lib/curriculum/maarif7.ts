@@ -70,7 +70,77 @@ const SOSYAL_BILGILER = buildCourse("maarif7-sosyal-bilgiler", "7. Sınıf Sosya
   },
 ]);
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [SOSYAL_BILGILER];
+// Theme headers are kept exactly as supplied ("1. Tema Sayılar ve Nicelikler (1)").
+const MATEMATIK = buildCourse("maarif7-matematik", "7. Sınıf Matematik", [
+  {
+    unit: "1. Tema Sayılar ve Nicelikler (1)",
+    topics: [
+      "Tam Sayılar",
+      "Rasyonel Sayılar",
+      "Mutlak Değer",
+      "Rasyonel Sayıların Farklı Temsilleri",
+      "Rasyonel Sayılarda Karşılaştırma ve Sıralama",
+      "Tam Sayılarla İşlemler ve Problem Çözme",
+      "Rasyonel Sayılarla İşlemler ve Problem Çözme",
+      "Çok Adımlı İşlemler",
+    ],
+  },
+  {
+    unit: "2. Tema Geometrik Nicelikler (1)",
+    topics: [
+      "Cisimlerin Farklı Yönlerden Görünümleri",
+      "Dikdörtgenler Prizmasının Açınımı ve Yüzey Alanı",
+      "Hacmi Eş Nesneler Aracılığıyla Yorumlama",
+      "Dikdörtgenler Prizmasının Hacim Bağıntısını Elde Etme",
+      "Hacim Ölçme Birimleri",
+      "Dikdörtgenler Prizması ile Modellenen Cisimlerin Yüzey Alanları ve Hacimlerine Yönelik Problemler",
+    ],
+  },
+  {
+    unit: "3. Tema İstatistiksel Araştırma Süreci",
+    topics: [
+      "Kategorik ve Nicel Veri Dağılımları",
+      "İstatistiksel Araştırma Süreci Adımları",
+      "Araştırma Sorusunu Belirleme",
+      "Verileri Toplama ve Analize Hazırlama",
+      "Veri Analizi (Görselleştirme ve Özetleme)",
+      "Veriyi Yorumlama ve Karar Verme",
+      "İstatistiksel Araştırma Süreçlerinin İncelenmesi",
+    ],
+  },
+  {
+    unit: "4. Tema Dönüşüm",
+    topics: ["Yansıma Dönüşümü", "Orta Dikme ve Açıortay İnşası"],
+  },
+  {
+    unit: "5. Tema Geometrik Şekiller",
+    topics: ["Üçgende Açıortay, Yükseklik, Kenar Orta Dikme ve Kenarortay", "Üçgende Kenarortay ve İnşası"],
+  },
+  {
+    unit: "6. Tema Sayılar ve Nicelikler (2)",
+    topics: ["Oran", "Birimli Birimsiz Oran", "Denk Oran", "Birim Oran", "Orantı", "Doğru Orantı Problemleri"],
+  },
+  {
+    unit: "7. Tema Veriden Olasılığa",
+    topics: ["Teorik Olasılık", "Tümleyen Olay", "Eşit Olasılıklı Olaylar", "Ayrık ve Ayrık Olmayan Olaylar"],
+  },
+  {
+    unit: "8. Tema İşlemlerle Cebirsel Düşünme ve Değişimler",
+    topics: ["Cebirsel İfadelerle İşlemler", "Denklemler", "Eşitsizlikler", "İspat", "Algoritmayı Yapılandırma"],
+  },
+  {
+    unit: "9. Tema Geometrik Nicelikler (2)",
+    topics: [
+      "Dairenin Alanı",
+      "Daire Diliminin Alanı",
+      "Eşkenar Dörtgenin Alanı",
+      "Yamuğun Alanı",
+      "Daire, Daire Dilimi, Eşkenar Dörtgen ve Yamuğun Alanına İlişkin Problemler",
+    ],
+  },
+]);
+
+export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, SOSYAL_BILGILER];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");

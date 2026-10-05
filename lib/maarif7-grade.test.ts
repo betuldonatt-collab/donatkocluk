@@ -26,11 +26,12 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-sosyal-bilgiler"]);
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-sosyal-bilgiler"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
-    expect(findCourseById("maarif7-matematik")).toBeNull();
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_matematik")).toEqual([]); // not supplied yet -> no topic table
+    expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");
+    expect(findCourseById("maarif7-fen-bilimleri")).toBeNull();
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_fen")).toEqual([]); // not supplied yet -> no topic table
     expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
   });
 
@@ -60,7 +61,7 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
 });
 
 describe("7th grade Sosyal Bilgiler", () => {
-  const course = MAARIF7_KAYNAK_COURSES[0];
+  const course = findCourseById("maarif7-sosyal-bilgiler")!;
 
   it("has the six units and 17 topics exactly as supplied, in order", () => {
     expect(course.units.map((u) => [u.unit, u.topics.map((t) => t.name)])).toEqual([
@@ -115,6 +116,61 @@ describe("7th grade Sosyal Bilgiler", () => {
 
   it("is the course the Sosyal Bilgiler exam subject analyses", () => {
     expect(coursesForMaarif7ExamSubject("m7_sosyal")).toEqual([course]);
+  });
+});
+
+describe("7th grade Matematik", () => {
+  const course = findCourseById("maarif7-matematik")!;
+
+  it("has the nine themes with the headers exactly as supplied, and 45 topics", () => {
+    expect(course.units.map((u) => [u.unit, u.topics.length])).toEqual([
+      ["1. Tema Sayılar ve Nicelikler (1)", 8],
+      ["2. Tema Geometrik Nicelikler (1)", 6],
+      ["3. Tema İstatistiksel Araştırma Süreci", 7],
+      ["4. Tema Dönüşüm", 2],
+      ["5. Tema Geometrik Şekiller", 2],
+      ["6. Tema Sayılar ve Nicelikler (2)", 6],
+      ["7. Tema Veriden Olasılığa", 4],
+      ["8. Tema İşlemlerle Cebirsel Düşünme ve Değişimler", 5],
+      ["9. Tema Geometrik Nicelikler (2)", 5],
+    ]);
+    expect(course.units.flatMap((u) => u.topics)).toHaveLength(45);
+  });
+
+  it("keeps the topics under their theme in the supplied order", () => {
+    const names = (i: number) => course.units[i].topics.map((t) => t.name);
+    expect(names(0)).toEqual([
+      "Tam Sayılar",
+      "Rasyonel Sayılar",
+      "Mutlak Değer",
+      "Rasyonel Sayıların Farklı Temsilleri",
+      "Rasyonel Sayılarda Karşılaştırma ve Sıralama",
+      "Tam Sayılarla İşlemler ve Problem Çözme",
+      "Rasyonel Sayılarla İşlemler ve Problem Çözme",
+      "Çok Adımlı İşlemler",
+    ]);
+    expect(names(1)[5]).toBe("Dikdörtgenler Prizması ile Modellenen Cisimlerin Yüzey Alanları ve Hacimlerine Yönelik Problemler");
+    expect(names(3)).toEqual(["Yansıma Dönüşümü", "Orta Dikme ve Açıortay İnşası"]);
+    expect(names(5)).toEqual(["Oran", "Birimli Birimsiz Oran", "Denk Oran", "Birim Oran", "Orantı", "Doğru Orantı Problemleri"]);
+    expect(names(8)).toEqual([
+      "Dairenin Alanı",
+      "Daire Diliminin Alanı",
+      "Eşkenar Dörtgenin Alanı",
+      "Yamuğun Alanı",
+      "Daire, Daire Dilimi, Eşkenar Dörtgen ve Yamuğun Alanına İlişkin Problemler",
+    ]);
+  });
+
+  it("has unique ids in the 7th-grade convention, every unit distinct (the (1)/(2) themes included)", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(45);
+    expect(ids[0]).toBe("maarif7-matematik-u0-t0");
+    expect(ids[ids.length - 1]).toBe("maarif7-matematik-u8-t4");
+    expect(new Set(course.units.map((u) => u.unit)).size).toBe(9);
+  });
+
+  it("is the course the Matematik exam subject analyses", () => {
+    expect(coursesForMaarif7ExamSubject("m7_matematik")).toEqual([course]);
   });
 });
 
