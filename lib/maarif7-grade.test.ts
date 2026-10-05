@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { findCourseById, isMaarifCourseId } from "./curriculum";
 import { LGS_EXAM_SUBJECTS, MAARIF7_EXAM_QUESTION_TOTAL, MAARIF7_EXAM_SUBJECTS, coursesForMaarif7ExamSubject } from "./curriculum/subject-groups";
 import { isMaarif7CourseId, MAARIF7_KAYNAK_COURSES } from "./curriculum/maarif7";
+import { flattenSelectionRows } from "./curriculum/rows";
 import { expectedGeneralExamKeys, findGeneralExamTotalMismatch, isGeneralExamScoresIncomplete } from "./exam-results-validation";
 import {
   fetchMaarifGrade,
@@ -26,12 +27,13 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-sosyal-bilgiler"]);
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");
-    expect(findCourseById("maarif7-fen-bilimleri")).toBeNull();
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_fen")).toEqual([]); // not supplied yet -> no topic table
+    expect(findCourseById("maarif7-fen-bilimleri")?.name).toBe("7. Sınıf Fen Bilimleri");
+    expect(findCourseById("maarif7-turkce")).toBeNull();
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_ingilizce")).toEqual([]); // not supplied yet -> no topic table
     expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
   });
 
@@ -116,6 +118,100 @@ describe("7th grade Sosyal Bilgiler", () => {
 
   it("is the course the Sosyal Bilgiler exam subject analyses", () => {
     expect(coursesForMaarif7ExamSubject("m7_sosyal")).toEqual([course]);
+  });
+});
+
+describe("7th grade Fen Bilimleri (three levels: Ünite > Konu > Alt konu)", () => {
+  const course = findCourseById("maarif7-fen-bilimleri")!;
+  const SEP = " › ";
+
+  it("has the seven units, with headers as supplied, and 26 topic lines", () => {
+    expect(course.units.map((u) => [u.unit, u.topics.length])).toEqual([
+      ["1. Ünite - Uzay Çağı", 3],
+      ["2. Ünite - Kuvvet ve Enerjiyi Keşfedelim", 3],
+      ["3. Ünite - Vücudumuzdaki Sistemler", 9],
+      ["4. Ünite - Işığın Kırılması ve Mercekler", 2],
+      ["5. Ünite - Maddenin Doğasına Yolculuk", 5],
+      ["6. Ünite - Elektriklenme", 2],
+      ["7. Ünite - Sürdürülebilir Yaşam ve Enerji", 2],
+    ]);
+    expect(course.units.flatMap((u) => u.topics)).toHaveLength(26);
+  });
+
+  it("keeps every Konu and every Alt konu: sub-topics are written 'Konu › Alt konu', in the supplied order", () => {
+    const names = (i: number) => course.units[i].topics.map((t) => t.name);
+    expect(names(0)).toEqual([
+      "Türkiye ve Uzay Araştırmaları › Uzay Teknolojileri",
+      "Türkiye ve Uzay Araştırmaları › Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+      "Uzayda Neler Var? › Yıldız Oluşumu",
+    ]);
+    expect(names(2)).toEqual([
+      "Sindirim Sistemi › Sindirim Sistemini Oluşturan Yapı ve Organlar",
+      "Sindirim Sistemi › Sindirim Sisteminin Sağlığı",
+      "Dolaşım Sistemi › Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+      "Dolaşım Sistemi › Kan Bağışının Toplum Açısından Önemi",
+      "Dolaşım Sistemi › Dolaşım Sisteminin Sağlığı",
+      "Solunum Sistemi › Solunum Sistemini Oluşturan Yapı ve Organlar",
+      "Solunum Sistemi › Solunum Sisteminin Sağlığı", // the typo ("Sağlığı0") is already fixed
+      "Boşaltım Sistemi › Boşaltım Sistemini Oluşturan Yapı ve Organlar",
+      "Boşaltım Sistemi › Boşaltım Sisteminin Sağlığı",
+    ]);
+    // A Konu with no Alt konu is a plain topic.
+    expect(names(4)).toEqual([
+      "Maddenin Tanecikli Yapısı › Atomun Yapısı ve Atomdaki Temel Parçacıklar",
+      "Maddenin Tanecikli Yapısı › Geçmişten Günümüze Atom",
+      "Saf Maddeler",
+      "Karışımlar › Çözünme Hızına Etki Eden Faktörler",
+      "Karışımların Ayrılması",
+    ]);
+    expect(names(6)).toEqual(["Besin Zinciri ve Enerji Akışı", "Sürdürülebilir Yaşam"]);
+    const all = course.units.flatMap((u) => u.topics.map((t) => t.name));
+    expect(all.filter((n) => n.includes(SEP))).toHaveLength(22);
+    expect(all.some((n) => /\d$/.test(n))).toBe(false);
+  });
+
+  it("has the 14 Konu headings across the units (each once), so the hierarchy is clear", () => {
+    const konular = course.units.flatMap((u) => [...new Set(u.topics.map((t) => t.name.split(SEP)[0]))]);
+    expect(konular).toHaveLength(17); // 14 with Alt konu + Saf Maddeler, Besin Zinciri, Sürdürülebilir Yaşam... listed per unit
+    expect(konular).toContain("Saf Maddeler");
+    expect(konular).toContain("Karışımların Ayrılması");
+  });
+
+  it("has unique ids in the 7th-grade convention", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(26);
+    expect(ids[0]).toBe("maarif7-fen-bilimleri-u0-t0");
+    expect(ids[ids.length - 1]).toBe("maarif7-fen-bilimleri-u6-t1");
+  });
+
+  it("is tracked per Konu in Kaynak Takibi: one row each, named by the Konu, its Alt konu listed beneath", () => {
+    const rows = flattenSelectionRows(course);
+    expect(rows.map((r) => r.label)).toEqual([
+      "Türkiye ve Uzay Araştırmaları",
+      "Uzayda Neler Var?",
+      "Kuvvet, İş ve Enerji İlişkisi",
+      "Enerji Dönüşümleri",
+      "Sindirim Sistemi",
+      "Dolaşım Sistemi",
+      "Solunum Sistemi",
+      "Boşaltım Sistemi",
+      "Işığın Kırılması",
+      "Mercekler",
+      "Maddenin Tanecikli Yapısı",
+      "Saf Maddeler",
+      "Karışımlar",
+      "Karışımların Ayrılması",
+      "Elektrik Yükleri ve Elektriklenme",
+      "7. Ünite - Sürdürülebilir Yaşam ve Enerji",
+    ]);
+    // Every one of the 26 topics is a member of exactly one row: nothing lost.
+    const members = rows.flatMap((r) => r.memberTopicIds);
+    expect(members).toHaveLength(26);
+    expect(new Set(members).size).toBe(26);
+  });
+
+  it("is the course the Fen Bilimleri exam subject analyses", () => {
+    expect(coursesForMaarif7ExamSubject("m7_fen")).toEqual([course]);
   });
 });
 

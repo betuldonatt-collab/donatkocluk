@@ -140,7 +140,69 @@ const MATEMATIK = buildCourse("maarif7-matematik", "7. Sınıf Matematik", [
   },
 ]);
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, SOSYAL_BILGILER];
+// Three levels: Ünite -> Konu -> Alt konu. The curriculum model has two (unit -> topic), so a sub-topic is
+// written "Konu › Alt konu" -- the same convention the 9th/10th grade's headed topics use: Kaynak Takibi
+// shows each Konu once as a heading with its sub-topics beneath it, and a Konu with no sub-topic is a plain
+// row. Unit headers are kept exactly as supplied ("1. Ünite - Uzay Çağı").
+const FEN_BILIMLERI = buildCourse("maarif7-fen-bilimleri", "7. Sınıf Fen Bilimleri", [
+  {
+    unit: "1. Ünite - Uzay Çağı",
+    topics: [
+      "Türkiye ve Uzay Araştırmaları › Uzay Teknolojileri",
+      "Türkiye ve Uzay Araştırmaları › Teknoloji ile Uzay Araştırmaları Arasındaki İlişki",
+      "Uzayda Neler Var? › Yıldız Oluşumu",
+    ],
+  },
+  {
+    unit: "2. Ünite - Kuvvet ve Enerjiyi Keşfedelim",
+    topics: [
+      "Kuvvet, İş ve Enerji İlişkisi › Fiziksel Anlamda İş",
+      "Kuvvet, İş ve Enerji İlişkisi › Enerji ve Enerji Çeşitleri",
+      "Enerji Dönüşümleri › Enerjinin Korunumu",
+    ],
+  },
+  {
+    unit: "3. Ünite - Vücudumuzdaki Sistemler",
+    topics: [
+      "Sindirim Sistemi › Sindirim Sistemini Oluşturan Yapı ve Organlar",
+      "Sindirim Sistemi › Sindirim Sisteminin Sağlığı",
+      "Dolaşım Sistemi › Dolaşım Sistemini Oluşturan Yapı ve Organlar",
+      "Dolaşım Sistemi › Kan Bağışının Toplum Açısından Önemi",
+      "Dolaşım Sistemi › Dolaşım Sisteminin Sağlığı",
+      "Solunum Sistemi › Solunum Sistemini Oluşturan Yapı ve Organlar",
+      "Solunum Sistemi › Solunum Sisteminin Sağlığı",
+      "Boşaltım Sistemi › Boşaltım Sistemini Oluşturan Yapı ve Organlar",
+      "Boşaltım Sistemi › Boşaltım Sisteminin Sağlığı",
+    ],
+  },
+  {
+    unit: "4. Ünite - Işığın Kırılması ve Mercekler",
+    topics: ["Işığın Kırılması › Kırılma Kanunları", "Mercekler › Merceklerin Günlük Hayatta Kullanım Alanları"],
+  },
+  {
+    unit: "5. Ünite - Maddenin Doğasına Yolculuk",
+    topics: [
+      "Maddenin Tanecikli Yapısı › Atomun Yapısı ve Atomdaki Temel Parçacıklar",
+      "Maddenin Tanecikli Yapısı › Geçmişten Günümüze Atom",
+      "Saf Maddeler",
+      "Karışımlar › Çözünme Hızına Etki Eden Faktörler",
+      "Karışımların Ayrılması",
+    ],
+  },
+  {
+    unit: "6. Ünite - Elektriklenme",
+    topics: [
+      "Elektrik Yükleri ve Elektriklenme › Elektriklenmenin Teknolojideki Kullanımı",
+      "Elektrik Yükleri ve Elektriklenme › Elektriklenme Çeşitleri",
+    ],
+  },
+  {
+    unit: "7. Ünite - Sürdürülebilir Yaşam ve Enerji",
+    topics: ["Besin Zinciri ve Enerji Akışı", "Sürdürülebilir Yaşam"],
+  },
+]);
+
+export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");
