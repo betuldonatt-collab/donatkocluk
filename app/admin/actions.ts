@@ -2,6 +2,7 @@
 
 import { fetchRequestedMaarifGrade } from "@/lib/maarif-grade";
 import { fetchIsGraduate, fetchRequestedGraduate } from "@/lib/graduate";
+import { fetchIsMaarif7 } from "@/lib/maarif-grade";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -241,10 +242,10 @@ export async function updateAcademicTrack(studentId: string, track: string | nul
 // always written together so a student can never end up with more than one.
 // null = ordinary YKS/LGS student. Admin-only; the profiles guard trigger
 // rejects anyone else's attempt at the DB level.
-export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | 11 | null) {
+export async function updateMaarifGrade(studentId: string, grade: 7 | 9 | 10 | 11 | null) {
   await requireAdmin();
   const studentIdV = parseInput(uuidSchema, studentId);
-  const gradeV = parseInput(z.union([z.literal(9), z.literal(10), z.literal(11)]).nullable(), grade);
+  const gradeV = parseInput(z.union([z.literal(7), z.literal(9), z.literal(10), z.literal(11)]).nullable(), grade);
   const supabase = await createClient();
   // A graduate (Mezun) is not in a Maarif grade (a CHECK constraint, migration 0117):
   // choosing a grade clears the flag. Only written when it is set, so this keeps
@@ -253,6 +254,9 @@ export async function updateMaarifGrade(studentId: string, grade: 9 | 10 | 11 | 
   const { error } = await supabase
     .from("profiles")
     .update({
+      // is_maarif7 (0119) is written only when it matters (choosing 7th grade, or leaving it),
+      // so this keeps working before that migration is applied.
+      ...(gradeV === 7 || (await fetchIsMaarif7(supabase, studentIdV)) ? { is_maarif7: gradeV === 7 } : {}),
       is_maarif9: gradeV === 9,
       is_maarif10: gradeV === 10,
       is_maarif11: gradeV === 11,
@@ -283,7 +287,11 @@ export async function updateGraduate(studentId: string, isGraduate: boolean): Pr
     }
     const { error } = await supabase
       .from("profiles")
-      .update(isGraduateV ? { is_graduate: true, is_maarif9: false, is_maarif10: false, is_maarif11: false } : { is_graduate: false })
+      .update(
+        isGraduateV
+          ? { is_graduate: true, is_maarif9: false, is_maarif10: false, is_maarif11: false, ...((await fetchIsMaarif7(supabase, studentIdV)) ? { is_maarif7: false } : {}) }
+          : { is_graduate: false },
+      )
       .eq("id", studentIdV)
       .eq("role", "student");
     if (error) throw dbError(error);
@@ -622,7 +630,12 @@ export async function approveSignupRequest(requestId: string): Promise<{ phone: 
       // submitSignupRequest, app/login/actions.ts).
       ...(request.requested_role === "student" && request.exam_type ? { exam_type: request.exam_type } : {}),
       ...(request.requested_role === "student" && requestedGrade !== null
-        ? { is_maarif9: requestedGrade === 9, is_maarif10: requestedGrade === 10, is_maarif11: requestedGrade === 11 }
+        ? {
+            ...(requestedGrade === 7 ? { is_maarif7: true } : {}),
+            is_maarif9: requestedGrade === 9,
+            is_maarif10: requestedGrade === 10,
+            is_maarif11: requestedGrade === 11,
+          }
         : {}),
       ...(request.requested_role === "student" && requestedGraduate ? { is_graduate: true } : {}),
     })

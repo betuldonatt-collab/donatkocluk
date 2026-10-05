@@ -1150,7 +1150,7 @@ const createRichCustomTaskSchema = z
     // mı?". Ignored for every other task type (each already has its own
     // always-pending or always-full-results shape).
     isCompleted: z.boolean().nullable().optional(),
-    generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9", "m10", "m11"]).nullable().optional(),
+    generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
     generalExamPublisher: z.string().trim().max(200).nullable().optional(),
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
     freeTitle: z.string().trim().max(200).nullable().optional(),
@@ -1207,6 +1207,7 @@ function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): stri
     const prefix =
       v.generalExamTrack === "ayt" ? "AYT"
       : v.generalExamTrack === "lgs" ? "LGS"
+      : v.generalExamTrack === "m7" ? "7. SINIF"
       : v.generalExamTrack === "m9" ? "9. SINIF"
       : v.generalExamTrack === "m10" ? "10. SINIF"
       : v.generalExamTrack === "m11" ? "11. SINIF"

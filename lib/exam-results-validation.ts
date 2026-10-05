@@ -42,7 +42,8 @@ type SubjectScore = { correct?: Filled; wrong?: Filled; empty?: Filled };
 
 // A general exam's title is the only place its track lives (no course_id) --
 // same convention every panel parses.
-function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" | "m11" {
+function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" | "m11" {
+  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
   if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
   if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
   if (/^11\.\s*SINIF\b/i.test(title)) return "m11";
@@ -63,7 +64,7 @@ export function expectedGeneralExamKeys(title: string, scores: Record<string, un
   if (track === "lgs") return LGS_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.map((s) => s.key);
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m11") return [];
+  if (track === "m11" || track === "m7") return []; // no exam-subject data yet
   if (track === "tyt") return TYT_SUBJECT_GROUPS.map((g) => g.key);
   const aytTrack = inferAytTrackFromScores(scores);
   return aytTrack ? AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => g.key) : null;
@@ -97,7 +98,7 @@ function questionsForGeneralExamKey(
   if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m9") return MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
   if (track === "m10") return MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m11") return null; // no fixed per-subject question counts yet
+  if (track === "m11" || track === "m7") return null; // no fixed per-subject question counts yet
   if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
   const aytTrack = inferAytTrackFromScores(scores);
   if (!aytTrack) return null;

@@ -13,6 +13,7 @@ import lgsJson from "./lgs.json";
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
+import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
 import { stripKonuNumberPrefix } from "./topic-name";
@@ -198,6 +199,7 @@ function findMaarif9Course(courseId: string): Course | null {
     MAARIF10_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
     MAARIF11_KAYNAK_COURSES.find((c) => c.id === courseId) ??
+    MAARIF7_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF_TYT_MERGED_COURSES.find((c) => c.id === courseId) ??
     null
   );
@@ -211,7 +213,8 @@ function findMaarif9Course(courseId: string): Course | null {
 export function isMaarifCourseId(courseId: string | null | undefined): boolean {
   return (
     !!courseId &&
-    (courseId.startsWith("maarif9-") ||
+    (courseId.startsWith("maarif7-") ||
+      courseId.startsWith("maarif9-") ||
       courseId.startsWith("maarif10-") ||
       courseId.startsWith("maarif11-") ||
       courseId.startsWith("maarif-tyt-"))

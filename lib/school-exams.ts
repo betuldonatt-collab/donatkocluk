@@ -2,11 +2,12 @@
 // Pure rules shared by the page, the server actions and the tests: which default
 // courses a grade has, the pastel colour palette, and how a typed grade is read.
 
-export type SchoolCohort = "lgs" | "grade9" | "grade10" | "grade11" | "grade12";
+export type SchoolCohort = "grade7" | "lgs" | "grade9" | "grade10" | "grade11" | "grade12";
 
 export type SchoolCourseDef = { key: string; name: string };
 
 export const COHORT_LABELS: Record<SchoolCohort, string> = {
+  grade7: "7. Sınıf",
   lgs: "8. Sınıf",
   grade9: "9. Sınıf",
   grade10: "10. Sınıf",
@@ -32,6 +33,14 @@ const MAARIF_BASE: SchoolCourseDef[] = [
 const FELSEFE: SchoolCourseDef = { key: "felsefe", name: "Felsefe" };
 
 export const DEFAULT_SCHOOL_COURSES: Record<SchoolCohort, SchoolCourseDef[]> = {
+  grade7: [
+    { key: "matematik", name: "Matematik" },
+    { key: "turkce", name: "Türkçe" },
+    { key: "fen", name: "Fen Bilimleri" },
+    { key: "sosyal", name: "Sosyal Bilgiler" },
+    { key: "ingilizce", name: "İngilizce" },
+    { key: "din", name: "Din Kültürü ve Ahlak Bilgisi" },
+  ],
   lgs: [
     { key: "matematik", name: "Matematik" },
     { key: "turkce", name: "Türkçe" },
@@ -47,15 +56,16 @@ export const DEFAULT_SCHOOL_COURSES: Record<SchoolCohort, SchoolCourseDef[]> = {
 };
 
 // Which school grade a student is in, from what the profile records. A graduate
-// (Mezun) has none -- no school exams. LGS is the 8th grade; a Maarif flag is 9/10/11;
+// (Mezun) has none -- no school exams. LGS is the 8th grade; a Maarif flag is 7/9/10/11;
 // every other YKS student is in the 12th grade.
 export function schoolCohortOf(student: {
   examType: "YKS" | "LGS";
-  maarifGrade: 9 | 10 | 11 | null;
+  maarifGrade: 7 | 9 | 10 | 11 | null;
   isGraduate: boolean;
 }): SchoolCohort | null {
   if (student.isGraduate) return null;
   if (student.examType === "LGS") return "lgs";
+  if (student.maarifGrade === 7) return "grade7";
   if (student.maarifGrade === 9) return "grade9";
   if (student.maarifGrade === 10) return "grade10";
   if (student.maarifGrade === 11) return "grade11";

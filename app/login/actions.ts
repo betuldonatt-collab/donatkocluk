@@ -187,6 +187,7 @@ export async function submitSignupRequest(
   }
   // Only a student request carries a cohort -- parent/coach requests leave
   // this null regardless of what the form sent.
+  const isMaarif7 = role === "student" && examTypeRaw === "MAARIF7";
   const isMaarif9 = role === "student" && examTypeRaw === "MAARIF9";
   const isMaarif10 = role === "student" && examTypeRaw === "MAARIF10";
   const isMaarif11 = role === "student" && examTypeRaw === "MAARIF11";
@@ -199,7 +200,7 @@ export async function submitSignupRequest(
   // is_maarif11 (carried as the matching signup_requests columns). The
   // three are pairwise mutually exclusive.
   const examType =
-    role === "student" ? (isMaarif9 || isMaarif10 || isMaarif11 || isGraduate ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
+    role === "student" ? (isMaarif7 || isMaarif9 || isMaarif10 || isMaarif11 || isGraduate ? "YKS" : EXAM_TYPES.has(examTypeRaw) ? examTypeRaw : null) : null;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -212,6 +213,7 @@ export async function submitSignupRequest(
       phone,
       requested_role: role,
       exam_type: examType,
+      ...(isMaarif7 ? { is_maarif7: true } : {}),
       ...(isMaarif9 ? { is_maarif9: true } : {}),
       ...(isMaarif10 ? { is_maarif10: true } : {}),
       ...(isMaarif11 ? { is_maarif11: true } : {}),

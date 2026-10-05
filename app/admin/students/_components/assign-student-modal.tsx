@@ -11,7 +11,7 @@ import { ResetPasswordButton } from "../../_components/reset-password-button";
 import { SendToPoolButton } from "../../_components/send-to-pool-button";
 
 type Person = { id: string; full_name: string | null };
-type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 9 | 10 | 11 | null; is_graduate?: boolean };
+type PoolStudent = Person & { admin_notes: string | null; academic_track: string | null; maarif_grade?: 7 | 9 | 10 | 11 | null; is_graduate?: boolean };
 type PoolCoach = Person & { activeCount: number; maxStudents: number };
 
 const TRACK_OPTIONS: { value: string; label: string }[] = [
@@ -20,7 +20,8 @@ const TRACK_OPTIONS: { value: string; label: string }[] = [
   { value: "yks_sozel", label: "YKS-Sözel" },
   { value: "yks_ydt", label: "YKS-YDT" },
   { value: "lgs_ortaokul", label: "LGS/Ortaokul" },
-  // Needs migration 0098/0099/0114 (academic_track is the coach_specialization enum).
+  // Needs migration 0098/0099/0114/0119 (academic_track is the coach_specialization enum).
+  { value: "maarif7", label: "7. Sınıf" },
   { value: "maarif9", label: "9. Sınıf" },
   { value: "maarif10", label: "10. Sınıf" },
   { value: "maarif11", label: "11. Sınıf" },
@@ -70,13 +71,13 @@ function AdminNotesField({ studentId, initialNotes }: { studentId: string; initi
 // Maarif grade -- switches the student's panel and the coach's forms to that grade's
 // curriculum (no YKS countdown / TYT-AYT tabs). 9th and 10th grade are mutually
 // exclusive (one select; the database also enforces it).
-function MaarifGradeField({ studentId, initial, onGradeChange }: { studentId: string; initial: 9 | 10 | 11 | null; onGradeChange?: (grade: 9 | 10 | 11 | null) => void }) {
-  const [grade, setGrade] = useState<9 | 10 | 11 | null>(initial);
+function MaarifGradeField({ studentId, initial, onGradeChange }: { studentId: string; initial: 7 | 9 | 10 | 11 | null; onGradeChange?: (grade: 7 | 9 | 10 | 11 | null) => void }) {
+  const [grade, setGrade] = useState<7 | 9 | 10 | 11 | null>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleChange(raw: string) {
-    const next = raw === "9" ? 9 : raw === "10" ? 10 : raw === "11" ? 11 : null;
+    const next = raw === "7" ? 7 : raw === "9" ? 9 : raw === "10" ? 10 : raw === "11" ? 11 : null;
     const previous = grade;
     setGrade(next);
     setSaving(true);
@@ -86,7 +87,7 @@ function MaarifGradeField({ studentId, initial, onGradeChange }: { studentId: st
       onGradeChange?.(next);
     } catch {
       setGrade(previous);
-      setError("Kaydedilemedi. Migration 0114 uygulandı mı?");
+      setError("Kaydedilemedi. Migration 0119 uygulandı mı?");
     } finally {
       setSaving(false);
     }
@@ -97,6 +98,7 @@ function MaarifGradeField({ studentId, initial, onGradeChange }: { studentId: st
       <label className="text-foreground text-sm font-medium">Maarif Sınıfı</label>
       <select value={grade === null ? "" : String(grade)} onChange={(e) => handleChange(e.target.value)} disabled={saving} className={selectClass}>
         <option value="">Yok (YKS / LGS)</option>
+        <option value="7">7. Sınıf (Maarif)</option>
         <option value="9">9. Sınıf (Maarif)</option>
         <option value="10">10. Sınıf (Maarif)</option>
         <option value="11">11. Sınıf (Maarif)</option>
@@ -145,7 +147,7 @@ function GraduateField({ studentId, checked, disabledReason, onChange }: { stude
 }
 
 // Maarif grade + Mezun together: they exclude each other (a graduate is not in a Maarif grade).
-function GradeFields({ studentId, initialGrade, initialGraduate }: { studentId: string; initialGrade: 9 | 10 | 11 | null; initialGraduate: boolean }) {
+function GradeFields({ studentId, initialGrade, initialGraduate }: { studentId: string; initialGrade: 7 | 9 | 10 | 11 | null; initialGraduate: boolean }) {
   const [graduate, setGraduate] = useState(initialGraduate);
   // Remount the grade select when a graduate flag clears it, so it shows "Yok".
   const [gradeKey, setGradeKey] = useState(0);

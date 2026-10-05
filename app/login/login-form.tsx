@@ -169,6 +169,7 @@ export function LoginForm({
                   <option value="YKS">YKS (Lise)</option>
                   <option value="MEZUN">Mezun (YKS)</option>
                   <option value="LGS">LGS (8. Sınıf)</option>
+                  <option value="MAARIF7">7. Sınıf (Maarif)</option>
                   <option value="MAARIF9">9. Sınıf (Maarif)</option>
                   <option value="MAARIF10">10. Sınıf (Maarif)</option>
                   <option value="MAARIF11">11. Sınıf (Maarif)</option>

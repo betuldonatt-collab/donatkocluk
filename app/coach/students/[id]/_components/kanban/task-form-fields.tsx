@@ -161,12 +161,13 @@ export function defaultTaskFormValue(examType: ExamType = "YKS", maarifGrade: Ma
 // editing an existing general-exam task pre-fills the track/publisher
 // fields instead of showing them blank.
 function parseGeneralExamTitle(title: string): { track: GeneralExamTrack; publisher: string } {
-  const match = title.match(/^(TYT|AYT|LGS|9\.\s*SINIF|10\.\s*SINIF|11\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
+  const match = title.match(/^(TYT|AYT|LGS|7\.\s*SINIF|9\.\s*SINIF|10\.\s*SINIF|11\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
   const track = match?.[1].toLowerCase();
   return {
     track:
       track === "ayt" ? "ayt"
       : track === "lgs" ? "lgs"
+      : track?.startsWith("7") ? "m7"
       : track?.startsWith("11") ? "m11"
       : track?.startsWith("10") ? "m10"
       : track?.startsWith("9") ? "m9"

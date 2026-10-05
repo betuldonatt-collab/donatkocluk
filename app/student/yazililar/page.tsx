@@ -16,7 +16,7 @@ export default async function YazililarPage() {
   const supabase = await createClient();
 
   let profileExamType: "YKS" | "LGS" = "YKS";
-  let maarifGrade: 9 | 10 | 11 | null = null;
+  let maarifGrade: 7 | 9 | 10 | 11 | null = null;
   let isGraduate = false;
   if (view) {
     const { data: profile } = await supabase.from("profiles").select("exam_type").eq("id", view.effectiveUserId).maybeSingle();

@@ -13,7 +13,7 @@ type SignupRequest = {
   requested_role: "student" | "parent" | "coach";
   // Only student requests carry a cohort (copied onto the profile on approval).
   exam_type?: "YKS" | "LGS" | null;
-  maarif_grade?: 9 | 10 | 11 | null;
+  maarif_grade?: 7 | 9 | 10 | 11 | null;
   // The public signup form's "Mezun" choice.
   is_graduate?: boolean;
 };

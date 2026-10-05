@@ -105,7 +105,7 @@ function buildGeneralExamTitle(track: GeneralExamTrack | null | undefined, publi
   // title now is still worth it on its own (never silently mislabel an
   // 11th grader's exam as "TYT").
   const prefix =
-    track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : track === "m9" ? "9. SINIF" : track === "m10" ? "10. SINIF" : track === "m11" ? "11. SINIF" : "TYT";
+    track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : track === "m7" ? "7. SINIF" : track === "m9" ? "9. SINIF" : track === "m10" ? "10. SINIF" : track === "m11" ? "11. SINIF" : "TYT";
   const pub = publisher?.trim();
   return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
 }
@@ -1349,7 +1349,7 @@ const assignTaskInputSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9", "m10", "m11"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1576,7 +1576,7 @@ const updateAssignedTaskSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m9", "m10", "m11"]).nullable().optional(),
+  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
