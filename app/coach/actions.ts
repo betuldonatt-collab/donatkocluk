@@ -31,6 +31,7 @@ import {
   computeAylikKarne,
   computeAytScoreBreakdown,
   computeLgsScoreBreakdown,
+  computeMaarif7ScoreBreakdown,
   computeNetSummary,
   computeTotalDurationMinutes,
   computeTytScoreBreakdown,
@@ -3142,7 +3143,16 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   if (durationError) throw dbError(durationError);
 
   const isLgs = profile?.exam_type === "LGS";
-  const topicMistakes = computeAylikKarne(curriculumCourseIdsFor(isLgs ? "LGS" : "YKS"), exams, mistakeRows ?? [], rangeStart, rangeEnd);
+  // A 7th grader (profiles.is_maarif7; exam_type stays 'YKS') gets the LGS-shaped card -- the same exam
+  // distribution and net rule -- over its own subjects and courses.
+  const isMaarif7 = !isLgs && (await fetchMaarifGrade(supabase, studentIdV)) === 7;
+  const topicMistakes = computeAylikKarne(
+    curriculumCourseIdsFor(isLgs ? "LGS" : "YKS", isMaarif7 ? 7 : null),
+    exams,
+    mistakeRows ?? [],
+    rangeStart,
+    rangeEnd,
+  );
   const currentNet = computeNetSummary(exams as KarneGeneralExam[], rangeStart, rangeEnd);
   const totalDurationMinutes = computeTotalDurationMinutes(durationRows ?? []);
   const previousStats = lastCycle?.stats as NetSummary | undefined;
@@ -3151,7 +3161,17 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   // and the general_exam rows (course_id always null) are disjoint subsets
   // of it, so each breakdown's own internal filtering picks each row up
   // exactly once, in whichever half actually applies to it.
-  const stats: NetSummary = isLgs
+  const stats: NetSummary = isMaarif7
+    ? {
+        tyt: { current: null, previous: null },
+        ayt: { current: null, previous: null },
+        lgs: { current: currentNet.m7, previous: previousStats?.lgs?.current ?? null },
+        lgsScoreBreakdown: computeMaarif7ScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        examLabel: "7. Sınıf Genel Deneme",
+        maarifGrade: 7,
+        totalDurationMinutes,
+      }
+    : isLgs
     ? {
         // An LGS report card has no TYT/AYT half -- kept {null, null} only
         // because NetSummary requires them -- and carries its own net

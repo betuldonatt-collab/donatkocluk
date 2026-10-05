@@ -51,7 +51,7 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
       {cycles.length > 0 && (
         isLgsCohort ? (
           <div className="border-border bg-card rounded-lg border p-4">
-            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">LGS Net Gelişimi</p>
+            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">{cycles.some((c) => c.stats.maarifGrade === 7) ? "7. Sınıf" : "LGS"} Net Gelişimi</p>
             <LineChart data={lgsTrend} />
           </div>
         ) : (

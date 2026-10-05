@@ -13,6 +13,8 @@ import {
   inferAytTrackFromScores,
   LGS_EXAM_SUBJECTS,
   LGS_SUBJECT_GROUPS,
+  MAARIF7_EXAM_SUBJECTS,
+  MAARIF7_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   type AytSubjectGroupKey,
   type SubjectGroupKey,
@@ -37,6 +39,7 @@ export type KarneMistakeRow = { task_id: string; course_id: string; topic_id: st
 const GENERAL_EXAM_COURSE_IDS = new Set([
   ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
   ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  ...MAARIF7_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
 ]);
 
 export function computeAylikKarne(
@@ -131,6 +134,12 @@ export type NetSummary = {
   // before LGS existed), so old archived Karneler still parse unchanged.
   lgs?: { current: number | null; previous: number | null };
   lgsScoreBreakdown?: KarneScoreBreakdown;
+  // A 7th grader's report card reuses the LGS-shaped fields above (the 7th grade has the LGS question
+  // distribution and 3 yanlış 1 doğruyu götürür scoring; its subjects are the six m7_ ones). These two say whose
+  // it is, so the screens label it "7. Sınıf Genel Deneme" and show the 7th grade's courses instead of LGS's.
+  // Absent on every LGS and YKS card, including every one saved before the 7th grade existed.
+  examLabel?: string;
+  maarifGrade?: 7;
   scoreBreakdown?: KarneScoreBreakdown;
   // One entry per track the student actually has signal in this cycle
   // (see computeAytScoreBreakdown's own comment) -- absent/empty is
@@ -176,7 +185,7 @@ function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m
 // codebase's established "sum totals, net once" convention (see
 // netChartFor in the analysis clients) so rounding never compounds. LGS
 // nets with its own 3:1 rule, YKS tracks with 4:1.
-function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt" | "lgs"): number | null {
+function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt" | "lgs" | "m7"): number | null {
   const inTrack = exams.filter((e) => parseGeneralExamTrack(e.title) === track && e.subject_scores);
   if (inTrack.length === 0) return null;
 
@@ -190,7 +199,7 @@ function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt" | "l
     },
     { correct: 0, wrong: 0 },
   );
-  const netFn = track === "lgs" ? computeLgsNet : computeNet;
+  const netFn = track === "lgs" || track === "m7" ? computeLgsNet : computeNet;
   return netFn(totals.correct / inTrack.length, totals.wrong / inTrack.length);
 }
 
@@ -202,12 +211,13 @@ export function computeNetSummary(
   exams: KarneGeneralExam[],
   rangeStart: string,
   rangeEnd: string,
-): { tyt: number | null; ayt: number | null; lgs: number | null } {
+): { tyt: number | null; ayt: number | null; lgs: number | null; m7: number | null } {
   const inRange = exams.filter((e) => e.task_date >= rangeStart && e.task_date <= rangeEnd);
   return {
     tyt: averageNetForTrack(inRange, "tyt"),
     ayt: averageNetForTrack(inRange, "ayt"),
     lgs: averageNetForTrack(inRange, "lgs"),
+    m7: averageNetForTrack(inRange, "m7"),
   };
 }
 
@@ -382,23 +392,26 @@ export function computeAytScoreBreakdown(
 // `lgs_`-prefixed ones a general exam's subject_scores is stored under).
 // Practice under an "lgs-" course lands in the matching subject; a Karma
 // or routine task with no course simply isn't counted, as in TYT.
-const LGS_COURSE_TO_SUBJECT_KEY = new Map<string, string>(
-  LGS_EXAM_SUBJECTS.flatMap((s) => s.courseIds.map((courseId) => [courseId, s.key] as const)),
-);
+// The same bucketing serves the 7th grade's report card (same six subjects and distribution, its own m7_ keys,
+// "7. SINIF" exam titles, maarif7-* courses): `subjects` + `track` pick the exam.
+type SectionedSubject = { key: string; label: string; courseIds: string[] };
 
-export function computeLgsScoreBreakdown(
+function computeSectionedScoreBreakdown(
+  subjects: readonly SectionedSubject[],
+  track: "lgs" | "m7",
   tasks: KarneScoreTask[],
   exams: KarneGeneralExam[],
   rangeStart: string,
   rangeEnd: string,
 ): KarneScoreBreakdown {
+  const courseToSubjectKey = new Map<string, string>(subjects.flatMap((s) => s.courseIds.map((courseId) => [courseId, s.key] as const)));
   const bySubject = new Map<string, { correct: number; wrong: number; empty: number }>(
-    LGS_EXAM_SUBJECTS.map((s) => [s.key, { correct: 0, wrong: 0, empty: 0 }]),
+    subjects.map((s) => [s.key, { correct: 0, wrong: 0, empty: 0 }]),
   );
 
   for (const t of tasks) {
     if (t.task_date < rangeStart || t.task_date > rangeEnd || !t.course_id) continue;
-    const key = LGS_COURSE_TO_SUBJECT_KEY.get(t.course_id);
+    const key = courseToSubjectKey.get(t.course_id);
     if (!key) continue;
     const bucket = bySubject.get(key)!;
     bucket.correct += t.correct_count ?? 0;
@@ -408,8 +421,8 @@ export function computeLgsScoreBreakdown(
 
   for (const e of exams) {
     if (e.task_date < rangeStart || e.task_date > rangeEnd || !e.subject_scores) continue;
-    if (parseGeneralExamTrack(e.title) !== "lgs") continue;
-    for (const subject of LGS_EXAM_SUBJECTS) {
+    if (parseGeneralExamTrack(e.title) !== track) continue;
+    for (const subject of subjects) {
       const s = e.subject_scores[subject.key];
       if (!s) continue;
       const bucket = bySubject.get(subject.key)!;
@@ -419,10 +432,29 @@ export function computeLgsScoreBreakdown(
     }
   }
 
-  const rows: KarneSubjectScoreRow[] = LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, ...bySubject.get(s.key)! }));
+  const rows: KarneSubjectScoreRow[] = subjects.map((s) => ({ key: s.key, label: s.label, ...bySubject.get(s.key)! }));
   const total = rows.reduce(
     (acc, r) => ({ correct: acc.correct + r.correct, wrong: acc.wrong + r.wrong, empty: acc.empty + r.empty }),
     { correct: 0, wrong: 0, empty: 0 },
   );
   return { total, bySubject: rows };
+}
+
+export function computeLgsScoreBreakdown(
+  tasks: KarneScoreTask[],
+  exams: KarneGeneralExam[],
+  rangeStart: string,
+  rangeEnd: string,
+): KarneScoreBreakdown {
+  return computeSectionedScoreBreakdown(LGS_EXAM_SUBJECTS, "lgs", tasks, exams, rangeStart, rangeEnd);
+}
+
+// The 7th grade's counterpart: Türkçe, Sosyal Bilgiler, Din Kültürü, İngilizce, Matematik, Fen Bilimleri.
+export function computeMaarif7ScoreBreakdown(
+  tasks: KarneScoreTask[],
+  exams: KarneGeneralExam[],
+  rangeStart: string,
+  rangeEnd: string,
+): KarneScoreBreakdown {
+  return computeSectionedScoreBreakdown(MAARIF7_EXAM_SUBJECTS, "m7", tasks, exams, rangeStart, rangeEnd);
 }

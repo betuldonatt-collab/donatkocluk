@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, TrendingDown, TrendingUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CourseTabs } from "@/components/course-tabs";
+import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
@@ -252,9 +253,9 @@ export function KarneDetailClient({
         <h3 className="text-foreground text-sm font-semibold">Net Gelişimi</h3>
         {isLgs ? (
           <div className="space-y-2">
-            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">LGS</p>
+            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{stats.maarifGrade === 7 ? "7. Sınıf" : "LGS"}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <NetCard label="LGS Genel Deneme Ortalama Net" current={stats.lgs!.current} previous={stats.lgs!.previous} />
+              <NetCard label={(stats.examLabel ?? "LGS Genel Deneme") + " Ortalama Net"} current={stats.lgs!.current} previous={stats.lgs!.previous} />
               {stats.lgsScoreBreakdown && (
                 <ScoreBreakdownCard
                   title="Toplam Doğru / Yanlış / Boş"
@@ -309,7 +310,14 @@ export function KarneDetailClient({
         </div>
 
         {isLgs ? (
-          <CourseTabs examType="LGS" render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+          stats.maarifGrade === 7 ? (
+            // A 7th grader's card: its own six courses (SÖZEL / SAYISAL), not LGS's.
+            <MaarifGradeProvider value={7}>
+              <CourseTabs render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+            </MaarifGradeProvider>
+          ) : (
+            <CourseTabs examType="LGS" render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+          )
         ) : (
         <Tabs defaultValue="tyt">
           <TabsList className="print:hidden">

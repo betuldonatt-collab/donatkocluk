@@ -137,7 +137,7 @@ export function KarnelerTab({
           </div>
           {isLgsCohort ? (
             <div className="border-border bg-card rounded-lg border p-4 lg:col-span-2">
-              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">LGS Net Gelişimi</p>
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">{cycles.some((c) => c.stats.maarifGrade === 7) ? "7. Sınıf" : "LGS"} Net Gelişimi</p>
               <LineChart data={lgsTrend} />
             </div>
           ) : (
@@ -448,6 +448,8 @@ function ReportCardReview({
   const stats = cycle.stats as NetSummary;
   const topicRows = cycle.topic_mistakes as KarneTopicRow[];
   const isLgs = stats.lgs !== undefined;
+  // A 7th grader's card has the LGS shape but its own label and courses (stats.examLabel / maarifGrade).
+  const isMaarif7Card = stats.maarifGrade === 7;
   const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
   const [track, setTrack] = useState<Track>("sayisal");
   const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
@@ -509,9 +511,9 @@ function ReportCardReview({
 
       {isLgs ? (
         <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">LGS</p>
+          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{isMaarif7Card ? "7. Sınıf" : "LGS"}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NetCard label="LGS Genel Deneme Ortalama Net" current={stats.lgs!.current} previous={stats.lgs!.previous} />
+            <NetCard label={(stats.examLabel ?? "LGS Genel Deneme") + " Ortalama Net"} current={stats.lgs!.current} previous={stats.lgs!.previous} />
             {stats.lgsScoreBreakdown && (
               <ScoreBreakdownCard
                 title="Toplam Doğru / Yanlış / Boş"
@@ -565,7 +567,8 @@ function ReportCardReview({
         </div>
 
         {isLgs ? (
-          <CourseTabs examType="LGS" render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+          // A 7th-grade card lists its own courses (SÖZEL / SAYISAL, via the page's Maarif grade); LGS its own.
+          <CourseTabs examType={isMaarif7Card ? "YKS" : "LGS"} render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
         ) : (
         <>
         <div className="space-y-2">

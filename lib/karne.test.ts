@@ -211,7 +211,7 @@ describe("computeNetSummary", () => {
   });
 
   it("returns null (not NaN or 0) for an empty exam list", () => {
-    expect(computeNetSummary([], "2026-01-01", "2026-01-31")).toEqual({ tyt: null, ayt: null, lgs: null });
+    expect(computeNetSummary([], "2026-01-01", "2026-01-31")).toEqual({ tyt: null, ayt: null, lgs: null, m7: null });
   });
 });
 

@@ -7,6 +7,7 @@ import {
   TYT_COURSES,
 } from "./index";
 import type { ExamType } from "../exam-type";
+import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 
 export const YKS_CURRICULUM_COURSE_IDS: string[] = [
   ...TYT_COURSES.map((c) => c.id),
@@ -18,6 +19,12 @@ export const YKS_CURRICULUM_COURSE_IDS: string[] = [
 
 export const LGS_CURRICULUM_COURSE_IDS: string[] = LGS_COURSES.map((c) => c.id);
 
-export function curriculumCourseIdsFor(examType: ExamType): string[] {
+export const MAARIF7_CURRICULUM_COURSE_IDS: string[] = MAARIF7_KAYNAK_COURSES.map((c) => c.id);
+
+// `maarifGrade`: a 7th grader's analytics (Konu Performans Haritası, Gelişim Haritası, Karne) cover the 7th
+// grade's own six courses, not the YKS list their exam_type ('YKS') would otherwise give them. Other Maarif
+// grades keep what they had.
+export function curriculumCourseIdsFor(examType: ExamType, maarifGrade: number | null = null): string[] {
+  if (maarifGrade === 7) return MAARIF7_CURRICULUM_COURSE_IDS;
   return examType === "LGS" ? LGS_CURRICULUM_COURSE_IDS : YKS_CURRICULUM_COURSE_IDS;
 }

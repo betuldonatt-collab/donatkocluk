@@ -8,7 +8,7 @@
 import { findCourseById, isLgsCourseId } from "./curriculum";
 import { lgsSelectionNodes } from "./curriculum/lgs-selection";
 import { courseHasBuckets, maarifSelectionNodes } from "./curriculum/maarif-selection";
-import { LGS_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
+import { LGS_SUBJECT_GROUPS, MAARIF7_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 
 export type GelisimHaritasiRow = {
   courseId: string;
@@ -57,6 +57,8 @@ export function heatTier(count: number, windowSize: number): HeatTier {
 const GENERAL_EXAM_COURSE_IDS = new Set([
   ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
   ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  // The 7th grade's Genel Deneme covers its six courses (maarif7-*), like LGS's does.
+  ...MAARIF7_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
 ]);
 
 export type TrialExam = { id: string; task_date: string; task_type: string; course_id: string | null };

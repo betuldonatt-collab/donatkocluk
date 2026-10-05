@@ -32,6 +32,8 @@ const RANGE_FILTERED_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler"])
 
 // Analiz (Deneme Konu Analizi) and Kaynak Takibi are adapted to the 9th-grade
 // curriculum; the TYT/AYT-based Gelişim Haritası, Grafikler and Karneler stay hidden.
+// The 7th grade is the exception: its own six courses / subjects (LGS-style distribution) are wired through
+// all of them, so none of its tabs is hidden (Yazılılar is separately hidden for graduates).
 const MAARIF9_HIDDEN_TABS = new Set(["gelisim-haritasi", "grafikler", "karneler"]);
 const NO_HIDDEN_TABS = new Set<string>();
 
@@ -89,8 +91,8 @@ export function DetailTabs({
 }) {
   // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
   // hidden; Program and Görüşmeler remain.
-  const isMaarif9 = useMaarifGrade() !== null;
-  const hiddenTabs = new Set(isMaarif9 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS);
+  const maarifGrade = useMaarifGrade();
+  const hiddenTabs = new Set(maarifGrade !== null && maarifGrade !== 7 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS);
   if (!schoolExams) hiddenTabs.add("yazililar");
   const [activeTab, setActiveTab] = useState(hiddenTabs.has(initialTab) ? "program" : initialTab);
   // One shared filter for Analiz / Gelişim Haritası / Grafikler -- lifted

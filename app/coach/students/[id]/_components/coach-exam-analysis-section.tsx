@@ -2,7 +2,7 @@
 
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { friendlyError } from "@/lib/friendly-error";
-import { isMaarif11GeneralExamTitle, MAARIF_GRADES } from "@/lib/maarif-grade";
+import { isMaarif11GeneralExamTitle, maarifCourseSections, MAARIF_GRADES } from "@/lib/maarif-grade";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -163,6 +163,8 @@ export function CoachExamAnalysisSection({
       ? TYT_SUBJECT_GROUPS
       : AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack];
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
+  // The 7th grade's courses are split SÖZEL / SAYISAL (like LGS's tabs): the picker shows the two groups.
+  const gradeSections = maarifGrade !== null && maarifGrade !== 11 && !isLgs ? maarifCourseSections(maarifGrade) : null;
   const genelCoursesInGroup = isMaarif11
     ? coursesForMaarifTytGroup(genelGroupKey)
     : gradeCfg
@@ -284,11 +286,21 @@ export function CoachExamAnalysisSection({
             onChange={(e) => setBranchCourseId(e.target.value)}
             aria-label="Branş dersi seç"
           >
-            {branchCourses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {gradeSections
+              ? gradeSections.map((section) => (
+                  <optgroup key={section.key} label={section.label}>
+                    {section.courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : branchCourses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
           </select>
         ) : (
           <select

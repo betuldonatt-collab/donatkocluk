@@ -12,6 +12,7 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   LGS_EXAM_SUBJECTS,
+  MAARIF7_EXAM_SUBJECTS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
   TYT_SUBJECT_GROUPS,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { MAARIF_GRADES, maarifCourseSections } from "@/lib/maarif-grade";
 import { DualMetricChart } from "./charts/dual-metric-chart";
 import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
@@ -27,8 +29,9 @@ import type { DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types
 // General-exam tasks have no course_id -- the TYT/AYT track lives only in
 // the title text, same convention buildGeneralExamTitle/parseGeneralExamTitle
 // use coach-side when creating the task.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m9" | "m10" {
+function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
   const t = title.toUpperCase();
+  if (/^7\.\s*SINIF\b/.test(t)) return "m7";
   if (/^9\.\s*SINIF\b/.test(t)) return "m9";
   if (/^10\.\s*SINIF\b/.test(t)) return "m10";
   if (t.startsWith("LGS")) return "lgs";
@@ -39,7 +42,7 @@ type ExamMode = "genel" | "brans";
 // m9/m10: a Maarif 9./10. Sınıf student's own Genel Deneme track (migration
 // 0096/0099) -- disjoint from TYT/AYT, one student is ever only ever on one
 // of these four, never a mix.
-type MainTrack = "tyt" | "ayt" | "m9" | "m10";
+type MainTrack = "tyt" | "ayt" | "m7" | "m9" | "m10";
 
 const GENEL_COLORS = ["var(--primary)", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4"];
 
@@ -103,16 +106,22 @@ export function ChartsTab({
   chartRange: ChartRange;
 }) {
   const isLgs = examType === "LGS";
-  // The net rule for everything on this tab: LGS 3 wrong : 1 right, YKS 4 : 1.
-  const netOf = isLgs ? computeLgsNet : computeNet;
+  const maarifGrade = useMaarifGrade();
+  // The net rule for everything on this tab: LGS 3 wrong : 1 right, YKS 4 : 1. The 7th grade has the LGS
+  // distribution and scoring (MAARIF_GRADES[7].lgsStyleScoring).
+  const lgsStyle = isLgs || (maarifGrade !== null && MAARIF_GRADES[maarifGrade].lgsStyleScoring === true);
+  const netOf = lgsStyle ? computeLgsNet : computeNet;
   const [examMode, setExamMode] = useState<ExamMode>("genel");
 
   // A Maarif 9./10. Sınıf student (migration 0096/0099) never has TYT/AYT
   // exams at all -- their Genel Deneme is always the m9/m10 track, so this
   // tab defaults straight to it instead of a TYT toggle that would only ever
   // show an empty chart. Not LGS/Maarif at all -> the ordinary tyt default.
-  const maarifGrade = useMaarifGrade();
-  const defaultMainTrack: MainTrack = maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "tyt";
+  const defaultMainTrack: MainTrack = maarifGrade === 7 ? "m7" : maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "tyt";
+  // A Maarif student's Branş Denemesi picker lists that grade's own courses (the 7th grade's grouped
+  // SÖZEL / SAYISAL), never the TYT/AYT ones.
+  const gradeCourses = maarifGrade !== null && maarifGrade !== 11 ? MAARIF_GRADES[maarifGrade].courses : null;
+  const gradeSections = maarifGrade !== null && maarifGrade !== 11 ? maarifCourseSections(maarifGrade) : null;
 
   // Branş Denemesi course picker: a Track -> Course cascade over the full
   // curriculum, not just courses the student happens to have exam data
@@ -121,7 +130,7 @@ export function ChartsTab({
   // the list entirely.
   const [mainTrack, setMainTrack] = useState<MainTrack>(defaultMainTrack);
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState<string>(isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id);
+  const [branchCourseId, setBranchCourseId] = useState<string>(gradeCourses?.[0]?.id ?? (isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id));
 
   function handleMainTrackChange(next: MainTrack) {
     setMainTrack(next);
@@ -134,7 +143,7 @@ export function ChartsTab({
     setBranchCourseId(AYT_COURSES_BY_TRACK[next][0].id);
   }
 
-  const branchCourses = isLgs ? LGS_COURSES : mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack];
+  const branchCourses = gradeCourses ?? (isLgs ? LGS_COURSES : mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack]);
 
   // One point per DAY, not per row: a day can hold several entries for the
   // same date now -- the student's own manual entries plus a Paragraf/Problem
@@ -189,9 +198,11 @@ export function ChartsTab({
       ? TYT_SUBJECT_GROUPS
       : mainTrack === "ayt"
         ? AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack]
-        : mainTrack === "m9"
-          ? MAARIF9_EXAM_SUBJECTS
-          : MAARIF10_EXAM_SUBJECTS;
+        : mainTrack === "m7"
+          ? MAARIF7_EXAM_SUBJECTS
+          : mainTrack === "m9"
+            ? MAARIF9_EXAM_SUBJECTS
+            : MAARIF10_EXAM_SUBJECTS;
   const genelSeries = seriesFor(genelGroups);
   const genelBreakdownData = generalExams
     .filter(
@@ -342,11 +353,21 @@ export function ChartsTab({
                 onChange={(e) => setBranchCourseId(e.target.value)}
                 aria-label="Branş dersi seç"
               >
-                {branchCourses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {gradeSections
+                  ? gradeSections.map((section) => (
+                      <optgroup key={section.key} label={section.label}>
+                        {section.courses.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  : branchCourses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
               </select>
             )}
           </div>
