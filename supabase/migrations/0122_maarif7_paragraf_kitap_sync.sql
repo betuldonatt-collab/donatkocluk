@@ -137,13 +137,23 @@ $$;
 
 -- Backfill: copy every 7th grader's existing done Paragraf / Kitap Okuma routine tasks into the new tracker
 -- (oldest first, so the newest task of a day wins, as it does when they sync live).
-select public.sync_lgs_daily_routine_entry(t.id)
-from public.student_tasks t
-join public.profiles p on p.id = t.student_id
-where p.is_maarif7
-  and t.course_id in ('paragraf', 'kitap-okuma')
-  and t.status in ('done', 'half_done')
-order by t.task_date asc, t.updated_at asc;
+do $$
+declare
+  r record;
+begin
+  for r in
+    select t.id
+    from public.student_tasks t
+    join public.profiles p on p.id = t.student_id
+    where p.is_maarif7
+      and t.course_id in ('paragraf', 'kitap-okuma')
+      and t.status in ('done', 'half_done')
+    order by t.task_date asc, t.updated_at asc
+  loop
+    perform public.sync_lgs_daily_routine_entry(r.id);
+  end loop;
+end;
+$$;
 
 notify pgrst, 'reload schema';
 
