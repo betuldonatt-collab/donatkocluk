@@ -18,14 +18,20 @@ import {
 const fen = findCourseById("maarif7-fen-bilimleri")!;
 const rows = flattenSelectionRows(fen);
 
-function render(grade: MaarifGrade, map: PipelineMap = {}, progress: Record<string, { solved: boolean; reviewed: boolean }> = {}) {
+function render(
+  grade: MaarifGrade,
+  map: PipelineMap = {},
+  progress: Record<string, { solved: boolean; reviewed: boolean }> = {},
+  course = fen,
+) {
+  const rows = flattenSelectionRows(course);
   const config = pipelineConfigFor("YKS", grade);
   return renderToStaticMarkup(
     <MaarifGradeProvider value={grade}>
       <table>
         <tbody>
           <MaarifTableBody
-            courseName={fen.name}
+            courseName={course.name}
             rows={rows}
             resources={[{ id: "r1", name: "Kaynak A" }]}
             progress={progress}
@@ -68,6 +74,16 @@ describe("7th grade Kaynak Takibi: the split layout", () => {
     expect(konu).toHaveLength(1);
     const solved = html.match(/aria-checked="true"[^>]*aria-label="[^"]*1\. Ünite - Uzay Çağı - Kaynak A - Soru Çözümü"|aria-label="[^"]*1\. Ünite - Uzay Çağı - Kaynak A - Soru Çözümü"[^>]*aria-checked="true"/g) ?? [];
     expect(solved).toHaveLength(1);
+  });
+});
+
+describe("7th grade İngilizce (one topic per theme) in the split layout", () => {
+  it("has one topic tick of each kind and one resource tick per theme: 8 of each", () => {
+    const html = render(7, {}, {}, findCourseById("maarif7-ingilizce")!);
+    expect(count(html, "Okul İlerlemesi")).toBe(8);
+    expect(count(html, "Konu Çalışması")).toBe(8);
+    expect(count(html, "Soru Çözümü")).toBe(8);
+    expect(count(html, "Çıkmış Sorular")).toBe(0);
   });
 });
 

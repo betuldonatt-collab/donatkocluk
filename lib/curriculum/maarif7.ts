@@ -246,7 +246,27 @@ const DIN_KULTURU = buildCourse("maarif7-din-kulturu-ve-ahlak-bilgisi", "7. Sın
   },
 ]);
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU];
+// İngilizce has only Themes, no sub-topics. Each Theme is both the unit (header exactly as supplied,
+// "Theme 1: School Life & Education") and its single topic (the Theme's title), so the split layout works
+// as for any other course: one topic line to tick Okul İlerlemesi / Konu Çalışması on, and the resource
+// ticks once on the unit. The id is the one the İngilizce exam subject (m7_ingilizce) analyses.
+const INGILIZCE_THEMES = [
+  "School Life & Education",
+  "Classroom Life & Learning",
+  "Personal Life & Well-Being",
+  "Family Life & Home",
+  "Life in the Neighbourhood, City & Social Life",
+  "Life in the World & Culture",
+  "Life in Nature & Global Problems",
+  "Life in the Universe & Future",
+];
+const INGILIZCE = buildCourse(
+  "maarif7-ingilizce",
+  "7. Sınıf İngilizce",
+  INGILIZCE_THEMES.map((title, i) => ({ unit: `Theme ${i + 1}: ${title}`, topics: [title] })),
+);
+
+export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");

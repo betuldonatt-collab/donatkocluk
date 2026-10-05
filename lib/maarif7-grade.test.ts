@@ -27,13 +27,13 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi"]);
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi", "maarif7-ingilizce"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");
     expect(findCourseById("maarif7-fen-bilimleri")?.name).toBe("7. Sınıf Fen Bilimleri");
     expect(findCourseById("maarif7-turkce")).toBeNull();
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_ingilizce")).toEqual([]); // not supplied yet -> no topic table
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_turkce")).toEqual([]); // not supplied yet -> no topic table
     expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
   });
 
@@ -266,6 +266,42 @@ describe("7th grade Din Kültürü ve Ahlak Bilgisi", () => {
   it("is connected to the exam analysis: the Din Kültürü subject of the 7th-grade Genel Deneme lists it", () => {
     expect(coursesForMaarif7ExamSubject("m7_din")).toEqual([course]);
     expect(MAARIF_GRADES[7].coursesForExamSubject("m7_din")).toEqual([course]);
+  });
+});
+
+describe("7th grade İngilizce (Themes only: each Theme is the unit and its single topic)", () => {
+  const course = findCourseById("maarif7-ingilizce")!;
+
+  it("has the eight themes as units, headers exactly as supplied, each with exactly one topic", () => {
+    expect(course.name).toBe("7. Sınıf İngilizce");
+    expect(course.units.map((u) => u.unit)).toEqual([
+      "Theme 1: School Life & Education",
+      "Theme 2: Classroom Life & Learning",
+      "Theme 3: Personal Life & Well-Being",
+      "Theme 4: Family Life & Home",
+      "Theme 5: Life in the Neighbourhood, City & Social Life",
+      "Theme 6: Life in the World & Culture",
+      "Theme 7: Life in Nature & Global Problems",
+      "Theme 8: Life in the Universe & Future",
+    ]);
+    expect(course.units.every((u) => u.topics.length === 1)).toBe(true);
+    // The single topic is the theme's own title: nothing lost, nothing invented.
+    expect(course.units.map((u) => u.topics[0].name)).toEqual(course.units.map((u) => u.unit.replace(/^Theme \d+: /, "")));
+  });
+
+  it("has unique ids in the 7th-grade convention, and is the course the İngilizce exam subject analyses", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(8);
+    expect(ids[0]).toBe("maarif7-ingilizce-u0-t0");
+    expect(ids[7]).toBe("maarif7-ingilizce-u7-t0");
+    expect(coursesForMaarif7ExamSubject("m7_ingilizce")).toEqual([course]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_ingilizce")).toEqual([course]);
+  });
+
+  it("is one row per theme in Kaynak Takibi (one topic line each), so the split layout works: 8 topic ticks of each kind, 8 resource ticks", () => {
+    const rows = flattenSelectionRows(course);
+    expect(rows).toHaveLength(8);
+    expect(rows.every((r) => r.memberTopicIds.length === 1)).toBe(true);
   });
 });
 
