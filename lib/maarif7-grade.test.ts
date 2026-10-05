@@ -26,8 +26,8 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
     expect(gradeOfTrack("m7")).toBe(7);
   });
 
-  it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi", "maarif7-ingilizce", "maarif7-turkce"]);
+  it("holds the six courses in the LGS order: the four SÖZEL ones first, then the two SAYISAL ones", () => {
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-turkce", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi", "maarif7-ingilizce", "maarif7-matematik", "maarif7-fen-bilimleri"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");

@@ -319,7 +319,10 @@ const TURKCE = buildCourse("maarif7-turkce", "7. Sınıf Türkçe", [
   },
 ]);
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE, TURKCE];
+// In the LGS order: the four SÖZEL courses first (Türkçe, Sosyal Bilgiler, Din Kültürü, İngilizce), then the two
+// SAYISAL ones (Matematik, Fen Bilimleri). Every flat list (course pickers, the first course selected by
+// default) therefore reads Sözel-first like LGS's; MAARIF7_SUBJECT_GROUPS (./subject-groups) names the sections.
+export const MAARIF7_KAYNAK_COURSES: Course[] = [TURKCE, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE, MATEMATIK, FEN_BILIMLERI];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");

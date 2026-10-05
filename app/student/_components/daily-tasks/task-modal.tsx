@@ -1355,15 +1355,20 @@ function TaskModalBody({
               </div>
             )}
 
-            {overCapSubject && examTrack !== "lgs" && (
+            {overCapSubject && examTrack !== "lgs" && examTrack !== "m7" && (
               <p className="text-destructive mb-2 text-xs">
                 {overCapSubject.label} için Doğru + Yanlış en fazla {overCapSubject.questions} olabilir.
               </p>
             )}
-            {examTrack === "lgs" && (
-              <LgsExamScoreGrid inputs={subjectInputs} onChange={setSubjectInputs} showMissing={showMissingScores} />
+            {(examTrack === "lgs" || examTrack === "m7") && (
+              <LgsExamScoreGrid
+                variant={examTrack === "m7" ? "maarif7" : "lgs"}
+                inputs={subjectInputs}
+                onChange={setSubjectInputs}
+                showMissing={showMissingScores}
+              />
             )}
-            {examTrack !== "lgs" && activeGroups.length > 0 && (
+            {examTrack !== "lgs" && examTrack !== "m7" && activeGroups.length > 0 && (
               <div className="space-y-3">
                 {activeGroups.map((g, gi) => (
                   <div key={g.key} className="space-y-1.5">

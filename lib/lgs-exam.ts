@@ -119,6 +119,27 @@ export function summarizeLgsScores(scores: Record<string, ScoreInput> | null | u
   };
 }
 
+// Sözel / Sayısal / total nets (3 yanlış 1 doğruyu götürür) for any exam split into those two sections -- the
+// 7th grade's Genel Deneme, which has the LGS distribution but no puan. null until EVERY subject has both Doğru
+// and Yanlış (a half-entered exam would produce a misleading net), like summarizeLgsScores.
+export function summarizeSectionNets(
+  subjects: readonly { key: string; section: string }[],
+  scores: Record<string, ScoreInput> | null | undefined,
+): { sozelNet: number; sayisalNet: number; totalNet: number } | null {
+  if (!scores) return null;
+  let sozel = 0;
+  let sayisal = 0;
+  for (const s of subjects) {
+    const raw = scores[s.key];
+    if (!raw || raw.correct === null || raw.correct === undefined || raw.wrong === null || raw.wrong === undefined) return null;
+    const net = computeLgsNet(raw.correct, raw.wrong);
+    if (s.section === "SÖZEL") sozel += net;
+    else sayisal += net;
+  }
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { sozelNet: round(sozel), sayisalNet: round(sayisal), totalNet: round(sozel + sayisal) };
+}
+
 export function formatNet(net: number): string {
   return net.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }

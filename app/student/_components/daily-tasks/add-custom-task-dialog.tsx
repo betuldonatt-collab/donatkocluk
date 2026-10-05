@@ -20,7 +20,7 @@ import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
 import type { StudentTask } from "./types";
-import { MAARIF_GRADES, stripGradePrefix, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 
 // Atomic TYT/AYT courses only -- deliberately NOT Paragraf/Problem's
@@ -238,8 +238,8 @@ export function AddCustomTaskDialog({
       : isBranchExam
         ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES]
         : ALL_COURSES;
-  const courseOptions: { id: string; label: string; group?: string }[] = isMaarif9
-    ? courseList.map((c) => ({ id: c.id, label: stripGradePrefix(c.name) }))
+  const courseOptions: { id: string; label: string; group?: string }[] = maarifGrade !== null
+    ? maarifCourseOptions(maarifGrade)
     : isLgs
       ? lgsCourseOptions()
       : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));

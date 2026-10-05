@@ -12,7 +12,7 @@ import { MAARIF_TYT_MERGED_COURSES } from "@/lib/curriculum/maarif-tyt";
 import { tracksForMaarif11Course, type Maarif11Track } from "@/lib/curriculum/maarif11";
 import type { ExamType } from "@/lib/exam-type";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { MAARIF_GRADES, stripGradePrefix } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarifCourseSections, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
 
 const MAARIF11_TRACK_LABELS: Record<Maarif11Track, string> = { sayisal: "Sayısal", ea: "Eşit Ağırlık", sozel: "Sözel" };
 
@@ -44,6 +44,57 @@ export function CourseChips({
       ))}
     </div>
   );
+}
+
+// Course chips grouped under SÖZEL / SAYISAL headings -- LGS's layout, and the 7th grade's. A section with
+// no course is left out.
+export function SectionedCourseChips({
+  sections,
+  selectedId,
+  onSelect,
+}: {
+  sections: { key: string; label: string; courses: Course[] }[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {sections.map((group) => {
+        if (group.courses.length === 0) return null;
+        return (
+          <div key={group.key} className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground w-16 text-[10px] font-semibold tracking-wide uppercase">{group.label}</span>
+            <CourseChips courses={group.courses} selectedId={selectedId} onSelect={onSelect} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// One Maarif grade's course chips: grouped SÖZEL / SAYISAL when the grade has sections (the 7th grade, like
+// LGS), one flat row otherwise. Names lose their "7. Sınıf" prefix.
+export function MaarifCourseChips({
+  grade,
+  selectedId,
+  onSelect,
+}: {
+  grade: MaarifGrade;
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const strip = (courses: Course[]) => courses.map((c) => ({ ...c, name: stripGradePrefix(c.name) }));
+  const sections = maarifCourseSections(grade);
+  if (sections) {
+    return (
+      <SectionedCourseChips
+        sections={sections.map((s) => ({ ...s, courses: strip(s.courses) }))}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
+    );
+  }
+  return <CourseChips courses={strip(MAARIF_GRADES[grade].courses)} selectedId={selectedId} onSelect={onSelect} />;
 }
 
 // The shared "pick a subject" chrome behind every curriculum page that used
@@ -170,11 +221,7 @@ export function CourseTabs({
     const selected = gradeCourses.find((c) => c.id === m9CourseId) ?? gradeCourses[0];
     return (
       <div className="space-y-4">
-        <CourseChips
-          courses={gradeCourses.map((c) => ({ ...c, name: stripGradePrefix(c.name) }))}
-          selectedId={selected.id}
-          onSelect={setM9CourseId}
-        />
+        <MaarifCourseChips grade={maarifGrade} selectedId={selected.id} onSelect={setM9CourseId} />
         {render(selected)}
       </div>
     );
@@ -184,22 +231,15 @@ export function CourseTabs({
     const selected = lgsCourses.find((c) => c.id === lgsCourseId) ?? lgsCourses[0];
     return (
       <div className="space-y-4">
-        <div className="space-y-2">
-          {LGS_SUBJECT_GROUPS.map((group) => {
-            const groupCourses = group.courseIds
-              .map((id) => lgsCourses.find((c) => c.id === id))
-              .filter((c): c is Course => !!c);
-            if (groupCourses.length === 0) return null;
-            return (
-              <div key={group.key} className="flex flex-wrap items-center gap-2">
-                <span className="text-muted-foreground w-16 text-[10px] font-semibold tracking-wide uppercase">
-                  {group.label}
-                </span>
-                <CourseChips courses={groupCourses} selectedId={selected.id} onSelect={setLgsCourseId} />
-              </div>
-            );
-          })}
-        </div>
+        <SectionedCourseChips
+          sections={LGS_SUBJECT_GROUPS.map((group) => ({
+            key: group.key,
+            label: group.label,
+            courses: group.courseIds.map((id) => lgsCourses.find((c) => c.id === id)).filter((c): c is Course => !!c),
+          }))}
+          selectedId={selected.id}
+          onSelect={setLgsCourseId}
+        />
         {render(selected)}
       </div>
     );

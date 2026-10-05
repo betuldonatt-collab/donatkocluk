@@ -221,10 +221,25 @@ export const MAARIF7_EXAM_SUBJECTS: { key: string; label: string; section: strin
 
 export const MAARIF7_EXAM_QUESTION_TOTAL = MAARIF7_EXAM_SUBJECTS.reduce((sum, s) => sum + s.questions, 0); // 90
 
+// The 7th grade is split into the same two LGS sessions as its Genel Deneme: SÖZEL (Türkçe, Sosyal Bilgiler,
+// Din Kültürü ve Ahlak Bilgisi, İngilizce) and SAYISAL (Matematik, Fen Bilimleri), each listing its courses in
+// that order. Derived from MAARIF7_EXAM_SUBJECTS' `section`, so the exam form, the analysis pages and the
+// course tabs can never disagree about which subject sits in which section.
+export const MAARIF7_SUBJECT_GROUPS: { key: "sozel" | "sayisal"; label: string; courseIds: string[] }[] = [
+  { key: "sozel" as const, label: "SÖZEL" },
+  { key: "sayisal" as const, label: "SAYISAL" },
+].map((g) => ({
+  ...g,
+  courseIds: MAARIF7_EXAM_SUBJECTS.filter((s) => s.section === g.label).flatMap((s) => s.courseIds),
+}));
+
+// The courses analysed for one exam subject ("m7_fen") OR for a whole section ("sozel" / "sayisal"),
+// exactly as LGS's Genel Deneme analysis shows two session tabs instead of six subject tabs.
 export function coursesForMaarif7ExamSubject(key: string): Course[] {
+  const group = MAARIF7_SUBJECT_GROUPS.find((g) => g.key === key);
   const subject = MAARIF7_EXAM_SUBJECTS.find((s) => s.key === key);
-  if (!subject) return [];
-  return subject.courseIds.map((id) => MAARIF7_KAYNAK_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
+  const ids = group ? group.courseIds : subject ? subject.courseIds : [];
+  return ids.map((id) => MAARIF7_KAYNAK_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }
 
 // 9th-grade (Maarif) Genel Deneme: 120 questions, scored per subject like

@@ -3,23 +3,43 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { LGS_EXAM_SUBJECTS } from "@/lib/curriculum/subject-groups";
-import { computeLgsSubjectResult, formatNet, lgsEmptyFor, summarizeLgsScores } from "@/lib/lgs-exam";
+import { LGS_EXAM_SUBJECTS, MAARIF7_EXAM_SUBJECTS } from "@/lib/curriculum/subject-groups";
+import { formatNet, summarizeLgsScores, summarizeSectionNets } from "@/lib/lgs-exam";
+import { computeLgsNet } from "@/lib/scoring";
 import { isBlankScore } from "@/lib/exam-results-validation";
 
 // The LGS result form, shared by the student's task modal and the coach's
 // "Sonuçları Gir": a Doğru / Yanlış row for each of the six subjects. Boş is
 // never typed -- it is worked out from the subject's question count -- and the
 // Net (3 yanlış 1 doğruyu götürür) and the approximate puan update as you type.
+//
+// The 7th grade's Genel Deneme has the same two sessions and six subjects (Sözel Bölüm / Sayısal Bölüm), so the
+// student's form shows the same grid in its "maarif7" variant: its own subjects and nets, but no puan (the
+// 7th grade has no LGS-style score).
 
 export type LgsScoreInputs = Record<string, { correct: string; wrong: string; empty: string }>;
+
+export type ScoreGridVariant = "lgs" | "maarif7";
+
+type GridSubject = { key: string; label: string; section: string; questions: number };
+
+function subjectsFor(variant: ScoreGridVariant): readonly GridSubject[] {
+  return variant === "maarif7" ? MAARIF7_EXAM_SUBJECTS : LGS_EXAM_SUBJECTS;
+}
+
+// Boş is what is left of the subject's questions; null until both Doğru and Yanlış are known.
+function emptyFor(questions: number, correct: number | null, wrong: number | null): number | null {
+  if (correct === null || wrong === null) return null;
+  return Math.max(0, questions - correct - wrong);
+}
 
 // Blank inputs for all six subjects, optionally seeded from stored scores.
 export function emptyLgsInputs(
   stored?: Record<string, { correct: number | null; wrong: number | null; empty: number | null }> | null,
+  variant: ScoreGridVariant = "lgs",
 ): LgsScoreInputs {
   return Object.fromEntries(
-    LGS_EXAM_SUBJECTS.map((s) => {
+    subjectsFor(variant).map((s) => {
       const existing = stored?.[s.key];
       const correct = existing?.correct ?? null;
       const wrong = existing?.wrong ?? null;
@@ -28,7 +48,7 @@ export function emptyLgsInputs(
         {
           correct: correct?.toString() ?? "",
           wrong: wrong?.toString() ?? "",
-          empty: lgsEmptyFor(s.key, correct, wrong)?.toString() ?? "",
+          empty: emptyFor(s.questions, correct, wrong)?.toString() ?? "",
         },
       ];
     }),
@@ -36,15 +56,15 @@ export function emptyLgsInputs(
 }
 
 // Doğru + Yanlış above a subject's question count -- the form refuses to save.
-export function lgsOverCapSubject(inputs: LgsScoreInputs) {
-  return LGS_EXAM_SUBJECTS.find((s) => {
+export function lgsOverCapSubject(inputs: LgsScoreInputs, variant: ScoreGridVariant = "lgs") {
+  return subjectsFor(variant).find((s) => {
     const v = inputs[s.key];
     return v ? (Number(v.correct) || 0) + (Number(v.wrong) || 0) > s.questions : false;
   });
 }
 
-export function lgsInputsIncomplete(inputs: LgsScoreInputs): boolean {
-  return LGS_EXAM_SUBJECTS.some((s) => {
+export function lgsInputsIncomplete(inputs: LgsScoreInputs, variant: ScoreGridVariant = "lgs"): boolean {
+  return subjectsFor(variant).some((s) => {
     const v = inputs[s.key];
     return !v || isBlankScore(v.correct) || isBlankScore(v.wrong);
   });
@@ -60,31 +80,37 @@ export function LgsExamScoreGrid({
   inputs,
   onChange,
   showMissing,
+  variant = "lgs",
 }: {
+  variant?: ScoreGridVariant;
   inputs: LgsScoreInputs;
   onChange: (next: LgsScoreInputs) => void;
   // After a refused save: outline the Doğru/Yanlış boxes that are still blank.
   showMissing?: boolean;
 }) {
+  const subjects = subjectsFor(variant);
+
   function update(key: string, field: "correct" | "wrong", raw: string) {
     const value = sanitizeDigits(raw);
     const current = inputs[key] ?? { correct: "", wrong: "", empty: "" };
     const nextRow = { ...current, [field]: value };
     const correct = nextRow.correct.trim() === "" ? null : Number(nextRow.correct);
     const wrong = nextRow.wrong.trim() === "" ? null : Number(nextRow.wrong);
-    onChange({ ...inputs, [key]: { ...nextRow, empty: lgsEmptyFor(key, correct, wrong)?.toString() ?? "" } });
+    const questions = subjects.find((s) => s.key === key)?.questions;
+    const empty = questions === undefined ? null : emptyFor(questions, correct, wrong);
+    onChange({ ...inputs, [key]: { ...nextRow, empty: empty?.toString() ?? "" } });
   }
 
-  const overCap = lgsOverCapSubject(inputs);
-  const summary = summarizeLgsScores(
-    Object.fromEntries(
-      LGS_EXAM_SUBJECTS.map((s) => {
-        const v = inputs[s.key];
-        const blank = !v || isBlankScore(v.correct) || isBlankScore(v.wrong);
-        return [s.key, { correct: blank ? null : Number(v.correct), wrong: blank ? null : Number(v.wrong), empty: null }];
-      }),
-    ),
+  const overCap = lgsOverCapSubject(inputs, variant);
+  const scores = Object.fromEntries(
+    subjects.map((s) => {
+      const v = inputs[s.key];
+      const blank = !v || isBlankScore(v.correct) || isBlankScore(v.wrong);
+      return [s.key, { correct: blank ? null : Number(v.correct), wrong: blank ? null : Number(v.wrong), empty: null }];
+    }),
   );
+  const lgsSummary = variant === "lgs" ? summarizeLgsScores(scores) : null;
+  const summary = lgsSummary ?? (variant === "lgs" ? null : summarizeSectionNets(subjects, scores));
 
   return (
     <div className="space-y-3">
@@ -94,15 +120,12 @@ export function LgsExamScoreGrid({
         </p>
       )}
 
-      {LGS_EXAM_SUBJECTS.map((s, i) => {
+      {subjects.map((s, i) => {
         const v = inputs[s.key] ?? { correct: "", wrong: "", empty: "" };
-        const result =
-          isBlankScore(v.correct) || isBlankScore(v.wrong)
-            ? null
-            : computeLgsSubjectResult(s.key, Number(v.correct), Number(v.wrong));
+        const result = isBlankScore(v.correct) || isBlankScore(v.wrong) ? null : { net: computeLgsNet(Number(v.correct), Number(v.wrong)) };
         return (
           <div key={s.key} className="space-y-1.5">
-            {s.section !== LGS_EXAM_SUBJECTS[i - 1]?.section && (
+            {s.section !== subjects[i - 1]?.section && (
               <p className="text-primary pt-1 text-xs font-semibold tracking-wide uppercase">
                 {s.section === "SÖZEL" ? "Sözel Bölüm" : "Sayısal Bölüm"}
               </p>
@@ -140,20 +163,26 @@ export function LgsExamScoreGrid({
         );
       })}
 
-      <div className="bg-muted/40 grid grid-cols-2 gap-2 rounded-lg border p-3 sm:grid-cols-4">
+      <div className={cn("bg-muted/40 grid gap-2 rounded-lg border p-3", variant === "lgs" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
         <SummaryStat label="Sözel Net" value={summary ? formatNet(summary.sozelNet) : "—"} />
         <SummaryStat label="Sayısal Net" value={summary ? formatNet(summary.sayisalNet) : "—"} />
         <SummaryStat label="Toplam Net" value={summary ? formatNet(summary.totalNet) : "—"} />
-        <SummaryStat
-          label="Yaklaşık Puan"
-          value={summary ? summary.approxScore.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "—"}
-          emphasis
-        />
+        {variant === "lgs" && (
+          <SummaryStat
+            label="Yaklaşık Puan"
+            value={lgsSummary ? lgsSummary.approxScore.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "—"}
+            emphasis
+          />
+        )}
       </div>
-      <p className="text-muted-foreground text-[11px]">
-        Net = Doğru − Yanlış ÷ 3. Puan, Türkçe / Matematik / Fen (×4) ve diğer dersler (×1) katsayılarıyla hesaplanan yaklaşık bir tahmindir;
-        gerçek LGS puanı sınavın genel sonuçlarına göre belirlenir.
-      </p>
+      {variant === "lgs" ? (
+        <p className="text-muted-foreground text-[11px]">
+          Net = Doğru − Yanlış ÷ 3. Puan, Türkçe / Matematik / Fen (×4) ve diğer dersler (×1) katsayılarıyla hesaplanan yaklaşık bir tahmindir;
+          gerçek LGS puanı sınavın genel sonuçlarına göre belirlenir.
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-[11px]">Net = Doğru − Yanlış ÷ 3.</p>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
   type Course,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
-import { MAARIF_GRADES, stripGradePrefix, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
@@ -119,7 +119,7 @@ export function courseOptionsFor(
 ): { id: string; label: string; group?: string }[] {
   // A Maarif student is offered ONLY their own grade's courses (9th and 10th
   // grade never mix).
-  if (maarifGrade !== null) return MAARIF_GRADES[maarifGrade].courses.map((c) => ({ id: c.id, label: stripGradePrefix(c.name) }));
+  if (maarifGrade !== null) return maarifCourseOptions(maarifGrade);
   if (examType === "LGS") {
     return [
       ...lgsCourseOptions(),

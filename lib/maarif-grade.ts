@@ -7,6 +7,7 @@ import { MAARIF10_KAYNAK_COURSES, isMaarif10CourseId } from "./curriculum/maarif
 import { MAARIF11_KAYNAK_COURSES, isMaarif11CourseId } from "./curriculum/maarif11";
 import {
   MAARIF7_EXAM_SUBJECTS,
+  MAARIF7_SUBJECT_GROUPS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
   coursesForMaarif7ExamSubject,
@@ -34,6 +35,9 @@ type GradeConfig = {
   examSubjects: MaarifExamSubject[]; // Genel Deneme (120 questions; 90 for the 7th grade, LGS-style)
   // 3 yanlış 1 doğruyu götürür (LGS) instead of TYT's 4 yanlış 1 doğru -- the 7th grade only.
   lgsStyleScoring?: boolean;
+  // The grade's SÖZEL / SAYISAL sections (the 7th grade only, like LGS): the course tabs, the Genel Deneme
+  // analysis tabs and the course pickers group by them. Absent = the grade's courses are one flat list.
+  sectionGroups?: { key: string; label: string; courseIds: string[] }[];
   isCourseId: (id: string | null | undefined) => boolean;
   coursesForExamSubject: (key: string) => Course[];
 };
@@ -48,6 +52,7 @@ export const MAARIF_GRADES: Record<MaarifGrade, GradeConfig> = {
     courses: MAARIF7_KAYNAK_COURSES,
     examSubjects: MAARIF7_EXAM_SUBJECTS,
     lgsStyleScoring: true,
+    sectionGroups: MAARIF7_SUBJECT_GROUPS,
     isCourseId: isMaarif7CourseId,
     coursesForExamSubject: coursesForMaarif7ExamSubject,
   },
@@ -105,6 +110,28 @@ export function isMaarif11GeneralExamTitle(title: string): boolean {
 // "9. Sınıf Matematik" -> "Matematik" (picker/chip labels).
 export function stripGradePrefix(name: string): string {
   return name.replace(/^\d+\.\s*Sınıf:?\s*/i, "");
+}
+
+// A grade's courses split into its sections (SÖZEL / SAYISAL), each in its own order, or null for a grade whose
+// courses are one flat list. A section with no course yet is left out.
+export function maarifCourseSections(grade: MaarifGrade): { key: string; label: string; courses: Course[] }[] | null {
+  const cfg = MAARIF_GRADES[grade];
+  if (!cfg.sectionGroups) return null;
+  return cfg.sectionGroups
+    .map((g) => ({
+      key: g.key,
+      label: g.label,
+      courses: g.courseIds.map((id) => cfg.courses.find((c) => c.id === id)).filter((c): c is Course => !!c),
+    }))
+    .filter((g) => g.courses.length > 0);
+}
+
+// The Ders picker options of a grade (prefix stripped): tagged with their section when the grade has sections
+// (the pickers then render the two headings, as they do for LGS), plain otherwise.
+export function maarifCourseOptions(grade: MaarifGrade): { id: string; label: string; group?: string }[] {
+  const sections = maarifCourseSections(grade);
+  if (!sections) return MAARIF_GRADES[grade].courses.map((c) => ({ id: c.id, label: stripGradePrefix(c.name) }));
+  return sections.flatMap((g) => g.courses.map((c) => ({ id: c.id, label: stripGradePrefix(c.name), group: g.label })));
 }
 
 type Flags = {

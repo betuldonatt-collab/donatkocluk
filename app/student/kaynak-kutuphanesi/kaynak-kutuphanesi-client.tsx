@@ -18,9 +18,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CourseChips, CourseTabs } from "@/components/course-tabs";
+import { CourseTabs, MaarifCourseChips } from "@/components/course-tabs";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { MAARIF_GRADES, stripGradePrefix, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, type MaarifGrade } from "@/lib/maarif-grade";
 import type { Course } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import { addResource } from "./actions";
@@ -97,11 +97,7 @@ function MaarifLibrary({
   }
   return (
     <div className="space-y-4">
-      <CourseChips
-        courses={gradeCourses.map((c) => ({ ...c, name: stripGradePrefix(c.name) }))}
-        selectedId={course.id}
-        onSelect={setCourseId}
-      />
+      <MaarifCourseChips grade={grade} selectedId={course.id} onSelect={setCourseId} />
       <CourseLibraryPanel course={course} resources={resources} onAdded={onAdded} />
     </div>
   );

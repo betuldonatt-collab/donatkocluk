@@ -123,7 +123,7 @@ export function CoachExamAnalysisSection({
     gradeCfg ? (gradeCfg.courses[0]?.id ?? "") : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
   );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    maarifGrade === 11 && !isLgs ? TYT_SUBJECT_GROUPS[0].key : gradeCfg ? (gradeCfg.examSubjects[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    maarifGrade === 11 && !isLgs ? TYT_SUBJECT_GROUPS[0].key : gradeCfg ? ((gradeCfg.sectionGroups ?? gradeCfg.examSubjects)[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
@@ -156,7 +156,7 @@ export function CoachExamAnalysisSection({
   const genelGroups = isMaarif11
     ? TYT_SUBJECT_GROUPS
     : gradeCfg
-    ? gradeCfg.examSubjects
+    ? (gradeCfg.sectionGroups ?? gradeCfg.examSubjects)
     : isLgs
     ? LGS_SUBJECT_GROUPS
     : mainTrack === "tyt"

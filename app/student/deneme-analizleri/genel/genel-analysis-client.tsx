@@ -227,7 +227,10 @@ export function GenelAnalysisClient({
     // has an empty examSubjects list -- examSubjects[0] would throw reading
     // .key off undefined, so this falls back to "" (no subject selected
     // yet) instead of assuming one always exists.
-    const activeSubjectKey = m9SubjectKey || (gradeCfg.examSubjects[0]?.key ?? "");
+    // A grade with SÖZEL / SAYISAL sections (the 7th grade, like LGS) gets one tab per section, each showing
+    // all of that section's courses; the others one tab per exam subject.
+    const m9Tabs: { key: string; label: string }[] = gradeCfg.sectionGroups ?? gradeCfg.examSubjects;
+    const activeSubjectKey = m9SubjectKey || (m9Tabs[0]?.key ?? "");
     const m9Courses = gradeCfg.coursesForExamSubject(activeSubjectKey);
     return (
       <div className="space-y-6">
@@ -242,7 +245,7 @@ export function GenelAnalysisClient({
         </Card>
 
         <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1">
-          {gradeCfg.examSubjects.map((s) => (
+          {m9Tabs.map((s) => (
             <button
               key={s.key}
               type="button"
