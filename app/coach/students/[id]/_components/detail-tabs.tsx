@@ -15,7 +15,9 @@ import { GelisimHaritasiTab } from "./gelisim-haritasi-tab";
 import { KarnelerTab } from "./karneler-tab";
 import { KaynakTakibiTab, type CourseResourceData } from "./kaynak-takibi-tab";
 import { ProgramTab } from "./program-tab";
+import { SchoolExamsTab } from "./school-exams-tab";
 import { SessionsTab } from "./sessions-tab";
+import type { CoachSchoolExams } from "../school-exams-data";
 import type { TopicPerformanceRow } from "./topic-performance-map";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
@@ -54,6 +56,7 @@ export function DetailTabs({
   sessions,
   examType = "YKS",
   lgsRoutines = [],
+  schoolExams = null,
 }: {
   studentId: string;
   topicPerformance: TopicPerformanceRow[];
@@ -81,11 +84,14 @@ export function DetailTabs({
   examType?: "YKS" | "LGS";
   // LGS students' Paragraf / Kitap Okuma log (lgs_daily_routines).
   lgsRoutines?: LgsDailyRoutine[];
+  // The student's Yazılılar (school exam grades). null = this student has none (a graduate), so the tab is hidden.
+  schoolExams?: CoachSchoolExams | null;
 }) {
   // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
   // hidden; Program and Görüşmeler remain.
   const isMaarif9 = useMaarifGrade() !== null;
-  const hiddenTabs = isMaarif9 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS;
+  const hiddenTabs = new Set(isMaarif9 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS);
+  if (!schoolExams) hiddenTabs.add("yazililar");
   const [activeTab, setActiveTab] = useState(hiddenTabs.has(initialTab) ? "program" : initialTab);
   // One shared filter for Analiz / Gelişim Haritası / Grafikler -- lifted
   // above the tabs (not owned by any one of them) specifically so it
@@ -106,6 +112,7 @@ export function DetailTabs({
           <TabsTrigger value="program">Program</TabsTrigger>
           {!hiddenTabs.has("kaynak-takibi") && <TabsTrigger value="kaynak-takibi">Kaynak Takibi</TabsTrigger>}
           {!hiddenTabs.has("karneler") && <TabsTrigger value="karneler">Karneler</TabsTrigger>}
+          {!hiddenTabs.has("yazililar") && <TabsTrigger value="yazililar">Yazılılar</TabsTrigger>}
           <TabsTrigger value="gorusmeler">Görüşmeler</TabsTrigger>
         </TabsList>
         {RANGE_FILTERED_TABS.has(activeTab) && <ChartRangePicker value={chartRange} onChange={setChartRange} />}
@@ -174,6 +181,12 @@ export function DetailTabs({
           allTimeTrackedMinutes={allTimeTrackedMinutes}
         />
       </TabsContent>
+
+      {schoolExams && (
+        <TabsContent value="yazililar" className="pt-4">
+          <SchoolExamsTab data={schoolExams} />
+        </TabsContent>
+      )}
 
       <TabsContent value="gorusmeler" className="pt-4">
         <SessionsTab studentId={studentId} initialSessions={sessions} />

@@ -158,3 +158,61 @@ export function checkCourseName(raw: string): CourseNameCheck {
 }
 
 export type RemovalStatus = "none" | "pending" | "rejected";
+
+// --- Read model (the coach's view of a student's Yazılılar) ----------------
+export type StoredSchoolCourse = {
+  id: string;
+  key: string;
+  isCustom: boolean;
+  name: string;
+  color: string | null;
+  removalStatus: RemovalStatus;
+  // The coach approved dropping it: hidden everywhere (its grades stay in the database).
+  removed: boolean;
+};
+export type StoredSchoolGrade = { courseId: string; term: Term; examNo: ExamNo; grade: number };
+
+export type SchoolCard = {
+  key: string;
+  name: string;
+  isCustom: boolean;
+  color: string | null;
+  removalStatus: RemovalStatus;
+  // "term-examNo" -> the saved grade (absent = nothing entered)
+  grades: Record<string, number>;
+  // Position among the cards, for the colour a card gets until the student picks one.
+  index: number;
+};
+
+export const gradeCellKey = (term: Term, examNo: ExamNo) => `${term}-${examNo}`;
+
+// One card per course the student has: every default course of their grade (even one they never
+// touched -- no row yet), then their own added courses. A course the coach approved dropping is
+// left out.
+export function buildSchoolCards(defaults: SchoolCourseDef[], courses: StoredSchoolCourse[], grades: StoredSchoolGrade[]): SchoolCard[] {
+  const byKey = new Map(courses.map((c) => [c.key, c]));
+  const gradesOf = (courseId: string | null) => {
+    const out: Record<string, number> = {};
+    if (courseId) for (const g of grades) if (g.courseId === courseId) out[gradeCellKey(g.term, g.examNo)] = g.grade;
+    return out;
+  };
+  const cards: SchoolCard[] = [];
+  defaults.forEach((def, i) => {
+    const row = byKey.get(def.key);
+    if (row?.removed) return;
+    cards.push({
+      key: def.key,
+      name: def.name,
+      isCustom: false,
+      color: row?.color ?? null,
+      removalStatus: row?.removalStatus ?? "none",
+      grades: gradesOf(row?.id ?? null),
+      index: i,
+    });
+  });
+  for (const row of courses) {
+    if (!row.isCustom || row.removed) continue;
+    cards.push({ key: row.key, name: row.name, isCustom: true, color: row.color, removalStatus: "none", grades: gradesOf(row.id), index: cards.length });
+  }
+  return cards;
+}

@@ -1,5 +1,6 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
+import { fetchSchoolExams } from "./school-exams-data";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -157,6 +158,8 @@ async function fetchStudentDetail(studentId: string) {
   const examType: ExamType = profile.exam_type === "LGS" ? "LGS" : "YKS";
   const curriculumCourseIds = curriculumCourseIdsFor(examType);
   const maarifGrade = await fetchMaarifGrade(supabase, studentId);
+  // Yazılılar: best-effort (null for a graduate; never throws), so it can't take the page down.
+  const schoolExams = await fetchSchoolExams(supabase, studentId, { examType, maarifGrade });
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
@@ -581,6 +584,7 @@ async function fetchStudentDetail(studentId: string) {
   return {
     profile: profile as StudentProfile,
     maarifGrade,
+    schoolExams,
     completion: computeDualCompletionStats(tasks, today, currentCycle),
     subjectCompletion: computeSubjectCompletion(tasks, today, currentCycle),
     progressFrom: currentCycle.start,
@@ -621,7 +625,7 @@ async function fetchStudentDetail(studentId: string) {
   };
 }
 
-const DETAIL_TABS = ["analiz", "gelisim-haritasi", "grafikler", "program", "kaynak-takibi", "karneler", "gorusmeler"] as const;
+const DETAIL_TABS = ["analiz", "gelisim-haritasi", "grafikler", "program", "kaynak-takibi", "karneler", "yazililar", "gorusmeler"] as const;
 
 export default async function CoachStudentDetailPage(props: PageProps<"/coach/students/[id]">) {
   const { id } = await props.params;
@@ -696,6 +700,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   lgsRoutines={detail.lgsRoutines}
                   examMistakes={detail.examMistakes}
                   sessions={detail.sessions}
+                  schoolExams={detail.schoolExams}
                 />
               </div>
 
