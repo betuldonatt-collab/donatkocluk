@@ -1,6 +1,7 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { fetchSchoolExams } from "@/lib/school-exams-data";
+import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -605,7 +606,7 @@ async function fetchStudentDetail(studentId: string) {
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
     // Only LGS tasks need a Kanıt Fotoğrafı (lib/lgs-completion.ts).
-    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: examType === "LGS" }),
+    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: usesPhotoWorkflow({ examType, maarifGrade }) }),
     courseResourceData,
     today,
     weekStats,

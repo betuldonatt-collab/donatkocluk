@@ -116,8 +116,9 @@ export function AlertPanel({
           href: `/coach/students/${a.student.id}?tab=karneler`,
         }))}
       />
-      <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS")} />
+      <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS" && !t.studentIsMaarif7)} />
       <PendingApprovalsPanel title="LGS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType === "LGS")} />
+      <PendingApprovalsPanel title="7. Sınıf Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS" && t.studentIsMaarif7)} />
       <LgsMissingTasksPanel alerts={alerts.lgsMissingTasks} />
     </div>
   );

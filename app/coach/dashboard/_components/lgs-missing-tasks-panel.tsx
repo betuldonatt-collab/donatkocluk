@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { MissingTaskDateGroups } from "../../_components/missing-task-groups";
 import type { LgsMissingTasksAlert } from "../types";
 
-// "LGS Eksik/Tamamlanmayan Görevler": every LGS student with past-due tasks
+// "LGS ve 7. Sınıf Eksik/Tamamlanmayan Görevler": every LGS or 7th-grade student with past-due tasks
 // that were never completed (and aren't just waiting for photo approval --
 // those live in "LGS Onay Bekleyen Görevler" beside it). Same tile chrome as
 // that card: icon + title + count, a one-line summary and "Detaylı İncele",
@@ -43,7 +43,7 @@ export function LgsMissingTasksPanel({ alerts }: { alerts: LgsMissingTasksAlert[
       >
         <CardHeader className="flex-row items-center gap-2 space-y-0">
           <ClipboardList className="text-muted-foreground size-4" />
-          <CardTitle className="text-sm">LGS Eksik/Tamamlanmayan Görevler ({taskCount})</CardTitle>
+          <CardTitle className="text-sm">LGS ve 7. Sınıf Eksik/Tamamlanmayan Görevler ({taskCount})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {alerts.length === 0 ? (
@@ -73,7 +73,7 @@ export function LgsMissingTasksPanel({ alerts }: { alerts: LgsMissingTasksAlert[
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>LGS Eksik/Tamamlanmayan Görevler</DialogTitle>
+            <DialogTitle>LGS ve 7. Sınıf Eksik/Tamamlanmayan Görevler</DialogTitle>
             <p className="text-muted-foreground text-xs">
               Son {MISSING_TASKS_WINDOW_DAYS} günde süresi geçen, tamamlanmayan görevler. Kitap Okuma dahil değildir; onay bekleyen fotoğraflar
               ayrı listededir.

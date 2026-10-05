@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
 import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS, type MissingTaskInput } from "@/lib/missing-tasks";
+import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
+import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import {
   getPendingFocusReviews,
   getPendingStudentTasks,
@@ -82,6 +84,8 @@ function buildCoachAlerts(
   pendingReportCardRows: { id: string; student_id: string; cycle_number: number; generated_at: string }[],
   lgsTaskRows: (MissingTaskInput & { student_id: string; title: string })[],
   today: string,
+  // LGS students and 7th graders: the cohorts whose tasks need a Kanit Fotografi (lib/photo-workflow.ts).
+  photoStudentIds: Set<string>,
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
@@ -150,7 +154,7 @@ function buildCoachAlerts(
     tasksByStudent.set(row.student_id, list);
   }
   for (const student of roster) {
-    if (student.exam_type !== "LGS") continue;
+    if (!photoStudentIds.has(student.id)) continue;
     const missing = findMissingTasks(tasksByStudent.get(student.id) ?? [], today, { requiresPhoto: true });
     if (missing.length === 0) continue;
     lgsMissingTasks.push({
@@ -275,7 +279,10 @@ async function fetchDashboardData(
   // Past-due, not-yet-completed tasks of this coach's LGS students, bounded to
   // the same look-back window the student page uses. Needs the roster's
   // exam types, so it runs after the profiles read above.
-  const lgsStudentIds = roster.filter((s) => s.exam_type === "LGS").map((s) => s.id);
+  // The photo-workflow cohorts: LGS students and 7th graders (lib/photo-workflow.ts).
+  const gradeById = await fetchMaarifGradesByIds(supabase, "profiles", roster.map((s) => s.id));
+  const photoStudentIds = new Set(roster.filter((s) => usesPhotoWorkflow({ examType: s.exam_type, maarifGrade: gradeById.get(s.id) ?? null })).map((s) => s.id));
+  const lgsStudentIds = [...photoStudentIds];
   const { data: lgsTaskRows } =
     lgsStudentIds.length > 0
       ? await supabase
@@ -295,6 +302,7 @@ async function fetchDashboardData(
     pendingReportCardRows ?? [],
     (lgsTaskRows ?? []) as (MissingTaskInput & { student_id: string; title: string })[],
     today,
+    photoStudentIds,
   );
 
   return {

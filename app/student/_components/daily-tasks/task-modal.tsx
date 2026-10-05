@@ -42,6 +42,8 @@ import {
   overCapGroup,
 } from "@/lib/curriculum/subject-groups";
 import { isMaarif11GeneralExamTitle } from "@/lib/maarif-grade";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { cn } from "@/lib/utils";
 import {
   getTaskTopicMistakes,
@@ -317,6 +319,8 @@ function TaskModalBody({
   initialStep: Step;
   examType?: ExamType;
 }) {
+  // LGS and 7th graders: Kanıt Fotoğrafı + coach approval on every task but Kitap Okuma (lib/photo-workflow.ts).
+  const photoWorkflow = usesPhotoWorkflow({ examType, maarifGrade: useMaarifGrade() });
   const [step, setStep] = useState<Step>(initialStep);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -488,7 +492,7 @@ function TaskModalBody({
   // The video-only box: Soru Çözümü with a question-count target, for every
   // cohort but LGS (whose completion rules need the counts). Branş Denemesi and
   // Genel Deneme never get it.
-  const showNoQuestionsBox = task.task_type === "question_bank" && !isDurationOnlyTarget && examType !== "LGS";
+  const showNoQuestionsBox = task.task_type === "question_bank" && !isDurationOnlyTarget && !photoWorkflow;
   const noQuestionsActive = showNoQuestionsBox && noQuestionsSolved;
   const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
   // Reading's own, simpler 2-field block (Sayfa Hedefi + Okunan Sayfa)
@@ -757,7 +761,7 @@ function TaskModalBody({
   // Soru Çözümü: counts, or the "Soruları çözmedim" box with a watched video
   // (lib/question-bank-validation.ts, re-checked by updateTaskProgress).
   function blockedByQuestionBankRule(): boolean {
-    if (task.task_type !== "question_bank" || isDurationOnlyTarget || examType === "LGS") return false;
+    if (task.task_type !== "question_bank" || isDurationOnlyTarget || photoWorkflow) return false;
     const problem = checkQuestionBankSave({
       correct: toNumberOrNull(correctCount),
       wrong: toNumberOrNull(wrongCount),
@@ -1406,7 +1410,7 @@ function TaskModalBody({
 
         {/* Kitap Okuma proves itself with a page range now (see
             showReadingProgress above), not a photo. */}
-        {examType === "LGS" && !isReading && (
+        {photoWorkflow && !isReading && (
           <EvidenceUploader
             taskId={task.id}
             paths={task.evidence_image_paths ?? []}

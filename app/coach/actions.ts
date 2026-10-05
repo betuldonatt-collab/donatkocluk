@@ -40,7 +40,7 @@ import {
   type KarneTopicRow,
   type NetSummary,
 } from "@/lib/karne";
-import { fetchMaarifGrade, type GeneralExamTrack } from "@/lib/maarif-grade";
+import { fetchMaarifGrade, fetchMaarifGradesByIds, type GeneralExamTrack } from "@/lib/maarif-grade";
 import {
   pipelineConfigFor,
   pipelineStepSchema,
@@ -1771,6 +1771,8 @@ export type PendingStudentTask = {
   evidenceCount: number;
   // The student's cohort, so the dashboard can split LGS / YKS approvals.
   studentExamType?: "YKS" | "LGS";
+  // A 7th grader (exam_type 'YKS' + is_maarif7): in the photo-approval flow like LGS, listed in its own panel.
+  studentIsMaarif7?: boolean;
   // What the student reported for an "evidence" task (applied on approval).
   claimedStatus: "done" | "half_done" | null;
 };
@@ -1812,6 +1814,7 @@ export async function getPendingStudentTasks(): Promise<(PendingStudentTask & { 
 
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
   const examTypeById = new Map((profiles ?? []).map((p) => [p.id, p.exam_type === "LGS" ? ("LGS" as const) : ("YKS" as const)]));
+  const gradeById = await fetchMaarifGradesByIds(supabase, "profiles", studentIds);
   const toPending = (t: NonNullable<typeof extraTasks>[number], kind: "extra" | "evidence") => {
     const { evidence_image_paths, evidence_pending_status, ...rest } = t;
     return {
@@ -1822,6 +1825,7 @@ export async function getPendingStudentTasks(): Promise<(PendingStudentTask & { 
       studentId: t.student_id,
       studentName: nameById.get(t.student_id) ?? null,
       studentExamType: examTypeById.get(t.student_id) ?? ("YKS" as const),
+      studentIsMaarif7: gradeById.get(t.student_id) === 7,
     };
   };
   const seen = new Set<string>();

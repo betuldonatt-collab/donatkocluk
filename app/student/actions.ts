@@ -10,7 +10,8 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { needsCoachApproval } from "@/lib/focus-approval";
 import { decideOpenAction } from "@/lib/focus-open-decision";
-import type { GeneralExamTrack } from "@/lib/maarif-grade";
+import { fetchMaarifGrade, type GeneralExamTrack } from "@/lib/maarif-grade";
+import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import {
   EXAM_SCORES_REQUIRED,
   GENERAL_EXAM_SCORES_REQUIRED,
@@ -187,10 +188,12 @@ const taskProgressPatchSchema = z
 // returned) -- callers cast it to their own StudentTask type, same as before.
 export type UpdateTaskProgressResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string };
 
-// LGS is the only cohort with the mandatory-photo / coach-approval workflow.
+// LGS students -- and 7th graders, who mirror LGS here -- are the only cohorts with the mandatory-photo /
+// coach-approval workflow (lib/photo-workflow.ts). Name kept: every "LGS rule" below applies to both.
 async function isLgsStudent(supabase: SupabaseClient, userId: string): Promise<boolean> {
   const { data } = await supabase.from("profiles").select("exam_type").eq("id", userId).maybeSingle();
-  return data?.exam_type === "LGS";
+  if (data?.exam_type === "LGS") return true;
+  return usesPhotoWorkflow({ examType: data?.exam_type, maarifGrade: await fetchMaarifGrade(supabase, userId) });
 }
 
 export async function updateTaskProgress(taskId: string, patch: TaskProgressPatch): Promise<UpdateTaskProgressResult> {
@@ -1867,8 +1870,8 @@ export async function uploadTaskEvidence(formData: FormData): Promise<EvidenceRe
 
     const supabase = await createClient();
     const user = await requireUser(supabase);
-    // Photo evidence exists only for LGS students (YKS / 9th / 10th grade cannot upload).
-    if (!(await isLgsStudent(supabase, user.id))) return { ok: false, error: "Kanıt fotoğrafı yalnızca LGS öğrencileri için." };
+    // Photo evidence exists only for LGS students and 7th graders (YKS / 9th / 10th / 11th grade cannot upload).
+    if (!(await isLgsStudent(supabase, user.id))) return { ok: false, error: "Kanıt fotoğrafı yalnızca LGS ve 7. sınıf öğrencileri için." };
     const task = await loadOwnEvidence(supabase, user.id, taskId);
 
     const path = evidencePath(user.id, taskId, crypto.randomUUID(), file.type);
