@@ -40,9 +40,10 @@ describe("7th-grade analytics cohort", () => {
     ]);
   });
 
-  it("leaves every other cohort and Maarif grade as before", () => {
+  it("leaves YKS, LGS and the 11th grade as before (9th and 10th have their own courses now)", () => {
     expect(curriculumCourseIdsFor("YKS")).toBe(YKS_CURRICULUM_COURSE_IDS);
-    expect(curriculumCourseIdsFor("YKS", 9)).toBe(YKS_CURRICULUM_COURSE_IDS);
+    expect(curriculumCourseIdsFor("YKS", 11)).toBe(YKS_CURRICULUM_COURSE_IDS);
+    expect(curriculumCourseIdsFor("YKS", 9)).not.toBe(YKS_CURRICULUM_COURSE_IDS); // the 9th grade has its own courses now
     expect(curriculumCourseIdsFor("LGS").some((id) => id.startsWith("lgs-"))).toBe(true);
   });
 });
