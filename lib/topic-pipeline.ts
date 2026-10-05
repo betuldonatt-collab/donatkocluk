@@ -70,6 +70,25 @@ const MAARIF_PIPELINE_CONFIG: PipelineConfig = {
   end: [{ key: "cikmis_sorular", label: "Çıkmış Sorular" }],
 };
 
+// The 7th grade's own pipeline: the same two topic steps, but NO "Çıkmış Sorular" column (the 7th grade has
+// no past-question data -- no national exam -- and none is wanted). Its Kaynak Takibi also lays the steps out
+// differently (components/maarif-table-body.tsx): Okul İlerlemesi AND Konu Çalışması are ticked on every
+// individual topic line, while the resource ticks (Soru Çözümü / Kaynak Taraması) sit once per unit.
+const MAARIF7_PIPELINE_CONFIG: PipelineConfig = {
+  table: "yks_topic_pipeline_status",
+  start: [
+    { key: "okul_ilerlemesi", label: "Okul İlerlemesi" },
+    { key: "konu_calismasi", label: "Konu Çalışması" },
+  ],
+  end: [],
+};
+
+// The steps ticked on every individual topic line (not once per group): a group then counts as done
+// only when EVERY topic of it is ticked (collapsePipelineMapForRows' `everyMemberSteps`).
+export function perTopicStepsFor(maarifGrade: MaarifGrade | null): readonly PipelineStepKey[] {
+  return maarifGrade === 7 ? ["okul_ilerlemesi", "konu_calismasi"] : ["okul_ilerlemesi"];
+}
+
 // The config a student's Kaynak Takibi pipeline actually renders/validates
 // against -- LGS and an ordinary YKS/mezun student get their fixed
 // PIPELINE_CONFIG entry unchanged; a Maarif student (any of the three
@@ -79,6 +98,7 @@ const MAARIF_PIPELINE_CONFIG: PipelineConfig = {
 // grade always resolve to the same config everywhere.
 export function pipelineConfigFor(examType: ExamType, maarifGrade: MaarifGrade | null): PipelineConfig {
   if (examType === "LGS") return PIPELINE_CONFIG.LGS;
+  if (maarifGrade === 7) return MAARIF7_PIPELINE_CONFIG;
   return maarifGrade !== null ? MAARIF_PIPELINE_CONFIG : PIPELINE_CONFIG.YKS;
 }
 

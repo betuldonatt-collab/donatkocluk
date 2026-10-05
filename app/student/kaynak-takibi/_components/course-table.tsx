@@ -32,7 +32,8 @@ import {
   MaarifStatCells,
   MaarifTableBody,
 } from "@/components/maarif-table-body";
-import { collapsePipelineMapForRows, type PipelineBinding } from "@/lib/topic-pipeline";
+import { collapsePipelineMapForRows, perTopicStepsFor, type PipelineBinding } from "@/lib/topic-pipeline";
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { flattenSelectionRows, isFlatRows } from "@/lib/curriculum/rows";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
@@ -123,11 +124,12 @@ export function CourseTable({
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
   const isMaarif = isMaarifCourseId(course.id);
+  const maarifGrade = useMaarifGrade();
   // A flat Maarif TYT course (Türkçe) has no Ünite column.
   const flat = isFlatRows(rows);
   // A Maarif unit's Okul İlerlemesi is ticked per subtopic, so it folds with
   // AND (unit done only when every subtopic is) for the summary bar.
-  const collapsedMap = pipeline && collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? ["okul_ilerlemesi"] : []);
+  const collapsedMap = pipeline && collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? perTopicStepsFor(maarifGrade) : []);
   const collapsedPipeline = pipeline && collapsedMap && { ...pipeline, map: collapsedMap };
   // Maarif courses render as a spreadsheet-style grid (MaarifTableBody);
   // every other cohort keeps the generic one-row-per-selection-row body.

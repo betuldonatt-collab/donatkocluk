@@ -2,12 +2,13 @@
 
 import { Fragment } from "react";
 
+import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { splitUnitGradeTag } from "@/lib/curriculum/maarif-tyt";
 import { isFlatRows, withGroupHeadings, type SelectionRow } from "@/lib/curriculum/rows";
 import { topicLinesForUnit, type TopicLine } from "@/lib/curriculum/topic-display";
-import type { PipelineBinding, PipelineMap, PipelineStep } from "@/lib/topic-pipeline";
+import { perTopicStepsFor, type PipelineBinding, type PipelineMap, type PipelineStep } from "@/lib/topic-pipeline";
 import { cn } from "@/lib/utils";
 
 // Maarif (9th/10th/11th grade) Kaynak Takibi body, laid out like a
@@ -98,6 +99,12 @@ export function MaarifTableBody({
   collapsedMap: PipelineMap;
   onToggleProgress: (topicId: string, resourceId: string, field: "solved" | "reviewed") => void;
 }) {
+  // 7th grade: the split layout -- Okul İlerlemesi AND Konu Çalışması on every topic line, resource ticks once per
+  // unit. Every other grade keeps its layout (only Okul İlerlemesi per topic, everything else per group).
+  const maarifGrade = useMaarifGrade();
+  const split = maarifGrade === 7;
+  const perTopicSteps = perTopicStepsFor(maarifGrade);
+
   // Every group as display lines: its heading once (if it has one), then its
   // topics on clean lines beneath (lib/curriculum/topic-display.ts).
   const groups: PreparedGroup[] = rows.map((row) => {
@@ -136,13 +143,13 @@ export function MaarifTableBody({
         </TableCell>
       );
     }
-    if (step.key === "okul_ilerlemesi") {
+    if (perTopicSteps.includes(step.key)) {
       if (line.kind === "heading") return <TableCell key={step.key} className={cn("bg-muted/40 px-3 py-1", border)} />;
       return (
         <TableCell key={step.key} className={cn("px-3 py-1 text-center", border)}>
           <Checkbox
-            checked={pipeline.map[line.topicId]?.okul_ilerlemesi ?? false}
-            onCheckedChange={() => pipeline.onToggle(line.topicId, "okul_ilerlemesi")}
+            checked={pipeline.map[line.topicId]?.[step.key] ?? false}
+            onCheckedChange={() => pipeline.onToggle(line.topicId, step.key)}
             aria-label={`${courseName} - ${scope} - ${fullNames.get(line.topicId)} - ${step.label}`}
           />
         </TableCell>
@@ -203,6 +210,14 @@ export function MaarifTableBody({
         const { row, lines } = group;
         const count = lines.length;
         const scope = row.label === row.unitLabel ? row.label : `${row.unitLabel} - ${row.label}`;
+        // Resource ticks: once per GROUP normally; in the split layout once per UNIT -- carried by the unit's
+        // first line, spanning the whole unit, reading from and saving against the unit's topics (its first
+        // topic is the id the tick is stored on).
+        const unitMembers =
+          split && item.unitRowSpan !== null
+            ? items.slice(ii, ii + item.unitRowSpan).flatMap((it) => (it.kind === "row" ? it.row.memberTopicIds : []))
+            : [];
+        const resourceScope = split ? row.unitLabel : scope;
         return lines.map((line, li) => {
           const isFirstLine = li === 0;
           const isLastLine = li === count - 1;
@@ -235,24 +250,27 @@ export function MaarifTableBody({
                 {line.text}
               </TableCell>
               {pipeline.config.start.map((step, si) => stepCell(step, si, group, line, isFirstLine))}
-              {isFirstLine &&
+              {(split ? isFirstLine && item.unitRowSpan !== null : isFirstLine) &&
                 resources.map((resource) => {
-                  const solved = row.memberTopicIds.some((id) => progress[`${id}::${resource.id}`]?.solved);
-                  const reviewed = row.memberTopicIds.some((id) => progress[`${id}::${resource.id}`]?.reviewed);
+                  const members = split ? unitMembers : row.memberTopicIds;
+                  const storeOn = split ? unitMembers[0] : row.id;
+                  const span = split ? unitLines : count;
+                  const solved = members.some((id) => progress[`${id}::${resource.id}`]?.solved);
+                  const reviewed = members.some((id) => progress[`${id}::${resource.id}`]?.reviewed);
                   return (
                     <Fragment key={resource.id}>
-                      <TableCell rowSpan={count} className="border-l text-center">
+                      <TableCell rowSpan={span} className="border-l text-center">
                         <Checkbox
                           checked={solved}
-                          onCheckedChange={() => onToggleProgress(row.id, resource.id, "solved")}
-                          aria-label={`${courseName} - ${scope} - ${resource.name} - Soru Çözümü`}
+                          onCheckedChange={() => onToggleProgress(storeOn, resource.id, "solved")}
+                          aria-label={`${courseName} - ${resourceScope} - ${resource.name} - Soru Çözümü`}
                         />
                       </TableCell>
-                      <TableCell rowSpan={count} className="text-center">
+                      <TableCell rowSpan={span} className="text-center">
                         <Checkbox
                           checked={reviewed}
-                          onCheckedChange={() => onToggleProgress(row.id, resource.id, "reviewed")}
-                          aria-label={`${courseName} - ${scope} - ${resource.name} - Kaynak Taraması Yapıldı`}
+                          onCheckedChange={() => onToggleProgress(storeOn, resource.id, "reviewed")}
+                          aria-label={`${courseName} - ${resourceScope} - ${resource.name} - Kaynak Taraması Yapıldı`}
                         />
                       </TableCell>
                     </Fragment>

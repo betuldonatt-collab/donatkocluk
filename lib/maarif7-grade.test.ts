@@ -56,7 +56,10 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("uses the Maarif pipeline and refuses another grade's courses", () => {
-    expect(pipelineConfigFor("YKS", 7)).toEqual(pipelineConfigFor("YKS", 9));
+    // Same table and topic steps as the other Maarif grades, minus Çıkmış Sorular (no past questions for the 7th).
+    expect(pipelineConfigFor("YKS", 7).table).toBe(pipelineConfigFor("YKS", 9).table);
+    expect(pipelineConfigFor("YKS", 7).start).toEqual(pipelineConfigFor("YKS", 9).start);
+    expect(pipelineConfigFor("YKS", 7).end).toEqual([]);
     const step = { courseId: "maarif9-matematik", topicId: "maarif9-matematik-u0-t0", step: "konu_calismasi" as const, value: true };
     expect(() => validatePipelineStep("YKS", step, 7)).toThrow("Geçersiz ders.");
   });
