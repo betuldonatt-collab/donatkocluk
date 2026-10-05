@@ -184,7 +184,7 @@ export function DetailTabs({
 
       {schoolExams && (
         <TabsContent value="yazililar" className="pt-4">
-          <SchoolExamsTab data={schoolExams} />
+          <SchoolExamsTab data={schoolExams} studentId={studentId} />
         </TabsContent>
       )}
 

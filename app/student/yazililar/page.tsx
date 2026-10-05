@@ -33,6 +33,16 @@ export default async function YazililarPage() {
   let grades: StoredGrade[] = [];
   let ready = true;
   if (view && cohort) {
+    // is_locked exists from migration 0120 (the coach locks a grade); before it is applied the grades are read
+    // without it, so every grade is simply open.
+    const readGrades = async () => {
+      const withLock = await supabase
+        .from("student_school_grades")
+        .select("course_id, term, exam_no, grade, is_locked")
+        .eq("student_id", view.effectiveUserId);
+      if (!withLock.error) return withLock;
+      return supabase.from("student_school_grades").select("course_id, term, exam_no, grade").eq("student_id", view.effectiveUserId);
+    };
     const [courseRes, gradeRes] = await Promise.all([
       supabase
         .from("student_school_courses")
@@ -40,7 +50,7 @@ export default async function YazililarPage() {
         .eq("student_id", view.effectiveUserId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true }),
-      supabase.from("student_school_grades").select("course_id, term, exam_no, grade").eq("student_id", view.effectiveUserId),
+      readGrades(),
     ]);
     if (courseRes.error || gradeRes.error) {
       // Most likely migration 0118 is not applied yet -- say so calmly instead of crashing.
@@ -61,6 +71,7 @@ export default async function YazililarPage() {
         term: g.term as 1 | 2,
         examNo: g.exam_no as 1 | 2,
         grade: Number(g.grade),
+        locked: (g as { is_locked?: boolean }).is_locked === true,
       }));
     }
   }

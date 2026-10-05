@@ -39,6 +39,12 @@ export async function fetchSchoolExams(
   const base = { cohort, defaults: DEFAULT_SCHOOL_COURSES[cohort], courses: [], grades: [] };
 
   try {
+    // is_locked exists from migration 0120; before it is applied the grades are read without it (all unlocked).
+    const readGrades = async () => {
+      const withLock = await supabase.from("student_school_grades").select("course_id, term, exam_no, grade, is_locked").eq("student_id", studentId);
+      if (!withLock.error) return withLock;
+      return supabase.from("student_school_grades").select("course_id, term, exam_no, grade").eq("student_id", studentId);
+    };
     const [courseRes, gradeRes] = await Promise.all([
       supabase
         .from("student_school_courses")
@@ -46,7 +52,7 @@ export async function fetchSchoolExams(
         .eq("student_id", studentId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true }),
-      supabase.from("student_school_grades").select("course_id, term, exam_no, grade").eq("student_id", studentId),
+      readGrades(),
     ]);
     if (courseRes.error || gradeRes.error) {
       console.error("[fetchSchoolExams] read failed:", courseRes.error ?? gradeRes.error);
@@ -69,6 +75,7 @@ export async function fetchSchoolExams(
         term: g.term as Term,
         examNo: g.exam_no as ExamNo,
         grade: Number(g.grade),
+        locked: (g as { is_locked?: boolean }).is_locked === true,
       })),
     };
   } catch (e) {

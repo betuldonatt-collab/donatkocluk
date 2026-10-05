@@ -170,16 +170,22 @@ export type StoredSchoolCourse = {
   // The coach approved dropping it: hidden everywhere (its grades stay in the database).
   removed: boolean;
 };
-export type StoredSchoolGrade = { courseId: string; term: Term; examNo: ExamNo; grade: number };
+// `locked`: the coach locked this grade, so the student can no longer change it (migration 0120). Absent / false
+// = open to both. Reads tolerate the column not existing yet (migration not applied): everything is then unlocked.
+export type StoredSchoolGrade = { courseId: string; term: Term; examNo: ExamNo; grade: number; locked?: boolean };
 
 export type SchoolCard = {
   key: string;
+  // The course's row id; null until a default course has been touched by anyone (no row yet).
+  courseId: string | null;
   name: string;
   isCustom: boolean;
   color: string | null;
   removalStatus: RemovalStatus;
   // "term-examNo" -> the saved grade (absent = nothing entered)
   grades: Record<string, number>;
+  // "term-examNo" -> true for each grade the coach locked
+  locks: Record<string, boolean>;
   // Position among the cards, for the colour a card gets until the student picks one.
   index: number;
 };
@@ -196,23 +202,40 @@ export function buildSchoolCards(defaults: SchoolCourseDef[], courses: StoredSch
     if (courseId) for (const g of grades) if (g.courseId === courseId) out[gradeCellKey(g.term, g.examNo)] = g.grade;
     return out;
   };
+  const locksOf = (courseId: string | null) => {
+    const out: Record<string, boolean> = {};
+    if (courseId) for (const g of grades) if (g.courseId === courseId && g.locked) out[gradeCellKey(g.term, g.examNo)] = true;
+    return out;
+  };
   const cards: SchoolCard[] = [];
   defaults.forEach((def, i) => {
     const row = byKey.get(def.key);
     if (row?.removed) return;
     cards.push({
       key: def.key,
+      courseId: row?.id ?? null,
       name: def.name,
       isCustom: false,
       color: row?.color ?? null,
       removalStatus: row?.removalStatus ?? "none",
       grades: gradesOf(row?.id ?? null),
+      locks: locksOf(row?.id ?? null),
       index: i,
     });
   });
   for (const row of courses) {
     if (!row.isCustom || row.removed) continue;
-    cards.push({ key: row.key, name: row.name, isCustom: true, color: row.color, removalStatus: "none", grades: gradesOf(row.id), index: cards.length });
+    cards.push({
+      key: row.key,
+      courseId: row.id,
+      name: row.name,
+      isCustom: true,
+      color: row.color,
+      removalStatus: "none",
+      grades: gradesOf(row.id),
+      locks: locksOf(row.id),
+      index: cards.length,
+    });
   }
   return cards;
 }

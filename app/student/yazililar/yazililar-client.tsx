@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Palette, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import { Check, Lock, Palette, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export type StoredCourse = {
   removalStatus: RemovalStatus;
   removed: boolean;
 };
-export type StoredGrade = { courseId: string; term: Term; examNo: ExamNo; grade: number };
+export type StoredGrade = { courseId: string; term: Term; examNo: ExamNo; grade: number; locked?: boolean };
 
 type Card = {
   key: string;
@@ -56,6 +56,8 @@ type Card = {
   removalStatus: RemovalStatus;
   // "term-examNo" -> the saved grade
   grades: Record<string, number | null>;
+  // "term-examNo" -> true for a grade the coach locked: read-only for the student
+  locks: Record<string, boolean>;
   // Position among the defaults, for the colour a card gets until the student picks one.
   defaultIndex: number;
 };
@@ -67,6 +69,11 @@ function buildCards(defaults: SchoolCourseDef[], courses: StoredCourse[], grades
   const gradesOf = (courseId: string | null) => {
     const out: Record<string, number | null> = {};
     if (courseId) for (const g of grades) if (g.courseId === courseId) out[cellKey(g.term, g.examNo)] = g.grade;
+    return out;
+  };
+  const locksOf = (courseId: string | null) => {
+    const out: Record<string, boolean> = {};
+    if (courseId) for (const g of grades) if (g.courseId === courseId && g.locked) out[cellKey(g.term, g.examNo)] = true;
     return out;
   };
   const cards: Card[] = [];
@@ -81,12 +88,13 @@ function buildCards(defaults: SchoolCourseDef[], courses: StoredCourse[], grades
       color: row?.color ?? null,
       removalStatus: row?.removalStatus ?? "none",
       grades: gradesOf(row?.id ?? null),
+      locks: locksOf(row?.id ?? null),
       defaultIndex: i,
     });
   });
   for (const row of courses) {
     if (!row.isCustom || row.removed) continue;
-    cards.push({ key: row.key, name: row.name, isCustom: true, courseId: row.id, color: row.color, removalStatus: "none", grades: gradesOf(row.id), defaultIndex: cards.length });
+    cards.push({ key: row.key, name: row.name, isCustom: true, courseId: row.id, color: row.color, removalStatus: "none", grades: gradesOf(row.id), locks: locksOf(row.id), defaultIndex: cards.length });
   }
   return cards;
 }
@@ -128,7 +136,7 @@ export function YazililarClient({
         onAdded={(row) =>
           setCards((prev) => [
             ...prev,
-            { key: row.course_key, name: row.name, isCustom: true, courseId: row.id, color: row.color, removalStatus: "none", grades: {}, defaultIndex: prev.length },
+            { key: row.course_key, name: row.name, isCustom: true, courseId: row.id, color: row.color, removalStatus: "none", grades: {}, locks: {}, defaultIndex: prev.length },
           ])
         }
       />
@@ -341,6 +349,7 @@ function CourseCard({
                     <GradeCell
                       label={`${card.name} ${TERM_LABELS[term]} ${EXAM_LABELS[examNo]}`}
                       saved={card.grades[cellKey(term, examNo)] ?? null}
+                      locked={card.locks[cellKey(term, examNo)] === true}
                       disabled={readOnly || card.removalStatus === "pending"}
                       onSave={(value) => handleSaveGrade(term, examNo, value)}
                     />
@@ -379,11 +388,14 @@ function CourseCard({
 function GradeCell({
   label,
   saved,
+  locked,
   disabled,
   onSave,
 }: {
   label: string;
   saved: number | null;
+  // The coach locked this grade: shown with a lock and not editable.
+  locked: boolean;
   disabled: boolean;
   onSave: (value: number | null) => Promise<boolean>;
 }) {
@@ -411,6 +423,19 @@ function GradeCell({
     } else {
       setText(formatGrade(lastSaved.current));
     }
+  }
+
+  if (locked) {
+    return (
+      <div
+        className="text-foreground flex h-10 w-full items-center justify-center gap-1 bg-black/5 text-sm font-semibold tabular-nums dark:bg-white/5"
+        title="Bu notu koçun kilitledi, değiştirilemez"
+        aria-label={label + " (koçun kilitledi: " + (formatGrade(saved) || "boş") + ")"}
+      >
+        <Lock className="text-muted-foreground size-3 shrink-0" aria-hidden />
+        <span>{formatGrade(saved)}</span>
+      </div>
+    );
   }
 
   return (

@@ -28,6 +28,8 @@ export type YazililarResult<T = void> = { ok: true; data: T } | { ok: false; err
 
 const courseKeySchema = z.string().trim().min(1).max(60);
 
+const GRADE_LOCKED_MESSAGE = "Bu notu koçun kilitledi, değiştirilemez. Değiştirmek için koçuna ulaş.";
+
 type Ctx = { supabase: SupabaseClient; userId: string; cohort: SchoolCohort };
 
 class UserError extends Error {}
@@ -104,6 +106,16 @@ export async function saveSchoolGrade(input: z.input<typeof saveGradeSchema>): P
   return run("saveSchoolGrade", async (ctx) => {
     const v = parseInput(saveGradeSchema, input);
     const course = await ensureCourse(ctx, v.courseKey);
+    // A grade the coach locked is read-only for the student (also enforced by a trigger, migration 0120).
+    // Best-effort read: before 0120 the column does not exist and nothing is locked.
+    const { data: existing } = await ctx.supabase
+      .from("student_school_grades")
+      .select("is_locked")
+      .eq("course_id", course.id)
+      .eq("term", v.term)
+      .eq("exam_no", v.examNo)
+      .maybeSingle();
+    if ((existing as { is_locked?: boolean } | null)?.is_locked) throw new UserError(GRADE_LOCKED_MESSAGE);
     if (v.value === null) {
       const { error } = await ctx.supabase
         .from("student_school_grades")
@@ -185,6 +197,9 @@ export async function renameCustomSchoolCourse(input: { courseId: string; name: 
 export async function deleteCustomSchoolCourse(courseId: string): Promise<YazililarResult> {
   return run("deleteCustomSchoolCourse", async (ctx) => {
     const id = parseInput(uuidSchema, courseId);
+    // Deleting the course would delete its grades -- not allowed while the coach has any of them locked.
+    const { data: locked } = await ctx.supabase.from("student_school_grades").select("id").eq("course_id", id).eq("is_locked", true).limit(1);
+    if ((locked ?? []).length > 0) throw new UserError("Bu dersin koçun kilitlediği notları var, ders silinemez.");
     const { error } = await ctx.supabase.from("student_school_courses").delete().eq("id", id).eq("student_id", ctx.userId).eq("is_custom", true);
     if (error) throw dbError(error);
     revalidatePath("/student/yazililar");
