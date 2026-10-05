@@ -158,9 +158,14 @@ export type LgsNormalizedScores =
 // exceed the subject's questions, and Boş is recomputed here rather than
 // trusted from the client. Also rolls the six rows up into the flat
 // total/correct/wrong/empty a task card reads.
-export function normalizeLgsScores(scores: Record<string, ScoreInput> | null | undefined): LgsNormalizedScores {
+// `subjects` defaults to the LGS exam; the 7th grade's Genel Deneme (same six subjects and question counts,
+// different keys) passes MAARIF7_EXAM_SUBJECTS.
+export function normalizeLgsScores(
+  scores: Record<string, ScoreInput> | null | undefined,
+  subjects: readonly { key: string; label: string; questions: number }[] = LGS_EXAM_SUBJECTS,
+): LgsNormalizedScores {
   const out: Record<string, { correct: number; wrong: number; empty: number }> = {};
-  for (const s of LGS_EXAM_SUBJECTS) {
+  for (const s of subjects) {
     const raw = scores?.[s.key];
     if (!raw || raw.correct === null || raw.correct === undefined || raw.wrong === null || raw.wrong === undefined) {
       return {

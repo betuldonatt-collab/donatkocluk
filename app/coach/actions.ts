@@ -10,6 +10,7 @@ import { isValidISODateOnly } from "@/lib/chart-range";
 import { countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
 import { normalizeLgsScores } from "@/lib/lgs-exam";
+import { MAARIF7_EXAM_SUBJECTS } from "@/lib/curriculum/subject-groups";
 import {
   EVIDENCE_BUCKET,
   applyPhotoDecisions,
@@ -2959,14 +2960,17 @@ export async function saveCoachTrialResults(
   if (inputV.subjectScores) {
     const { data: existing, error: existingError } = await supabase
       .from("student_tasks")
-      .select("task_type")
+      .select("task_type, title")
       .eq("id", taskIdV)
       .maybeSingle();
     if (existingError) throw dbError(existingError);
     if (!existing || existing.task_type !== "general_exam") {
       return { ok: false, error: "Ders bazlı sonuç yalnızca Genel Deneme için girilebilir." };
     }
-    const normalized = normalizeLgsScores(inputV.subjectScores);
+    // Which six subjects the rows must cover: the 7th grade's Genel Deneme ("7. SINIF Genel Deneme ...") has its
+    // own keys (m7_*), every other per-subject exam is the LGS one.
+    const isMaarif7Exam = /^7\.\s*SINIF\b/i.test(String(existing.title ?? ""));
+    const normalized = isMaarif7Exam ? normalizeLgsScores(inputV.subjectScores, MAARIF7_EXAM_SUBJECTS) : normalizeLgsScores(inputV.subjectScores);
     if (!normalized.ok) return { ok: false, error: normalized.error };
     lgs = normalized;
   }

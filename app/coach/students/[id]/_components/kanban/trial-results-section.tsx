@@ -155,10 +155,11 @@ export function TrialResultsSection({
   const [showMissingScores, setShowMissingScores] = useState(false);
 
   const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
-  // LGS Genel Deneme gets the same per-subject form as the student's
-  // (LgsExamScoreGrid); every other exam keeps the one overall D/Y/B entry.
-  const isLgsGeneral = task.task_type === "general_exam" && examTrack === "lgs";
-  const [lgsInputs, setLgsInputs] = useState(() => emptyLgsInputs(task.subject_scores));
+  // The LGS and the 7th-grade Genel Deneme get the same per-subject Sözel/Sayısal form as the student's
+  // (LgsExamScoreGrid, its "lgs" / "maarif7" variants); every other exam keeps the one overall D/Y/B entry.
+  const isGridGeneral = task.task_type === "general_exam" && (examTrack === "lgs" || examTrack === "m7");
+  const gridVariant = examTrack === "m7" ? "maarif7" : "lgs";
+  const [lgsInputs, setLgsInputs] = useState(() => emptyLgsInputs(task.subject_scores, gridVariant));
   const [aytTrack, setAytTrack] = useState<Track | null>(() => inferAytTrackFromScores(task.subject_scores));
 
   useEffect(() => {
@@ -233,13 +234,13 @@ export function TrialResultsSection({
   }
 
   async function handleSave() {
-    if (isLgsGeneral) {
-      if (lgsInputsIncomplete(lgsInputs)) {
+    if (isGridGeneral) {
+      if (lgsInputsIncomplete(lgsInputs, gridVariant)) {
         setShowMissingScores(true);
         setError(GENERAL_EXAM_SCORES_REQUIRED);
         return;
       }
-      const over = lgsOverCapSubject(lgsInputs);
+      const over = lgsOverCapSubject(lgsInputs, gridVariant);
       if (over) {
         setError(`${over.label} için Doğru + Yanlış en fazla ${over.questions} olabilir.`);
         return;
@@ -305,9 +306,9 @@ export function TrialResultsSection({
     <div className="border-border space-y-3 rounded-lg border p-3">
       <p className="text-foreground text-sm font-semibold">Sonuçları Gir</p>
 
-      {isLgsGeneral && <LgsExamScoreGrid inputs={lgsInputs} onChange={setLgsInputs} showMissing={showMissingScores} />}
+      {isGridGeneral && <LgsExamScoreGrid variant={gridVariant} inputs={lgsInputs} onChange={setLgsInputs} showMissing={showMissingScores} />}
 
-      {!isLgsGeneral && (
+      {!isGridGeneral && (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Field label="Toplam" value={totalCount} onChange={(v) => handleCountFieldChange("total", v)} />
         <Field
@@ -331,7 +332,7 @@ export function TrialResultsSection({
       </div>
       )}
 
-      {totalMismatch && !isLgsGeneral && (
+      {totalMismatch && !isGridGeneral && (
         <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-md px-3 py-2 text-xs">
           <AlertTriangle className="size-3.5 shrink-0" />
           Toplam, Doğru + Yanlış + Boş toplamına eşit değil.
@@ -369,7 +370,7 @@ export function TrialResultsSection({
 
       {error && <p className="text-destructive text-xs">{error}</p>}
 
-      <Button type="button" size="sm" onClick={handleSave} disabled={saving || trackNotChosen || (totalMismatch && !isLgsGeneral)}>
+      <Button type="button" size="sm" onClick={handleSave} disabled={saving || trackNotChosen || (totalMismatch && !isGridGeneral)}>
         {saving ? "Kaydediliyor..." : "Sonuçları Kaydet"}
       </Button>
     </div>
