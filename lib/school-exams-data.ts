@@ -14,10 +14,10 @@ import {
   type Term,
 } from "@/lib/school-exams";
 
-// A student's Yazılılar (school exam grades), as the coach sees them on the student's detail page: read-only.
+// A student's Yazılılar (school exam grades), as the coach (editable) and the parent (read-only) see them.
 // The coach_students link is what the tables' own policies check (migration 0118), so a coach only ever
 // gets rows of students on their roster.
-export type CoachSchoolExams = {
+export type SchoolExamsData = {
   cohort: SchoolCohort;
   defaults: SchoolCourseDef[];
   courses: StoredSchoolCourse[];
@@ -32,7 +32,7 @@ export async function fetchSchoolExams(
   supabase: SupabaseClient,
   studentId: string,
   student: { examType: "YKS" | "LGS"; maarifGrade: MaarifGrade | null },
-): Promise<CoachSchoolExams | null> {
+): Promise<SchoolExamsData | null> {
   const isGraduate = await fetchIsGraduate(supabase, studentId);
   const cohort = schoolCohortOf({ examType: student.examType, maarifGrade: student.maarifGrade, isGraduate });
   if (!cohort) return null;

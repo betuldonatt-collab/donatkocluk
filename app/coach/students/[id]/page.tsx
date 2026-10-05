@@ -1,6 +1,6 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
-import { fetchSchoolExams } from "./school-exams-data";
+import { fetchSchoolExams } from "@/lib/school-exams-data";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 

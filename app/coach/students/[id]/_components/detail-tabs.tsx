@@ -17,7 +17,7 @@ import { KaynakTakibiTab, type CourseResourceData } from "./kaynak-takibi-tab";
 import { ProgramTab } from "./program-tab";
 import { SchoolExamsTab } from "./school-exams-tab";
 import { SessionsTab } from "./sessions-tab";
-import type { CoachSchoolExams } from "../school-exams-data";
+import type { SchoolExamsData } from "@/lib/school-exams-data";
 import type { TopicPerformanceRow } from "./topic-performance-map";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
@@ -85,7 +85,7 @@ export function DetailTabs({
   // LGS students' Paragraf / Kitap Okuma log (lgs_daily_routines).
   lgsRoutines?: LgsDailyRoutine[];
   // The student's Yazılılar (school exam grades). null = this student has none (a graduate), so the tab is hidden.
-  schoolExams?: CoachSchoolExams | null;
+  schoolExams?: SchoolExamsData | null;
 }) {
   // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
   // hidden; Program and Görüşmeler remain.

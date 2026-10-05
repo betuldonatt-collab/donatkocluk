@@ -15,7 +15,7 @@ vi.mock("@/app/student/yazililar/actions", () => ({
 }));
 
 import { SchoolExamsTab } from "@/app/coach/students/[id]/_components/school-exams-tab";
-import type { CoachSchoolExams } from "@/app/coach/students/[id]/school-exams-data";
+import type { SchoolExamsData } from "@/lib/school-exams-data";
 import { YazililarClient } from "@/app/student/yazililar/yazililar-client";
 import { buildSchoolCards, DEFAULT_SCHOOL_COURSES, type StoredSchoolCourse } from "./school-exams";
 
@@ -27,7 +27,7 @@ const course = (over: Partial<StoredSchoolCourse> & Pick<StoredSchoolCourse, "id
   ...over,
 });
 
-const base = (over: Partial<CoachSchoolExams> = {}): CoachSchoolExams => ({
+const base = (over: Partial<SchoolExamsData> = {}): SchoolExamsData => ({
   cohort: "grade7",
   defaults: DEFAULT_SCHOOL_COURSES.grade7,
   courses: [],
@@ -88,7 +88,7 @@ describe("the coach's Yazılılar tab", () => {
       { courseId: "c1", term: 1, examNo: 2, grade: 90 },
     ],
   });
-  const render = (data: CoachSchoolExams) => renderToStaticMarkup(<SchoolExamsTab data={data} studentId="s1" />);
+  const render = (data: SchoolExamsData) => renderToStaticMarkup(<SchoolExamsTab data={data} studentId="s1" />);
 
   it("shows an editable box for every yazılı of every course (6 courses x 4)", () => {
     const html = render(withGrades);

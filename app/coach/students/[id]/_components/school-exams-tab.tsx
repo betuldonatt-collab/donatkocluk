@@ -26,13 +26,13 @@ import {
 import { cn } from "@/lib/utils";
 import { decideCourseRemoval } from "../../../school-exam-actions";
 import { saveSchoolGradeForStudent, setSchoolGradeLock } from "../../../school-grade-actions";
-import type { CoachSchoolExams } from "../school-exams-data";
+import type { SchoolExamsData } from "@/lib/school-exams-data";
 
 // "Yazılılar" on the student's detail page: the school-exam grades per course, per term, per yazılı, in the card
 // colours the student picked. The coach edits any grade, LOCKS single grades (a locked grade is read-only for
 // the student; an unlocked one stays editable by both) and decides the student's "bu dersi almıyorum" requests
 // right on the course's card.
-export function SchoolExamsTab({ data, studentId }: { data: CoachSchoolExams; studentId: string }) {
+export function SchoolExamsTab({ data, studentId }: { data: SchoolExamsData; studentId: string }) {
   const [cards, setCards] = useState(() => buildSchoolCards(data.defaults, data.courses, data.grades));
 
   if (!data.ready) {

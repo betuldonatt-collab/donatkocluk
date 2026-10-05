@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, FileText, Home, MessageSquare, Settings } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, Home, MessageSquare, NotebookPen, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -16,6 +16,7 @@ import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 const NAV_ITEMS = [
   { href: "/parent", label: "Ana Sayfa", icon: Home },
   { href: "/parent/karne", label: "Karneler", icon: FileText },
+  { href: "/parent/yazililar", label: "Yazılılar", icon: NotebookPen },
   { href: "/parent/notes", label: "Koçtan Notlar", icon: MessageSquare },
   { href: "/parent/settings", label: "Ayarlar", icon: Settings },
 ];
