@@ -87,6 +87,17 @@ describe("7th grade İngilizce (one topic per theme) in the split layout", () =>
   });
 });
 
+describe("7th grade Türkçe (three topics per Tema) in the split layout", () => {
+  it("has a topic tick of each kind on every topic line (18) and one resource tick per Tema (6)", () => {
+    const html = render(7, {}, {}, findCourseById("maarif7-turkce")!);
+    expect(count(html, "Okul İlerlemesi")).toBe(18);
+    expect(count(html, "Konu Çalışması")).toBe(18);
+    expect(count(html, "Soru Çözümü")).toBe(6);
+    expect(count(html, "Kaynak Taraması Yapıldı")).toBe(6);
+    expect(count(html, "Çıkmış Sorular")).toBe(0);
+  });
+});
+
 describe("the other grades keep their layout", () => {
   it("9th grade (same rows): Konu Çalışması and the resource ticks stay once per group (16), only Okul İlerlemesi per topic", () => {
     const html = render(9);

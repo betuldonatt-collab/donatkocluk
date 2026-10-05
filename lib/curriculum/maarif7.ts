@@ -266,7 +266,60 @@ const INGILIZCE = buildCourse(
   INGILIZCE_THEMES.map((title, i) => ({ unit: `Theme ${i + 1}: ${title}`, topics: [title] })),
 );
 
-export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE];
+// Türkçe: six Temas, three topics each, headers and topic wording exactly as supplied (the parenthesised
+// sub-lists are part of the topic name). The id is the one the Türkçe exam subject (m7_turkce) analyses.
+const TURKCE = buildCourse("maarif7-turkce", "7. Sınıf Türkçe", [
+  {
+    unit: "1. Tema: Hayat Boyu Gelişim",
+    topics: [
+      "Sözcükte Anlam (Gerçek, Mecaz, Terim Anlam)",
+      "Parçada Anlam (Ana Düşünce ve Yardımcı Düşünce)",
+      "Fiillerde Anlam Özellikleri (İş, Oluş, Durum Fiilleri)",
+    ],
+  },
+  {
+    unit: "2. Tema: Bir Hilal Uğruna",
+    topics: [
+      "Sözcükler Arası Anlam İlişkileri (Eş, Zıt, Eş Sesli)",
+      "Fiillerde Kip (Haber ve Dilek Kipleri)",
+      "Fiillerde Kişi ve Çekim",
+    ],
+  },
+  {
+    unit: "3. Tema: İletişim ve Sosyal İlişkiler",
+    topics: [
+      "Cümlede Anlam İlişkileri (Neden-Sonuç, Amaç-Sonuç, Koşul)",
+      "Fiillerde Anlam (Zaman) Kayması",
+      "Fiilde Yapı (Basit, Türemiş ve Birleşik Fiiller)",
+    ],
+  },
+  {
+    unit: "4. Tema: Türk Sanatı",
+    topics: [
+      "Deyimler ve Atasözleri",
+      "Söz Sanatları (Kişileştirme, Konuşturma, Benzetme, Abartma)",
+      "Ek Fiil (İsimleri Yüklem Yapma ve Birleşik Zamanlı Fiil)",
+    ],
+  },
+  {
+    unit: "5. Tema: Okuma Kültürü",
+    topics: [
+      "Metin Türleri (Hikâye, Masal, Fabl, Roman vb.)",
+      "Anlatım Biçimleri ve Düşünceyi Geliştirme Yolları",
+      "Zarflar (Durum, Zaman, Miktar, Yer-Yön, Soru Zarfları)",
+    ],
+  },
+  {
+    unit: "6. Tema: Hak ve Sorumluluklar",
+    topics: [
+      "Örtülü Anlam ve Cümle Yorumlama",
+      "Yazım Kuralları ve Noktalama İşaretleri",
+      "Anlatım Bozuklukları (Anlama Dayalı Bozukluklar)",
+    ],
+  },
+]);
+
+export const MAARIF7_KAYNAK_COURSES: Course[] = [MATEMATIK, FEN_BILIMLERI, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE, TURKCE];
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");

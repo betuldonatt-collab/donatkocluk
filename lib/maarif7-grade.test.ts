@@ -27,13 +27,12 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
   });
 
   it("holds the courses supplied so far (Sosyal Bilgiler first); a course not supplied yet is simply absent", () => {
-    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi", "maarif7-ingilizce"]);
+    expect(MAARIF7_KAYNAK_COURSES.map((c) => c.id)).toEqual(["maarif7-matematik", "maarif7-fen-bilimleri", "maarif7-sosyal-bilgiler", "maarif7-din-kulturu-ve-ahlak-bilgisi", "maarif7-ingilizce", "maarif7-turkce"]);
     expect(MAARIF_GRADES[7].courses).toBe(MAARIF7_KAYNAK_COURSES);
     expect(findCourseById("maarif7-sosyal-bilgiler")?.name).toBe("7. Sınıf Sosyal Bilgiler");
     expect(findCourseById("maarif7-matematik")?.name).toBe("7. Sınıf Matematik");
     expect(findCourseById("maarif7-fen-bilimleri")?.name).toBe("7. Sınıf Fen Bilimleri");
-    expect(findCourseById("maarif7-turkce")).toBeNull();
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_turkce")).toEqual([]); // not supplied yet -> no topic table
+    expect(findCourseById("maarif7-turkce")?.name).toBe("7. Sınıf Türkçe");
     expect(MAARIF_GRADES[7].coursesForExamSubject("anything")).toEqual([]);
   });
 
@@ -302,6 +301,40 @@ describe("7th grade İngilizce (Themes only: each Theme is the unit and its sing
     const rows = flattenSelectionRows(course);
     expect(rows).toHaveLength(8);
     expect(rows.every((r) => r.memberTopicIds.length === 1)).toBe(true);
+  });
+});
+
+describe("7th grade Türkçe (six Temas, three topics each)", () => {
+  const course = findCourseById("maarif7-turkce")!;
+  const THEMES: [string, string[]][] = [["1. Tema: Hayat Boyu Gelişim",["Sözcükte Anlam (Gerçek, Mecaz, Terim Anlam)","Parçada Anlam (Ana Düşünce ve Yardımcı Düşünce)","Fiillerde Anlam Özellikleri (İş, Oluş, Durum Fiilleri)"]],
+    ["2. Tema: Bir Hilal Uğruna",["Sözcükler Arası Anlam İlişkileri (Eş, Zıt, Eş Sesli)","Fiillerde Kip (Haber ve Dilek Kipleri)","Fiillerde Kişi ve Çekim"]],
+    ["3. Tema: İletişim ve Sosyal İlişkiler",["Cümlede Anlam İlişkileri (Neden-Sonuç, Amaç-Sonuç, Koşul)","Fiillerde Anlam (Zaman) Kayması","Fiilde Yapı (Basit, Türemiş ve Birleşik Fiiller)"]],
+    ["4. Tema: Türk Sanatı",["Deyimler ve Atasözleri","Söz Sanatları (Kişileştirme, Konuşturma, Benzetme, Abartma)","Ek Fiil (İsimleri Yüklem Yapma ve Birleşik Zamanlı Fiil)"]],
+    ["5. Tema: Okuma Kültürü",["Metin Türleri (Hikâye, Masal, Fabl, Roman vb.)","Anlatım Biçimleri ve Düşünceyi Geliştirme Yolları","Zarflar (Durum, Zaman, Miktar, Yer-Yön, Soru Zarfları)"]],
+    ["6. Tema: Hak ve Sorumluluklar",["Örtülü Anlam ve Cümle Yorumlama","Yazım Kuralları ve Noktalama İşaretleri","Anlatım Bozuklukları (Anlama Dayalı Bozukluklar)"]]];
+
+  it("has the six Temas as units and 18 topics, exactly as supplied, in order", () => {
+    expect(course.name).toBe("7. Sınıf Türkçe");
+    expect(course.units.map((u) => [u.unit, u.topics.map((t) => t.name)])).toEqual(THEMES);
+    expect(course.units.flatMap((u) => u.topics)).toHaveLength(18);
+  });
+
+  it("has unique ids in the 7th-grade convention, and is the course the Türkçe exam subject analyses", () => {
+    const ids = course.units.flatMap((u) => u.topics.map((t) => t.id));
+    expect(new Set(ids).size).toBe(18);
+    expect(ids[0]).toBe("maarif7-turkce-u0-t0");
+    expect(ids[17]).toBe("maarif7-turkce-u5-t2");
+    expect(coursesForMaarif7ExamSubject("m7_turkce")).toEqual([course]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_turkce")).toEqual([course]);
+  });
+
+  it("is one row per topic line in Kaynak Takibi, so the split layout has 18 topic lines and 6 resource groups", () => {
+    const rows = flattenSelectionRows(course);
+    expect(rows.flatMap((r) => r.memberTopicIds)).toHaveLength(18);
+  });
+
+  it("every one of the six exam subjects of the 7th-grade Genel Deneme now has a topic table", () => {
+    for (const s of MAARIF7_EXAM_SUBJECTS) expect(MAARIF_GRADES[7].coursesForExamSubject(s.key)).toHaveLength(1);
   });
 });
 
