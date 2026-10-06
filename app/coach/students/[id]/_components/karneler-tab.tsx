@@ -87,6 +87,8 @@ export function KarnelerTab({
   // generateCycleReportCard); a student is one cohort throughout, so any
   // such cycle means the LGS trend chart replaces the TYT/AYT pair.
   const isLgsCohort = cycles.some((c) => c.stats.lgs !== undefined);
+  // An 11th grader's cards carry no AYT half: one "11. Sınıf" chart (its TYT-structured Genel Deneme net).
+  const isMaarif11Cohort = cycles.some((c) => c.stats.maarifGrade === 11);
   const lgsTrend = approvedCyclesAsc
     .filter((c) => c.stats.lgs?.current != null)
     .map((c) => ({ date: c.range_start, value: c.stats.lgs!.current! }));
@@ -135,7 +137,12 @@ export function KarnelerTab({
             <p className="text-foreground mt-2 text-2xl font-bold">{formatDuration(allTimeTrackedMinutes)}</p>
             <p className="text-muted-foreground mt-1 text-xs">Bu sistemde bugüne kadar tutulan toplam süre</p>
           </div>
-          {isLgsCohort ? (
+          {isMaarif11Cohort ? (
+            <div className="border-border bg-card rounded-lg border p-4 lg:col-span-2">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">11. Sınıf Net Gelişimi</p>
+              <LineChart data={tytTrend} />
+            </div>
+          ) : isLgsCohort ? (
             <div className="border-border bg-card rounded-lg border p-4 lg:col-span-2">
               <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">{cycles.some((c) => c.stats.maarifGrade === 7) ? "7. Sınıf" : "LGS"} Net Gelişimi</p>
               <LineChart data={lgsTrend} />
@@ -436,7 +443,7 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: KarneTopicRow[]
   );
 }
 
-function ReportCardReview({
+export function ReportCardReview({
   cycle,
   onApproved,
   onDeleted,
@@ -450,6 +457,9 @@ function ReportCardReview({
   const isLgs = stats.lgs !== undefined;
   // A 7th grader's card has the LGS shape but its own label and courses (stats.examLabel / maarifGrade).
   const isMaarif7Card = stats.maarifGrade === 7;
+  // An 11th grader's card is YKS-shaped but has no AYT half: one "11. Sınıf" net block, and its own courses
+  // (Maarif TYT + 11. Sınıf, via the page's Maarif grade) in the topic grid.
+  const isMaarif11Card = stats.maarifGrade === 11;
   const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
   const [track, setTrack] = useState<Track>("sayisal");
   const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
@@ -509,7 +519,21 @@ function ReportCardReview({
     <div className="space-y-4">
       {stats.totalDurationMinutes !== undefined && <TotalDurationCard totalDurationMinutes={stats.totalDurationMinutes} />}
 
-      {isLgs ? (
+      {isMaarif11Card ? (
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">11. Sınıf</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <NetCard label={(stats.examLabel ?? "11. Sınıf Genel Deneme") + " Ortalama Net"} current={stats.tyt.current} previous={stats.tyt.previous} />
+            {stats.scoreBreakdown && (
+              <ScoreBreakdownCard
+                title="Toplam Doğru / Yanlış / Boş"
+                total={stats.scoreBreakdown.total}
+                bySubject={stats.scoreBreakdown.bySubject}
+              />
+            )}
+          </div>
+        </div>
+      ) : isLgs ? (
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{isMaarif7Card ? "7. Sınıf" : "LGS"}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -566,7 +590,9 @@ function ReportCardReview({
           ))}
         </div>
 
-        {isLgs ? (
+        {isMaarif11Card ? (
+          <CourseTabs render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+        ) : isLgs ? (
           // A 7th-grade card lists its own courses (SÖZEL / SAYISAL, via the page's Maarif grade); LGS its own.
           <CourseTabs examType={isMaarif7Card ? "YKS" : "LGS"} render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
         ) : (

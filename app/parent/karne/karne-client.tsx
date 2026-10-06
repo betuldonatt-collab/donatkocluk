@@ -40,6 +40,8 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
   const lgsTrend = cyclesAsc.filter((c) => c.stats.lgs?.current != null).map((c) => ({ date: c.range_start, value: c.stats.lgs!.current! }));
   const isLgsCohort = cycles.some((c) => c.stats.lgs != null);
   const aytTrend = cyclesAsc.filter((c) => c.stats.ayt.current !== null).map((c) => ({ date: c.range_start, value: c.stats.ayt.current! }));
+  // An 11th grader's cards carry no AYT half: one "11. Sınıf" chart (its TYT-structured Genel Deneme net).
+  const isMaarif11Cohort = cycles.some((c) => c.stats.maarifGrade === 11);
 
   return (
     <div className="space-y-4">
@@ -49,7 +51,12 @@ export function KarneListClient({ cycles }: { cycles: KarneListItem[] }) {
       </div>
 
       {cycles.length > 0 && (
-        isLgsCohort ? (
+        isMaarif11Cohort ? (
+          <div className="border-border bg-card rounded-lg border p-4">
+            <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">11. Sınıf Net Gelişimi</p>
+            <LineChart data={tytTrend} />
+          </div>
+        ) : isLgsCohort ? (
           <div className="border-border bg-card rounded-lg border p-4">
             <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">{cycles.some((c) => c.stats.maarifGrade === 7) ? "7. Sınıf" : "LGS"} Net Gelişimi</p>
             <LineChart data={lgsTrend} />

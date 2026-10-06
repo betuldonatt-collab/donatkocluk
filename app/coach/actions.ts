@@ -3267,9 +3267,13 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   const isLgs = profile?.exam_type === "LGS";
   // A 7th grader (profiles.is_maarif7; exam_type stays 'YKS') gets the LGS-shaped card -- the same exam
   // distribution and net rule -- over its own subjects and courses.
-  const isMaarif7 = !isLgs && (await fetchMaarifGrade(supabase, studentIdV)) === 7;
+  const maarifGrade = isLgs ? null : await fetchMaarifGrade(supabase, studentIdV);
+  const isMaarif7 = maarifGrade === 7;
+  // An 11th grader keeps the YKS-shaped card (its Genel Deneme is TYT-structured), over its own courses and the
+  // Maarif TYT ones, and without an AYT half.
+  const isMaarif11 = maarifGrade === 11;
   const topicMistakes = computeAylikKarne(
-    curriculumCourseIdsFor(isLgs ? "LGS" : "YKS", isMaarif7 ? 7 : null),
+    curriculumCourseIdsFor(isLgs ? "LGS" : "YKS", isMaarif7 ? 7 : isMaarif11 ? 11 : null),
     exams,
     mistakeRows ?? [],
     rangeStart,
@@ -3291,6 +3295,15 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
         lgsScoreBreakdown: computeMaarif7ScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
         examLabel: "7. Sınıf Genel Deneme",
         maarifGrade: 7,
+        totalDurationMinutes,
+      }
+    : isMaarif11
+    ? {
+        tyt: { current: currentNet.tyt, previous: previousStats?.tyt.current ?? null },
+        ayt: { current: null, previous: null },
+        scoreBreakdown: computeTytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        examLabel: "11. Sınıf Genel Deneme",
+        maarifGrade: 11,
         totalDurationMinutes,
       }
     : isLgs

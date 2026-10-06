@@ -16,6 +16,7 @@ import {
   MAARIF7_EXAM_SUBJECTS,
   MAARIF7_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
+  coursesForMaarifTytGroup,
   type AytSubjectGroupKey,
   type SubjectGroupKey,
 } from "./curriculum/subject-groups";
@@ -40,6 +41,8 @@ const GENERAL_EXAM_COURSE_IDS = new Set([
   ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
   ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
   ...MAARIF7_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  // An 11th grader's Genel Deneme is analysed against the merged Maarif TYT courses.
+  ...TYT_SUBJECT_GROUPS.flatMap((g) => coursesForMaarifTytGroup(g.key).map((c) => c.id)),
 ]);
 
 export function computeAylikKarne(
@@ -139,7 +142,9 @@ export type NetSummary = {
   // it is, so the screens label it "7. Sınıf Genel Deneme" and show the 7th grade's courses instead of LGS's.
   // Absent on every LGS and YKS card, including every one saved before the 7th grade existed.
   examLabel?: string;
-  maarifGrade?: 7;
+  // An 11th grader's card keeps the YKS shape (its Genel Deneme is TYT-structured, so tyt carries its net and
+  // scoreBreakdown its D/Y/B; ayt stays empty) and sets these two to be labelled "11. Sınıf Genel Deneme".
+  maarifGrade?: 7 | 11;
   scoreBreakdown?: KarneScoreBreakdown;
   // One entry per track the student actually has signal in this cycle
   // (see computeAytScoreBreakdown's own comment) -- absent/empty is
@@ -252,9 +257,25 @@ export type KarneScoreBreakdown = {
   bySubject: KarneSubjectScoreRow[];
 };
 
-const TYT_COURSE_TO_SUBJECT_GROUP = new Map<string, SubjectGroupKey>(
-  TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds.map((courseId) => [courseId, g.key] as const)),
-);
+// The 11th grade's own courses sit in the same four sections as the TYT ones they share a subject with.
+const MAARIF11_COURSE_TO_SUBJECT_GROUP: [string, SubjectGroupKey][] = [
+  ["maarif11-turk-dili-ve-edebiyati", "turkce"],
+  ["maarif11-tarih", "sosyal"],
+  ["maarif11-cografya", "sosyal"],
+  ["maarif11-felsefe", "sosyal"],
+  ["maarif11-matematik", "matematik"],
+  ["maarif11-fizik", "fen"],
+  ["maarif11-kimya", "fen"],
+  ["maarif11-biyoloji", "fen"],
+];
+
+// Practice under a TYT course, a merged Maarif TYT course (11th grade) or an 11th-grade course all feed the same
+// four sections as the Genel Deneme's own subject keys.
+const TYT_COURSE_TO_SUBJECT_GROUP = new Map<string, SubjectGroupKey>([
+  ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds.map((courseId) => [courseId, g.key] as const)),
+  ...TYT_SUBJECT_GROUPS.flatMap((g) => coursesForMaarifTytGroup(g.key).map((c) => [c.id, g.key] as const)),
+  ...MAARIF11_COURSE_TO_SUBJECT_GROUP,
+]);
 
 export function computeTytScoreBreakdown(
   tasks: KarneScoreTask[],

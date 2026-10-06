@@ -211,6 +211,9 @@ export function KarneDetailClient({
   // A cycle generated for an LGS student carries stats.lgs (see
   // generateCycleReportCard); YKS cycles never do.
   const isLgs = stats.lgs !== undefined;
+  // An 11th grader's card is YKS-shaped but has no AYT half (see generateCycleReportCard): one "11. Sınıf" net block,
+  // and its own courses (Maarif TYT + 11. Sınıf) in the topic grid.
+  const isMaarif11 = stats.maarifGrade === 11;
 
   return (
     <div className="space-y-6 print:space-y-4">
@@ -247,7 +250,21 @@ export function KarneDetailClient({
 
       <section className="space-y-4 print:break-inside-avoid">
         <h3 className="text-foreground text-sm font-semibold">Net Gelişimi</h3>
-        {isLgs ? (
+        {isMaarif11 ? (
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">11. Sınıf</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NetCard label={(stats.examLabel ?? "11. Sınıf Genel Deneme") + " Ortalama Net"} current={stats.tyt.current} previous={stats.tyt.previous} />
+              {stats.scoreBreakdown && (
+                <ScoreBreakdownCard
+                  title="Toplam Doğru / Yanlış / Boş"
+                  total={stats.scoreBreakdown.total}
+                  bySubject={stats.scoreBreakdown.bySubject}
+                />
+              )}
+            </div>
+          </div>
+        ) : isLgs ? (
           <div className="space-y-2">
             <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{stats.maarifGrade === 7 ? "7. Sınıf" : "LGS"}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -305,7 +322,11 @@ export function KarneDetailClient({
           ))}
         </div>
 
-        {isLgs ? (
+        {isMaarif11 ? (
+          <MaarifGradeProvider value={11}>
+            <CourseTabs render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
+          </MaarifGradeProvider>
+        ) : isLgs ? (
           stats.maarifGrade === 7 ? (
             // A 7th grader's card: its own six courses (SÖZEL / SAYISAL), not LGS's.
             <MaarifGradeProvider value={7}>

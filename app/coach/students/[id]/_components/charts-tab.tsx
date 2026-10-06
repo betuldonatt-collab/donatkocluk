@@ -20,7 +20,7 @@ import {
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { MAARIF_GRADES, maarifCourseSections } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarif11AssignableCourses, maarif11CourseOptions, maarifCourseSections } from "@/lib/maarif-grade";
 import { ExamDetailDialog } from "./exam-detail-dialog";
 import type { CourseResourceData } from "./kaynak-takibi-tab";
 import { TaskDrawer, type TaskDrawerState } from "./kanban/task-drawer";
@@ -169,9 +169,12 @@ export function ChartsTab({
   // show an empty chart. Not LGS/Maarif at all -> the ordinary tyt default.
   const defaultMainTrack: MainTrack = maarifGrade === 7 ? "m7" : maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "tyt";
   // A Maarif student's Branş Denemesi picker lists that grade's own courses (the 7th grade's grouped
-  // SÖZEL / SAYISAL), never the TYT/AYT ones.
-  const gradeCourses = maarifGrade !== null && maarifGrade !== 11 ? MAARIF_GRADES[maarifGrade].courses : null;
+  // SÖZEL / SAYISAL), never the TYT/AYT ones. The 11th grade's lists its own "11. Sınıf" courses and the merged
+  // "Maarif TYT" ones (what its Genel Deneme is analysed against) under two headings.
+  const gradeCourses =
+    maarifGrade === 11 ? maarif11AssignableCourses() : maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : null;
   const gradeSections = maarifGrade !== null && maarifGrade !== 11 ? maarifCourseSections(maarifGrade) : null;
+  const m11Options = maarifGrade === 11 ? maarif11CourseOptions() : null;
 
   // Branş Denemesi course picker: a Track -> Course cascade over the full
   // curriculum, not just courses the student happens to have exam data
@@ -310,7 +313,8 @@ export function ChartsTab({
       b: e.duration_minutes ?? 0,
     }));
 
-  const selectedBranchCourseName = findCourseById(branchCourseId)?.name ?? branchCourseId;
+  const selectedBranchCourseName =
+    m11Options?.find((o) => o.id === branchCourseId)?.label ?? findCourseById(branchCourseId)?.name ?? branchCourseId;
 
   return (
     <div className="space-y-6">
@@ -399,7 +403,19 @@ export function ChartsTab({
                 onChange={(e) => setBranchCourseId(e.target.value)}
                 aria-label="Branş dersi seç"
               >
-                {gradeSections
+                {m11Options
+                  ? ["11. Sınıf", "Maarif TYT"].map((group) => (
+                      <optgroup key={group} label={group}>
+                        {m11Options
+                          .filter((o) => o.group === group)
+                          .map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))
+                  : gradeSections
                   ? gradeSections.map((section) => (
                       <optgroup key={section.key} label={section.label}>
                         {section.courses.map((c) => (

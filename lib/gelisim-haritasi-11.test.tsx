@@ -94,16 +94,20 @@ describe("11th grade: the Gelişim Haritası is visible", () => {
       </MaarifGradeProvider>,
     );
 
-  it("coach: the 11th grade has the tab; Grafikler and Karneler stay hidden for it", () => {
+  it("coach: the 11th grade has every tab, Grafikler and Karneler included", () => {
     const out = coachTabs(11);
     expect(out).toContain("Gelişim Haritası");
     expect(out).toContain("Analiz");
-    expect(out).not.toContain(">Grafikler<");
-    expect(out).not.toContain(">Karneler<");
+    expect(out).toContain(">Grafikler<");
+    expect(out).toContain(">Karneler<");
   });
 
-  it("coach: nobody else changed (9th / 10th still without it, the 7th and YKS with everything)", () => {
-    for (const grade of [9, 10] as const) expect(coachTabs(grade), String(grade)).not.toContain("Gelişim Haritası");
+  it("coach: nobody else changed (9th / 10th still without them, the 7th and YKS with everything)", () => {
+    for (const grade of [9, 10] as const) {
+      expect(coachTabs(grade), String(grade)).not.toContain("Gelişim Haritası");
+      expect(coachTabs(grade), String(grade)).not.toContain(">Grafikler<");
+      expect(coachTabs(grade), String(grade)).not.toContain(">Karneler<");
+    }
     for (const grade of [7, null] as const) {
       const out = coachTabs(grade);
       expect(out, String(grade)).toContain("Gelişim Haritası");
@@ -118,12 +122,12 @@ describe("11th grade: the Gelişim Haritası is visible", () => {
       </MaarifGradeProvider>,
     );
 
-  it("student: the 11th grade's Deneme Analizleri has Gelişim Haritası (no Karnelerim); 9th / 10th / 7th as before; YKS with all four", () => {
+  it("student: the 11th grade's Deneme Analizleri has Gelişim Haritası and Karnelerim; 9th / 10th / 7th as before; YKS with all four", () => {
     const eleven = studentTabs(11);
     expect(eleven).toContain("Gelişim Haritası");
     expect(eleven).toContain("Branş Denemesi Analizi");
     expect(eleven).toContain("Genel Deneme Analizi");
-    expect(eleven).not.toContain("Karnelerim");
+    expect(eleven).toContain("Karnelerim");
     for (const grade of [7, 9, 10] as const) {
       const out = studentTabs(grade);
       expect(out, String(grade)).not.toContain("Gelişim Haritası");

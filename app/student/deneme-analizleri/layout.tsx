@@ -15,13 +15,13 @@ const TABS = [
 
 export default function DenemeAnalizleriLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Maarif students: Branş and Genel Deneme analysis only (Karnelerim is TYT/AYT-based) -- plus the Gelişim Haritası for
-  // the 11th grade, whose own courses and Maarif TYT courses are wired into it.
+  // Maarif students: Branş and Genel Deneme analysis only (Karnelerim is TYT/AYT-based) -- plus the Gelişim Haritası and Karnelerim
+  // for the 11th grade, whose own courses and Maarif TYT courses are wired into them.
   const grade = useMaarifGrade();
   const tabs =
     grade === null
       ? TABS
-      : TABS.filter((t) => t.href.endsWith("/brans") || t.href.endsWith("/genel") || (grade === 11 && t.href.endsWith("/gelisim-haritasi")));
+      : TABS.filter((t) => t.href.endsWith("/brans") || t.href.endsWith("/genel") || (grade === 11 && (t.href.endsWith("/gelisim-haritasi") || t.href.endsWith("/karne"))));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
