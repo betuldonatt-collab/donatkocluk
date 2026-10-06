@@ -632,15 +632,15 @@ export function TaskFormFields({
           )}
           {showTopic && (
             <div className="space-y-1.5">
-              <Label>Konu</Label>
+              <Label>{isLgsCourseId(course?.id) ? "Ünite" : "Konu"}</Label>
               {/* A grouped unit ("Problemler (Genel)", "Trigonometri (Genel)", ...) is chosen as a whole; its subtopics are not
-                  listed here but reached through the secondary picker below it. */}
+                  listed here but reached through the secondary picker below it. An LGS course's first step is its Ünite. */}
               <SmartCombobox
                 options={mainTopicOptions(course, topicOptions)}
                 value={mainValueOf(course, value.topicId)}
                 onChange={(topicId) => set({ topicId })}
-                placeholder="Konu ara..."
-                ariaLabel="Konu seç"
+                placeholder={isLgsCourseId(course?.id) ? "Ünite ara..." : "Konu ara..."}
+                ariaLabel={isLgsCourseId(course?.id) ? "Ünite seç" : "Konu seç"}
               />
             </div>
           )}

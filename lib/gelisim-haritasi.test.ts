@@ -103,8 +103,9 @@ describe("computeGelisimHaritasi", () => {
     ];
 
     const rows = computeGelisimHaritasi([LGS_COURSE_ID], exams, mistakeRows);
-    // One row for the whole Konu, not one per Alt Konu.
-    expect(rows.filter((r) => r.courseId === LGS_COURSE_ID)).toHaveLength(12);
+    // One row for the whole Konu, not one per Alt Konu: the 12 Konu plus the six "(Genel)" unit masters.
+    expect(rows.filter((r) => r.courseId === LGS_COURSE_ID)).toHaveLength(12 + 6);
+    expect(rows.filter((r) => r.courseId === LGS_COURSE_ID && !r.topicId.includes("-genel-u"))).toHaveLength(12);
     const carpanlarVeKatlar = rows.find((r) => r.topicId === "lgs-matematik-u0-t0")!;
     expect(carpanlarVeKatlar.topicName).toBe("Çarpanlar ve Katlar");
     expect(carpanlarVeKatlar.wrongCount).toBe(1);

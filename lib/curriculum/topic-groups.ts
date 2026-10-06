@@ -125,7 +125,18 @@ export type TopicGroup = {
   masterId: string;
   // The specific subtopics offered under the master topic, in curriculum order.
   members: Topic[];
+  // Only an LGS group: every raw topic id its rows fold (its members are selection nodes, each of which folds several raw
+  // topics). A Kaynak Takibi parent row sums these.
+  allTopicIds?: string[];
 };
+
+// An LGS course's groups come from its selection nodes (lib/curriculum/lgs-selection.ts registers the provider when it
+// loads; it cannot be imported here without a cycle).
+let lgsGroupsProvider: ((course: Course) => TopicGroup[]) | null = null;
+
+export function setLgsGroupsProvider(provider: (course: Course) => TopicGroup[]) {
+  lgsGroupsProvider = provider;
+}
 
 const cache = new WeakMap<Course, TopicGroup[]>();
 
@@ -133,6 +144,11 @@ export function topicGroups(course: Course | null | undefined): TopicGroup[] {
   if (!course) return [];
   const cached = cache.get(course);
   if (cached) return cached;
+  if (course.id.startsWith("lgs-")) {
+    const lgsGroups = lgsGroupsProvider ? lgsGroupsProvider(course) : [];
+    cache.set(course, lgsGroups);
+    return lgsGroups;
+  }
   const flat = new Set(UNGROUPED_TOPIC_NAMES[course.id] ?? []);
   const groups: TopicGroup[] = [];
   for (const [li, label] of groupableLabels(course.units).entries()) {
@@ -200,7 +216,7 @@ export function groupParentLayout(
       kind: "parent",
       unitLabel: group.unitLabel,
       unitRowSpan: first.unitRowSpan + 1,
-      memberTopicIds: [group.masterId, ...group.members.map((t) => t.id)],
+      memberTopicIds: group.allTopicIds ?? [group.masterId, ...group.members.map((t) => t.id)],
       aggregatedStats: hasAggregatedStats(course, group.unitLabel),
     });
   }
