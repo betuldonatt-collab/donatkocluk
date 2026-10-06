@@ -16,7 +16,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CalendarClock, ChevronLeft, ChevronRight, Clock, Lock, LockOpen, Plus } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Clock, ListChecks, Lock, LockOpen, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,8 @@ import {
 } from "../_components/kanban/task-card-body";
 import type { ExamType } from "@/lib/exam-type";
 import { TaskDrawer, type TaskDrawerState } from "../_components/kanban/task-drawer";
+import { TransferTasksDialog, type TransferSuccess } from "../_components/kanban/transfer-tasks-dialog";
+import { formatShortDate, isTransferable } from "@/lib/task-transfer";
 
 const DAY_PREFIX = "day:";
 
@@ -256,14 +258,29 @@ export function ScheduleBoard({
   // equivalent, since there's nothing bulky to replace there.
   const [paintMode, setPaintMode] = useState<AssignedTaskStatus | null>(null);
 
+  // "Toplu İşlem" (bulk select) mode -- while on, every card gets a checkbox and a click selects it instead of opening
+  // the editor; "Seçilenleri Aktar" then copies the selection to a new date and marks the originals "Ertelendi" (see
+  // TransferTasksDialog). Mutually exclusive with the paintbrush: both turn the whole card into a click target.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setTransferOpen(false);
+  }
+
   useEffect(() => {
-    if (!paintMode) return;
+    if (!paintMode && !selectMode) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setPaintMode(null);
+      if (e.key !== "Escape" || transferOpen) return;
+      setPaintMode(null);
+      if (selectMode) exitSelectMode();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [paintMode]);
+  }, [paintMode, selectMode, transferOpen]);
 
   // Flattened once per courseResourceData change -- a task's resource_ids
   // don't carry their own course_id, and a resource could in principle be
@@ -340,6 +357,8 @@ export function ScheduleBoard({
       setTasks(taskRows as DetailTask[]);
       setEvents(eventRows);
       setWeekDays(newWeekDays);
+      // A selection belongs to the week it was made on.
+      setSelectedIds(new Set());
     } finally {
       setLoading(false);
     }
@@ -642,6 +661,42 @@ export function ScheduleBoard({
     });
   }
 
+  function handleToggleSelect(task: DetailTask) {
+    if (!isTransferable(task)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(task.id)) next.delete(task.id);
+      else next.add(task.id);
+      return next;
+    });
+  }
+
+  // The tasks of the week on screen that "Seçilenleri Aktar" could hand out again (not done, not already postponed).
+  const transferableTasks = tasks.filter(isTransferable);
+  const selectedTasks = tasks.filter((t) => selectedIds.has(t.id) && isTransferable(t));
+
+  function handleSelectAllIncomplete() {
+    setSelectedIds(new Set(transferableTasks.map((t) => t.id)));
+  }
+
+  function handleTransferred(result: TransferSuccess) {
+    const postponedById = new Map(result.postponed.map((p) => [p.id, p]));
+    const copiesVisible = weekDays.some((d) => d.date === result.targetDate);
+    setTasks((prev) => [
+      ...prev.map((t) => {
+        const p = postponedById.get(t.id);
+        return p ? { ...t, status: p.status as DetailTask["status"], postponed_to: p.postponed_to } : t;
+      }),
+      ...(copiesVisible ? (result.created as unknown as DetailTask[]) : []),
+    ]);
+    toast.success(
+      `${result.created.length} görev ${formatShortDate(result.targetDate)} tarihine aktarıldı; asıl görevler "Ertelendi" olarak işaretlendi.${
+        copiesVisible ? "" : " (Yeni tarih bu haftanın dışında; o haftaya geçince görürsün.)"
+      }`,
+    );
+    exitSelectMode();
+  }
+
   function handleDelete(task: DetailTask) {
     const previousTasks = tasks;
     setTasks((prev) => prev.filter((t) => t.id !== task.id));
@@ -758,7 +813,10 @@ export function ScheduleBoard({
           <button
             key={value}
             type="button"
-            onClick={() => setPaintMode((prev) => (prev === value ? null : value))}
+            onClick={() => {
+              if (selectMode) exitSelectMode();
+              setPaintMode((prev) => (prev === value ? null : value));
+            }}
             className={cn(
               "border-border inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
               paintMode === value ? activeClass : "bg-background text-foreground hover:bg-accent",
@@ -773,7 +831,52 @@ export function ScheduleBoard({
             Modu Kapat (Esc)
           </Button>
         )}
+
+        <span className="bg-border mx-1 hidden h-6 w-px sm:block" aria-hidden />
+        <button
+          type="button"
+          onClick={() => {
+            if (selectMode) {
+              exitSelectMode();
+            } else {
+              setPaintMode(null);
+              setSelectMode(true);
+            }
+          }}
+          aria-pressed={selectMode}
+          className={cn(
+            "border-border inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+            selectMode ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground hover:bg-accent",
+          )}
+        >
+          <ListChecks className="size-4" />
+          Toplu İşlem
+        </button>
       </div>
+
+      {selectMode && (
+        <div className="border-primary/40 bg-primary/5 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
+          <span className="text-sm font-medium">
+            {selectedTasks.length > 0 ? `${selectedTasks.length} görev seçildi` : "Aktarmak istediğin görevlere tıkla"}
+          </span>
+          <span className="text-muted-foreground text-xs">Tamamlanmış ve zaten ertelenmiş görevler seçilemez.</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleSelectAllIncomplete} disabled={transferableTasks.length === 0}>
+              Tamamlanmayanların Hepsini Seç ({transferableTasks.length})
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} disabled={selectedTasks.length === 0}>
+              Seçimi Temizle
+            </Button>
+            <Button type="button" size="sm" onClick={() => setTransferOpen(true)} disabled={selectedTasks.length === 0}>
+              <Send className="size-4" />
+              Seçilenleri Aktar
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={exitSelectMode}>
+              Kapat (Esc)
+            </Button>
+          </div>
+        </div>
+      )}
 
       {weekLocked && (
         <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
@@ -824,6 +927,9 @@ export function ScheduleBoard({
                   onStatusChange={handleStatusChange}
                   onToggleLock={handleToggleTaskLock}
                   paintMode={paintMode}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={handleToggleSelect}
                   onAddEvent={() => setEventDialogState({ mode: "create", date: day.date })}
                   onEditEvent={(event) => setEventDialogState({ mode: "edit", event })}
                   onDuplicateEvent={handleDuplicateEvent}
@@ -882,6 +988,16 @@ export function ScheduleBoard({
         />
       )}
 
+      {transferOpen && selectedTasks.length > 0 && (
+        <TransferTasksDialog
+          studentId={studentId}
+          taskIds={selectedTasks.map((t) => t.id)}
+          defaultDate={today}
+          onClose={() => setTransferOpen(false)}
+          onTransferred={handleTransferred}
+        />
+      )}
+
       {eventDialogState && (
         <EventDialog
           key={eventDialogState.mode === "edit" ? `edit:${eventDialogState.event.id}` : `create:${eventDialogState.date}`}
@@ -922,6 +1038,9 @@ function DayColumn({
   onStatusChange,
   onToggleLock,
   paintMode,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
   onAddEvent,
   onEditEvent,
   onDuplicateEvent,
@@ -957,6 +1076,9 @@ function DayColumn({
   onStatusChange: (task: DetailTask, status: AssignedTaskStatus) => void;
   onToggleLock: (task: DetailTask) => void;
   paintMode: AssignedTaskStatus | null;
+  selectMode: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (task: DetailTask) => void;
   onAddEvent: () => void;
   onEditEvent: (event: StudentEvent) => void;
   onDuplicateEvent: (event: StudentEvent) => void;
@@ -1093,6 +1215,9 @@ function DayColumn({
                 onDelete={onDelete}
                 onStatusChange={onStatusChange}
                 paintMode={paintMode}
+                selectMode={selectMode}
+                selected={selectedIds.has(task.id)}
+                onToggleSelect={onToggleSelect}
                 cardHeight={routineRows.heightOf(i)}
                 onResize={(deltaY) => routineRows.onResize(i, deltaY)}
                 onResizeEnd={() => routineRows.onResizeEnd(i, maxRoutineSlots)}
@@ -1164,6 +1289,9 @@ function DayColumn({
                       onStatusChange={onStatusChange}
                       onToggleLock={onToggleLock}
                       paintMode={paintMode}
+                      selectMode={selectMode}
+                      selected={selectedIds.has(item.data.id)}
+                      onToggleSelect={onToggleSelect}
                       cardHeight={taskRows.heightOf(i)}
                       onResize={(deltaY) => taskRows.onResize(i, deltaY)}
                       onResizeEnd={() => taskRows.onResizeEnd(i, maxGorevSlots)}

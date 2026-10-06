@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import type { AssignedTaskStatus } from "../../../../actions";
 import type { DetailTask } from "../../types";
 import { EvidencePhotoButton } from "./evidence-photo-button";
+import { isTransferable } from "@/lib/task-transfer";
+import { PostponedBadge, TaskSelectBox } from "./task-transfer-parts";
 import { cardBackgroundClass, statusClasses, TaskCardBody, TaskCardHoverDetail } from "./task-card-body";
 
 const PAINT_FLASH_CLASS: Partial<Record<AssignedTaskStatus, string>> = {
@@ -30,6 +32,9 @@ export function KanbanTaskCard({
   onStatusChange,
   onToggleLock,
   paintMode,
+  selectMode,
+  selected,
+  onToggleSelect,
   cardHeight,
   onResize,
   onResizeEnd,
@@ -49,6 +54,10 @@ export function KanbanTaskCard({
   // mutes the grip handle + action-icon row so there's only one click
   // target on the card while it's active.
   paintMode: AssignedTaskStatus | null;
+  // "Toplu İşlem": while on, the whole card is a select toggle (a checkbox in the corner) instead of opening the editor.
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: (task: DetailTask) => void;
   // Current height in px for the ROW this card is in (its position in the
   // day's Görevler list -- see taskRows in schedule-board.tsx), and the
   // drag callbacks (see ResizeHandle). Every card and placeholder at that
@@ -68,7 +77,7 @@ export function KanbanTaskCard({
   // ordinary: nothing about persisting order changes for a locked card).
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
-    disabled: task.is_locked || !!paintMode,
+    disabled: task.is_locked || !!paintMode || selectMode,
   });
   // A real height, not a floor: every card at this row index across all 7
   // days shares cardHeight (see the prop's own comment), and applying it as
@@ -81,6 +90,8 @@ export function KanbanTaskCard({
   // a plain cut, never a "…". Dragging the row's handle taller still grows
   // every card in that row together.
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, height: cardHeight };
+
+  const selectable = selectMode && isTransferable(task);
 
   function handlePaintClick() {
     if (!paintMode) return;
@@ -95,12 +106,15 @@ export function KanbanTaskCard({
         <div
           ref={setNodeRef}
           style={style}
-          onClick={paintMode ? handlePaintClick : undefined}
+          onClick={paintMode ? handlePaintClick : selectMode ? () => selectable && onToggleSelect(task) : undefined}
           className={cn(
             "border-border relative flex flex-col overflow-hidden rounded-md border p-2.5 transition-colors",
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",
+            selectable && "cursor-pointer hover:ring-primary/50 hover:ring-2",
+            selectMode && !selectable && "cursor-not-allowed opacity-60",
+            selected && "ring-primary ring-2",
             flash && PAINT_FLASH_CLASS[flash],
           )}
         >
@@ -112,7 +126,7 @@ export function KanbanTaskCard({
                 task.is_locked
                   ? "text-muted-foreground/50 cursor-not-allowed"
                   : "text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing",
-                paintMode && "pointer-events-none opacity-30",
+                (paintMode || selectMode) && "pointer-events-none opacity-30",
               )}
               aria-label={task.is_locked ? "Kilitli -- taşınamaz" : "Sürükleyerek taşı"}
               {...attributes}
@@ -120,10 +134,15 @@ export function KanbanTaskCard({
             >
               {task.is_locked ? <Lock className="size-3.5" /> : <GripVertical className="size-3.5" />}
             </button>
-            <TaskCardBody task={task} resourceNameById={resourceNameById} />
+            <div className={cn("min-w-0 flex-1", selectMode && "pr-6")}>
+              <TaskCardBody task={task} resourceNameById={resourceNameById} />
+              <PostponedBadge task={task} />
+            </div>
           </div>
 
-          <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", paintMode && "pointer-events-none opacity-30")}>
+          {selectMode && <TaskSelectBox checked={selected} disabled={!selectable} />}
+
+          <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", (paintMode || selectMode) && "pointer-events-none opacity-30")}>
             <EvidencePhotoButton studentId={studentId} task={task} />
             <Button
               type="button"

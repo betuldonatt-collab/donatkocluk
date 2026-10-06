@@ -287,7 +287,7 @@ async function fetchDashboardData(
     lgsStudentIds.length > 0
       ? await supabase
           .from("student_tasks")
-          .select("id, student_id, task_date, task_type, course_id, title, status, is_approved_by_coach, evidence_image_paths, evidence_review_status")
+          .select("id, student_id, task_date, task_type, course_id, title, status, is_approved_by_coach, evidence_image_paths, evidence_review_status, postponed_to")
           .in("student_id", lgsStudentIds)
           .lt("task_date", today)
           .gte("task_date", addDaysISO(today, -MISSING_TASKS_WINDOW_DAYS))

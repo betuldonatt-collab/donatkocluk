@@ -66,6 +66,8 @@ export type DetailTask = {
   // verdicts (0089).
   evidence_review_status?: "none" | "pending" | "approved" | "rejected";
   evidence_photo_status?: Record<string, "approved" | "rejected">;
+  // "Ertelendi" (0127): the date this task was handed out again through the board's Toplu İşlem; null/absent = not postponed.
+  postponed_to?: string | null;
 };
 
 export type DetailSession = {

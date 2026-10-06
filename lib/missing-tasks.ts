@@ -18,6 +18,8 @@ export type MissingTaskInput = {
   is_approved_by_coach: boolean;
   evidence_image_paths?: string[] | null;
   evidence_review_status?: string | null;
+  // Handed out again on a later date (migration 0127) -- already dealt with, never listed.
+  postponed_to?: string | null;
 };
 
 export type MissingTask<T extends MissingTaskInput> = { task: T; reason: MissingTaskReason };
@@ -51,6 +53,7 @@ export function findMissingTasks<T extends MissingTaskInput>(
     if (!task.is_approved_by_coach) continue;
     if (task.task_date >= today || task.task_date < earliest) continue;
     if (task.status === "done" || task.status === "half_done") continue;
+    if (task.postponed_to) continue;
     // Photos sent and waiting for the coach: already in Onay Bekleyen.
     if (task.evidence_review_status === "pending") continue;
 

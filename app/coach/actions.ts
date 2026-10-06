@@ -20,6 +20,7 @@ import {
   statusAppliedByApproval,
   type PhotoDecision,
 } from "@/lib/task-evidence";
+import { isTransferable, MAX_TRANSFER_TASKS, statusWhenPostponed } from "@/lib/task-transfer";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
 import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
@@ -1733,6 +1734,109 @@ export async function duplicateAssignedTask(studentId: string, taskId: string, t
 
   revalidatePath(`/coach/students/${studentIdV}`);
   return { ...data, resource_ids: resourceIds };
+}
+
+// "Toplu İşlem" -> "Seçilenleri Aktar": hands the selected unfinished tasks out again on one new date. Each gets a fresh
+// copy there (pending, no results, no photos -- lib/task-transfer.ts) and the ORIGINAL stays where it was, marked
+// "Ertelendi" (student_tasks.postponed_to, migration 0127). Finished and already-postponed tasks are left out.
+export type TransferAssignedTasksResult =
+  | { ok: true; created: (Record<string, unknown> & { id: string; resource_ids: string[] })[]; postponed: { id: string; status: string; postponed_to: string }[]; skipped: number }
+  | { ok: false; error: string };
+
+// Returns { ok, error } rather than throwing: a thrown Server Action error reaches the browser as a minified React error in production.
+export async function transferAssignedTasks(studentId: string, taskIds: string[], targetDate: string): Promise<TransferAssignedTasksResult> {
+  try {
+    return { ok: true, ...(await transferAssignedTasksOrThrow(studentId, taskIds, targetDate)) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
+}
+
+async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[], targetDate: string) {
+  await assertNotImpersonating();
+  const studentIdV = parseInput(uuidSchema, studentId);
+  const taskIdsV = [...new Set(parseInput(z.array(uuidSchema).min(1, "Aktarılacak görev seçilmedi.").max(MAX_TRANSFER_TASKS), taskIds))];
+  const targetDateV = parseInput(weekStartSchema, targetDate);
+  const supabase = await createClient();
+  const user = await requireUser(supabase);
+  await requireCoachAccess(supabase, user.id, studentIdV);
+
+  const { data: found, error: fetchError } = await supabase.from("student_tasks").select("*").eq("student_id", studentIdV).in("id", taskIdsV);
+  if (fetchError) throw dbError(fetchError);
+  if ((found ?? []).length !== taskIdsV.length) throw new Error("Seçilen görevlerden bazıları bulunamadı. Sayfayı yenileyip tekrar dene.");
+
+  // The board's own order (day, then position in the day), so the copies land in the new day in the same sequence.
+  const originals = (found ?? [])
+    .filter((t) => isTransferable(t))
+    .sort((a, b) => (a.task_date === b.task_date ? a.order_index - b.order_index : a.task_date < b.task_date ? -1 : 1));
+  if (originals.length === 0) throw new Error("Seçilen görevler zaten tamamlanmış ya da daha önce ertelenmiş; aktarılacak görev yok.");
+
+  const [{ data: resourceRows, error: resError }, startOrderByDate] = await Promise.all([
+    supabase.from("task_resources").select("task_id, resource_id, order_index").in("task_id", originals.map((t) => t.id)).order("order_index", { ascending: true }),
+    nextOrderIndexByDate(supabase, studentIdV, [targetDateV]),
+  ]);
+  if (resError) throw dbError(resError);
+  const resourceIdsByTask = new Map<string, string[]>();
+  for (const r of resourceRows ?? []) resourceIdsByTask.set(r.task_id, [...(resourceIdsByTask.get(r.task_id) ?? []), r.resource_id]);
+
+  const startOrder = startOrderByDate.get(targetDateV)!;
+  const { data: copies, error: insertError } = await supabase
+    .from("student_tasks")
+    .insert(
+      originals.map((original, i) => ({
+        student_id: original.student_id,
+        coach_id: user.id,
+        task_date: targetDateV,
+        task_type: original.task_type,
+        title: original.title,
+        description: original.description,
+        course_id: original.course_id,
+        topic_id: original.topic_id,
+        total_count: original.total_count,
+        duration_minutes: original.duration_minutes,
+        video_links: original.video_links,
+        order_index: startOrder + i,
+        is_coach_assigned: true,
+        is_approved_by_coach: true,
+      })),
+    )
+    .select("*");
+  if (insertError) throw dbError(insertError);
+
+  const copyIds = (copies ?? []).map((c) => c.id);
+  const undoCopies = async () => {
+    await supabase.from("task_resources").delete().in("task_id", copyIds);
+    await supabase.from("student_tasks").delete().in("id", copyIds);
+  };
+
+  try {
+    // insert().select() returns the rows in insertion order, so copy i belongs to original i.
+    for (const [i, copy] of (copies ?? []).entries()) await linkTaskResources(supabase, [copy.id], resourceIdsByTask.get(originals[i].id));
+
+    // A task nobody had marked yet becomes "Yapılmadı"; a half-done one keeps its status. Two updates, one per case.
+    const untouched = originals.filter((t) => statusWhenPostponed(t.status) === t.status).map((t) => t.id);
+    const unmarked = originals.filter((t) => statusWhenPostponed(t.status) !== t.status).map((t) => t.id);
+    const now = new Date().toISOString();
+    for (const [ids, patch] of [
+      [unmarked, { status: "not_done", postponed_to: targetDateV, updated_at: now }],
+      [untouched, { postponed_to: targetDateV, updated_at: now }],
+    ] as const) {
+      if (ids.length === 0) continue;
+      const { error } = await supabase.from("student_tasks").update(patch).in("id", ids);
+      if (error) throw dbError(error);
+    }
+  } catch (e) {
+    // Never leave the copies without the originals being marked (a second attempt would then hand the work out twice).
+    await undoCopies();
+    throw e;
+  }
+
+  revalidatePath(`/coach/students/${studentIdV}`);
+  return {
+    created: (copies ?? []).map((c, i) => ({ ...c, resource_ids: resourceIdsByTask.get(originals[i].id) ?? [] })),
+    postponed: originals.map((t) => ({ id: t.id, status: statusWhenPostponed(t.status), postponed_to: targetDateV })),
+    skipped: taskIdsV.length - originals.length,
+  };
 }
 
 // --- Soft Coach Approval (student self-logged entries) -------------------

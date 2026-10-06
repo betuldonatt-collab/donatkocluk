@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import type { AssignedTaskStatus } from "../../../../actions";
 import type { DetailTask } from "../../types";
 import { EvidencePhotoButton } from "./evidence-photo-button";
+import { isTransferable } from "@/lib/task-transfer";
+import { PostponedBadge, TaskSelectBox } from "./task-transfer-parts";
 import { cardBackgroundClass, statusClasses, TaskCardBody, TaskCardHoverDetail } from "./task-card-body";
 
 const PAINT_FLASH_CLASS: Partial<Record<AssignedTaskStatus, string>> = {
@@ -31,6 +33,9 @@ export function RoutineTaskCard({
   onDelete,
   onStatusChange,
   paintMode,
+  selectMode,
+  selected,
+  onToggleSelect,
   cardHeight,
   onResize,
   onResizeEnd,
@@ -46,6 +51,10 @@ export function RoutineTaskCard({
   // Non-null while "Hızlı İşaretleme" (Paintbrush) mode is active -- see
   // KanbanTaskCard's own comment, same treatment here.
   paintMode: AssignedTaskStatus | null;
+  // "Toplu İşlem": while on, the whole card is a select toggle (a checkbox in the corner) instead of opening the editor.
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: (task: DetailTask) => void;
   // See KanbanTaskCard's own comment -- this card's own row height (its
   // position within the Rutinler lane's routineRows, independent of the
   // Görevler lane's own row heights).
@@ -54,6 +63,8 @@ export function RoutineTaskCard({
   onResizeEnd: () => void;
 }) {
   const [flash, setFlash] = useState<AssignedTaskStatus | null>(null);
+
+  const selectable = selectMode && isTransferable(task);
 
   function handlePaintClick() {
     if (!paintMode) return;
@@ -66,7 +77,7 @@ export function RoutineTaskCard({
     <HoverCard>
       <HoverCardTrigger asChild>
         <div
-          onClick={paintMode ? handlePaintClick : undefined}
+          onClick={paintMode ? handlePaintClick : selectMode ? () => selectable && onToggleSelect(task) : undefined}
           // A real height, not a floor -- see KanbanTaskCard's matching
           // comment: minHeight let one card with more text than its row
           // neighbors grow taller than the rest, breaking the row's
@@ -79,14 +90,22 @@ export function RoutineTaskCard({
             cardBackgroundClass(task),
             statusClasses(task),
             paintMode && "cursor-pointer ring-primary/50 hover:ring-2",
+            selectable && "cursor-pointer hover:ring-primary/50 hover:ring-2",
+            selectMode && !selectable && "cursor-not-allowed opacity-60",
+            selected && "ring-primary ring-2",
             flash && PAINT_FLASH_CLASS[flash],
           )}
         >
           <div className="flex min-h-0 flex-1 items-start gap-1.5">
-            <TaskCardBody task={task} resourceNameById={resourceNameById} />
+            <div className={cn("min-w-0 flex-1", selectMode && "pr-6")}>
+              <TaskCardBody task={task} resourceNameById={resourceNameById} />
+              <PostponedBadge task={task} />
+            </div>
           </div>
 
-          <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", paintMode && "pointer-events-none opacity-30")}>
+          {selectMode && <TaskSelectBox checked={selected} disabled={!selectable} />}
+
+          <div className={cn("mt-auto flex shrink-0 justify-end gap-0.5 pt-1.5", (paintMode || selectMode) && "pointer-events-none opacity-30")}>
             <EvidencePhotoButton studentId={studentId} task={task} />
             <Button type="button" variant="ghost" size="icon" className="size-5" onClick={() => onDuplicate(task)} aria-label="Kopyala">
               <Copy className="size-3" />
