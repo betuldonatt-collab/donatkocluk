@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
 import { resolveCycles, type CycleWindow, type ProgressLock } from "@/lib/completion";
+import { fetchAllPages } from "@/lib/paged-select";
 import { reconcileStaleFocusSessions } from "./actions";
 import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
 import { NextSessionCard } from "./_components/next-session-card";
@@ -18,6 +19,11 @@ const MONTH_LABELS = [
   "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
+
+// The columns of a task the student's panel actually reads (the StudentTask type, minus the two computed fields and the
+// long-dropped resource_id) -- listed instead of select("*") so nothing else rides along.
+const STUDENT_TASK_COLUMNS =
+  "id, task_date, task_type, title, description, course_id, topic_id, total_count, correct_count, wrong_count, empty_count, start_page, end_page, duration_minutes, tracked_duration_minutes, tracked_duration_seconds, subject_scores, video_links, completed, analysis_pending, evidence_image_paths, evidence_review_status, evidence_photo_status, status, reason, note, is_coach_assigned, order_index, rejected_at, rejection_reason";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -57,18 +63,64 @@ async function fetchHomeData(userId: string) {
   // instead of disappearing the moment its scheduled time passes.
   const graceCutoff = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
   const ratingCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  // The latest lock and the soonest pending session fix the cycle windows the progress cards read; that dependent read
+  // starts the moment those two answer, while everything else is still being fetched (it used to wait for ALL of them).
+  const lockQuery = supabase
+    .from("progress_locks")
+    .select("period_start, locked_at")
+    .eq("student_id", userId)
+    .order("locked_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const upcomingSessionQuery = supabase
+    .from("coaching_sessions")
+    .select("scheduled_at")
+    .eq("student_id", userId)
+    .eq("outcome", "pending")
+    .order("scheduled_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const progressBundle = Promise.all([lockQuery, upcomingSessionQuery]).then(async ([{ data: lastLockRow }, { data: upcomingSessionRow }]) => {
+    const lastLock = lastLockRow as ProgressLock | null;
+    const { current: currentCycle, previous: previousCycle } = resolveCycles(
+      lastLock,
+      (upcomingSessionRow?.scheduled_at ?? null) as string | null,
+      today,
+    );
+    // Slim rows for the progress cards: covers whichever reaches furthest back
+    // (the previous cycle's start, the current cycle's start, or this week's
+    // Monday) through whichever reaches furthest forward (the current cycle's
+    // end -- not always "today", see lib/completion.ts -- or the day after
+    // this week, Yarın on a Sunday).
+    const progressTasksFrom = [previousCycle.start, currentCycle.start, weekStart].sort()[0];
+    const progressTasksTo = currentCycle.end > dayAfterWeek ? currentCycle.end : dayAfterWeek;
+    const { data: progressExtraRows } = await fetchAllPages((from, to, withCount) =>
+      supabase
+        .from("student_tasks")
+        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes", withCount ? { count: "exact" } : undefined)
+        .eq("student_id", userId)
+        .gte("task_date", progressTasksFrom)
+        .lte("task_date", progressTasksTo)
+        .order("task_date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+    return { lastLock, currentCycle, previousCycle, progressExtraRows };
+  });
+
   const [
     { data: sessionRows },
     { data: weekTaskRows },
     { data: pendingTaskRows },
     { data: ratingSessionRows },
-    { data: lastLockRow },
-    { data: upcomingSessionRow },
     { data: profileRow },
-    { data: taskResourceRows },
+    { data: weekResourceRows },
+    { data: pendingResourceRows },
     { data: fixedTaskRows },
     { data: allTaskDurationRows },
     { data: sessionBalanceRows },
+    { data: reviewRows },
+    { lastLock, currentCycle, previousCycle, progressExtraRows },
   ] = await Promise.all([
       supabase
         .from("coaching_sessions")
@@ -79,7 +131,7 @@ async function fetchHomeData(userId: string) {
         .limit(1),
       supabase
         .from("student_tasks")
-        .select("*")
+        .select(STUDENT_TASK_COLUMNS)
         .eq("student_id", userId)
         // From YESTERDAY, not just today: the grid is a rolling 7 days that
         // starts today, but the Dün tab needs yesterday's tasks on the very
@@ -88,13 +140,18 @@ async function fetchHomeData(userId: string) {
         .gte("task_date", yesterdayIso)
         .lte("task_date", weekEnd)
         .order("created_at", { ascending: true }),
-      supabase
-        .from("student_tasks")
-        .select("*")
-        .eq("student_id", userId)
-        .eq("analysis_pending", true)
-        .lt("task_date", yesterdayIso)
-        .order("task_date", { ascending: false }),
+      // Every earlier task still waiting for its exam analysis -- read in pages, ordered totally (date, then id).
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_tasks")
+          .select(STUDENT_TASK_COLUMNS, withCount ? { count: "exact" } : undefined)
+          .eq("student_id", userId)
+          .eq("analysis_pending", true)
+          .lt("task_date", yesterdayIso)
+          .order("task_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
       // Evaluation prompt: only a session completed in the last 14 days that
       // has never been rated (student_rating is set on submit, so a rated
       // session can never come back). Anything older -- notably the
@@ -109,85 +166,81 @@ async function fetchHomeData(userId: string) {
         .gte("scheduled_at", ratingCutoff)
         .order("scheduled_at", { ascending: false })
         .limit(1),
-      // The single most recent progress lock -- where the completion
-      // percentages currently start counting (lib/completion.ts), and the
-      // frozen boundary for `week_locked` below. No lock yet -> resolved
-      // from the soonest still-pending session (next query).
-      supabase
-        .from("progress_locks")
-        .select("period_start, locked_at")
-        .eq("student_id", userId)
-        .order("locked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      // No lock yet -> the soonest still-pending session anchors the
-      // bootstrap two-week window (lib/completion.ts).
-      supabase
-        .from("coaching_sessions")
-        .select("scheduled_at")
-        .eq("student_id", userId)
-        .eq("outcome", "pending")
-        .order("scheduled_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
       supabase.from("profiles").select("schedule_routine_row_heights_px, schedule_task_row_heights_px, exam_type").eq("id", userId).maybeSingle(),
-      // Which book/kaynak (if any) a coach linked to each task -- mirrors
-      // the coach panel's own task_resources join (schedule/page.tsx)
-      // exactly, just scoped by student_tasks.student_id instead of by
-      // coach roster. Not filtered on lock/date range: a resource name is
-      // cheap, harmless to fetch for a pending-analysis task from an
-      // older week too, and doing so here avoids a second query shaped
-      // just for that handful of rows.
+      // Which book/kaynak (if any) a coach linked to each task -- mirrors the coach panel's own task_resources join
+      // (schedule/page.tsx), scoped by student_tasks.student_id. Only for the tasks this page actually shows: the
+      // week window, and (second read) the older pending-analysis ones -- not for every task the student ever had.
       supabase
         .from("task_resources")
         .select("task_id, order_index, student_tasks!inner(student_id), student_resources(name)")
         .eq("student_tasks.student_id", userId)
+        .gte("student_tasks.task_date", yesterdayIso)
+        .lte("student_tasks.task_date", weekEnd)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("task_resources")
+        .select("task_id, order_index, student_tasks!inner(student_id), student_resources(name)")
+        .eq("student_tasks.student_id", userId)
+        .eq("student_tasks.analysis_pending", true)
+        .lt("student_tasks.task_date", yesterdayIso)
         .order("order_index", { ascending: true }),
       // "Sabit Görevler" -- week-independent (no date range), read-only
       // here (RLS: student_fixed_tasks_student_read). Same student-side
       // injection ScheduleBoard does for the coach, see task-board.tsx.
-      supabase.from("student_fixed_tasks").select("*").eq("student_id", userId),
+      supabase.from("student_fixed_tasks").select("id, title, day_of_week, start_time, end_time, description").eq("student_id", userId),
       // "Tüm Zamanlar" total for the dashboard's own Toplam Süre card --
-      // every task ever, one column only (cheap). tracked_duration_seconds
-      // only ever grows from a real completed Focus Timer session (never a
-      // target), so it needs no status filter -- summing across every
-      // task, any status, is already exactly "real time tracked."
-      supabase.from("student_tasks").select("tracked_duration_seconds").eq("student_id", userId),
+      // one column only, and only the tasks that ever tracked any time
+      // (tracked_duration_seconds only ever grows from a real completed Focus
+      // Timer session, never a target, so it needs no status filter -- the
+      // rows left out contribute 0 to the sum). Read in pages so a long
+      // history is summed completely instead of being cut at the API's row cap.
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_tasks")
+          .select("tracked_duration_seconds", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", userId)
+          .gt("tracked_duration_seconds", 0)
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
       // "Kalan Görüşme Hakkı" -- paid-count minus completed-count, allowed
       // to go negative on purpose (see 0084_session_payment_tracking.sql)
       // as a payment reminder, so this is deliberately NOT filtered to
       // is_paid=true only: a completed-but-unpaid session must still count
       // against the balance for the negative number to ever appear.
-      supabase.from("coaching_sessions").select("is_paid, outcome").eq("student_id", userId),
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("coaching_sessions")
+          .select("is_paid, outcome", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", userId)
+          .order("scheduled_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
+      // Süre Tut sessions over 6 hours are held for the coach's approval (migration
+      // 0086) instead of counting immediately -- shown so the student understands
+      // why their time / rank hasn't moved. Pending ones always; decided ones for
+      // two weeks. Best-effort: a failed read (e.g. before the migration is run)
+      // just hides the card.
+      supabase
+        .from("focus_session_reviews")
+        .select("id, seconds, status, approved_seconds, ended_at, reviewed_at, student_tasks(title)")
+        .eq("student_id", userId)
+        // Records the student dismissed themselves (migration 0105) stay in the
+        // table for the coach's history but never come back here.
+        .is("student_dismissed_at", null)
+        .order("ended_at", { ascending: false })
+        .limit(15),
+      progressBundle,
     ]);
 
-  const lastLock = lastLockRow as ProgressLock | null;
-  const { current: currentCycle, previous: previousCycle } = resolveCycles(
-    lastLock,
-    (upcomingSessionRow?.scheduled_at ?? null) as string | null,
-    today,
-  );
   // A task is frozen once its date falls STRICTLY BEFORE the latest lock day
   // -- the lock day itself belongs to the new, still-open cycle -- same
   // boundary the RLS policies enforce (migration 0103).
   const lockedThroughDate = lastLock ? lastLock.locked_at.slice(0, 10) : null;
 
-  // Slim rows for the progress cards: covers whichever reaches furthest back
-  // (the previous cycle's start, the current cycle's start, or this week's
-  // Monday) through whichever reaches furthest forward (the current cycle's
-  // end -- not always "today", see lib/completion.ts -- or the day after
-  // this week, Yarın on a Sunday).
-  const progressTasksFrom = [previousCycle.start, currentCycle.start, weekStart].sort()[0];
-  const progressTasksTo = currentCycle.end > dayAfterWeek ? currentCycle.end : dayAfterWeek;
-  const { data: progressExtraRows } = await supabase
-    .from("student_tasks")
-    .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes")
-    .eq("student_id", userId)
-    .gte("task_date", progressTasksFrom)
-    .lte("task_date", progressTasksTo);
-
   const resourceNamesByTask = new Map<string, string[]>();
-  for (const row of taskResourceRows ?? []) {
+  for (const row of [...(weekResourceRows ?? []), ...(pendingResourceRows ?? [])]) {
     const name = (row as unknown as { student_resources: { name: string } | null }).student_resources?.name;
     if (!name) continue;
     const list = resourceNamesByTask.get(row.task_id) ?? [];
@@ -207,20 +260,6 @@ async function fetchHomeData(userId: string) {
     (allTaskDurationRows ?? []).reduce((sum, r) => sum + (r.tracked_duration_seconds ?? 0), 0) / 60,
   );
 
-  // Süre Tut sessions over 6 hours are held for the coach's approval (migration
-  // 0086) instead of counting immediately -- shown so the student understands
-  // why their time / rank hasn't moved. Pending ones always; decided ones for
-  // two weeks. Best-effort: a failed read (e.g. before the migration is run)
-  // just hides the card.
-  const { data: reviewRows } = await supabase
-    .from("focus_session_reviews")
-    .select("id, seconds, status, approved_seconds, ended_at, reviewed_at, student_tasks(title)")
-    .eq("student_id", userId)
-    // Records the student dismissed themselves (migration 0105) stay in the
-    // table for the coach's history but never come back here.
-    .is("student_dismissed_at", null)
-    .order("ended_at", { ascending: false })
-    .limit(15);
   const reviewCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const focusReviews: StudentFocusReview[] = (reviewRows ?? [])
     .filter((r) => r.status === "pending" || new Date(r.reviewed_at ?? r.ended_at).getTime() >= reviewCutoff)

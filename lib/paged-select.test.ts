@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { fetchAllPages, PAGE_SIZE } from "./paged-select";
 
@@ -50,8 +50,17 @@ describe("fetchAllPages", () => {
     expect(t.calls.map((c) => c.from)).toEqual([0, 1000, 2000]);
   });
 
-  it("a failing page fails the whole read instead of returning a partial list", async () => {
-    await expect(fetchAllPages(table(2500, { failAt: 1000 }).fetchPage)).rejects.toThrow("boom");
-    await expect(fetchAllPages(table(10, { failAt: 0 }).fetchPage)).rejects.toThrow("boom");
+  it("a failing page never throws: the read comes back empty with the error set, not as a partial list", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const late = await fetchAllPages(table(2500, { failAt: 1000 }).fetchPage);
+    expect(late.data).toEqual([]);
+    expect(late.error).toBeInstanceOf(Error);
+    const early = await fetchAllPages(table(10, { failAt: 0 }).fetchPage);
+    expect(early).toMatchObject({ data: [], error: expect.any(Error) });
+    spy.mockRestore();
+  });
+
+  it("reports no error on success", async () => {
+    expect((await fetchAllPages(table(5).fetchPage)).error).toBeNull();
   });
 });

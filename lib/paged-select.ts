@@ -5,16 +5,31 @@
 // `fetchPage(from, to, withCount)` must run the same ordered query with .range(from, to) -- and pass
 // { count: "exact" } to .select() when withCount is true. Ordering must be total (add a tie-break such as the row id),
 // otherwise rows can repeat or go missing between pages.
+//
+// It never throws: a page that fails makes the whole read come back empty with `error` set (and logged) -- exactly what a
+// failed single read gave these pages before (data: null, treated as empty). A page that renders right after a Server
+// Action must not throw (the client would see an opaque React error even though the save went through).
 
 export const PAGE_SIZE = 1000;
 
 type PageResult<T> = { data: T[] | null; error: unknown; count?: number | null };
 
-export async function fetchAllPages<T>(fetchPage: (from: number, to: number, withCount: boolean) => PromiseLike<PageResult<T>>): Promise<{ data: T[] }> {
+export async function fetchAllPages<T>(
+  fetchPage: (from: number, to: number, withCount: boolean) => PromiseLike<PageResult<T>>,
+): Promise<{ data: T[]; error: unknown }> {
+  try {
+    return { data: await readAllPages(fetchPage), error: null };
+  } catch (error) {
+    console.error("[paged read failed]", error);
+    return { data: [], error };
+  }
+}
+
+async function readAllPages<T>(fetchPage: (from: number, to: number, withCount: boolean) => PromiseLike<PageResult<T>>): Promise<T[]> {
   const first = await fetchPage(0, PAGE_SIZE - 1, true);
   if (first.error) throw first.error;
   const rows = [...(first.data ?? [])];
-  if (rows.length < PAGE_SIZE) return { data: rows };
+  if (rows.length < PAGE_SIZE) return rows;
 
   const pageCount = typeof first.count === "number" ? Math.ceil(first.count / PAGE_SIZE) : null;
   if (pageCount !== null) {
@@ -23,7 +38,7 @@ export async function fetchAllPages<T>(fetchPage: (from: number, to: number, wit
       if (page.error) throw page.error;
       rows.push(...(page.data ?? []));
     }
-    return { data: rows };
+    return rows;
   }
 
   // No total available: walk the pages one by one until a short one.
@@ -31,6 +46,6 @@ export async function fetchAllPages<T>(fetchPage: (from: number, to: number, wit
     const page = await fetchPage(from, from + PAGE_SIZE - 1, false);
     if (page.error) throw page.error;
     rows.push(...(page.data ?? []));
-    if ((page.data ?? []).length < PAGE_SIZE) return { data: rows };
+    if ((page.data ?? []).length < PAGE_SIZE) return rows;
   }
 }

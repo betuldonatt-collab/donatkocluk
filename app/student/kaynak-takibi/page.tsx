@@ -67,10 +67,8 @@ export default async function KaynakTakibiPage() {
     // YKS: 2, Maarif: 3). A missing table/column (migration not run yet)
     // just reads as empty.
     const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
-    let pipelineRows: PipelineRow[] = [];
-    try {
-      pipelineRows = (
-        await fetchAllPages<PipelineRow>(
+    // A failed read logs and reads as empty (fetchAllPages never throws).
+    const { data: pipelineRows } = await fetchAllPages<PipelineRow>(
           (from, to, withCount) =>
             supabase
               .from(pipelineConfig.table)
@@ -80,10 +78,6 @@ export default async function KaynakTakibiPage() {
               .order("topic_id", { ascending: true })
               .range(from, to) as unknown as PromiseLike<{ data: PipelineRow[] | null; error: unknown; count?: number | null }>,
         )
-      ).data;
-    } catch (pipelineError) {
-      console.error("[kaynak-takibi] pipeline read failed:", pipelineError);
-    }
     const pipelineByCourse = groupPipelineRows(pipelineRows, pipelineConfig);
 
     function courseEntry(courseId: string): CourseData {

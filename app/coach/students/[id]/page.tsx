@@ -334,9 +334,6 @@ async function fetchStudentDetail(studentId: string) {
             .order("course_id", { ascending: true })
             .order("topic_id", { ascending: true })
             .range(from, to) as unknown as PromiseLike<{ data: PipelineRow[] | null; error: unknown; count?: number | null }>,
-      ).then(
-        (r) => ({ data: r.data, error: null as unknown }),
-        (error: unknown) => ({ data: [] as PipelineRow[], error }),
       ),
     ]);
 
