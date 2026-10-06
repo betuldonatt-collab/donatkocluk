@@ -106,6 +106,19 @@ export function withoutUnitMasters<C extends { units: { topics: { id: string }[]
   } as C;
 }
 
+// Grouped units whose question statistics (Toplam / D / Y / B) are shown ONCE for the whole unit in Kaynak Takibi, not
+// per topic: the unit's topics stay individually tickable (resources, pipeline steps), but their question counts are
+// rolled up into the unit's single stat cell. Underlying data is untouched -- the figures are still stored per topic id
+// (student_topic_stats); only what the table shows is aggregated. Legacy TYT Matematik's "Problemler" only (never the
+// Maarif TYT or AYT Matematik courses).
+const AGGREGATED_STATS_UNITS: Record<string, string[]> = {
+  "tyt-matematik": ["Problemler"],
+};
+
+export function hasAggregatedStats(course: Course | null | undefined, unitLabel: string): boolean {
+  return !!course && (AGGREGATED_STATS_UNITS[course.id] ?? []).includes(unitLabel);
+}
+
 export type TopicGroup = {
   unitLabel: string;
   masterId: string;
@@ -168,12 +181,15 @@ export type GroupParent = {
   unitLabel: string;
   unitRowSpan: number;
   memberTopicIds: string[];
+  // The unit's stats are shown once, in one cell spanning the whole unit (see AGGREGATED_STATS_UNITS): the parent row
+  // carries it, and the unit's own rows leave their stat cells out.
+  aggregatedStats: boolean;
 };
 
 export function groupParentLayout(
   course: Course,
   rows: SelectionRow[],
-): { parentBefore: Map<string, GroupParent>; unitSpan: (row: SelectionRow) => number | null } {
+): { parentBefore: Map<string, GroupParent>; unitSpan: (row: SelectionRow) => number | null; hideRowStats: (row: SelectionRow) => boolean } {
   const parentBefore = new Map<string, GroupParent>();
   for (const group of topicGroups(course)) {
     // the master topic is the first topic of its unit, so its row is the unit's first row
@@ -184,11 +200,15 @@ export function groupParentLayout(
       unitLabel: group.unitLabel,
       unitRowSpan: first.unitRowSpan + 1,
       memberTopicIds: [group.masterId, ...group.members.map((t) => t.id)],
+      aggregatedStats: hasAggregatedStats(course, group.unitLabel),
     });
   }
+  const aggregatedUnits = new Set([...parentBefore.values()].filter((p) => p.aggregatedStats).map((p) => p.unitLabel));
   return {
     parentBefore,
     // the first row's unit cell moves up to the parent row
     unitSpan: (row) => (parentBefore.has(row.id) ? null : row.unitRowSpan),
+    // a row of an aggregated unit has no stat cells of its own (they are the parent row's one spanning cell)
+    hideRowStats: (row) => aggregatedUnits.has(row.unitLabel),
   };
 }

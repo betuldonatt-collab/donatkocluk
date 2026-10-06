@@ -262,3 +262,95 @@ describe("Kaynak Takibi: a parent row with the cumulative stats for every groupe
     expect(unitSpan(rows[0])).toBe(1);
   });
 });
+
+describe("TYT Matematik 'Problemler': one aggregated stat cell, topics still tickable one by one", () => {
+  const members = topicGroups(course("tyt-matematik")).find((g) => g.unitLabel === "Problemler")!;
+  const byTopic: Record<string, Stat> = {
+    [members.masterId]: stat(10, 6, 3, 1),
+    [members.members[0].id]: stat(20, 15, 4, 1),
+    [members.members[3].id]: stat(5, 2, 2, 1),
+    "tyt-matematik-u0-t0": stat(99, 90, 5, 4), // an ordinary topic, outside the unit
+  };
+  const render = (id: string, stats: Record<string, Stat>, student: boolean) => {
+    const topicStats = { byTopic: stats, karma: stat(0, 0, 0, 0) };
+    const c = course(id);
+    return renderToStaticMarkup(
+      student ? (
+        <CourseTable course={c} resources={[{ id: "r1", name: "Kaynak A" }]} progress={{}} topicStats={topicStats} onAddResource={async () => {}} onToggle={() => {}} />
+      ) : (
+        <EditableCourseTable
+          course={c}
+          resources={[{ id: "r1", name: "Kaynak A", is_active: true }]}
+          progress={{}}
+          topicStats={topicStats}
+          onAddResource={() => {}}
+          onToggle={() => {}}
+          onArchiveResource={() => {}}
+          onReactivateResource={() => {}}
+          onDeleteResource={async () => {}}
+        />
+      ),
+    );
+  };
+  const rowsOf = (html: string) => html.split("<tr").slice(1);
+  const cellsOf = (row: string) => (row.match(/<td /g) ?? []).length;
+
+  for (const student of [true, false]) {
+    const who = student ? "student" : "coach";
+
+    it(`${who}: the unit's four stat cells appear once, spanning the whole unit, with the summed figures`, () => {
+      const rows = rowsOf(render("tyt-matematik", byTopic, student));
+      const parent = rows.find((r) => r.includes("data-topic-group-parent"))!;
+      // total 35, D 23, Y 9, B 3 -- the master and the subtopics together; the ordinary topic's 99 is not in it
+      for (const n of ["35", "23", "9", "3"]) expect(parent).toContain(`>${n}<`);
+      expect(parent).not.toContain(">99<");
+      // the four stat cells span the parent row and the 9 rows of the unit
+      expect((parent.match(/rowSpan="10"/g) ?? []).length).toBe(4 + 1); // 4 stat cells + the unit cell
+    });
+
+    it(`${who}: no row of the unit repeats stats, and none of its topics shows a question count`, () => {
+      const rows = rowsOf(render("tyt-matematik", byTopic, student));
+      const start = rows.findIndex((r) => r.includes("data-topic-group-parent"));
+      const parent = rows[start];
+      const unitRows = rows.slice(start + 1, start + 10);
+      const ordinary = rows.find((r) => r.includes("Temel Kavramlar"))!;
+      // an ordinary row: 4 stat cells + the unit cell... a unit row has exactly 4 stat cells fewer than an ordinary one
+      expect(unitRows).toHaveLength(9);
+      for (const r of unitRows) {
+        expect(r.includes("data-topic-group-parent")).toBe(false);
+        for (const n of [">20<", ">15<", ">5<", ">10<"]) expect(r, n).not.toContain(n);
+      }
+      // the first unit row's own cell count: label + checkbox cells (no stats, no unit cell: it moved to the parent)
+      expect(cellsOf(unitRows[1])).toBe(cellsOf(ordinary) - 4 - 1);
+      expect(parent).toContain("Problemler");
+    });
+
+    it(`${who}: every topic of the unit keeps its own tick cells (progress is still tracked one by one)`, () => {
+      const html = render("tyt-matematik", byTopic, student);
+      const rows = rowsOf(html);
+      const start = rows.findIndex((r) => r.includes("data-topic-group-parent"));
+      for (const r of rows.slice(start + 1, start + 10)) expect((r.match(/role="checkbox"/g) ?? []).length, r.slice(0, 120)).toBe(2);
+      for (const name of ["Problemler (Genel)", "Sayı-Kesir Problemleri", "Yaş Problemleri", "Rutin Olmayan Problemler"]) expect(html).toContain(name);
+    });
+
+    it(`${who}: the figures are still stored per topic -- the table only rolls them up (no id changes)`, () => {
+      expect(members.masterId).toBe("tyt-matematik-problemler");
+      expect(members.members.map((t) => t.id)).toEqual(["tyt-matematik-u1-t0", "tyt-matematik-u1-t1", "tyt-matematik-u1-t2", "tyt-matematik-u1-t3", "tyt-matematik-u1-t4", "tyt-matematik-u1-t5", "tyt-matematik-u1-t6", "tyt-matematik-u1-t7"]);
+      // with no data at all the aggregated cell reads "–", like any other topic without a result
+      const empty = rowsOf(render("tyt-matematik", {}, student)).find((r) => r.includes("data-topic-group-parent"))!;
+      expect((empty.match(/>–</g) ?? []).length).toBe(4);
+    });
+  }
+
+  it("is limited to legacy TYT Matematik: every other grouped unit keeps its per-topic stats", () => {
+    const fizik = course("tyt-fizik");
+    const dalga = topicGroups(fizik)[0];
+    const html = render("tyt-fizik", { [dalga.members[0].id]: stat(20, 15, 4, 1), [dalga.masterId]: stat(10, 6, 3, 1) }, true);
+    const rows = rowsOf(html);
+    const parent = rows.find((r) => r.includes("data-topic-group-parent") && r.includes(">Dalgalar<"))!;
+    // only its unit cell spans the unit; its four stat cells are ordinary single-row cells
+    expect((parent.match(/rowSpan="7"/g) ?? []).length).toBe(1);
+    // a subtopic row still shows its own figures
+    expect(rows.some((r) => r.includes(">20<") && r.includes(">15<"))).toBe(true);
+  });
+});
