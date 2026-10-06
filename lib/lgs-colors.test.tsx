@@ -80,3 +80,29 @@ describe("the student's own cards and the parent's board follow the same rule", 
     expect(subjectBackgroundClass("lgs-fen-bilimleri", "question_bank", { deepLgs: true })).toMatch(/\/12$/);
   });
 });
+
+describe("İngilizce Kelime Quizi: İngilizce's hue at the deeper tier, on every panel", () => {
+  const expected = "bg-[var(--subject-kimya)]/12"; // İngilizce reuses Kimya's token (see FAMILY_CLASSES)
+
+  it("is no longer the neutral grey: the İngilizce hue, deeper tier (same shade as the LGS İngilizce course)", () => {
+    expect(subjectBackgroundClass("ingilizce-quiz", "vocab_quiz")).toBe(expected);
+    expect(subjectBackgroundClass(null, "vocab_quiz")).toBe(expected); // by task type alone
+    expect(subjectBackgroundClass("ingilizce-quiz", "question_bank")).toBe(expected); // by its pseudo course alone
+    expect(subjectBackgroundClass("lgs-ingilizce", "question_bank", { deepLgs: true })).toBe(expected);
+    expect(subjectBackgroundClass("ingilizce-quiz", "vocab_quiz")).not.toBe("bg-slate-500/10");
+  });
+
+  it("needs no option: coach, student and parent all call the same function", async () => {
+    const { subjectTintClass } = await import("@/app/student/_components/daily-tasks/types");
+    expect(cardBackgroundClass({ course_id: "ingilizce-quiz", task_type: "vocab_quiz" } as DetailTask)).toBe(expected);
+    expect(subjectTintClass({ course_id: "ingilizce-quiz", task_type: "vocab_quiz" } as never)).toBe(expected);
+    expect(subjectBackgroundClass("ingilizce-quiz", "vocab_quiz")).toBe(expected); // the parent board's own call
+  });
+
+  it("leaves every other task alone: a Genel Deneme keeps its colour, a Branş Denemesi its shade, the paragraf routine its grey", () => {
+    expect(subjectBackgroundClass(null, "general_exam")).toBe("bg-[var(--subject-genel-deneme)]");
+    expect(subjectBackgroundClass("lgs-ingilizce", "branch_exam", { deepLgs: true })).toMatch(/\/20$/);
+    expect(subjectBackgroundClass("paragraf", "question_bank")).toBe("bg-slate-500/10");
+    expect(subjectBackgroundClass("kitap-okuma", "reading")).toBe("bg-slate-500/10");
+  });
+});

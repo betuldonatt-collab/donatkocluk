@@ -218,6 +218,10 @@ export function subjectBackgroundClass(
   // Genel Deneme is a milestone, meant to stand out rather than blend
   // into the subject palette.
   if (taskType === "general_exam") return "bg-[var(--subject-genel-deneme)]";
+  // "İngilizce Kelime Quizi" (LGS): its own task type with the pseudo course "ingilizce-quiz", so it matches no course
+  // family below and used to fall through to the neutral grey. It takes İngilizce's hue at the deeper tier, like the 8th
+  // grade's regular courses -- the same on every panel (it is LGS-only, so there is nothing to opt in to).
+  if (taskType === "vocab_quiz" || courseId === "ingilizce-quiz") return FAMILY_CLASSES.ingilizce[1];
   if (courseId) {
     const routineClass = ROUTINE_CLASSES[courseId];
     if (routineClass) return routineClass;
