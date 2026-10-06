@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { checkQuestionBankSave, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
+import { checkQuestionBankSave, durationOnlyCountsRequired, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Languages, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
@@ -749,7 +749,10 @@ function TaskModalBody({
   // watched video (lib/question-bank-validation.ts, re-checked by updateTaskProgress). For LGS / 7th-grade
   // students there is no box -- some count is always required.
   function blockedByQuestionBankRule(): boolean {
-    if (task.task_type !== "question_bank" || isDurationOnlyTarget) return false;
+    if (task.task_type !== "question_bank") return false;
+    // A duration-only target keeps its counts optional -- except in Matematik / Geometri, where Doğru is required
+    // too (not when the student is reporting the task as not done).
+    if (isDurationOnlyTarget && !durationOnlyCountsRequired({ courseId: task.course_id, status: manualStatus })) return false;
     const problem = checkQuestionBankSave({
       correct: toNumberOrNull(correctCount),
       wrong: toNumberOrNull(wrongCount),
@@ -757,6 +760,7 @@ function TaskModalBody({
       noQuestionsSolved: noQuestionsActive,
       watchedVideo: hasWatchedVideo(videoLinks),
       isLgs: photoWorkflow,
+      noBox: isDurationOnlyTarget,
     });
     if (!problem) return false;
     // Outline the Doğru box when it is the one missing.

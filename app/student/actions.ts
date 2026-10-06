@@ -20,7 +20,7 @@ import {
   isGeneralExamScoresIncomplete,
 } from "@/lib/exam-results-validation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
-import { checkQuestionBankSave, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
+import { checkQuestionBankSave, durationOnlyCountsRequired, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
@@ -220,7 +220,7 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   const { data: existing, error: fetchError } = await supabase
     .from("student_tasks")
     .select(
-      "student_id, is_coach_assigned, is_approved_by_coach, task_type, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count, subject_scores, video_links",
+      "student_id, is_coach_assigned, is_approved_by_coach, task_type, course_id, title, status, evidence_image_paths, evidence_review_status, evidence_photo_status, total_count, correct_count, wrong_count, empty_count, subject_scores, video_links",
     )
     .eq("id", taskIdV)
     .maybeSingle();
@@ -238,7 +238,11 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   if (existing.task_type === "question_bank") {
     const savesCounts = "correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV;
     const target = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
-    if (noQuestionsSolved || (savesCounts && target !== null)) {
+    // A coach-assigned task with only a time target ("Soru Çözümü · 60 dk") keeps its counts optional -- except in
+    // Matematik / Geometri, where Doğru is required too (unless the student reports the task as not done).
+    const durationOnlyMath =
+      savesCounts && target === null && existing.is_coach_assigned && durationOnlyCountsRequired({ courseId: existing.course_id, status: patchV.status });
+    if (noQuestionsSolved || (savesCounts && target !== null) || durationOnlyMath) {
       const finalCorrect = "correct_count" in patchV ? (patchV.correct_count ?? null) : existing.correct_count;
       const finalWrong = "wrong_count" in patchV ? (patchV.wrong_count ?? null) : existing.wrong_count;
       const finalEmpty = "empty_count" in patchV ? (patchV.empty_count ?? null) : existing.empty_count;
@@ -253,6 +257,7 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
         noQuestionsSolved,
         watchedVideo: hasWatchedVideo(existing.video_links as { watched?: boolean }[] | null),
         isLgs,
+        noBox: target === null,
       });
       if (problem) throw new Error(problem);
     }

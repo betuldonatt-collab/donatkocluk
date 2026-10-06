@@ -7,6 +7,8 @@ import {
   NO_QUESTIONS_NOT_FOR_LGS,
   NO_QUESTIONS_WITH_COUNTS,
   QUESTION_CORRECT_REQUIRED,
+  durationOnlyCountsRequired,
+  isMathOrGeometryCourse,
   QUESTION_COUNTS_REQUIRED,
   zeroFillQuestionCounts,
 } from "./question-bank-validation";
@@ -81,5 +83,60 @@ describe("hasWatchedVideo", () => {
     expect(hasWatchedVideo([{ watched: false }, {}])).toBe(false);
     expect(hasWatchedVideo([])).toBe(false);
     expect(hasWatchedVideo(null)).toBe(false);
+  });
+});
+
+describe("duration-only Soru Çözümü: Doğru is required in Matematik / Geometri only", () => {
+  it("recognises Matematik and Geometri courses of every cohort, and nothing else", async () => {
+    const { MAARIF_GRADES } = await import("./maarif-grade");
+    const mathGeo = ["tyt-matematik", "tyt-geometri", "lgs-matematik", "maarif7-matematik"];
+    for (const id of mathGeo) expect(isMathOrGeometryCourse(id), id).toBe(true);
+    // every course of the 7th-10th grades whose name says Matematik / Geometri is detected, the others are not
+    for (const grade of [7, 9, 10] as const) {
+      for (const course of MAARIF_GRADES[grade].courses) {
+        expect(isMathOrGeometryCourse(course.id), course.name).toBe(/matematik|geometri/i.test(course.name));
+      }
+    }
+    for (const id of ["tyt-fizik", "tyt-turkce", "tyt-kimya", "lgs-fen", "lgs-turkce", "maarif7-fen-bilimleri", "paragraf", "problem", "yeni-nesil-mat-dozu", "kitap-okuma"]) {
+      expect(isMathOrGeometryCourse(id), id).toBe(false);
+    }
+    expect(isMathOrGeometryCourse(null)).toBe(false);
+    expect(isMathOrGeometryCourse("no-such-course")).toBe(false);
+  });
+
+  it("every AYT Matematik / Geometri course (Sayısal and EA) counts too", async () => {
+    const { AYT_COURSES_BY_TRACK } = await import("./curriculum");
+    const all = [...AYT_COURSES_BY_TRACK.sayisal, ...AYT_COURSES_BY_TRACK.ea, ...AYT_COURSES_BY_TRACK.sozel];
+    const math = all.filter((c) => /matematik|geometri/i.test(c.name));
+    expect(math.length).toBeGreaterThan(0);
+    for (const c of math) expect(isMathOrGeometryCourse(c.id), c.id).toBe(true);
+  });
+
+  it("requires Doğru for a math / geometry duration-only task, not for other subjects, and never for Yapılmadı", () => {
+    expect(durationOnlyCountsRequired({ courseId: "tyt-matematik", status: "done" })).toBe(true);
+    expect(durationOnlyCountsRequired({ courseId: "tyt-geometri", status: "half_done" })).toBe(true);
+    expect(durationOnlyCountsRequired({ courseId: "tyt-matematik", status: null })).toBe(true);
+    expect(durationOnlyCountsRequired({ courseId: "tyt-matematik", status: "not_done" })).toBe(false);
+    expect(durationOnlyCountsRequired({ courseId: "tyt-fizik", status: "done" })).toBe(false);
+    expect(durationOnlyCountsRequired({ courseId: "lgs-fen", status: "done" })).toBe(false);
+  });
+
+  it("when required, a blank Doğru gets the message (no mention of the missing 'Soruları çözmedim' box)", () => {
+    const noBox = { ...base, noBox: true };
+    expect(checkQuestionBankSave({ ...noBox, wrong: 2 })).toBe(QUESTION_CORRECT_REQUIRED);
+    expect(checkQuestionBankSave(noBox)).not.toContain("Soruları çözmedim");
+    expect(checkQuestionBankSave(noBox)).toBe(NO_QUESTIONS_NOT_FOR_LGS);
+    expect(checkQuestionBankSave({ ...noBox, correct: 0 })).toBeNull();
+    expect(checkQuestionBankSave({ ...noBox, correct: 12, wrong: 3 })).toBeNull();
+  });
+});
+
+describe("Matematik / Geometri detection covers the 11th grade's merged Maarif TYT courses too", () => {
+  it("each course whose name says Matematik or Geometri is detected", async () => {
+    const { MAARIF_TYT_MERGED_COURSES } = await import("./curriculum/maarif-tyt");
+    const { MAARIF_GRADES } = await import("./maarif-grade");
+    for (const course of [...MAARIF_TYT_MERGED_COURSES, ...MAARIF_GRADES[11].courses]) {
+      expect(isMathOrGeometryCourse(course.id), course.name).toBe(/matematik|geometri/i.test(course.name));
+    }
   });
 });
