@@ -20,6 +20,7 @@ import type { Course, Unit } from "./index";
 import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { alignedUnits, SUBJECT_SPECS } from "./maarif-tyt-structure";
+import { withUnitMasters } from "./topic-groups";
 
 type MergePair = {
   id: string;
@@ -64,7 +65,10 @@ export function splitUnitGradeTag(label: string): { grade: string | null; title:
   return m ? { grade: m[1], title: m[2] } : { grade: null, title: label };
 }
 
-export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, m9Id, m10Id }) => {
+// Every unit with two or more topics also carries its master topic "<unit> (Genel)" (withUnitMasters, lib/curriculum/
+// topic-groups.ts): the coach picks the Ünite as a whole and may then narrow it to one Alt Başlık, like the 11th grade's own
+// courses and the TYT / AYT grouped units. Türkçe has no units (one flat list) and so stays as it is.
+export const MAARIF_TYT_MERGED_COURSES: Course[] = withUnitMasters(MERGE_PAIRS.map(({ id, name, m9Id, m10Id }) => {
   // A subject with a bucket structure (maarif-tyt-structure.ts) is laid out in
   // its buckets -- each one a single leaf, raw topics hidden -- instead of 9th's
   // units followed by 10th's. Its units are numbered across both grades, so
@@ -80,7 +84,7 @@ export const MAARIF_TYT_MERGED_COURSES: Course[] = MERGE_PAIRS.map(({ id, name, 
     name,
     units: [...(c9 ? taggedUnits(c9.units, "9. Sınıf") : []), ...(c10 ? taggedUnits(c10.units, "10. Sınıf") : [])],
   };
-});
+}));
 
 export function isMaarifTytMergedCourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif-tyt-");

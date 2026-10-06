@@ -6,11 +6,14 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
+import { withoutUnitMasters } from "./topic-groups";
 import { alignedUnits, hasBucketedStructure, resolveSpec, SUBJECT_SPECS } from "./maarif-tyt-structure";
 import { courseHasBuckets, maarifSelectionNodes } from "./maarif-selection";
 import { flattenSelectionRows, isFlatRows, withGroupHeadings } from "./rows";
 
-const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
+// The merged course as its structure spec defines it: the generated "(Genel)" master topics (withUnitMasters) are checked
+// on their own below, so every structure assertion here keeps describing the native buckets.
+const merged = (id: string) => withoutUnitMasters(MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!);
 const tarih = merged("maarif-tyt-tarih");
 const cografya = merged("maarif-tyt-cografya");
 const raw = (prefix: string) =>
@@ -103,7 +106,7 @@ describe("Tarih: the buckets are the only thing shown", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(rawTarih).toHaveLength(27); // 13 (9th) + 14 (10th)
     expect(tarih.units.some((u) => u.unit === "Diğer")).toBe(false);
-    expect(findCourseById("maarif-tyt-tarih")).toBe(tarih);
+    expect(findCourseById("maarif-tyt-tarih")).toBe(MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-tarih"));
   });
 
   it("hides the raw topics behind each bucket but keeps their real ids as members", () => {

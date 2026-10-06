@@ -6,11 +6,12 @@ import { describe, expect, it } from "vitest";
 import { MAARIF_GRADES } from "../maarif-grade";
 import { MAARIF11_KAYNAK_COURSES, isMaarif11CourseId } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES, isMaarifTytMergedCourseId } from "./maarif-tyt";
+import { withoutUnitMasters } from "./topic-groups";
 import { courseHasBuckets } from "./maarif-selection";
 import { hasBucketedStructure, SUBJECT_SPECS } from "./maarif-tyt-structure";
 
 const native = (id: string) => MAARIF11_KAYNAK_COURSES.find((c) => c.id === id)!;
-const merged = (id: string) => MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!;
+const merged = (id: string) => withoutUnitMasters(MAARIF_TYT_MERGED_COURSES.find((c) => c.id === id)!);
 
 describe("native 11th-grade courses stay on their own data", () => {
   it("Coğrafya keeps its 7 native units and 19 topics", () => {

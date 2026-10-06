@@ -27,36 +27,83 @@ const UNGROUPED_TOPIC_NAMES: Record<string, string[]> = {
   "tyt-biyoloji": ["Kalıtım"],
 };
 
-// The id of a generated master topic: "<courseId>-genel-u<unitIndex>" (also what the TYT / AYT data uses).
+// The id of a generated master topic: "<courseId>-genel-u<n>", n = the position of the unit's LABEL among the course's
+// distinct unit labels (also what the TYT / AYT data uses; there every unit is one entry, so n is its index).
 export function unitMasterId(courseId: string, unitIndex: number): string {
   return `${courseId}-genel-u${unitIndex}`;
 }
 
-// "1. Ünite: Kuvvet ve Hareket" -> "Kuvvet ve Hareket" (the Maarif unit label without its number): a topic name must
-// never start with a hierarchy number on screen, and the master topic is a topic.
-function unitTitle(label: string): string {
-  const title = label.replace(/^\d+\.\s*(?:Ünite|Tema)\s*:\s*/i, "").trim();
-  return title === "" ? label : title;
+// The distinct unit labels of a course, in order, with a "-" (headerless) or empty label left out: those have no unit to
+// group. A course can list one unit as several entries (the merged "Maarif TYT" courses: one entry per bucket).
+function groupableLabels(units: { unit: string | null }[]): string[] {
+  const labels: string[] = [];
+  for (const u of units) if (u.unit && u.unit !== "-" && !labels.includes(u.unit)) labels.push(u.unit);
+  return labels;
+}
+
+// "1. Ünite: Kuvvet ve Hareket" -> "Kuvvet ve Hareket" (a Maarif unit label without its number): a topic name must never
+// start with a hierarchy number on screen, and the master topic is a topic. The merged courses tag a unit with its grade
+// ("(9. Sınıf) 1. Ünite: Allah İnsan İlişkisi"): the tag stays, the number goes.
+const UNIT_LABEL_PARTS = /^(\(\d+\. Sınıf\)\s*)?(\d+)\.\s*(Ünite|Tema)\s*:\s*(.*)$/i;
+
+function masterBaseName(label: string): { tag: string; title: string; number: string | null } {
+  const m = UNIT_LABEL_PARTS.exec(label);
+  if (!m || m[4].trim() === "") return { tag: "", title: label, number: null };
+  return { tag: m[1] ?? "", title: m[4].trim(), number: `${m[2]}. ${m[3]}` };
 }
 
 // Adds a master topic ("<unit title> (Genel)", id from unitMasterId) to every unit that has at least two topics, and
-// returns new course objects. For curricula whose JSON is generated from a source list by a script (the 11th grade's
-// maarif11.json): the masters are added when the data is loaded, so re-running the script never loses them. The master
-// goes LAST in its unit, so no existing topic keeps anything but its own position and id (a Maarif Kaynak Takibi row is
-// identified by the first topic of its group -- saved ticks are keyed by it). A unit with a single topic has nothing to
-// group and stays flat, as does a "-" (headerless) unit.
-export function withUnitMasters<U extends { unit: string | null; topics: { id: string; name: string }[] }, C extends { id: string; units: U[] }>(courses: C[]): C[] {
-  return courses.map(
-    (course) =>
-      ({
-        ...course,
-        units: course.units.map((unit, ui) =>
-          !unit.unit || unit.unit === "-" || unit.topics.length < 2
-            ? unit
-            : { ...unit, topics: [...unit.topics, { id: unitMasterId(course.id, ui), name: `${unitTitle(unit.unit)} (Genel)` }] },
-        ),
-      }) as C,
-  );
+// returns new course objects. For curricula that are generated from a source list by a script or assembled from other
+// courses (the 11th grade's maarif11.json, the merged "Maarif TYT" courses): the masters are added when the data is
+// loaded, so regenerating the data never loses them. A unit with a single topic has nothing to group and stays flat, as
+// does a "-" (headerless) or unlabelled one.
+//
+// Nothing that exists changes id or position: the master is added LAST in its unit (a Maarif Kaynak Takibi row is
+// identified by the first topic of its group -- saved ticks are keyed by it). A unit that is one entry gets the master
+// as that entry's last topic; a unit made of several bucket entries gets one more bucket entry, named like the master,
+// after them (a Kaynak Takibi row of its own, with the stats of tasks assigned to the unit as a whole).
+//
+// Two units of one course can share a title (Maarif Matematik "1. Tema: Sayılar" and "3. Tema: Sayılar"): their masters
+// then say which one they are ("Sayılar — 1. Tema (Genel)") so they stay apart in a picker.
+export function withUnitMasters<
+  U extends { unit: string | null; bucket?: string; topics: { id: string; name: string }[] },
+  C extends { id: string; units: U[] },
+>(courses: C[]): C[] {
+  return courses.map((course) => {
+    const labels = groupableLabels(course.units);
+    const baseNames = labels.map((l) => masterBaseName(l));
+    const plain = baseNames.map((b) => `${b.tag}${b.title}`);
+    const masterName = (li: number) => {
+      const b = baseNames[li];
+      const clash = plain.some((n, i) => i !== li && n === plain[li]);
+      return `${b.tag}${b.title}${clash && b.number ? ` — ${b.number}` : ""} (Genel)`;
+    };
+
+    const topicTotal = (label: string) => course.units.filter((u) => u.unit === label).reduce((n, u) => n + u.topics.length, 0);
+    const lastEntryOf = new Map<string, number>();
+    course.units.forEach((u, i) => {
+      if (u.unit) lastEntryOf.set(u.unit, i);
+    });
+
+    const units = course.units.flatMap((unit, i): U[] => {
+      const li = unit.unit ? labels.indexOf(unit.unit) : -1;
+      if (li === -1 || lastEntryOf.get(unit.unit!) !== i || topicTotal(unit.unit!) < 2) return [unit];
+      const master = { id: unitMasterId(course.id, li), name: masterName(li) };
+      if (unit.bucket !== undefined) return [unit, { unit: unit.unit, bucket: master.name, topics: [master] } as unknown as U];
+      return [{ ...unit, topics: [...unit.topics, master] }];
+    });
+    return { ...course, units } as C;
+  });
+}
+
+// The same course without its generated master topics (and the bucket entries that only held one): the course as its
+// source data defines it. For tests and tools that check the native structure of a course.
+export function withoutUnitMasters<C extends { units: { topics: { id: string }[] }[] }>(course: C): C {
+  const isMaster = (id: string) => /-genel-u\d+$/.test(id);
+  return {
+    ...course,
+    units: course.units.map((u) => ({ ...u, topics: u.topics.filter((t) => !isMaster(t.id)) })).filter((u) => u.topics.length > 0),
+  } as C;
 }
 
 export type TopicGroup = {
@@ -74,12 +121,13 @@ export function topicGroups(course: Course | null | undefined): TopicGroup[] {
   if (cached) return cached;
   const flat = new Set(UNGROUPED_TOPIC_NAMES[course.id] ?? []);
   const groups: TopicGroup[] = [];
-  for (const [ui, unit] of course.units.entries()) {
-    if (unit.unit === "-") continue;
+  for (const [li, label] of groupableLabels(course.units).entries()) {
+    // a unit can be several entries (the merged Maarif TYT courses' buckets): its topics are all of them together
+    const topics = course.units.filter((u) => u.unit === label).flatMap((u) => u.topics);
     // The master: named "<unit> (Genel)", or carrying the generated master id (units whose label starts with a number).
-    const master = unit.topics.find((t) => t.name === unit.unit + " (Genel)" || t.id === unitMasterId(course.id, ui));
+    const master = topics.find((t) => t.name === label + " (Genel)" || t.id === unitMasterId(course.id, li));
     if (!master) continue;
-    groups.push({ unitLabel: unit.unit, masterId: master.id, members: unit.topics.filter((t) => t.id !== master.id && !flat.has(t.name)) });
+    groups.push({ unitLabel: label, masterId: master.id, members: topics.filter((t) => t.id !== master.id && !flat.has(t.name)) });
   }
   cache.set(course, groups);
   return groups;

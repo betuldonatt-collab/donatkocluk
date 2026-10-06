@@ -30,7 +30,8 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
     const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
     const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
     const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
-    const mergedTopicIds = din.units.flatMap((u) => u.topics.map((t) => t.id));
+    // (the generated "(Genel)" masters, withUnitMasters, are the only ids that are not from the 9th / 10th grade lists)
+    const mergedTopicIds = din.units.flatMap((u) => u.topics.map((t) => t.id)).filter((id) => !id.includes("-genel-u"));
     const sourceTopicIds = [...m9.units, ...m10.units].flatMap((u) => u.topics.map((t) => t.id));
     expect(mergedTopicIds).toEqual(sourceTopicIds);
   });
