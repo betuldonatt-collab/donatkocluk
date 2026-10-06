@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
-import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
+import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/paragraf-problem-chart";
 import { computeNet } from "@/lib/scoring";
 import { ChartRangePicker } from "../_components/charts/chart-range-picker";
 import { DualMetricChart } from "../_components/charts/dual-metric-chart";
@@ -158,16 +158,10 @@ export function ParagrafProblemClient({
     [history],
   );
 
-  const paragrafSeries = chartSortedAsc.map((e) => ({
-    date: e.date,
-    a: computeNet(e.paragraf.dogru, e.paragraf.yanlis),
-    b: e.paragraf.sure,
-  }));
-  const problemSeries = chartSortedAsc.map((e) => ({
-    date: e.date,
-    a: computeNet(e.problem.dogru, e.problem.yanlis),
-    b: e.problem.sure,
-  }));
+  // Only the days with data for THAT subject are plotted (practiceChartSeries): a day with nothing logged is not a
+  // point at 0 -- the line bridges from the last real day to the next and the days sit side by side.
+  const paragrafSeries = practiceChartSeries(chartSortedAsc, "paragraf", computeNet);
+  const problemSeries = practiceChartSeries(chartSortedAsc, "problem", computeNet);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">

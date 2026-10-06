@@ -33,3 +33,26 @@ export function aggregateParagrafProblemByDate(rows: ParagrafProblemDay[]): Para
   }
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
+
+// Whether a day holds any real Paragraf (or Problem) practice: questions or time. A day on which only the OTHER subject
+// was logged carries all zeros for this one -- that is "nothing done", not a result of 0.
+export function hasPracticeData(counts: ParagrafProblemCounts): boolean {
+  return counts.dogru + counts.yanlis + counts.bos + counts.sure > 0;
+}
+
+export type PracticePoint = { date: string; a: number; b: number };
+
+// The points of the Paragraf Gelişimi / Problem Gelişimi charts (Net + Süre per day): ONLY the days that have data for
+// that subject, so the line runs straight from one real day to the next and the days sit side by side on the x-axis,
+// instead of dropping to 0 on a day the subject was not practised (which reads as a collapse in performance). A real
+// result -- even a net of 0 or below from questions actually answered -- keeps its point. NOT used for the daily total
+// questions chart, where 0 genuinely means the student did not study.
+export function practiceChartSeries(
+  days: ParagrafProblemDay[],
+  subject: "paragraf" | "problem",
+  netOf: (dogru: number, yanlis: number) => number,
+): PracticePoint[] {
+  return days
+    .filter((d) => hasPracticeData(d[subject]))
+    .map((d) => ({ date: d.date, a: netOf(d[subject].dogru, d[subject].yanlis), b: d[subject].sure }));
+}

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isDateInChartRange, type ChartRange } from "@/lib/chart-range";
-import { aggregateParagrafProblemByDate } from "@/lib/paragraf-problem-chart";
+import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
@@ -210,16 +210,10 @@ export function ChartsTab({
         problem: { dogru: e.problem_dogru, yanlis: e.problem_yanlis, bos: 0, sure: e.problem_sure },
       })),
   );
-  const paragrafSeries = sortedEntries.map((e) => ({
-    date: e.date,
-    a: computeNet(e.paragraf.dogru, e.paragraf.yanlis),
-    b: e.paragraf.sure,
-  }));
-  const problemSeries = sortedEntries.map((e) => ({
-    date: e.date,
-    a: computeNet(e.problem.dogru, e.problem.yanlis),
-    b: e.problem.sure,
-  }));
+  // Only the days with data for THAT subject are plotted (practiceChartSeries): a day with nothing logged is not a
+  // point at 0 -- the line bridges from the last real day to the next and the days sit side by side.
+  const paragrafSeries = practiceChartSeries(sortedEntries, "paragraf", computeNet);
+  const problemSeries = practiceChartSeries(sortedEntries, "problem", computeNet);
 
   // LGS: Paragraf (3:1 net + duration) and Kitap Okuma (pages/day) from the
   // daily routine rows; a row can carry just one of the two.
