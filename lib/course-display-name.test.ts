@@ -16,6 +16,11 @@ describe("courseDisplayName: the TYT / AYT prefix is added once, never twice", (
     expect(courseDisplayName("ayt-matematik-sayisal", "Matematik")).toBe("AYT Matematik");
   });
 
+  it("prefixes the merged Maarif TYT courses, once", () => {
+    expect(courseDisplayName("maarif-tyt-fizik", "Fizik")).toBe("Maarif TYT Fizik");
+    expect(courseDisplayName("maarif-tyt-fizik", "Maarif TYT Fizik")).toBe("Maarif TYT Fizik");
+  });
+
   it("leaves a combined branch-exam course's name alone (it already says TYT / AYT)", () => {
     expect(courseDisplayName("tyt-fen-macro", "TYT Fen")).toBe("TYT Fen");
     expect(courseDisplayName("tyt-sosyal-macro", "TYT Sosyal")).toBe("TYT Sosyal");

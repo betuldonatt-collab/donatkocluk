@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { TYT_BRANCH_EXAM_MACRO_COURSES, TYT_COURSES, yksCourseOptions, type Course } from "./curriculum";
+import { courseDisplayName, type Course } from "./curriculum";
+import { MAARIF_TYT_MERGED_COURSES } from "./curriculum/maarif-tyt";
 import { MAARIF7_KAYNAK_COURSES, isMaarif7CourseId } from "./curriculum/maarif7";
 import { MAARIF9_KAYNAK_COURSES, isMaarif9CourseId } from "./curriculum/maarif9";
 import { MAARIF10_KAYNAK_COURSES, isMaarif10CourseId } from "./curriculum/maarif10";
@@ -134,17 +135,21 @@ export function maarifCourseOptions(grade: MaarifGrade): { id: string; label: st
   return sections.flatMap((g) => g.courses.map((c) => ({ id: c.id, label: stripGradePrefix(c.name), group: g.label })));
 }
 
-// The Ders options of an 11th grader's task form: the grade's own courses ("11. Sınıf Matematik") AND every TYT course
-// ("TYT Matematik"), listed under their own headings and never merged -- both versions of a subject are assignable,
-// and the prefix in each label says which one it is. A Branş Denemesi also offers the combined TYT courses.
-export function maarif11CourseOptions(isBranchExam: boolean): { id: string; label: string; group: string }[] {
-  const own = MAARIF_GRADES[11].courses.map((c) => ({ id: c.id, label: c.name, group: "11. Sınıf" }));
-  const tyt = yksCourseOptions({
-    atomic: TYT_COURSES,
-    macros: isBranchExam ? TYT_BRANCH_EXAM_MACRO_COURSES : [],
-    aytTrack: null,
-  }).map((o) => ({ ...o, group: "TYT" }));
-  return [...own, ...tyt];
+// The courses an 11th grader's tasks can be assigned from (the coach's "Yeni görev ekle" and the student's "Ek Çalışma
+// Ekle"): the grade's own courses AND its "Maarif TYT" courses (the 9th + 10th grade curricula merged per subject,
+// lib/curriculum/maarif-tyt.ts -- the very courses of the Kaynak Takibi "Maarif TYT" tab, so a task's results land
+// there). Never the standard TYT courses.
+export function maarif11AssignableCourses(): Course[] {
+  return [...MAARIF_GRADES[11].courses, ...MAARIF_TYT_MERGED_COURSES];
+}
+
+// Their Ders options: "11. Sınıf Matematik" and "Maarif TYT Matematik" are separate items under their own headings
+// (this year's courses first); the prefix in each label says which curriculum it is.
+export function maarif11CourseOptions(): { id: string; label: string; group: string }[] {
+  return [
+    ...MAARIF_GRADES[11].courses.map((c) => ({ id: c.id, label: c.name, group: "11. Sınıf" })),
+    ...MAARIF_TYT_MERGED_COURSES.map((c) => ({ id: c.id, label: courseDisplayName(c.id, c.name), group: "Maarif TYT" })),
+  ];
 }
 
 type Flags = {

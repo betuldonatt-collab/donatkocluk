@@ -23,7 +23,7 @@ import { isSoruCozumuLike } from "@/lib/task-types";
 import { TopicGroupSelect } from "@/components/topic-group-select";
 import { mainTopicOptions, mainValueOf } from "@/lib/curriculum/topic-groups";
 import type { StudentTask } from "./types";
-import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarif11AssignableCourses, maarif11CourseOptions, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
 
@@ -194,7 +194,8 @@ export function AddCustomTaskDialog({
   const maarifGrade = useMaarifGrade();
   const aytTrack = useAytTrack();
   const isMaarif9 = maarifGrade !== null;
-  const gradeCourses = maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : [];
+  // An 11th grader may also pick the "Maarif TYT" courses (lib/maarif-grade.ts); every other grade only its own.
+  const gradeCourses = maarifGrade === 11 ? maarif11AssignableCourses() : maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : [];
   const singleGeneralExamFormat = isLgs || isMaarif9;
   const [value, setValue] = useState<FormState>(() => initialFormState(examType, maarifGrade));
   const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
@@ -243,7 +244,9 @@ export function AddCustomTaskDialog({
         ? [...BRANCH_EXAM_MACRO_COURSES, ...ALL_COURSES]
         : ALL_COURSES;
   const courseOptions: { id: string; label: string; group?: string }[] = maarifGrade !== null
-    ? maarifCourseOptions(maarifGrade)
+    ? maarifGrade === 11
+      ? maarif11CourseOptions()
+      : maarifCourseOptions(maarifGrade)
     : isLgs
       ? lgsCourseOptions()
       : studentYksCourseOptions(isBranchExam, aytTrack);

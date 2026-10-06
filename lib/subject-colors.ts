@@ -150,6 +150,17 @@ const COURSE_FAMILY: Record<string, SubjectFamily> = {
   "maarif10-gd-cografya": "cografya",
   "maarif10-gd-felsefe": "felsefe",
   "maarif10-gd-din-kulturu-ve-ahlak-bilgisi": "din",
+  // The 11th grade's merged "Maarif TYT" courses (9th + 10th grade per subject): same families again.
+  "maarif-tyt-turk-dili-ve-edebiyati": "turkce",
+  "maarif-tyt-matematik": "matematik",
+  "maarif-tyt-geometri": "geometri",
+  "maarif-tyt-cografya": "cografya",
+  "maarif-tyt-fizik": "fizik",
+  "maarif-tyt-kimya": "kimya",
+  "maarif-tyt-din-kulturu": "din",
+  "maarif-tyt-tarih": "tarih",
+  "maarif-tyt-biyoloji": "biyoloji",
+  "maarif-tyt-felsefe": "felsefe",
   // 11th grade (Maarif): same families again.
   "maarif11-turk-dili-ve-edebiyati": "turkce",
   "maarif11-matematik": "matematik",
@@ -193,8 +204,9 @@ const ROUTINE_CLASSES: Record<string, string> = {
 };
 
 // `deepMaarif11`: an 11th grader's own ("maarif11-") courses take the deeper (AYT) tier instead of the TYT one, so a
-// student who works on both curricula shows "this year's subject" (deeper) and "exam prep" (lighter, TYT) apart at a
-// glance. Opt-in: only the coach's own views pass it; every other caller keeps the tier it always had.
+// student who works on both curricula shows "this year's subject" (deeper) and "exam prep" (the merged "Maarif TYT"
+// courses, lighter) apart at a glance. Opt-in: the coach's views and the student's own cards pass it; every other caller
+// keeps the tier it always had.
 export function subjectBackgroundClass(courseId: string | null, taskType: string, options: { deepMaarif11?: boolean } = {}): string {
   // Standalone punchy color, not part of the TYT/AYT/Branş tier system --
   // Genel Deneme is a milestone, meant to stand out rather than blend

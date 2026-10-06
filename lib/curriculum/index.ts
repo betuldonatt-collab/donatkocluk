@@ -182,7 +182,15 @@ export function aytTrackOf(academicTrack: string | null | undefined): Track | nu
 // the prefix in their name and must not get it twice ("TYT TYT Fen"). Every place that builds or shows such a name
 // goes through this one function, so the prefix can never double up -- whatever course it is.
 export function courseDisplayName(courseId: string | null | undefined, name: string): string {
-  const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
+  // The 11th grade's merged 9th + 10th grade courses ("maarif-tyt-matematik", plain name "Matematik") read "Maarif TYT
+  // Matematik", so they can never be mistaken for the grade's own "11. Sınıf Matematik".
+  const prefix = courseId?.startsWith("tyt-")
+    ? "TYT "
+    : courseId?.startsWith("ayt-")
+      ? "AYT "
+      : courseId?.startsWith("maarif-tyt-")
+        ? "Maarif TYT "
+        : "";
   return prefix && !name.startsWith(prefix) ? prefix + name : name;
 }
 

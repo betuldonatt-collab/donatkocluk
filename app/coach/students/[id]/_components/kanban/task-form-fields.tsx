@@ -125,9 +125,9 @@ export function courseOptionsFor(
   maarifGrade: MaarifGrade | null = null,
   aytTrack: Track | null = null,
 ): { id: string; label: string; group?: string }[] {
-  // An 11th grader is offered their own courses AND every TYT course (the grade is exam-prep year); the other
-  // Maarif grades only their own (7th, 9th and 10th grade never mix).
-  if (maarifGrade === 11) return maarif11CourseOptions(isBranchExam);
+  // An 11th grader is offered their own courses AND the "Maarif TYT" ones (exam-prep year); the other Maarif grades
+  // only their own (7th, 9th and 10th grade never mix).
+  if (maarifGrade === 11) return maarif11CourseOptions();
   if (maarifGrade !== null) return maarifCourseOptions(maarifGrade);
   if (examType === "LGS") {
     return [
