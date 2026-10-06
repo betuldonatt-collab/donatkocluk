@@ -1305,6 +1305,7 @@ export async function getPastWeeksForStudent(studentId: string): Promise<{ weekS
 
 export type AssignableTaskType =
   | "question_bank"
+  | "resource_review"
   | "topic_study"
   | "branch_exam"
   | "general_exam"
@@ -1336,7 +1337,7 @@ type AssignTaskInput = {
 const videoLinkSchema = z.object({ url: z.string().trim().max(2000), title: z.string().trim().max(300).nullable() });
 
 const assignTaskInputSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]),
+  taskType: z.enum(["question_bank", "resource_review", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -1563,7 +1564,7 @@ export async function assignRoutineToWeek(input: AssignTaskInput & { studentId: 
 // --- Student detail: schedule workspace (edit/duplicate/move/delete) -----
 
 const updateAssignedTaskSchema = z.object({
-  taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]).optional(),
+  taskType: z.enum(["question_bank", "resource_review", "topic_study", "branch_exam", "general_exam", "video", "reading", "vocab_quiz"]).optional(),
   courseId: z.string().trim().max(60).nullable().optional(),
   topicId: z.string().trim().max(60).nullable().optional(),
   resourceIds: z.array(uuidSchema).optional(),
@@ -3108,7 +3109,7 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
     .from("student_tasks")
     .select("id, task_date, task_type, course_id, title, subject_scores, correct_count, wrong_count, empty_count")
     .eq("student_id", studentIdV)
-    .in("task_type", ["branch_exam", "general_exam", "question_bank", "topic_study"])
+    .in("task_type", ["branch_exam", "general_exam", "question_bank", "resource_review", "topic_study"])
     .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true")
     .gte("task_date", rangeStart)
     .lte("task_date", rangeEnd);

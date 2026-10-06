@@ -1,3 +1,5 @@
+import { isSoruCozumuLike } from "./task-types";
+
 export type CountFields = {
   total: number | null;
   correct: number | null;
@@ -60,7 +62,7 @@ export function applyCountChange(
     wrong: toNumberOrNull(next.wrong),
     empty: toNumberOrNull(next.empty),
   });
-  const typedByStudent = opts.taskType === "question_bank";
+  const typedByStudent = isSoruCozumuLike(opts.taskType);
   return {
     // A coach-assigned Toplam is the coach's call and must never silently change.
     total: !opts.isCoachAssigned && derived.total !== undefined ? String(derived.total) : next.total,

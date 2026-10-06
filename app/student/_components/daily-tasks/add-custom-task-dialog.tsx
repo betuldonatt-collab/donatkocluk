@@ -19,6 +19,7 @@ import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actio
 import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from "../../actions";
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
+import { isSoruCozumuLike } from "@/lib/task-types";
 import { ProblemlerSubtopicSelect } from "@/components/problemler-subtopic-select";
 import { mainTopicOptions, problemlerMainValue } from "@/lib/curriculum/problemler";
 import type { StudentTask } from "./types";
@@ -45,6 +46,7 @@ export function studentYksCourseOptions(isBranchExam: boolean, aytTrack: Track |
 
 const TASK_TYPE_OPTIONS: { value: RichTaskType; label: string }[] = [
   { value: "question_bank", label: "Soru Çözümü" },
+  { value: "resource_review", label: "Kaynak Taraması" },
   { value: "topic_study", label: "Konu Çalışması" },
   { value: "branch_exam", label: "Branş Denemesi" },
   { value: "general_exam", label: "Genel Deneme" },
@@ -204,15 +206,16 @@ export function AddCustomTaskDialog({
   const isGeneralExam = value.taskType === "general_exam";
   const isFree = value.taskType === "extra_custom";
   const isReading = value.taskType === "reading";
-  const isQuestionBank = value.taskType === "question_bank";
+  // Kaynak Taraması behaves exactly like Soru Çözümü (lib/task-types.ts).
+  const isQuestionBank = isSoruCozumuLike(value.taskType);
   // "Bu çalışmayı tamamladın mı?" applies to both types that have real
   // Doğru/Yanlış/Boş results to log -- a solved question set or an
   // already-taken trial exam.
   const hasCompletedToggle = isQuestionBank || isBranchExam;
   const isCompletedWithToggle = hasCompletedToggle && value.isCompleted;
   const showCourse = !isGeneralExam && !isFree && !isReading;
-  const showTopic = value.taskType === "question_bank" || value.taskType === "topic_study";
-  const showResource = value.taskType === "question_bank" || value.taskType === "topic_study" || isBranchExam;
+  const showTopic = isQuestionBank || value.taskType === "topic_study";
+  const showResource = isQuestionBank || value.taskType === "topic_study" || isBranchExam;
   // "Evet" is what unlocks the full Toplam/Doğru/Yanlış/Boş entry --
   // otherwise (including each type's own default, "Hayır") it's just a
   // target, same as every other type below.

@@ -54,6 +54,7 @@ export type ParentFixedTask = {
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   question_bank: "Soru Çözümü",
+  resource_review: "Kaynak Taraması",
   video: "Video İzleme",
   topic_study: "Konu Çalışması",
   branch_exam: "Branş Denemesi",

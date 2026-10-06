@@ -2,6 +2,7 @@ import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-col
 
 export type TaskType =
   | "question_bank"
+  | "resource_review"
   | "video"
   | "topic_study"
   | "branch_exam"
@@ -111,6 +112,7 @@ export type TopicMistake = { course_id: string; topic_id: string; status: TopicM
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   question_bank: "Soru Çözümü",
+  resource_review: "Kaynak Taraması",
   video: "Video İzleme",
   topic_study: "Konu Anlatımı / Tekrarı",
   branch_exam: "Branş Denemesi",

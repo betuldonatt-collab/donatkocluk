@@ -28,6 +28,7 @@ import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifG
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
 import { ProblemlerSubtopicSelect } from "@/components/problemler-subtopic-select";
+import { isSoruCozumuLike } from "@/lib/task-types";
 import { mainTopicOptions, problemlerMainValue } from "@/lib/curriculum/problemler";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
@@ -61,6 +62,7 @@ export function courseLabel(course: Course) {
 // several, or none.
 export const TASK_TYPE_OPTIONS: { value: AssignableTaskType; label: string }[] = [
   { value: "question_bank", label: "Soru Çözümü" },
+  { value: "resource_review", label: "Kaynak Taraması" },
   { value: "topic_study", label: "Konu Çalışması / Video" },
   { value: "branch_exam", label: "Branş Denemesi" },
   { value: "general_exam", label: "Genel Deneme" },
@@ -193,6 +195,7 @@ function parseBranchExamPublisher(title: string): string {
 function isAssignableType(t: string): t is AssignableTaskType {
   return (
     t === "question_bank" ||
+    t === "resource_review" ||
     t === "topic_study" ||
     t === "branch_exam" ||
     t === "general_exam" ||
@@ -435,7 +438,7 @@ export function TaskFormFields({
   // at specific books to solve questions from, same as a pure Soru
   // Bankası task.
   const showResource =
-    (value.taskType === "question_bank" || value.taskType === "topic_study" || isBranchExam) && !!courseResourceData;
+    (isSoruCozumuLike(value.taskType) || value.taskType === "topic_study" || isBranchExam) && !!courseResourceData;
 
   // "Genel Deneme" has no course/topic/count/duration/video at all --
   // replaced by the Sınav Türü + Yayınevi fields below. The merged

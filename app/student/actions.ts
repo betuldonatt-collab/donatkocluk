@@ -12,6 +12,7 @@ import { needsCoachApproval } from "@/lib/focus-approval";
 import { decideOpenAction } from "@/lib/focus-open-decision";
 import { fetchMaarifGrade, type GeneralExamTrack } from "@/lib/maarif-grade";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
+import { isSoruCozumuLike } from "@/lib/task-types";
 import {
   EXAM_SCORES_REQUIRED,
   GENERAL_EXAM_SCORES_REQUIRED,
@@ -233,9 +234,9 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   // "Soruları çözmedim" (video-only) box, which needs a watched video and is
   // saved as Yarım Yapıldı -- lib/question-bank-validation.ts. Branş / Genel
   // Deneme have their own, stricter rule just below and never get this bypass.
-  const noQuestionsSolved = existing.task_type === "question_bank" && patchV.no_questions_solved === true;
+  const noQuestionsSolved = isSoruCozumuLike(existing.task_type) && patchV.no_questions_solved === true;
   delete patchV.no_questions_solved;
-  if (existing.task_type === "question_bank") {
+  if (isSoruCozumuLike(existing.task_type)) {
     const savesCounts = "correct_count" in patchV || "wrong_count" in patchV || "empty_count" in patchV;
     const target = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
     // A coach-assigned task with only a time target ("Soru Çözümü · 60 dk") keeps its counts optional -- except in
@@ -347,7 +348,7 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
   const dualTarget = "total_count" in patchV ? (patchV.total_count ?? null) : existing.total_count;
   const isDual = (existing.task_type === "video" || existing.task_type === "topic_study") && dualTarget !== null;
   const isDurationOnlyTarget =
-    (existing.task_type === "question_bank" || existing.task_type === "branch_exam" || existing.task_type === "reading") &&
+    (isSoruCozumuLike(existing.task_type) || existing.task_type === "branch_exam" || existing.task_type === "reading") &&
     dualTarget === null;
   const needsManualStatus = isDual || isDurationOnlyTarget;
   let dualManualStatus: DualPartStatus | null = null;
@@ -1148,14 +1149,14 @@ export async function sendFocusHeartbeat(): Promise<void> {
 //   afterward through the existing TaskModal (which already has the
 //   full subject-scores flow for that type) -- avoids re-building that
 //   considerably more complex UI a second time here.
-export type RichTaskType = "question_bank" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom" | "reading";
+export type RichTaskType = "question_bank" | "resource_review" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom" | "reading";
 
 const richTaskCountField = z.number().int().min(0).max(10000).nullable().optional();
 
 const createRichCustomTaskSchema = z
   .object({
     taskDate: dateSchema,
-    taskType: z.enum(["question_bank", "topic_study", "branch_exam", "general_exam", "extra_custom", "reading"]),
+    taskType: z.enum(["question_bank", "resource_review", "topic_study", "branch_exam", "general_exam", "extra_custom", "reading"]),
     courseId: z.string().trim().max(60).nullable().optional(),
     topicId: z.string().trim().max(60).nullable().optional(),
     resourceIds: z.array(uuidSchema).optional(),
@@ -1184,7 +1185,7 @@ const createRichCustomTaskSchema = z
   )
   .refine(
     (v) =>
-      (v.taskType !== "question_bank" && v.taskType !== "branch_exam") ||
+      (!isSoruCozumuLike(v.taskType) && v.taskType !== "branch_exam") ||
       countsAreConsistent({ total: v.totalCount ?? null, correct: v.correctCount ?? null, wrong: v.wrongCount ?? null, empty: v.emptyCount ?? null }),
     { message: "Toplam, Doğru + Yanlış + Boş toplamına eşit olmalıdır.", path: ["totalCount"] },
   )
@@ -1259,8 +1260,8 @@ export async function createRichCustomTask(input: CreateRichTaskInput) {
   // other type (including a bare Toplam-only "Konu Çalışması" target)
   // still needs its own completion step, same as a coach-assigned one
   // would.
-  const hasFullResults = (v.taskType === "question_bank" || v.taskType === "branch_exam") && v.isCompleted === true;
-  const takesCourseTopic = v.taskType === "question_bank" || v.taskType === "topic_study" || v.taskType === "branch_exam";
+  const hasFullResults = (isSoruCozumuLike(v.taskType) || v.taskType === "branch_exam") && v.isCompleted === true;
+  const takesCourseTopic = isSoruCozumuLike(v.taskType) || v.taskType === "topic_study" || v.taskType === "branch_exam";
   const takesTotalCount = v.taskType !== "extra_custom" && v.taskType !== "general_exam";
   // A branch exam declared already-complete right here, with real misses,
   // still owes its topic-by-topic Deneme Analizi -- exactly the same
@@ -1286,7 +1287,7 @@ export async function createRichCustomTask(input: CreateRichTaskInput) {
       // (lib/curriculum's ROUTINE_COURSES) regardless of what courseId (none)
       // the dialog sent.
       course_id: v.taskType === "reading" ? "kitap-okuma" : takesCourseTopic ? v.courseId || null : null,
-      topic_id: v.taskType === "question_bank" || v.taskType === "topic_study" ? v.topicId || null : null,
+      topic_id: isSoruCozumuLike(v.taskType) || v.taskType === "topic_study" ? v.topicId || null : null,
       total_count: takesTotalCount ? (v.totalCount ?? null) : null,
       correct_count: hasFullResults ? (v.correctCount ?? null) : null,
       wrong_count: hasFullResults ? (v.wrongCount ?? null) : null,

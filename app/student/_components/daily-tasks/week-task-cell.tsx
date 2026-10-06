@@ -39,6 +39,7 @@ function courseLabel(courseId: string | null): string | null {
 
 const TASK_TYPE_ICONS = {
   question_bank: BookOpenCheck,
+  resource_review: BookOpenCheck,
   video: Video,
   topic_study: ClipboardList,
   branch_exam: Sparkles,
@@ -88,6 +89,7 @@ function formatTrackedTime(totalMinutes: number): string {
 function cellSubtitle(task: StudentTask): string {
   switch (task.task_type) {
     case "question_bank":
+    case "resource_review":
     case "branch_exam": {
       // See taskSubtitle's matching comment in task-card.tsx -- the
       // assigned target must stay visible once progress starts, not get

@@ -26,7 +26,7 @@ export const NO_QUESTIONS_WITH_COUNTS =
   "“Soruları çözmedim” işaretliyken doğru, yanlış ve boş girilemez. Ya kutuyu kaldır ya da sayıları sil.";
 
 export const NO_QUESTIONS_NOT_FOR_LGS =
-  "Soru Çözümü görevini tamamlamak için doğru, yanlış ve boş sayılarını girmelisin.";
+  "Bu görevi tamamlamak için doğru, yanlış ve boş sayılarını girmelisin.";
 
 // Whether a Soru Çözümü is in Matematik or Geometri, any cohort (TYT / AYT / LGS / 7th-10th grade ...): decided by the
 // course's name, so every course called "... Matematik" or "... Geometri" counts and nothing else does (Problem and

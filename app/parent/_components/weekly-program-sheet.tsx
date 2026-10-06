@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { courseDisplayName, findCourseById } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
 
-export type ProgramTaskType = "question_bank" | "video" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom";
+export type ProgramTaskType = "question_bank" | "resource_review" | "video" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom";
 
 export type ProgramTask = {
   id: string;
@@ -37,6 +37,7 @@ const STATUS_COLORS: Record<ProgramTask["status"], string> = {
 
 const TASK_TYPE_LABELS: Record<ProgramTaskType, string> = {
   question_bank: "Soru Çözümü",
+  resource_review: "Kaynak Taraması",
   video: "Video İzleme",
   topic_study: "Konu Çalışması",
   branch_exam: "Branş Denemesi",

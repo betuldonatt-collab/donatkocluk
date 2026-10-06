@@ -21,6 +21,7 @@ import {
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   question_bank: "Soru Çözümü",
+  resource_review: "Kaynak Taraması",
   branch_exam: "Branş Denemesi",
   general_exam: "Genel Deneme",
   topic_study: "Konu Çalışması",

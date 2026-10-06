@@ -44,6 +44,7 @@ import {
 import { isMaarif11GeneralExamTitle } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
+import { isSoruCozumuLike } from "@/lib/task-types";
 import { cn } from "@/lib/utils";
 import {
   getTaskTopicMistakes,
@@ -91,7 +92,7 @@ export function TaskModal({
   const needsWideModal =
     task?.task_type === "branch_exam" ||
     task?.task_type === "general_exam" ||
-    task?.task_type === "question_bank" ||
+    isSoruCozumuLike(task?.task_type) ||
     ((task?.task_type === "video" || task?.task_type === "topic_study") && task?.total_count !== null);
 
   return (
@@ -348,7 +349,7 @@ function TaskModalBody({
   // starts with the box ticked.
   const [noQuestionsSolved, setNoQuestionsSolved] = useState(
     () =>
-      task.task_type === "question_bank" &&
+      isSoruCozumuLike(task.task_type) &&
       task.status === "half_done" &&
       task.correct_count === null &&
       task.wrong_count === null &&
@@ -474,7 +475,7 @@ function TaskModalBody({
   // target ever set, not only a coach-assigned one.
   const isDurationOnlyTarget = isReading
     ? task.total_count === null
-    : (task.task_type === "question_bank" || task.task_type === "branch_exam") &&
+    : (isSoruCozumuLike(task.task_type) || task.task_type === "branch_exam") &&
       task.is_coach_assigned &&
       task.total_count === null;
 
@@ -483,7 +484,7 @@ function TaskModalBody({
   // from the entered counts, so they never show the manual status buttons.
   // A duration/page-target-only target is the one exception (see above).
   const isPureCountType =
-    (task.task_type === "question_bank" ||
+    (isSoruCozumuLike(task.task_type) ||
       task.task_type === "branch_exam" ||
       task.task_type === "general_exam" ||
       isReading) &&
@@ -492,9 +493,9 @@ function TaskModalBody({
   // The video-only box: Soru Çözümü with a question-count target, for every
   // cohort but LGS (whose completion rules need the counts). Branş Denemesi and
   // Genel Deneme never get it.
-  const showNoQuestionsBox = task.task_type === "question_bank" && !isDurationOnlyTarget && !photoWorkflow;
+  const showNoQuestionsBox = isSoruCozumuLike(task.task_type) && !isDurationOnlyTarget && !photoWorkflow;
   const noQuestionsActive = showNoQuestionsBox && noQuestionsSolved;
-  const showFlatCounts = task.task_type === "question_bank" || task.task_type === "branch_exam" || isDual;
+  const showFlatCounts = isSoruCozumuLike(task.task_type) || task.task_type === "branch_exam" || isDual;
   // Reading's own, simpler 2-field block (Sayfa Hedefi + Okunan Sayfa)
   // instead of the 4-field Toplam/Doğru/Yanlış/Boş grid -- there's no
   // Yanlış/Boş concept for pages read, and reusing showFlatCounts's grid
@@ -649,7 +650,7 @@ function TaskModalBody({
       patch.wrong_count = toNumberOrNull(wrongCount);
       patch.empty_count = toNumberOrNull(emptyCount);
       // Soru Çözümü: a box left blank next to a typed one is saved as 0 (the student shouldn't have to type it).
-      if (task.task_type === "question_bank") {
+      if (isSoruCozumuLike(task.task_type)) {
         const zeroed = zeroFillQuestionCounts({ correct: patch.correct_count, wrong: patch.wrong_count, empty: patch.empty_count });
         patch.correct_count = zeroed.correct;
         patch.wrong_count = zeroed.wrong;
@@ -749,7 +750,7 @@ function TaskModalBody({
   // watched video (lib/question-bank-validation.ts, re-checked by updateTaskProgress). For LGS / 7th-grade
   // students there is no box -- some count is always required.
   function blockedByQuestionBankRule(): boolean {
-    if (task.task_type !== "question_bank") return false;
+    if (!isSoruCozumuLike(task.task_type)) return false;
     // A duration-only target keeps its counts optional -- except in Matematik / Geometri, where Doğru is required
     // too (not when the student is reporting the task as not done).
     if (isDurationOnlyTarget && !durationOnlyCountsRequired({ courseId: task.course_id, status: manualStatus })) return false;
@@ -1241,7 +1242,7 @@ function TaskModalBody({
               value={correctCount}
               onChange={(v) => handleCountFieldChange("correct", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(correctCount)}
+              invalid={showMissingScores && (task.task_type === "branch_exam" || isSoruCozumuLike(task.task_type)) && isBlankScore(correctCount)}
             />
             <Field
               label="Yanlış"

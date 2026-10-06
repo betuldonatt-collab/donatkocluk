@@ -22,6 +22,7 @@ const MONTH_LABELS = [
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   question_bank: "Soru Çözümü",
+  resource_review: "Kaynak Taraması",
   video: "Video İzleme",
   topic_study: "Konu Anlatımı",
   branch_exam: "Branş Denemesi",

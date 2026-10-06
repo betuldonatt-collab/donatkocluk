@@ -1,4 +1,5 @@
 import { isGeneralExamScoresIncomplete } from "./exam-results-validation";
+import { isSoruCozumuLike } from "./task-types";
 
 // LGS students only: what a task needs before it can be completed (and so sent
 // to the coach for approval).
@@ -38,7 +39,7 @@ export function lgsCompletionProblem(input: {
   if (input.photoCount < 1) {
     return "Bu görevi tamamlamak için en az bir kanıt fotoğrafı yüklemelisin.";
   }
-  if (input.taskType === "question_bank" || input.taskType === "branch_exam") {
+  if (isSoruCozumuLike(input.taskType) || input.taskType === "branch_exam") {
     if (input.correct == null || input.wrong == null || input.empty == null) {
       return "Bu görevi tamamlamak için doğru, yanlış ve boş sayılarını girmelisin (çözmediklerin için 0 yaz).";
     }

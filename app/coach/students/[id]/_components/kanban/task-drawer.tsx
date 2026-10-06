@@ -16,6 +16,7 @@ import { TrialResultsSection } from "./trial-results-section";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import type { MaarifGrade } from "@/lib/maarif-grade";
 import { isCourseRoutine, routineOptionsFor, type RoutineType } from "./routine-options";
+import { isSoruCozumuLike } from "@/lib/task-types";
 
 export type TaskDrawerState =
   | { mode: "create"; date: string }
@@ -254,7 +255,7 @@ export function TaskDrawer({
   // of back to back; array order (which becomes task_resources.order_index)
   // is preserved by .map() regardless of which call actually finishes first.
   async function resolveResourceIds(): Promise<string[]> {
-    if (value.taskType !== "question_bank" && value.taskType !== "branch_exam" && value.taskType !== "topic_study") return [];
+    if (!isSoruCozumuLike(value.taskType) && value.taskType !== "branch_exam" && value.taskType !== "topic_study") return [];
     const kind = value.taskType === "branch_exam" ? "branch_exam" : "study";
     const resolved = await Promise.all(
       value.resources.map(async (r): Promise<string | null> => {

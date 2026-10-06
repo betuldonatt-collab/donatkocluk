@@ -24,6 +24,7 @@ import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask
 
 const TASK_TYPE_ICONS = {
   question_bank: BookOpenCheck,
+  resource_review: BookOpenCheck,
   video: Video,
   topic_study: ClipboardList,
   branch_exam: Sparkles,
@@ -59,6 +60,7 @@ function formatTrackedTime(totalMinutes: number): string {
 function taskSubtitle(task: StudentTask): string {
   switch (task.task_type) {
     case "question_bank":
+    case "resource_review":
     case "branch_exam": {
       // The assigned target (e.g. "40 soru") -- unlike general_exam below,
       // this IS a real pre-assigned goal here, not a computed result, so
