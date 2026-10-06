@@ -3,14 +3,13 @@ import { logPerf, startPerf } from "@/lib/perf-log";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
 import { getAuthUser } from "@/lib/supabase/session";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { computeLgsNet, computeNet } from "@/lib/scoring";
+import { lgsNetChart, maarif7NetChart, netChartFor, parseGeneralExamTrack, type ParentGeneralExam } from "@/lib/parent-net-charts";
 import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
 import { weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
 import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
 import { isLgsParentView } from "@/lib/parent-lgs";
-import { isGeneralExamScoresIncomplete } from "@/lib/exam-results-validation";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { WeeklyProgressCard } from "@/components/weekly-progress-card";
 import { LineChart } from "./_components/line-chart";
@@ -18,39 +17,6 @@ import { SessionCalendar, type ParentSession } from "./_components/session-calen
 import { SessionQuotaStats } from "./_components/session-quota-stats";
 import { WeeklyStatsSummary, type WeekStat } from "./_components/weekly-stats-summary";
 import { WeeklyProgramSheet, type ProgramTask } from "./_components/weekly-program-sheet";
-
-type SubjectScores = Record<string, { correct?: number; wrong?: number }>;
-type GeneralExam = { id: string; title: string; task_date: string; subject_scores: SubjectScores | null };
-
-// General-exam tasks have no course_id -- the TYT/AYT track lives only in
-// the title text, same convention the student/coach panels already parse.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
-}
-
-// Overall net = sum of correct/wrong across all subjects, netted once on
-// the totals (not summed per-subject net) so rounding never compounds.
-// Unlike the student's own Genel Analiz page, this doesn't split AYT by
-// track (sayısal/EA/sözel/YDT) -- the parent view just wants one line per
-// exam type, not the track-selector complexity.
-// netFn is the cohort's own negative-marking rule (YKS 4:1, LGS 3:1).
-function netChartFor(exams: GeneralExam[], netFn: (correct: number, wrong: number) => number = computeNet) {
-  return exams
-    .filter((e) => e.subject_scores)
-    .slice()
-    .sort((a, b) => a.task_date.localeCompare(b.task_date))
-    .map((e) => {
-      const totals = Object.values(e.subject_scores!).reduce<{ correct: number; wrong: number }>(
-        (acc, s) => ({ correct: acc.correct + (s.correct ?? 0), wrong: acc.wrong + (s.wrong ?? 0) }),
-        { correct: 0, wrong: 0 },
-      );
-      return { date: e.task_date, value: netFn(totals.correct, totals.wrong) };
-    });
-}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -194,17 +160,13 @@ async function fetchDashboardData() {
 
   const weekStat = sumWeekStats((dailyStatsRows ?? []).map((r) => ({ total: r.total_count })));
 
-  const exams = (examRows ?? []) as GeneralExam[];
+  const exams = (examRows ?? []) as ParentGeneralExam[];
   const tytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "tyt"));
   const aytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "ayt"));
-  // Only exams with a complete, valid result set (every subject's Doğru/Yanlış/Boş)
-  // reach the chart -- a half-entered exam never plots a misleading net.
-  const lgsNetChartData = netChartFor(
-    exams.filter(
-      (e) => parseGeneralExamTrack(e.title) === "lgs" && !isGeneralExamScoresIncomplete(e.title, e.subject_scores as never),
-    ),
-    computeLgsNet,
-  );
+  // Only exams with a complete, valid result set reach the chart (lib/parent-net-charts.ts).
+  const lgsNetChartData = lgsNetChart(exams);
+  // A 7th grader's parent gets the 7th grade's own chart (3:1) instead of the empty TYT/AYT ones.
+  const maarif7NetChartData = maarif7NetChart(exams);
 
   // Only ever populated for an LGS student (see the batch above).
   const dailyRows: DailyProgressTask[] = isLgsParentView(profile.exam_type, profile.is_maarif7) ? (dailyRowData as unknown as DailyProgressTask[]) : [];
@@ -232,6 +194,8 @@ async function fetchDashboardData() {
     tytNetChartData,
     aytNetChartData,
     lgsNetChartData,
+    maarif7NetChartData,
+    isMaarif7: profile.is_maarif7 === true,
     examType: (profile.exam_type ?? "YKS") as "YKS" | "LGS",
     // LGS-style program view (Dün/Bugün/Yarın bars, Tam Program): LGS students and 7th graders.
     programView: isLgsParentView(profile.exam_type, profile.is_maarif7),
@@ -268,6 +232,8 @@ export default async function ParentPage() {
     tytNetChartData,
     aytNetChartData,
     lgsNetChartData,
+    maarif7NetChartData,
+    isMaarif7,
     examType,
     programView,
   } = data;
@@ -317,7 +283,19 @@ export default async function ParentPage() {
           </CardContent>
         </Card>
 
-        {examType === "LGS" ? (
+        {isMaarif7 ? (
+          // A 7th grader's parent sees the 7th grade's own exam chart (the LGS distribution, net 3:1) -- never the
+          // empty TYT/AYT ones.
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">7. Sınıf Genel Deneme</CardTitle>
+              <CardDescription>Tüm derslerin toplamı üzerinden net değişimi (3 yanlış 1 doğruyu götürür)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LineChart data={maarif7NetChartData} />
+            </CardContent>
+          </Card>
+        ) : examType === "LGS" ? (
           // An LGS student's parent sees only LGS's own exam chart -- never
           // the TYT/AYT ones (and its net is LGS's 3:1, not YKS's 4:1).
           <Card>
