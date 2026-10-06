@@ -97,3 +97,29 @@ describe("the student's task modal: an explicit 'Yapılmadı' for every task typ
     expect(render(task({ task_type: "topic_study" }), { grade: 9 })).not.toContain("Kanıt");
   });
 });
+
+describe("the Soru Çözümü form: all three counts typed, nothing auto-filled", () => {
+  const soru = task({ task_type: "question_bank", total_count: 100 });
+
+  it("tells the student to fill all three boxes (0 for none) and that going over the target is fine", () => {
+    for (const opts of [{ grade: 7 as MaarifGrade }, { grade: null, examType: "LGS" as const }, { grade: null }, { grade: 9 as MaarifGrade }]) {
+      const html = render(soru, opts);
+      expect(html).toContain("üçünü de doldur");
+      expect(html).toContain("0 yaz");
+      expect(html).toContain("Hedeften fazla soru çözebilirsin");
+      expect(html).toContain("Yarım Yapıldı");
+    }
+  });
+
+  it("the video-only 'Soruları çözmedim' box stays for the cohorts that had it, and off for LGS / 7th grade", () => {
+    expect(render(soru, { grade: null })).toContain("Soruları çözmedim");
+    expect(render(soru, { grade: 9 })).toContain("Soruları çözmedim");
+    expect(render(soru, { grade: 7 })).not.toContain("Soruları çözmedim");
+    expect(render(soru, { grade: null, examType: "LGS" })).not.toContain("Soruları çözmedim");
+  });
+
+  it("Branş Denemesi and Genel Deneme do not get this hint (their rules are unchanged)", () => {
+    expect(render(task({ task_type: "branch_exam", total_count: 40 }), { grade: 7 })).not.toContain("Hedeften fazla soru çözebilirsin");
+    expect(render(task({ task_type: "general_exam", title: "7. SINIF Genel Deneme" }), { grade: 7 })).not.toContain("Hedeften fazla soru çözebilirsin");
+  });
+});

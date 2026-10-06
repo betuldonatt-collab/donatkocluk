@@ -14,6 +14,11 @@
 export const QUESTION_COUNTS_REQUIRED =
   "Doğru, yanlış ve boş sayılarını gir. Soruları çözmediysen “Soruları çözmedim” kutusunu işaretle.";
 
+// Soru Çözümü needs ALL THREE of Doğru / Yanlış / Boş typed -- 0 for what there was none of -- since nothing fills
+// Boş in for the student any more. Shown when some, but not all, of the three are blank.
+export const QUESTION_COUNTS_INCOMPLETE =
+  "Doğru, yanlış ve boş kutularının üçünü de doldurman gerekiyor. Çözmediğin ya da boş bıraktığın soru yoksa ilgili kutuya 0 yaz.";
+
 export const NO_QUESTIONS_NEEDS_VIDEO =
   "“Soruları çözmedim” seçeneği için en az bir videoyu izlendi olarak işaretlemelisin. Hiçbir şey yapmadıysan “Yapılmadı”yı seç.";
 
@@ -43,9 +48,12 @@ export function checkQuestionBankSave(input: QuestionBankSaveInput): string | nu
     if (!input.watchedVideo) return NO_QUESTIONS_NEEDS_VIDEO;
     return null;
   }
-  // Some counts (even just Doğru, the rest read as 0) is a normal save; none at
-  // all needs the box.
-  return anyCount ? null : QUESTION_COUNTS_REQUIRED;
+  // All three typed (0 is a number) is a normal save, whatever the total -- fewer than the target is "Yarım
+  // Yapıldı", the target or more "Yapıldı" (computeAutoTaskStatus). A blank box is never read as 0.
+  if (input.correct !== null && input.wrong !== null && input.empty !== null) return null;
+  // Nothing typed at all: the box is the way out where it exists (every cohort but LGS / 7th grade, whose
+  // completion rules need the counts), so only there does the message point at it.
+  return anyCount || input.isLgs ? QUESTION_COUNTS_INCOMPLETE : QUESTION_COUNTS_REQUIRED;
 }
 
 export function hasWatchedVideo(links: { watched?: boolean }[] | null | undefined): boolean {

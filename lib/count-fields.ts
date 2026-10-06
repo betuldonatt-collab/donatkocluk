@@ -33,6 +33,43 @@ export function countsAreConsistent(fields: CountFields): boolean {
   return total === correct + wrong + empty;
 }
 
+// --- The student's Toplam / Doğru / Yanlış / Boş boxes -----------------------------------------------------------
+//
+// What typing into ONE of the four boxes does to the others. Every task type with these boxes derives the missing
+// fourth value (autoCalcMissingField), EXCEPT Soru Çözümü: there Doğru, Yanlış and Boş are always typed by the
+// student -- nothing fills Boş (or Doğru / Yanlış) in for them, so "50 doğru, 10 yanlış" of 100 stays 60 solved and the
+// task reads "Yarım Yapıldı" instead of Boş quietly becoming 40 and the task "Yapıldı". Only a self-created task's own
+// Toplam is still derived (the coach-assigned Toplam is never touched). Branş / Genel Deneme are not affected: they
+// have their own per-subject / strict forms.
+export type CountStrings = { total: string; correct: string; wrong: string; empty: string };
+
+function toNumberOrNull(v: string): number | null {
+  return v.trim() === "" ? null : Number(v);
+}
+
+export function applyCountChange(
+  opts: { taskType: string; isCoachAssigned: boolean },
+  current: CountStrings,
+  field: keyof CountStrings,
+  value: string,
+): CountStrings {
+  const next: CountStrings = { ...current, [field]: value };
+  const derived = autoCalcMissingField({
+    total: toNumberOrNull(next.total),
+    correct: toNumberOrNull(next.correct),
+    wrong: toNumberOrNull(next.wrong),
+    empty: toNumberOrNull(next.empty),
+  });
+  const typedByStudent = opts.taskType === "question_bank";
+  return {
+    // A coach-assigned Toplam is the coach's call and must never silently change.
+    total: !opts.isCoachAssigned && derived.total !== undefined ? String(derived.total) : next.total,
+    correct: !typedByStudent && derived.correct !== undefined ? String(derived.correct) : next.correct,
+    wrong: !typedByStudent && derived.wrong !== undefined ? String(derived.wrong) : next.wrong,
+    empty: !typedByStudent && derived.empty !== undefined ? String(derived.empty) : next.empty,
+  };
+}
+
 export type AutoTaskStatus = "done" | "half_done";
 
 // Tolerance for auto-computed task status (see updateTaskProgress in
@@ -44,6 +81,10 @@ export type AutoTaskStatus = "done" | "half_done";
 // task-modal.tsx), never auto-assigned by this rule.
 export const AUTO_STATUS_TOLERANCE = 5;
 
+// Exceeding the target is fine: solving / studying MORE than the coach assigned is never an error and is simply
+// "done" (target - solved is then negative). Only Branş Denemesi and Genel Deneme have a hard maximum, and that lives
+// in their own per-subject forms (lib/curriculum/subject-groups.ts overCapGroup), not here.
+//
 // Shared by the server (the actual, authoritative computation in
 // updateTaskProgress) and the client (a live preview hint under the count
 // fields, computed identically so the hint never disagrees with what

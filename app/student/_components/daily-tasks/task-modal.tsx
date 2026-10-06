@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { autoCalcMissingField, computeAutoTaskStatus, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
+import { applyCountChange, computeAutoTaskStatus, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { LgsExamScoreGrid, emptyLgsInputs } from "@/components/lgs-exam-score-grid";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
@@ -619,38 +619,18 @@ function TaskModalBody({
   // If exactly 3 of Toplam/Doğru/Yanlış/Boş are filled, auto-fills the 4th
   // (lib/count-fields.ts) so the student doesn't have to do the arithmetic.
   function handleCountFieldChange(field: "total" | "correct" | "wrong" | "empty", value: string) {
-    const next = {
-      total: field === "total" ? value : totalCount,
-      correct: field === "correct" ? value : correctCount,
-      wrong: field === "wrong" ? value : wrongCount,
-      empty: field === "empty" ? value : emptyCount,
-    };
+    // Soru Çözümü: nothing is filled in for the student -- Doğru / Yanlış / Boş are all typed (lib/count-fields.ts
+    // applyCountChange). The coach-assigned Toplam is never student-editable and never changes here.
+    const next = applyCountChange(
+      { taskType: task.task_type, isCoachAssigned: task.is_coach_assigned },
+      { total: totalCount, correct: correctCount, wrong: wrongCount, empty: emptyCount },
+      field,
+      value,
+    );
     setTotalCount(next.total);
     setCorrectCount(next.correct);
     setWrongCount(next.wrong);
     setEmptyCount(next.empty);
-    const derived = autoCalcMissingField({
-      total: toNumberOrNull(next.total),
-      correct: toNumberOrNull(next.correct),
-      wrong: toNumberOrNull(next.wrong),
-      empty: toNumberOrNull(next.empty),
-    });
-    // Coach-assigned Toplam is never student-editable (it renders as
-    // ReadOnlyField below, not Field) and must never silently change --
-    // for a coach-assigned task with NO count target at all (a duration-
-    // only target, e.g. "Soru Çözümü · 60 dk"), Toplam stays permanently
-    // null/unfilled, so entering Doğru+Yanlış+Boş makes exactly 3 of 4
-    // fields "filled" and this auto-calc used to derive and silently set
-    // a Toplam here anyway -- invisible in the UI (it still shows the
-    // real, unchanged "—" from task.total_count), but included in the
-    // save payload, where the server correctly rejects it as an attempt
-    // to change a coach-assigned total. That rejection is what surfaced
-    // to the student as a hard crash (React error #441) instead of just
-    // saving. See app/student/actions.ts's updateTaskProgress guard.
-    if (!task.is_coach_assigned && derived.total !== undefined) setTotalCount(String(derived.total));
-    if (derived.correct !== undefined) setCorrectCount(String(derived.correct));
-    if (derived.wrong !== undefined) setWrongCount(String(derived.wrong));
-    if (derived.empty !== undefined) setEmptyCount(String(derived.empty));
   }
 
   useEffect(() => {
@@ -758,19 +738,22 @@ function TaskModalBody({
     return true;
   }
 
-  // Soru Çözümü: counts, or the "Soruları çözmedim" box with a watched video
-  // (lib/question-bank-validation.ts, re-checked by updateTaskProgress).
+  // Soru Çözümü: all three of Doğru / Yanlış / Boş typed (0 for none), or the "Soruları çözmedim" box with a
+  // watched video (lib/question-bank-validation.ts, re-checked by updateTaskProgress). For LGS / 7th-grade
+  // students there is no box -- the three counts are always required.
   function blockedByQuestionBankRule(): boolean {
-    if (task.task_type !== "question_bank" || isDurationOnlyTarget || photoWorkflow) return false;
+    if (task.task_type !== "question_bank" || isDurationOnlyTarget) return false;
     const problem = checkQuestionBankSave({
       correct: toNumberOrNull(correctCount),
       wrong: toNumberOrNull(wrongCount),
       empty: toNumberOrNull(emptyCount),
       noQuestionsSolved: noQuestionsActive,
       watchedVideo: hasWatchedVideo(videoLinks),
-      isLgs: false,
+      isLgs: photoWorkflow,
     });
     if (!problem) return false;
+    // Outline the boxes still blank, like the Branş Denemesi form does.
+    setShowMissingScores(true);
     setError(problem);
     return true;
   }
@@ -1247,22 +1230,28 @@ function TaskModalBody({
               value={correctCount}
               onChange={(v) => handleCountFieldChange("correct", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(correctCount)}
+              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(correctCount)}
             />
             <Field
               label="Yanlış"
               value={wrongCount}
               onChange={(v) => handleCountFieldChange("wrong", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(wrongCount)}
+              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(wrongCount)}
             />
             <Field
               label="Boş"
               value={emptyCount}
               onChange={(v) => handleCountFieldChange("empty", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(emptyCount)}
+              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(emptyCount)}
             />
+            {task.task_type === "question_bank" && !noQuestionsActive && (
+              <p className="text-muted-foreground col-span-2 text-xs sm:col-span-4">
+                Doğru, yanlış ve boş kutularının üçünü de doldur; olmayan için 0 yaz. Hedeften fazla soru çözebilirsin. Hedefin altında kalırsan görev
+                “Yarım Yapıldı”, hedefe ulaşırsan ya da geçersen “Yapıldı” olur.
+              </p>
+            )}
             {showNoQuestionsBox && (
               <div className="col-span-2 flex items-start gap-2 sm:col-span-4">
                 <Checkbox

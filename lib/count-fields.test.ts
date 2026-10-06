@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoCalcMissingField, computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus } from "./count-fields";
+import { applyCountChange, autoCalcMissingField, computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus } from "./count-fields";
 
 describe("autoCalcMissingField", () => {
   it("derives total from correct + wrong + empty", () => {
@@ -103,5 +103,52 @@ describe("mergeDualTaskStatus", () => {
 
   it("is 'not_done' when both halves are not_done", () => {
     expect(mergeDualTaskStatus("not_done", "not_done")).toBe("not_done");
+  });
+});
+
+describe("applyCountChange: Soru Çözümü never fills Boş in", () => {
+  const coachSoru = { taskType: "question_bank", isCoachAssigned: true };
+  const state = { total: "100", correct: "", wrong: "", empty: "" };
+
+  it("50 doğru + 10 yanlış of a coach-assigned 100: Boş stays blank (not 40), the coach's Toplam is untouched", () => {
+    let s = applyCountChange(coachSoru, state, "correct", "50");
+    s = applyCountChange(coachSoru, s, "wrong", "10");
+    expect(s).toEqual({ total: "100", correct: "50", wrong: "10", empty: "" });
+  });
+
+  it("typing 0 into Boş is just a number: 60 solved of 100 -> Yarım Yapıldı", () => {
+    let s = applyCountChange(coachSoru, state, "correct", "50");
+    s = applyCountChange(coachSoru, s, "wrong", "10");
+    s = applyCountChange(coachSoru, s, "empty", "0");
+    expect(s).toEqual({ total: "100", correct: "50", wrong: "10", empty: "0" });
+    expect(computeAutoTaskStatus(100, 50, 10, 0)).toBe("half_done");
+  });
+
+  it("does not derive Doğru or Yanlış either (nothing but what the student typed)", () => {
+    expect(applyCountChange(coachSoru, { total: "100", correct: "", wrong: "10", empty: "5" }, "wrong", "10")).toEqual({ total: "100", correct: "", wrong: "10", empty: "5" });
+  });
+
+  it("a self-created Soru Çözümü still derives its own Toplam from the three typed boxes", () => {
+    const own = { taskType: "question_bank", isCoachAssigned: false };
+    expect(applyCountChange(own, { total: "", correct: "30", wrong: "5", empty: "" }, "empty", "2")).toEqual({ total: "37", correct: "30", wrong: "5", empty: "2" });
+  });
+
+  it("every other task type keeps the auto-fill (unchanged)", () => {
+    const branch = { taskType: "branch_exam", isCoachAssigned: true };
+    expect(applyCountChange(branch, { total: "40", correct: "30", wrong: "", empty: "" }, "empty", "5")).toEqual({ total: "40", correct: "30", wrong: "5", empty: "5" });
+    const topic = { taskType: "topic_study", isCoachAssigned: true };
+    expect(applyCountChange(topic, { total: "40", correct: "30", wrong: "5", empty: "" }, "wrong", "5").empty).toBe("5");
+  });
+});
+
+describe("exceeding the assigned target", () => {
+  it("is simply done: more than the target solved never lowers or blocks the status", () => {
+    expect(computeAutoTaskStatus(100, 100, 0, 0)).toBe("done");
+    expect(computeAutoTaskStatus(100, 90, 20, 5)).toBe("done"); // 115 of 100
+    expect(computeAutoTaskStatus(100, 500, 0, 0)).toBe("done");
+  });
+
+  it("below the target is Yarım Yapıldı (60 of 100)", () => {
+    expect(computeAutoTaskStatus(100, 50, 10, 0)).toBe("half_done");
   });
 });

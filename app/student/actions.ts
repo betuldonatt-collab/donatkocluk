@@ -242,21 +242,20 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
       const finalCorrect = "correct_count" in patchV ? (patchV.correct_count ?? null) : existing.correct_count;
       const finalWrong = "wrong_count" in patchV ? (patchV.wrong_count ?? null) : existing.wrong_count;
       const finalEmpty = "empty_count" in patchV ? (patchV.empty_count ?? null) : existing.empty_count;
-      const allBlank = finalCorrect === null && finalWrong === null && finalEmpty === null;
-      // An LGS student keeps the existing LGS completion rules (below), so the
-      // "counts required" check is not applied to them without the box.
-      const isLgs = noQuestionsSolved || allBlank ? await isLgsStudent(supabase, user.id) : false;
-      if (noQuestionsSolved || !isLgs) {
-        const problem = checkQuestionBankSave({
-          correct: finalCorrect,
-          wrong: finalWrong,
-          empty: finalEmpty,
-          noQuestionsSolved,
-          watchedVideo: hasWatchedVideo(existing.video_links as { watched?: boolean }[] | null),
-          isLgs,
-        });
-        if (problem) throw new Error(problem);
-      }
+      // Doğru, Yanlış and Boş must ALL be typed (0 for none) -- also for LGS / 7th-grade students, whose
+      // completion rules below then add the photo. Nothing fills Boş in for the student any more, so a blank box
+      // is refused with a message that says what to do (lib/question-bank-validation.ts), never read as 0.
+      const missingAny = finalCorrect === null || finalWrong === null || finalEmpty === null;
+      const isLgs = noQuestionsSolved || missingAny ? await isLgsStudent(supabase, user.id) : false;
+      const problem = checkQuestionBankSave({
+        correct: finalCorrect,
+        wrong: finalWrong,
+        empty: finalEmpty,
+        noQuestionsSolved,
+        watchedVideo: hasWatchedVideo(existing.video_links as { watched?: boolean }[] | null),
+        isLgs,
+      });
+      if (problem) throw new Error(problem);
     }
     if (noQuestionsSolved) {
       patchV.correct_count = null;
