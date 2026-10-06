@@ -691,10 +691,15 @@ export function ScheduleBoard({
     ]);
     toast.success(
       `${result.created.length} görev ${formatShortDate(result.targetDate)} tarihine aktarıldı; asıl görevler "Ertelendi" olarak işaretlendi.${
-        copiesVisible ? "" : " (Yeni tarih bu haftanın dışında; o haftaya geçince görürsün.)"
+        copiesVisible ? "" : " Yeni görevleri görmen için o haftaya geçildi."
       }`,
     );
     exitSelectMode();
+    // The copies landed outside the window on screen: jump to a 7-day window starting on the target date so the
+    // coach sees them right away (the board reloads that week from the server).
+    if (!copiesVisible) {
+      loadWeek(getWeekDays(result.targetDate)).catch((e) => toast.error(friendlyError(e, "Yeni haftaya geçilemedi; tarih seçiciden o güne git.")));
+    }
   }
 
   function handleDelete(task: DetailTask) {
