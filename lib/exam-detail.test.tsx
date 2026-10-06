@@ -6,7 +6,8 @@ import { StackedBarChart } from "@/app/coach/students/[id]/_components/charts/st
 import { DualMetricChart } from "@/app/coach/students/[id]/_components/charts/dual-metric-chart";
 import { findCourseById } from "./curriculum";
 import { flattenSelectionRows } from "./curriculum/rows";
-import { examScoreTotals, examTrackOf, generalExamTabs, markedRowCount, subjectScoreSummary } from "./exam-detail";
+import { comparableGeneralExams, examPublisher, examScoreTotals, examTrackOf, generalExamTabs, markedRowCount, subjectScoreSummary } from "./exam-detail";
+import { ExamComparisonView } from "@/components/exam-comparison-view";
 
 const score = (correct: number, wrong: number, empty: number) => ({ correct, wrong, empty });
 const firstTopicId = (courseId: string, n = 0) => flattenSelectionRows(findCourseById(courseId)!)[n].memberTopicIds[0];
@@ -183,5 +184,87 @@ describe("the charts stay inert unless asked to report clicks", () => {
     ];
     const out = renderToStaticMarkup(<StackedBarChart data={data} series={series} onSelect={() => {}} />);
     expect((out.match(/<rect /g) ?? []).length).toBe(2);
+  });
+});
+
+describe("Genel Deneme side by side", () => {
+  const e = (id: string, date: string, over: Partial<ExamDetailExam> = {}) => exam({ id, task_date: date, title: `TYT Genel Deneme - Yayın ${id.toUpperCase()}`, ...over });
+  const a = e("a", "2026-09-01", { subject_scores: { ...tytScores, matematik: score(20, 10, 10) } });
+  const b = e("b", "2026-09-15", { subject_scores: { ...tytScores, matematik: score(28, 6, 6) } });
+  const c = e("c", "2026-10-01", { analysis_pending: true });
+  const ayt = e("x", "2026-09-10", { title: "AYT Genel Deneme - X", subject_scores: { ayt_matematik: score(30, 5, 5), ayt_fizik: score(10, 2, 2) } });
+  const aytSozel = e("y", "2026-09-12", { title: "AYT Genel Deneme - Y", subject_scores: { ayt_sozel_sozel1: score(20, 2, 2) } });
+  const branch = e("br", "2026-09-05", { task_type: "branch_exam", course_id: "tyt-matematik", title: "TYT Branş Denemesi - Z" });
+  const mathId = (n: number) => firstTopicId("tyt-matematik", n);
+
+  it("comparableGeneralExams: same track only, oldest first, no branch exams", () => {
+    expect(comparableGeneralExams([c, ayt, b, branch, a], a).map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(comparableGeneralExams([ayt, aytSozel, a], ayt).map((x) => x.id)).toEqual(["x"]); // Sayısal vs Sözel AYT stay apart
+    expect(comparableGeneralExams([a, b, c], c).map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(examPublisher("TYT Genel Deneme - 3D Yayınları")).toBe("3D Yayınları");
+    expect(examPublisher("TYT Genel Deneme")).toBe("—");
+  });
+
+  const html = (props: { focus?: string; tab?: string; marked?: Record<string, string[]>; onEdit?: boolean; exams?: ExamDetailExam[] }) =>
+    renderToStaticMarkup(
+      <ExamComparisonView
+        exams={props.exams ?? [a, b, c]}
+        focusExamId={props.focus ?? "b"}
+        initialTabKey={props.tab}
+        markedByExam={new Map(Object.entries(props.marked ?? {}).map(([id, topics]) => [id, new Set(topics)]))}
+        onEdit={props.onEdit === false ? undefined : () => {}}
+      />,
+    );
+
+  it("every exam is a column, in order, with the active subject's own figures; the clicked one is highlighted", () => {
+    const out = html({ tab: "matematik" });
+    for (const publisher of ["Yayın A", "Yayın B", "Yayın C"]) expect(out).toContain(publisher);
+    expect(out.indexOf("Yayın A")).toBeLessThan(out.indexOf("Yayın B"));
+    expect(out.indexOf("Yayın B")).toBeLessThan(out.indexOf("Yayın C"));
+    expect(out).toContain("D:20 Y:10 B:10"); // exam a, Matematik
+    expect(out).toContain("Net 17.50");
+    expect(out).toContain("D:28 Y:6 B:6"); // exam b
+    expect(out).toContain("Net 26.50");
+    // the Matematik tab lists two courses (Matematik, Geometri): the clicked exam's column is highlighted in each
+    expect((out.match(/data-focused="true"/g) ?? []).length).toBe(2);
+    expect(out).toMatch(/data-focused="true"[^>]*>[\s\S]{0,400}Yayın B/);
+  });
+
+  it("a topic shows an X only in the exams that marked it", () => {
+    const t0 = mathId(0);
+    const t3 = mathId(3);
+    const out = html({ tab: "matematik", marked: { a: [t0], b: [t0, t3], c: [] } });
+    const row = (name: string) => out.split("<tr").find((r) => r.includes(`>${name}<`) || r.includes(`>${name}`)) ?? "";
+    const first = flattenSelectionRows(findCourseById("tyt-matematik")!);
+    const xs = (r: string) => (r.match(/aria-label="İşaretli"/g) ?? []).length;
+    expect(xs(row(first[0].label))).toBe(2); // a and b
+    expect(xs(row(first[3].label))).toBe(1); // b only
+    expect(xs(row(first[1].label))).toBe(0);
+  });
+
+  it("each subject tab shows its own courses across all exams", () => {
+    expect(html({ tab: "fen" })).toContain('aria-label="Fizik konuları"');
+    expect(html({ tab: "fen" })).toContain('aria-label="Biyoloji konuları"');
+    expect(html({ tab: "turkce" })).toContain('aria-label="Türkçe konuları"');
+    expect(html({ tab: "turkce" })).not.toContain('aria-label="Matematik konuları"');
+    expect(html({ tab: "turkce" })).toContain("D:30 Y:8 B:2"); // Türkçe figures in the column heads
+  });
+
+  it("keeps 'Sonuçları Düzenle' reachable: one shortcut per exam column when the caller gives onEdit, none without", () => {
+    const withEdit = html({ tab: "matematik" });
+    expect((withEdit.match(/aria-label="Sonuçları Düzenle: /g) ?? []).length).toBe(3 * 2); // one per exam in each of the tab's two course tables
+    expect(withEdit).toContain("Sonuçları Düzenle: TYT Genel Deneme - Yayın A");
+    expect(html({ tab: "matematik", onEdit: false })).not.toContain("Sonuçları Düzenle");
+  });
+
+  it("flags exams whose topic analysis is still missing, and copes with no exams", () => {
+    expect(html({ tab: "matematik" })).toContain("Analiz Bekliyor");
+    expect(html({ tab: "matematik" })).toContain("1 denemenin konu analizi henüz girilmemiş");
+    expect(renderToStaticMarkup(<ExamComparisonView exams={[]} focusExamId="zz" markedByExam={new Map()} />)).toContain("Karşılaştırılacak deneme yok");
+  });
+
+  it("an exam without scores for the subject says so instead of showing zeros", () => {
+    const noScores = e("n", "2026-10-05", { subject_scores: null });
+    expect(html({ tab: "matematik", exams: [a, noScores], focus: "a" })).toContain("sonuç yok");
   });
 });

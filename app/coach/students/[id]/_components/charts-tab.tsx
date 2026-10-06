@@ -496,7 +496,8 @@ export function ChartsTab({
       {detailExam && (
         <ExamDetailDialog
           exam={detailExam}
-          markedTopicIds={markedTopicsByExam.get(detailExam.id) ?? new Set<string>()}
+          allGeneralExams={generalExams}
+          markedByExam={markedTopicsByExam}
           netOf={netOf}
           onClose={() => setDetailExamId(null)}
           onEdit={(exam) => {
