@@ -15,7 +15,7 @@ function formatExamDate(dateStr: string) {
 
 // The popup behind a click on an exam in Grafikler (the net charts and the Genel Deneme Geçmişi list), read-only, with a
 // shortcut into the coach's existing edit drawer ("Sonuçları Düzenle"). Nothing here changes data by itself.
-//  - Genel Deneme: ALL exams of that track side by side (topics as rows, exams as columns, oldest to newest), one subject
+//  - Genel Deneme: ALL exams of that track side by side (topics as rows, exams as columns, newest to oldest), one subject
 //    at a time via one-click tabs; the clicked exam's column is highlighted.
 //  - Branş Denemesi: that one exam's scores and its course's topic table.
 export function ExamDetailDialog({

@@ -197,10 +197,10 @@ describe("Genel Deneme side by side", () => {
   const branch = e("br", "2026-09-05", { task_type: "branch_exam", course_id: "tyt-matematik", title: "TYT Branş Denemesi - Z" });
   const mathId = (n: number) => firstTopicId("tyt-matematik", n);
 
-  it("comparableGeneralExams: same track only, oldest first, no branch exams", () => {
-    expect(comparableGeneralExams([c, ayt, b, branch, a], a).map((x) => x.id)).toEqual(["a", "b", "c"]);
+  it("comparableGeneralExams: same track only, newest first, no branch exams", () => {
+    expect(comparableGeneralExams([c, ayt, b, branch, a], a).map((x) => x.id)).toEqual(["c", "b", "a"]);
     expect(comparableGeneralExams([ayt, aytSozel, a], ayt).map((x) => x.id)).toEqual(["x"]); // Sayısal vs Sözel AYT stay apart
-    expect(comparableGeneralExams([a, b, c], c).map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(comparableGeneralExams([a, b, c], c).map((x) => x.id)).toEqual(["c", "b", "a"]);
     expect(examPublisher("TYT Genel Deneme - 3D Yayınları")).toBe("3D Yayınları");
     expect(examPublisher("TYT Genel Deneme")).toBe("—");
   });
@@ -216,11 +216,12 @@ describe("Genel Deneme side by side", () => {
       />,
     );
 
-  it("every exam is a column, in order, with the active subject's own figures; the clicked one is highlighted", () => {
-    const out = html({ tab: "matematik" });
+  it("every exam is a column, newest on the left, with the active subject's own figures; the clicked one is highlighted", () => {
+    // the view shows the order it is given (comparableGeneralExams hands it newest first)
+    const out = html({ tab: "matematik", exams: comparableGeneralExams([a, b, c], b) });
     for (const publisher of ["Yayın A", "Yayın B", "Yayın C"]) expect(out).toContain(publisher);
-    expect(out.indexOf("Yayın A")).toBeLessThan(out.indexOf("Yayın B"));
-    expect(out.indexOf("Yayın B")).toBeLessThan(out.indexOf("Yayın C"));
+    expect(out.indexOf("Yayın C")).toBeLessThan(out.indexOf("Yayın B"));
+    expect(out.indexOf("Yayın B")).toBeLessThan(out.indexOf("Yayın A"));
     expect(out).toContain("D:20 Y:10 B:10"); // exam a, Matematik
     expect(out).toContain("Net 17.50");
     expect(out).toContain("D:28 Y:6 B:6"); // exam b

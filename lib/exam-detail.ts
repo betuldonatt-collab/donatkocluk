@@ -113,8 +113,9 @@ export function markedRowCount(rows: { memberTopicIds: string[] }[], markedTopic
 }
 
 // The exams that belong in one side-by-side comparison with `focus`: every Genel Deneme of the same track (TYT with TYT, LGS
-// with LGS, one grade with its own grade; AYT also by Sayısal / EA / Sözel, which only the score keys tell), oldest first so
-// the columns read as a progression from left to right. Ties on one day keep a stable order (by id).
+// with LGS, one grade with its own grade; AYT also by Sayısal / EA / Sözel, which only the score keys tell), NEWEST first
+// (the same order as the Analiz tab's tables): the most recent exam is the leftmost column, history runs towards the right.
+// Ties on one day keep a stable order (by id).
 export function comparableGeneralExams<T extends { id: string; title: string; task_date: string; task_type: string; subject_scores: SubjectScores | null }>(
   all: T[],
   focus: T,
@@ -124,7 +125,7 @@ export function comparableGeneralExams<T extends { id: string; title: string; ta
   return all
     .filter((e) => e.task_type === "general_exam" && examTrackOf(e.title) === track && (track !== "ayt" || aytTrack(e) === aytTrack(focus)))
     .slice()
-    .sort((a, b) => a.task_date.localeCompare(b.task_date) || a.id.localeCompare(b.id));
+    .sort((a, b) => b.task_date.localeCompare(a.task_date) || a.id.localeCompare(b.id));
 }
 
 // "TYT Genel Deneme - 3D Yayınları" -> "3D Yayınları" (the publisher is the title's " - " suffix); "—" when there is none.

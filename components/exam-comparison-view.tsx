@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { ExamDetailExam } from "@/components/exam-detail-view";
 
 // Genel Deneme side by side: for one subject at a time, every topic is a row and every exam of the track a column
-// (oldest on the left, newest on the right), with the same plain X wherever the student marked the topic in that exam --
+// (newest on the left, going back in time towards the right, like the Analiz tab), with the same plain X wherever the student marked the topic in that exam --
 // so a coach reads a topic's progression across the whole history in one view. A one-click subject switcher on top;
 // each exam column carries that subject's own Doğru / Yanlış / Boş / Net and a shortcut into the edit drawer.
 // Read-only: editing only happens through onEdit (the existing drawer).
@@ -159,7 +159,7 @@ export function ExamComparisonView({
   onEdit,
   initialTabKey,
 }: {
-  // Every exam of the track, oldest first (comparableGeneralExams).
+  // Every exam of the track, newest first (comparableGeneralExams).
   exams: ExamDetailExam[];
   // The exam the coach clicked: its column is highlighted.
   focusExamId: string;
@@ -207,7 +207,7 @@ export function ExamComparisonView({
       </div>
 
       <p className="text-muted-foreground text-xs">
-        {exams.length} deneme, eskiden yeniye soldan sağa. Vurgulu sütun tıkladığın deneme; X = o denemede işaretlenen konu.
+        {exams.length} deneme, en yeniden eskiye soldan sağa. Vurgulu sütun tıkladığın deneme; X = o denemede işaretlenen konu.
         {pendingCount > 0 && ` ${pendingCount} denemenin konu analizi henüz girilmemiş.`}
       </p>
 
