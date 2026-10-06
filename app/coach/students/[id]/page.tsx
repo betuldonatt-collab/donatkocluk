@@ -24,7 +24,8 @@ import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
 import { MissingTasksCard } from "./_components/missing-tasks-card";
 import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
-import { findMissingTasks } from "@/lib/missing-tasks";
+import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS } from "@/lib/missing-tasks";
+import { fetchAllPages } from "@/lib/paged-select";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
@@ -62,7 +63,17 @@ function getWeekDays(referenceIso: string) {
   });
 }
 
-function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
+// What the whole-history reads below carry per task: only the columns the completion percentages, the question totals
+// and the tracked-time sum use -- never the heavy ones (subject scores, photo paths, descriptions, video links).
+type CompletionRow = Pick<DetailTask, "task_date" | "status" | "task_type" | "title" | "course_id">;
+type HistoryTask = CompletionRow &
+  Pick<DetailTask, "id" | "topic_id" | "is_coach_assigned" | "is_approved_by_coach" | "total_count" | "correct_count" | "wrong_count" | "empty_count"> & {
+    tracked_duration_seconds: number | null;
+  };
+const HISTORY_COLUMNS =
+  "id, task_date, task_type, title, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, total_count, correct_count, wrong_count, empty_count, tracked_duration_seconds";
+
+function classifyTrack(task: Pick<DetailTask, "task_type" | "title" | "course_id">): "tyt" | "ayt" | "other" {
   // Genel Deneme has no course_id -- its TYT/AYT track lives only in the
   // title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."),
   // per the coach's request to avoid a dedicated column for it.
@@ -82,7 +93,7 @@ function classifyTrack(task: DetailTask): "tyt" | "ayt" | "other" {
 // (all-time) figure is the exact same bucketing, just over every task ever
 // assigned through today instead of only this week's -- see
 // computeDualCompletionStats below, which runs this over both slices.
-function bucketCompletionStats(tasks: DetailTask[]): CompletionStats {
+function bucketCompletionStats(tasks: CompletionRow[]): CompletionStats {
   const buckets = {
     overall: { done: 0, total: 0 },
     tyt: { done: 0, total: 0 },
@@ -101,7 +112,7 @@ function bucketCompletionStats(tasks: DetailTask[]): CompletionStats {
   return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
-function computeDualCompletionStats(allTasks: DetailTask[], today: string, currentCycle: CycleWindow): DualCompletionStats {
+function computeDualCompletionStats(allTasks: CompletionRow[], today: string, currentCycle: CycleWindow): DualCompletionStats {
   return {
     weekly: bucketCompletionStats(tasksInCycle(allTasks, currentCycle)),
     allTime: bucketCompletionStats(allTasks.filter((t) => t.task_date <= today)),
@@ -111,7 +122,7 @@ function computeDualCompletionStats(allTasks: DetailTask[], today: string, curre
 // Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
 // (paragraf/problem) aren't real curriculum subjects, so they're excluded
 // here even though they're valid course_ids elsewhere in the app.
-function bucketSubjectCompletion(tasks: DetailTask[]): Map<string, { courseName: string; done: number; total: number }> {
+function bucketSubjectCompletion(tasks: CompletionRow[]): Map<string, { courseName: string; done: number; total: number }> {
   const buckets = new Map<string, { courseName: string; done: number; total: number }>();
   for (const t of tasks) {
     if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
@@ -132,7 +143,7 @@ function courseLabelFor(courseId: string): string {
 // course touched in EITHER scope -- a course only worked on in a prior
 // week still shows its all-time figure with "—" for this week's, and vice
 // versa for a course picked up for the first time this week.
-function computeSubjectCompletion(allTasks: DetailTask[], today: string, currentCycle: CycleWindow): SubjectCompletion[] {
+function computeSubjectCompletion(allTasks: CompletionRow[], today: string, currentCycle: CycleWindow): SubjectCompletion[] {
   const weekly = bucketSubjectCompletion(tasksInCycle(allTasks, currentCycle));
   const allTime = bucketSubjectCompletion(allTasks.filter((t) => t.task_date <= today));
   const courseIds = new Set([...weekly.keys(), ...allTime.keys()]);
@@ -168,6 +179,9 @@ async function fetchStudentDetail(studentId: string) {
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
+  const missingFrom = new Date(`${today}T00:00:00Z`);
+  missingFrom.setUTCDate(missingFrom.getUTCDate() - MISSING_TASKS_WINDOW_DAYS);
+  const missingFromIso = missingFrom.toISOString().slice(0, 10);
 
   const [
     { data: allTasks },
@@ -178,7 +192,8 @@ async function fetchStudentDetail(studentId: string) {
     { data: resourceRows },
     { data: progressRows },
     { data: noteRows },
-    { data: taskResourceRows },
+    { data: examRows },
+    { data: missingWindowRows },
     { data: dailyStatsRows },
     { data: reportCardRows },
     { data: topicStatsRows },
@@ -188,11 +203,17 @@ async function fetchStudentDetail(studentId: string) {
     { data: lgsRoutineRows },
     { data: pipelineRows, error: pipelineError },
   ] = await Promise.all([
-      supabase
-        .from("student_tasks")
-        .select("*")
-        .eq("student_id", studentId)
-        .order("task_date", { ascending: false }),
+      // The student's WHOLE task history, slim: only the columns the percentages / question totals need (HISTORY_COLUMNS),
+      // read in pages so a long history is neither dragged over the wire as full rows nor cut at the API's row cap.
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_tasks")
+          .select(HISTORY_COLUMNS, withCount ? { count: "exact" } : undefined)
+          .eq("student_id", studentId)
+          .order("task_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
       supabase
         .from("coaching_sessions")
         .select("*")
@@ -225,21 +246,35 @@ async function fetchStudentDetail(studentId: string) {
         .select("id, name, course_id, is_active, kind, total_stock, remaining_stock")
         .eq("student_id", studentId)
         .order("created_at", { ascending: true }),
-      supabase
-        .from("student_resource_progress")
-        .select("course_id, topic_id, resource_id, solved, reviewed, total_questions, correct_answers, incorrect_answers")
-        .eq("student_id", studentId),
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_resource_progress")
+          .select("course_id, topic_id, resource_id, solved, reviewed, total_questions, correct_answers, incorrect_answers", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", studentId)
+          .order("topic_id", { ascending: true })
+          .order("resource_id", { ascending: true })
+          .range(from, to),
+      ),
       supabase
         .from("coach_notes")
         .select("*")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false })
         .range(0, STUDENT_NOTES_PAGE_SIZE - 1),
+      // Full rows for the exam tasks only (the exam charts and analysis need subject scores etc.) ...
       supabase
-        .from("task_resources")
-        .select("task_id, resource_id, order_index, student_tasks!inner(student_id)")
-        .eq("student_tasks.student_id", studentId)
-        .order("order_index", { ascending: true }),
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", studentId)
+        .in("task_type", ["general_exam", "branch_exam"])
+        .order("task_date", { ascending: false }),
+      // ... and for the look-back window of "Tamamlanmayan Görevler" (a week), not the whole history.
+      supabase
+        .from("student_tasks")
+        .select("*")
+        .eq("student_id", studentId)
+        .gte("task_date", missingFromIso)
+        .lt("task_date", today),
       supabase
         .from("student_daily_stats")
         .select("entry_date, total_count, correct_count, wrong_count, empty_count")
@@ -256,10 +291,15 @@ async function fetchStudentDetail(studentId: string) {
       // student_tasks write site rather than recomputed here from
       // approvedTasks -- bounded by distinct topics ever touched, not by
       // how many years of task history exist.
-      supabase
-        .from("student_topic_stats")
-        .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count")
-        .eq("student_id", studentId),
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_topic_stats")
+          .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", studentId)
+          .order("course_id", { ascending: true })
+          .order("topic_id", { ascending: true })
+          .range(from, to),
+      ),
       // "Sabit Görevler" -- week-independent (no date range), the Program
       // tab's own manager list.
       supabase
@@ -284,20 +324,32 @@ async function fetchStudentDetail(studentId: string) {
             .eq("student_id", studentId)
             .order("entry_date", { ascending: true })
         : Promise.resolve({ data: [] as never[] }),
-      supabase.from(pipelineConfig.table).select(pipelineSelectColumns(pipelineConfig)).eq("student_id", studentId),
+      // Per-topic pipeline ticks, in pages like every other whole-student list; a failure reads as empty (logged below).
+      fetchAllPages<PipelineRow>(
+        (from, to, withCount) =>
+          supabase
+            .from(pipelineConfig.table)
+            .select(pipelineSelectColumns(pipelineConfig), withCount ? { count: "exact" } : undefined)
+            .eq("student_id", studentId)
+            .order("course_id", { ascending: true })
+            .order("topic_id", { ascending: true })
+            .range(from, to) as unknown as PromiseLike<{ data: PipelineRow[] | null; error: unknown; count?: number | null }>,
+      ).then(
+        (r) => ({ data: r.data, error: null as unknown }),
+        (error: unknown) => ({ data: [] as PipelineRow[], error }),
+      ),
     ]);
 
   // A missing pipeline table reads as empty.
   if (pipelineError) console.error("[coach student detail] pipeline read failed:", pipelineError);
-  const pipelineByCourse = groupPipelineRows((pipelineRows ?? []) as unknown as PipelineRow[], pipelineConfig);
+  const pipelineByCourse = groupPipelineRows(pipelineRows ?? [], pipelineConfig);
 
-  const resourceIdsByTask = new Map<string, string[]>();
-  for (const row of taskResourceRows ?? []) {
-    const list = resourceIdsByTask.get(row.task_id) ?? [];
-    list.push(row.resource_id);
-    resourceIdsByTask.set(row.task_id, list);
-  }
-  const tasks = (allTasks ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[];
+  // Nothing on this page shows a task's linked resources outside the weekly board (which loads its own week), so the
+  // whole-history task_resources join this used to run is gone; exam / missing-task rows carry an empty list, the same
+  // way the dashboard's own exam rows do.
+  const withNoResources = (rows: unknown[] | null) => (rows ?? []).map((t) => ({ ...(t as object), resource_ids: [] as string[] })) as DetailTask[];
+  const tasks = (allTasks ?? []) as HistoryTask[];
+  const examTasks = withNoResources(examRows);
   // All-time tracked minutes for the Karneler tab's own stat card -- reuses
   // this same already-fetched full-history `allTasks` (no new query).
   // tracked_duration_seconds only ever grows from a real completed Focus
@@ -326,7 +378,7 @@ async function fetchStudentDetail(studentId: string) {
   // result. Applies uniformly to every task type, including "Ekstra
   // Çalışma" -- there's nothing task-type-specific here, only completion
   // state.
-  const isCompletedTask = (t: DetailTask) => t.status === "done" || t.status === "half_done";
+  const isCompletedTask = (t: Pick<DetailTask, "status">) => t.status === "done" || t.status === "half_done";
   const sessions = (sessionRows ?? []) as DetailSession[];
   // No lock yet -> the student's soonest still-pending session anchors the
   // bootstrap two-week window instead (lib/completion.ts).
@@ -598,15 +650,15 @@ async function fetchStudentDetail(studentId: string) {
     paragrafEntries,
     lgsRoutines: (lgsRoutineRows ?? []) as LgsDailyRoutine[],
     examType,
-    generalExams: tasks.filter((t) => t.task_type === "general_exam"),
-    branchExams: tasks.filter((t) => t.task_type === "branch_exam"),
+    generalExams: examTasks.filter((t) => t.task_type === "general_exam"),
+    branchExams: examTasks.filter((t) => t.task_type === "branch_exam"),
     examMistakes: mistakeRows ?? [],
     weekDays,
     weekTasks: (weekTaskRows ?? []) as DetailTask[],
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
     // Only LGS tasks need a Kanıt Fotoğrafı (lib/lgs-completion.ts).
-    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: usesPhotoWorkflow({ examType, maarifGrade }) }),
+    missingTasks: findMissingTasks(withNoResources(missingWindowRows), today, { requiresPhoto: usesPhotoWorkflow({ examType, maarifGrade }) }),
     courseResourceData,
     today,
     weekStats,

@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import type { ExamType } from "@/lib/exam-type";
 import { getViewContext } from "@/lib/impersonation";
 import { KARMA_TOPIC_ID } from "@/lib/curriculum";
 import { bridgeProblemRoutine } from "@/lib/curriculum/problemler";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { getStudentExamType } from "@/lib/student-exam-type";
+import { fetchAllPages } from "@/lib/paged-select";
 import type { ResourceTotals } from "./_components/totals-summary";
 import { KaynakTakibiClient, type CourseData } from "./kaynak-takibi-client";
 
@@ -13,21 +15,32 @@ const EMPTY_STAT = { total: 0, correct: 0, wrong: 0, empty: 0 };
 export default async function KaynakTakibiPage() {
   const view = await getViewContext("student");
   const supabase = await createClient();
-  const examType = await getStudentExamType();
 
   const courseData: Record<string, CourseData> = {};
+  let examType: ExamType = "YKS";
 
   if (view) {
-    const [{ data: resourceRows }, { data: progressRows }, { data: topicStatsRows }] = await Promise.all([
+    // The cohort and the Maarif grade are independent of the three table reads, so all five run together (they used
+    // to run one after another); only the per-topic pipeline read below needs the cohort first.
+    const [examTypeRead, maarifGrade, { data: resourceRows }, { data: progressRows }, { data: topicStatsRows }] = await Promise.all([
+      getStudentExamType(),
+      fetchMaarifGrade(supabase, view.effectiveUserId),
       supabase
         .from("student_resources")
         .select("id, name, course_id, kind, total_stock, remaining_stock")
         .eq("student_id", view.effectiveUserId)
         .order("created_at", { ascending: true }),
-      supabase
-        .from("student_resource_progress")
-        .select("course_id, topic_id, resource_id, solved, reviewed")
-        .eq("student_id", view.effectiveUserId),
+      // Read in pages (ordered by the table's own unique key): a student with many resources can have more than the
+      // API's 1000-row cap of ticks, and a single read would silently leave the rest unticked on screen.
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_resource_progress")
+          .select("course_id, topic_id, resource_id, solved, reviewed", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", view.effectiveUserId)
+          .order("topic_id", { ascending: true })
+          .order("resource_id", { ascending: true })
+          .range(from, to),
+      ),
       // Sourced from student_topic_stats (migration 0072) instead of
       // student_tasks directly -- that rollup already applies the exact
       // same counting rule this query used to apply itself (coach-
@@ -37,23 +50,41 @@ export default async function KaynakTakibiPage() {
       // fixed-size read keyed by (course, topic), not one that grows with
       // total lifetime task count. Same swap already applied and verified
       // on the coach's own equivalent view (app/coach/students/[id]/page.tsx).
-      supabase
-        .from("student_topic_stats")
-        .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count")
-        .eq("student_id", view.effectiveUserId),
+      fetchAllPages((from, to, withCount) =>
+        supabase
+          .from("student_topic_stats")
+          .select("course_id, topic_id, total_count, correct_count, wrong_count, empty_count", withCount ? { count: "exact" } : undefined)
+          .eq("student_id", view.effectiveUserId)
+          .order("course_id", { ascending: true })
+          .order("topic_id", { ascending: true })
+          .range(from, to),
+      ),
     ]);
+
+    examType = examTypeRead;
 
     // Per-topic pipeline checkboxes -- the cohort's own table (LGS: 4 steps,
     // YKS: 2, Maarif: 3). A missing table/column (migration not run yet)
     // just reads as empty.
-    const maarifGrade = await fetchMaarifGrade(supabase, view.effectiveUserId);
     const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
-    const { data: pipelineRows, error: pipelineError } = await supabase
-      .from(pipelineConfig.table)
-      .select(pipelineSelectColumns(pipelineConfig))
-      .eq("student_id", view.effectiveUserId);
-    if (pipelineError) console.error("[kaynak-takibi] pipeline read failed:", pipelineError);
-    const pipelineByCourse = groupPipelineRows((pipelineRows ?? []) as unknown as PipelineRow[], pipelineConfig);
+    let pipelineRows: PipelineRow[] = [];
+    try {
+      pipelineRows = (
+        await fetchAllPages<PipelineRow>(
+          (from, to, withCount) =>
+            supabase
+              .from(pipelineConfig.table)
+              .select(pipelineSelectColumns(pipelineConfig), withCount ? { count: "exact" } : undefined)
+              .eq("student_id", view.effectiveUserId)
+              .order("course_id", { ascending: true })
+              .order("topic_id", { ascending: true })
+              .range(from, to) as unknown as PromiseLike<{ data: PipelineRow[] | null; error: unknown; count?: number | null }>,
+        )
+      ).data;
+    } catch (pipelineError) {
+      console.error("[kaynak-takibi] pipeline read failed:", pipelineError);
+    }
+    const pipelineByCourse = groupPipelineRows(pipelineRows, pipelineConfig);
 
     function courseEntry(courseId: string): CourseData {
       return (courseData[courseId] ??= { resources: [], branchExamResources: [], progress: {}, pipeline: pipelineByCourse[courseId] ?? {}, topicStats: { byTopic: {}, karma: { ...EMPTY_STAT } } });
