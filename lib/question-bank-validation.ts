@@ -14,11 +14,6 @@
 export const QUESTION_COUNTS_REQUIRED =
   "Doğru, yanlış ve boş sayılarını gir. Soruları çözmediysen “Soruları çözmedim” kutusunu işaretle.";
 
-// Soru Çözümü needs ALL THREE of Doğru / Yanlış / Boş typed -- 0 for what there was none of -- since nothing fills
-// Boş in for the student any more. Shown when some, but not all, of the three are blank.
-export const QUESTION_COUNTS_INCOMPLETE =
-  "Doğru, yanlış ve boş kutularının üçünü de doldurman gerekiyor. Çözmediğin ya da boş bıraktığın soru yoksa ilgili kutuya 0 yaz.";
-
 export const NO_QUESTIONS_NEEDS_VIDEO =
   "“Soruları çözmedim” seçeneği için en az bir videoyu izlendi olarak işaretlemelisin. Hiçbir şey yapmadıysan “Yapılmadı”yı seç.";
 
@@ -39,6 +34,13 @@ export type QuestionBankSaveInput = {
   isLgs: boolean;
 };
 
+// A Soru Çözümü result with at least one count typed: the boxes left blank are saved as 0, so Doğru / Yanlış / Boş
+// are always all numbers (the LGS / 7th-grade completion rules need all three). All blank stays all blank.
+export function zeroFillQuestionCounts<T extends { correct: number | null; wrong: number | null; empty: number | null }>(counts: T): T {
+  if (counts.correct === null && counts.wrong === null && counts.empty === null) return counts;
+  return { ...counts, correct: counts.correct ?? 0, wrong: counts.wrong ?? 0, empty: counts.empty ?? 0 };
+}
+
 // null = fine to save; otherwise the Turkish reason it is refused.
 export function checkQuestionBankSave(input: QuestionBankSaveInput): string | null {
   const anyCount = input.correct !== null || input.wrong !== null || input.empty !== null;
@@ -48,12 +50,13 @@ export function checkQuestionBankSave(input: QuestionBankSaveInput): string | nu
     if (!input.watchedVideo) return NO_QUESTIONS_NEEDS_VIDEO;
     return null;
   }
-  // All three typed (0 is a number) is a normal save, whatever the total -- fewer than the target is "Yarım
-  // Yapıldı", the target or more "Yapıldı" (computeAutoTaskStatus). A blank box is never read as 0.
-  if (input.correct !== null && input.wrong !== null && input.empty !== null) return null;
+  // Any typed count is a normal save: a box left blank counts as 0 (the caller writes the zeros -- see
+  // zeroFillQuestionCounts), whatever the total. Fewer than the target is "Yarım Yapıldı", the target or more
+  // "Yapıldı" (computeAutoTaskStatus).
+  if (anyCount) return null;
   // Nothing typed at all: the box is the way out where it exists (every cohort but LGS / 7th grade, whose
   // completion rules need the counts), so only there does the message point at it.
-  return anyCount || input.isLgs ? QUESTION_COUNTS_INCOMPLETE : QUESTION_COUNTS_REQUIRED;
+  return input.isLgs ? NO_QUESTIONS_NOT_FOR_LGS : QUESTION_COUNTS_REQUIRED;
 }
 
 export function hasWatchedVideo(links: { watched?: boolean }[] | null | undefined): boolean {

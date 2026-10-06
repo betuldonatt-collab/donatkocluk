@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { checkQuestionBankSave, hasWatchedVideo } from "@/lib/question-bank-validation";
+import { checkQuestionBankSave, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Languages, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
@@ -648,6 +648,13 @@ function TaskModalBody({
       patch.correct_count = toNumberOrNull(correctCount);
       patch.wrong_count = toNumberOrNull(wrongCount);
       patch.empty_count = toNumberOrNull(emptyCount);
+      // Soru Çözümü: a box left blank next to a typed one is saved as 0 (the student shouldn't have to type it).
+      if (task.task_type === "question_bank") {
+        const zeroed = zeroFillQuestionCounts({ correct: patch.correct_count, wrong: patch.wrong_count, empty: patch.empty_count });
+        patch.correct_count = zeroed.correct;
+        patch.wrong_count = zeroed.wrong;
+        patch.empty_count = zeroed.empty;
+      }
       if (isTytBranchExam) patch.duration_minutes = toNumberOrNull(durationMinutes);
       if (noQuestionsActive) {
         patch.correct_count = null;
@@ -738,9 +745,9 @@ function TaskModalBody({
     return true;
   }
 
-  // Soru Çözümü: all three of Doğru / Yanlış / Boş typed (0 for none), or the "Soruları çözmedim" box with a
+  // Soru Çözümü: at least one count typed (a box left blank counts as 0), or the "Soruları çözmedim" box with a
   // watched video (lib/question-bank-validation.ts, re-checked by updateTaskProgress). For LGS / 7th-grade
-  // students there is no box -- the three counts are always required.
+  // students there is no box -- some count is always required.
   function blockedByQuestionBankRule(): boolean {
     if (task.task_type !== "question_bank" || isDurationOnlyTarget) return false;
     const problem = checkQuestionBankSave({
@@ -752,8 +759,6 @@ function TaskModalBody({
       isLgs: photoWorkflow,
     });
     if (!problem) return false;
-    // Outline the boxes still blank, like the Branş Denemesi form does.
-    setShowMissingScores(true);
     setError(problem);
     return true;
   }
@@ -1230,28 +1235,22 @@ function TaskModalBody({
               value={correctCount}
               onChange={(v) => handleCountFieldChange("correct", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(correctCount)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(correctCount)}
             />
             <Field
               label="Yanlış"
               value={wrongCount}
               onChange={(v) => handleCountFieldChange("wrong", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(wrongCount)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(wrongCount)}
             />
             <Field
               label="Boş"
               value={emptyCount}
               onChange={(v) => handleCountFieldChange("empty", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(emptyCount)}
+              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(emptyCount)}
             />
-            {task.task_type === "question_bank" && !noQuestionsActive && (
-              <p className="text-muted-foreground col-span-2 text-xs sm:col-span-4">
-                Doğru, yanlış ve boş kutularının üçünü de doldur; olmayan için 0 yaz. Hedeften fazla soru çözebilirsin. Hedefin altında kalırsan görev
-                “Yarım Yapıldı”, hedefe ulaşırsan ya da geçersen “Yapıldı” olur.
-              </p>
-            )}
             {showNoQuestionsBox && (
               <div className="col-span-2 flex items-start gap-2 sm:col-span-4">
                 <Checkbox

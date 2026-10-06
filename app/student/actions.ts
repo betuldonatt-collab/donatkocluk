@@ -20,7 +20,7 @@ import {
   isGeneralExamScoresIncomplete,
 } from "@/lib/exam-results-validation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
-import { checkQuestionBankSave, hasWatchedVideo } from "@/lib/question-bank-validation";
+import { checkQuestionBankSave, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
 import { findCourseById, findTopicById } from "@/lib/curriculum";
@@ -242,11 +242,10 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
       const finalCorrect = "correct_count" in patchV ? (patchV.correct_count ?? null) : existing.correct_count;
       const finalWrong = "wrong_count" in patchV ? (patchV.wrong_count ?? null) : existing.wrong_count;
       const finalEmpty = "empty_count" in patchV ? (patchV.empty_count ?? null) : existing.empty_count;
-      // Doğru, Yanlış and Boş must ALL be typed (0 for none) -- also for LGS / 7th-grade students, whose
-      // completion rules below then add the photo. Nothing fills Boş in for the student any more, so a blank box
-      // is refused with a message that says what to do (lib/question-bank-validation.ts), never read as 0.
-      const missingAny = finalCorrect === null || finalWrong === null || finalEmpty === null;
-      const isLgs = noQuestionsSolved || missingAny ? await isLgsStudent(supabase, user.id) : false;
+      // At least one count must be typed (or the "Soruları çözmedim" box used) -- also for LGS / 7th-grade
+      // students, whose completion rules below then add the photo. Boxes left blank are saved as 0 (below).
+      const noneTyped = finalCorrect === null && finalWrong === null && finalEmpty === null;
+      const isLgs = noQuestionsSolved || noneTyped ? await isLgsStudent(supabase, user.id) : false;
       const problem = checkQuestionBankSave({
         correct: finalCorrect,
         wrong: finalWrong,
@@ -256,6 +255,18 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
         isLgs,
       });
       if (problem) throw new Error(problem);
+    }
+    // A blank Doğru / Yanlış / Boş next to a typed one is 0, not "unknown": store the zeros, so the three are always
+    // all numbers (the completion rules for LGS / 7th grade need that) whichever box the student skipped.
+    if (!noQuestionsSolved && savesCounts) {
+      const zeroed = zeroFillQuestionCounts({
+        correct: "correct_count" in patchV ? (patchV.correct_count ?? null) : existing.correct_count,
+        wrong: "wrong_count" in patchV ? (patchV.wrong_count ?? null) : existing.wrong_count,
+        empty: "empty_count" in patchV ? (patchV.empty_count ?? null) : existing.empty_count,
+      });
+      patchV.correct_count = zeroed.correct;
+      patchV.wrong_count = zeroed.wrong;
+      patchV.empty_count = zeroed.empty;
     }
     if (noQuestionsSolved) {
       patchV.correct_count = null;
