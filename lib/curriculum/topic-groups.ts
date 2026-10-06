@@ -27,6 +27,38 @@ const UNGROUPED_TOPIC_NAMES: Record<string, string[]> = {
   "tyt-biyoloji": ["Kalıtım"],
 };
 
+// The id of a generated master topic: "<courseId>-genel-u<unitIndex>" (also what the TYT / AYT data uses).
+export function unitMasterId(courseId: string, unitIndex: number): string {
+  return `${courseId}-genel-u${unitIndex}`;
+}
+
+// "1. Ünite: Kuvvet ve Hareket" -> "Kuvvet ve Hareket" (the Maarif unit label without its number): a topic name must
+// never start with a hierarchy number on screen, and the master topic is a topic.
+function unitTitle(label: string): string {
+  const title = label.replace(/^\d+\.\s*(?:Ünite|Tema)\s*:\s*/i, "").trim();
+  return title === "" ? label : title;
+}
+
+// Adds a master topic ("<unit title> (Genel)", id from unitMasterId) to every unit that has at least two topics, and
+// returns new course objects. For curricula whose JSON is generated from a source list by a script (the 11th grade's
+// maarif11.json): the masters are added when the data is loaded, so re-running the script never loses them. The master
+// goes LAST in its unit, so no existing topic keeps anything but its own position and id (a Maarif Kaynak Takibi row is
+// identified by the first topic of its group -- saved ticks are keyed by it). A unit with a single topic has nothing to
+// group and stays flat, as does a "-" (headerless) unit.
+export function withUnitMasters<U extends { unit: string | null; topics: { id: string; name: string }[] }, C extends { id: string; units: U[] }>(courses: C[]): C[] {
+  return courses.map(
+    (course) =>
+      ({
+        ...course,
+        units: course.units.map((unit, ui) =>
+          !unit.unit || unit.unit === "-" || unit.topics.length < 2
+            ? unit
+            : { ...unit, topics: [...unit.topics, { id: unitMasterId(course.id, ui), name: `${unitTitle(unit.unit)} (Genel)` }] },
+        ),
+      }) as C,
+  );
+}
+
 export type TopicGroup = {
   unitLabel: string;
   masterId: string;
@@ -42,9 +74,10 @@ export function topicGroups(course: Course | null | undefined): TopicGroup[] {
   if (cached) return cached;
   const flat = new Set(UNGROUPED_TOPIC_NAMES[course.id] ?? []);
   const groups: TopicGroup[] = [];
-  for (const unit of course.units) {
+  for (const [ui, unit] of course.units.entries()) {
     if (unit.unit === "-") continue;
-    const master = unit.topics.find((t) => t.name === unit.unit + " (Genel)");
+    // The master: named "<unit> (Genel)", or carrying the generated master id (units whose label starts with a number).
+    const master = unit.topics.find((t) => t.name === unit.unit + " (Genel)" || t.id === unitMasterId(course.id, ui));
     if (!master) continue;
     groups.push({ unitLabel: unit.unit, masterId: master.id, members: unit.topics.filter((t) => t.id !== master.id && !flat.has(t.name)) });
   }

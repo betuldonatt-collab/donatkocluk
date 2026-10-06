@@ -24,7 +24,7 @@ import {
   type Track,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
-import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarif11CourseOptions, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
 import { TopicGroupSelect } from "@/components/topic-group-select";
@@ -125,8 +125,9 @@ export function courseOptionsFor(
   maarifGrade: MaarifGrade | null = null,
   aytTrack: Track | null = null,
 ): { id: string; label: string; group?: string }[] {
-  // A Maarif student is offered ONLY their own grade's courses (9th and 10th
-  // grade never mix).
+  // An 11th grader is offered their own courses AND every TYT course (the grade is exam-prep year); the other
+  // Maarif grades only their own (7th, 9th and 10th grade never mix).
+  if (maarifGrade === 11) return maarif11CourseOptions(isBranchExam);
   if (maarifGrade !== null) return maarifCourseOptions(maarifGrade);
   if (examType === "LGS") {
     return [

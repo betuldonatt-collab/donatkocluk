@@ -271,7 +271,7 @@ describe("Biyoloji: the buckets are the only thing shown", () => {
     const own = MAARIF11_KAYNAK_COURSES.find((c) => c.id === "maarif11-biyoloji")!;
     expect(courseHasBuckets(own)).toBe(false);
     expect(own.units.map((u) => u.unit)).toEqual(["1. Ünite: Tepki", "2. Ünite: Homeostazi"]);
-    expect(own.units.map((u) => u.topics.length)).toEqual([16, 10]);
+    expect(own.units.map((u) => u.topics.length)).toEqual([17, 11]); // 16 + 10 native topics, plus each unit's "(Genel)" master
   });
 });
 

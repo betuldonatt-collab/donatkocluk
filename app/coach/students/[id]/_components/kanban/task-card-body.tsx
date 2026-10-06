@@ -46,7 +46,7 @@ export function statusClasses(task: DetailTask) {
 // indigo tint (see lib/subject-colors.ts), since they aren't tied to one
 // subject family.
 export function cardBackgroundClass(task: DetailTask) {
-  return subjectBackgroundClass(task.course_id, task.task_type);
+  return subjectBackgroundClass(task.course_id, task.task_type, { deepMaarif11: true });
 }
 
 // The floor a coach can drag a card down to (see ResizeHandle in

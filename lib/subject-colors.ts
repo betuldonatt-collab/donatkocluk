@@ -192,7 +192,10 @@ const ROUTINE_CLASSES: Record<string, string> = {
   "yeni-nesil-mat-dozu": "bg-violet-500/25",
 };
 
-export function subjectBackgroundClass(courseId: string | null, taskType: string): string {
+// `deepMaarif11`: an 11th grader's own ("maarif11-") courses take the deeper (AYT) tier instead of the TYT one, so a
+// student who works on both curricula shows "this year's subject" (deeper) and "exam prep" (lighter, TYT) apart at a
+// glance. Opt-in: only the coach's own views pass it; every other caller keeps the tier it always had.
+export function subjectBackgroundClass(courseId: string | null, taskType: string, options: { deepMaarif11?: boolean } = {}): string {
   // Standalone punchy color, not part of the TYT/AYT/Branş tier system --
   // Genel Deneme is a milestone, meant to stand out rather than blend
   // into the subject palette.
@@ -206,7 +209,7 @@ export function subjectBackgroundClass(courseId: string | null, taskType: string
     if (family) {
       const [tyt, ayt, branch] = FAMILY_CLASSES[family];
       if (taskType === "branch_exam") return branch;
-      return courseId.startsWith("ayt-") ? ayt : tyt;
+      return courseId.startsWith("ayt-") || (options.deepMaarif11 === true && courseId.startsWith("maarif11-")) ? ayt : tyt;
     }
   }
   // Paragraf/Problem routines, extra_custom, or no course set at all.

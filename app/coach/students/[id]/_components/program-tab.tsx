@@ -260,7 +260,7 @@ export function ProgramTab({
                         key={task.id}
                         className={cn(
                           "border-border rounded-md border p-1.5 text-[11px]",
-                          subjectBackgroundClass(task.course_id, task.task_type),
+                          subjectBackgroundClass(task.course_id, task.task_type, { deepMaarif11: true }),
                           taskStatusBorderClass(task.status, task.completed),
                         )}
                       >

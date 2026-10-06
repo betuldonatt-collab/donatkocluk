@@ -14,6 +14,7 @@
 import type { Course } from "./index";
 import kaynakTakibiJson from "./maarif11.json";
 import { withCleanNames } from "./topic-name";
+import { withUnitMasters } from "./topic-groups";
 
 export type Maarif11Track = "sayisal" | "ea" | "sozel";
 
@@ -21,7 +22,10 @@ export type Maarif11Topic = { id: string; name: string };
 export type Maarif11Unit = { unit: string; topics: Maarif11Topic[] };
 export type Maarif11Course = { id: string; name: string; units: Maarif11Unit[] };
 
-export const MAARIF11_COURSES: Maarif11Course[] = withCleanNames(kaynakTakibiJson as Maarif11Course[]);
+// Every unit with two or more topics also carries its master topic "<unit> (Genel)" (withUnitMasters, lib/curriculum/
+// topic-groups.ts): the coach picks the Ünite as a whole and may then narrow it to one Alt Başlık, exactly like the TYT /
+// AYT grouped units.
+export const MAARIF11_COURSES: Maarif11Course[] = withUnitMasters(withCleanNames(kaynakTakibiJson as Maarif11Course[]));
 
 export const MAARIF11_KAYNAK_COURSES: Course[] = MAARIF11_COURSES;
 

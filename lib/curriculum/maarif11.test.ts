@@ -8,7 +8,9 @@ import { MAARIF_GRADES } from "../maarif-grade";
 import { subjectBackgroundClass } from "../subject-colors";
 import { validatePipelineStep } from "../topic-pipeline";
 
-const topicCount = (c: { units: { topics: unknown[] }[] }) => c.units.reduce((n, u) => n + u.topics.length, 0);
+// Native topics only: every unit with two or more topics also carries a generated "(Genel)" master (withUnitMasters).
+const topicCount = (c: { units: { topics: { id: string }[] }[] }) =>
+  c.units.reduce((n, u) => n + u.topics.filter((t) => !t.id.includes("-genel-u")).length, 0);
 const course = (id: string) => MAARIF11_KAYNAK_COURSES.find((c) => c.id === id)!;
 const raw = (id: string) => (rawJson as { id: string; units: { unit: string; topics: { id: string; name: string }[] }[] }[]).find((c) => c.id === id)!;
 
@@ -129,7 +131,8 @@ describe("maarif11 integration", () => {
     const fizik = course("maarif11-fizik");
     const rows = flattenSelectionRows(fizik);
     // Unit 1 alone has 6 headings (Serbest Düşme, İki Boyutta..., Newton'ın..., Sürtünme..., Limit Hız, Düzgün Çembersel Hareket).
-    expect(rows.filter((r) => r.unitLabel === fizik.units[0].unit)).toHaveLength(6);
+    // plus the unit's own "(Genel)" master, which closes the unit as its own row.
+    expect(rows.filter((r) => r.unitLabel === fizik.units[0].unit)).toHaveLength(7);
     expect(rows.length).toBeGreaterThan(fizik.units.length);
     expect(rows.flatMap((r) => r.memberTopicIds)).toEqual(fizik.units.flatMap((u) => u.topics.map((t) => t.id)));
     expect(rows[0].label).toBe("Serbest Düşme");

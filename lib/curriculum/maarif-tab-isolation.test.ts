@@ -25,7 +25,8 @@ describe("native 11th-grade courses stay on their own data", () => {
       "6. Ünite: Afetler ve Sürdürülebilir Çevre",
       "7. Ünite: Bölgeler, Ülkeler ve Küresel Bağlantılar",
     ]);
-    expect(c.units.map((u) => u.topics.length)).toEqual([1, 1, 2, 2, 5, 3, 5]);
+    // 19 native topics; every unit with two or more also carries its "(Genel)" master (withUnitMasters), which comes last.
+    expect(c.units.map((u) => u.topics.length)).toEqual([1, 1, 3, 3, 6, 4, 6]);
     expect(c.units[0].topics[0].name).toBe("Mekânsal Sorunlar Karşısında Coğrafya Bilimi");
     expect(c.units[1].topics[0].name).toBe("Web Tabanlı CBS Uygulamaları");
   });
@@ -37,7 +38,7 @@ describe("native 11th-grade courses stay on their own data", () => {
       "2. Ünite: Dönüşüm Sürecinde Osmanlı (1789-1908)",
       "3. Ünite: Savaşlar Sarmalında Osmanlı (1908-1918)",
     ]);
-    expect(c.units.flatMap((u) => u.topics)).toHaveLength(11);
+    expect(c.units.flatMap((u) => u.topics)).toHaveLength(11 + 3); // 11 native topics + one "(Genel)" master per unit
     expect(c.units.flatMap((u) => u.topics.map((t) => t.name))).not.toContain("Osmanlı Devleti'nin İlim ve İrfan Geleneği");
   });
 
