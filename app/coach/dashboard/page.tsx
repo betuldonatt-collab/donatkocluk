@@ -242,7 +242,7 @@ async function fetchDashboardData(
   const prevWeekMonday = addDaysISO(todayWeek[0].date, -7);
   const prevWeekSunday = addDaysISO(todayWeek[0].date, -1);
 
-  const [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }] =
+  const [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }, gradeById, { data: pastDueTaskRows }] =
     studentIds.length > 0
       ? await Promise.all([
           supabase.from("profiles").select("id, full_name, exam_type").in("id", studentIds),
@@ -271,28 +271,26 @@ async function fetchDashboardData(
             .in("task_type", ["general_exam", "branch_exam"])
             .eq("analysis_pending", true)
             .order("task_date", { ascending: true }),
+          // Maarif grades and the past-due task candidates need only the roster's ids, so they are read together with
+          // everything above instead of one after the other; the photo-workflow cohort is filtered out of the
+          // candidates once the profiles and grades are in (below).
+          fetchMaarifGradesByIds(supabase, "profiles", studentIds),
+          supabase
+            .from("student_tasks")
+            .select("id, student_id, task_date, task_type, course_id, title, status, is_approved_by_coach, evidence_image_paths, evidence_review_status, postponed_to")
+            .in("student_id", studentIds)
+            .lt("task_date", today)
+            .gte("task_date", addDaysISO(today, -MISSING_TASKS_WINDOW_DAYS))
+            .in("status", ["pending", "not_done"]),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, new Map<string, number | null>(), { data: [] }];
 
   const roster = (profiles ?? []) as RosterStudent[];
 
-  // Past-due, not-yet-completed tasks of this coach's LGS students, bounded to
-  // the same look-back window the student page uses. Needs the roster's
-  // exam types, so it runs after the profiles read above.
-  // The photo-workflow cohorts: LGS students and 7th graders (lib/photo-workflow.ts).
-  const gradeById = await fetchMaarifGradesByIds(supabase, "profiles", roster.map((s) => s.id));
+  // Past-due, not-yet-completed tasks of this coach's photo-workflow students, bounded to the same look-back window the
+  // student page uses. The photo-workflow cohorts: LGS students and 7th graders (lib/photo-workflow.ts).
   const photoStudentIds = new Set(roster.filter((s) => usesPhotoWorkflow({ examType: s.exam_type, maarifGrade: gradeById.get(s.id) ?? null })).map((s) => s.id));
-  const lgsStudentIds = [...photoStudentIds];
-  const { data: lgsTaskRows } =
-    lgsStudentIds.length > 0
-      ? await supabase
-          .from("student_tasks")
-          .select("id, student_id, task_date, task_type, course_id, title, status, is_approved_by_coach, evidence_image_paths, evidence_review_status, postponed_to")
-          .in("student_id", lgsStudentIds)
-          .lt("task_date", today)
-          .gte("task_date", addDaysISO(today, -MISSING_TASKS_WINDOW_DAYS))
-          .in("status", ["pending", "not_done"])
-      : { data: [] };
+  const lgsTaskRows = (pastDueTaskRows ?? []).filter((r) => photoStudentIds.has(r.student_id));
 
   const alerts = buildCoachAlerts(
     roster,
@@ -369,6 +367,14 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
   let data = emptyDashboard[0];
   let pendingApprovals = emptyDashboard[1];
   let focusReviews = emptyDashboard[2];
+  // Students asking to drop a school course (Yazılılar): best-effort, [] if migration 0118 is not applied yet. Started
+  // together with the reads below (it does not depend on them) instead of after them.
+  const courseRemovalsPromise = view
+    ? getPendingCourseRemovals().catch((e) => {
+        console.error("[CoachDashboardPage] course removals failed", e);
+        return [] as Awaited<ReturnType<typeof getPendingCourseRemovals>>;
+      })
+    : Promise.resolve([] as Awaited<ReturnType<typeof getPendingCourseRemovals>>);
   if (view) {
     try {
       [data, pendingApprovals, focusReviews] = await Promise.all([
@@ -380,10 +386,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
       console.error("[CoachDashboardPage] fetchDashboardData failed", e);
     }
   }
-
-  // Students asking to drop a school course (Yazılılar): best-effort, [] if migration 0118
-  // is not applied yet.
-  const courseRemovals = view ? await getPendingCourseRemovals() : [];
+  const courseRemovals = await courseRemovalsPromise;
 
   // Notification-side echo of the pending-approvals card above -- see
   // syncPendingApprovalNotifications' own comment (app/coach/actions.ts).

@@ -4,6 +4,7 @@ import { BookOpen, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { groupStudentsByCycleWindow } from "@/lib/cycle-query-groups";
 import { completionPercent, resolveCycles, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
 import { formatPercentile } from "@/lib/profile-terms";
@@ -33,12 +34,11 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
   if (studentIds.length === 0) return [];
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: profiles }, { data: taskRows }, { data: lockRows }, { data: sessionRows }] = await Promise.all([
+  const [{ data: profiles }, { data: lockRows }, { data: sessionRows }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, city, parent_name, parent_phone, remaining_sessions, target_university, target_department, target_high_school, target_percentile, exam_type")
       .in("id", studentIds),
-    supabase.from("student_tasks").select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes").in("student_id", studentIds),
     // Every student's own most recent lock -- ordered so the FIRST row seen
     // per student below is their latest one (see lastLockByStudent).
     supabase.from("progress_locks").select("student_id, period_start, locked_at").in("student_id", studentIds).order("locked_at", { ascending: false }),
@@ -70,8 +70,23 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
     currentCycleByStudent.set(id, resolveCycles(lastLockByStudent.get(id) ?? null, upcomingSessionByStudent.get(id) ?? null, today).current);
   }
 
+  // Only the tasks inside each student's CURRENT cycle window are read (that is all the percentage below counts) -- the
+  // page used to pull every task of every student ever assigned, which grew with each month of coaching (and, past the
+  // API's row cap, silently dropped rows). Students sharing a window share one query.
+  const taskGroups = await Promise.all(
+    groupStudentsByCycleWindow(studentIds, (id) => currentCycleByStudent.get(id)!).map(async (group) => {
+      const { data } = await supabase
+        .from("student_tasks")
+        .select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes")
+        .in("student_id", group.studentIds)
+        .gte("task_date", group.start)
+        .lte("task_date", group.end);
+      return data ?? [];
+    }),
+  );
+
   const tasksByStudent = new Map<string, WeightableTask[]>();
-  for (const t of taskRows ?? []) {
+  for (const t of taskGroups.flat()) {
     const list = tasksByStudent.get(t.student_id) ?? [];
     list.push({
       task_date: t.task_date,

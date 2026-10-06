@@ -364,13 +364,19 @@ export function ScheduleBoard({
     }
   }
 
-  function tasksByDay(date: string) {
-    return tasks.filter((t) => t.task_date === date).sort((a, b) => a.order_index - b.order_index);
-  }
-
-  function eventsByDay(date: string) {
-    return events.filter((e) => e.event_date === date).sort((a, b) => a.order_index - b.order_index);
-  }
+  // The board's per-day buckets, built once per change of tasks / events / window (one pass each) instead of
+  // re-filtering and re-sorting the whole week's rows for every day on every render -- and a render happens on every
+  // drag-over, card selection and paint click. The arrays keep their identity while the data is unchanged.
+  const dayBuckets = useMemo(() => {
+    const buckets = new Map<string, { routine: DetailTask[]; regular: DetailTask[]; events: StudentEvent[] }>();
+    for (const day of weekDays) buckets.set(day.date, { routine: [], regular: [], events: [] });
+    for (const t of [...tasks].sort((a, b) => a.order_index - b.order_index)) {
+      const bucket = buckets.get(t.task_date);
+      if (bucket) (isRoutineCourseId(t.course_id) ? bucket.routine : bucket.regular).push(t);
+    }
+    for (const e of [...events].sort((a, b) => a.order_index - b.order_index)) buckets.get(e.event_date)?.events.push(e);
+    return buckets;
+  }, [tasks, events, weekDays]);
 
   function handleEventCreated(created: StudentEvent) {
     setEvents((prev) => [...prev, created]);
@@ -729,11 +735,12 @@ export function ScheduleBoard({
   // neighbor still has a same-height placeholder sitting at each row it's
   // missing (needed for taskRows.heightOf(i) to mean the same row for
   // every day, not just "however many items I happen to have").
-  const maxRoutineSlots = Math.max(0, ...weekDays.map((day) => tasksByDay(day.date).filter((t) => isRoutineCourseId(t.course_id)).length));
-  const maxGorevSlots = Math.max(
-    0,
-    ...weekDays.map((day) => tasksByDay(day.date).filter((t) => !isRoutineCourseId(t.course_id)).length + eventsByDay(day.date).length),
-  );
+  let maxRoutineSlots = 0;
+  let maxGorevSlots = 0;
+  for (const bucket of dayBuckets.values()) {
+    maxRoutineSlots = Math.max(maxRoutineSlots, bucket.routine.length);
+    maxGorevSlots = Math.max(maxGorevSlots, bucket.regular.length + bucket.events.length);
+  }
 
   return (
     <div className="space-y-4">
@@ -904,7 +911,7 @@ export function ScheduleBoard({
         <div className="overflow-x-auto pb-2">
           <div className="grid min-w-[1260px] grid-cols-7 items-start gap-3">
             {weekDays.map((day) => {
-              const dayTasks = tasksByDay(day.date);
+              const bucket = dayBuckets.get(day.date)!;
               return (
                 <DayColumn
                   key={day.date}
@@ -912,13 +919,13 @@ export function ScheduleBoard({
                   day={day}
                   isToday={day.date === today}
                   isDropTarget={day.date === overDay}
-                  events={eventsByDay(day.date)}
+                  events={bucket.events}
                   fixedTasks={fixedTasksByDate.get(day.date) ?? []}
                   maxFixedSlots={maxFixedSlots}
                   fixedRowHeights={fixedRows.heights}
                   registerFixedRef={fixedRows.registerRef}
-                  routineTasks={dayTasks.filter((t) => isRoutineCourseId(t.course_id))}
-                  regularTasks={dayTasks.filter((t) => !isRoutineCourseId(t.course_id))}
+                  routineTasks={bucket.routine}
+                  regularTasks={bucket.regular}
                   maxRoutineSlots={maxRoutineSlots}
                   maxGorevSlots={maxGorevSlots}
                   routineRows={routineRows}

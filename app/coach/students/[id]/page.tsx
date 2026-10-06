@@ -152,16 +152,19 @@ function computeSubjectCompletion(allTasks: DetailTask[], today: string, current
 async function fetchStudentDetail(studentId: string) {
   const supabase = await createClient();
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", studentId).maybeSingle();
+  // Independent of each other, so one round trip instead of two.
+  const [{ data: profile }, maarifGrade] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", studentId).maybeSingle(),
+    fetchMaarifGrade(supabase, studentId),
+  ]);
   if (!profile) return null;
 
   // The cohort decides which curriculum the analytics below cover.
   const examType: ExamType = profile.exam_type === "LGS" ? "LGS" : "YKS";
-  const maarifGrade = await fetchMaarifGrade(supabase, studentId);
   // A 7th/9th/10th grader's maps (Konu Performans, Gelişim Haritası) cover that grade's own courses.
   const curriculumCourseIds = curriculumCourseIdsFor(examType, maarifGrade);
-  // Yazılılar: best-effort (null for a graduate; never throws), so it can't take the page down.
-  const schoolExams = await fetchSchoolExams(supabase, studentId, { examType, maarifGrade });
+  // Per-topic pipeline ticks (the student's cohort table: LGS 4 steps, YKS 2, Maarif 3), keyed course -> topic.
+  const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
 
   const today = todayISO();
   const weekDays = getWeekDays(today);
@@ -180,6 +183,10 @@ async function fetchStudentDetail(studentId: string) {
     { data: reportCardRows },
     { data: topicStatsRows },
     { data: fixedTaskRows },
+    schoolExams,
+    { data: coachLink },
+    { data: lgsRoutineRows },
+    { data: pipelineRows, error: pipelineError },
   ] = await Promise.all([
       supabase
         .from("student_tasks")
@@ -261,36 +268,26 @@ async function fetchStudentDetail(studentId: string) {
         .eq("student_id", studentId)
         .order("day_of_week", { ascending: true })
         .order("start_time", { ascending: true }),
+      // Yazılılar: best-effort (null for a graduate; never throws), so it can't take the page down.
+      fetchSchoolExams(supabase, studentId, { examType, maarifGrade }),
+      // coaching_start_date is so often never set that generateCycleReportCard (app/coach/actions.ts) falls back to
+      // the coach_students roster-link's own created_at -- fetched here too, purely so the Karneler tab's date range
+      // picker can default to the same "next cycle" range the server would have auto-computed. RLS already scopes
+      // this to the caller's own link (or an admin's), no explicit coach_id filter needed.
+      supabase.from("coach_students").select("created_at").eq("student_id", studentId).maybeSingle(),
+      // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines (migration 0087) rather than
+      // paragraf_problem_entries; a 7th grader does the same (migration 0122).
+      examType === "LGS" || maarifGrade === 7
+        ? supabase
+            .from("lgs_daily_routines")
+            .select("id, entry_date, paragraf_correct, paragraf_wrong, paragraf_empty, paragraf_duration_minutes, book_title, book_author, book_pages_read")
+            .eq("student_id", studentId)
+            .order("entry_date", { ascending: true })
+        : Promise.resolve({ data: [] as never[] }),
+      supabase.from(pipelineConfig.table).select(pipelineSelectColumns(pipelineConfig)).eq("student_id", studentId),
     ]);
 
-  // coaching_start_date is so often never set that generateCycleReportCard
-  // (app/coach/actions.ts) falls back to the coach_students roster-link's
-  // own created_at -- fetched here too, purely so the Karneler tab's date
-  // range picker can default to the same "next cycle" range the server
-  // would have auto-computed. RLS already scopes this to the caller's own
-  // link (or an admin's), no explicit coach_id filter needed, matching
-  // every other query above.
-  const { data: coachLink } = await supabase.from("coach_students").select("created_at").eq("student_id", studentId).maybeSingle();
-
-  // LGS students log Paragraf + Kitap Okuma in lgs_daily_routines (migration
-  // 0087) rather than paragraf_problem_entries.
-  // A 7th grader does the same (Paragraf / Kitap Okuma, migration 0122).
-  const { data: lgsRoutineRows } =
-    examType === "LGS" || maarifGrade === 7
-      ? await supabase
-          .from("lgs_daily_routines")
-          .select("id, entry_date, paragraf_correct, paragraf_wrong, paragraf_empty, paragraf_duration_minutes, book_title, book_author, book_pages_read")
-          .eq("student_id", studentId)
-          .order("entry_date", { ascending: true })
-      : { data: [] };
-
-  // Per-topic pipeline ticks (the student's cohort table: LGS 4 steps, YKS
-  // 2, Maarif 3), keyed course -> topic. A missing table reads as empty.
-  const pipelineConfig = pipelineConfigFor(examType, maarifGrade);
-  const { data: pipelineRows, error: pipelineError } = await supabase
-    .from(pipelineConfig.table)
-    .select(pipelineSelectColumns(pipelineConfig))
-    .eq("student_id", studentId);
+  // A missing pipeline table reads as empty.
   if (pipelineError) console.error("[coach student detail] pipeline read failed:", pipelineError);
   const pipelineByCourse = groupPipelineRows((pipelineRows ?? []) as unknown as PipelineRow[], pipelineConfig);
 
@@ -417,10 +414,21 @@ async function fetchStudentDetail(studentId: string) {
   // branch exams pushed out by more frequent recent TYT ones).
   const allExams = approvedTasks.filter((t) => t.task_type === "branch_exam" || t.task_type === "general_exam");
   const allExamIds = allExams.map((e) => e.id);
-  const { data: mistakeRows } =
+  // Karma tasks contribute their per-topic breakdown rows (aggregated further below) instead of a single total --
+  // same completion requirement as the totals loop, so a still-pending karma task's breakdown (if any were ever entered
+  // ahead of completion) doesn't leak into the aggregation either. Read together with the mistakes: independent queries.
+  const karmaTaskIds = approvedTasks.filter((t) => t.topic_id === "karma" && isCompletedTask(t)).map((t) => t.id);
+  const [{ data: mistakeRows }, { data: breakdownRows }] = await Promise.all([
     allExamIds.length > 0
-      ? await supabase.from("student_task_topic_mistakes").select("task_id, course_id, topic_id").in("task_id", allExamIds)
-      : { data: [] };
+      ? supabase.from("student_task_topic_mistakes").select("task_id, course_id, topic_id").in("task_id", allExamIds)
+      : Promise.resolve({ data: [] as { task_id: string; course_id: string; topic_id: string }[] }),
+    karmaTaskIds.length > 0
+      ? supabase
+          .from("student_task_topic_breakdown")
+          .select("course_id, topic_id, total_questions, correct_answers, incorrect_answers")
+          .in("task_id", karmaTaskIds)
+      : Promise.resolve({ data: [] as { course_id: string; topic_id: string; total_questions: number; correct_answers: number; incorrect_answers: number }[] }),
+  ]);
 
   const examTitleById = new Map(allExams.map((e) => [e.id, e.title]));
   const counts = new Map<string, { courseId: string; topicId: string; count: number; examTitles: string[] }>();
@@ -555,18 +563,6 @@ async function fetchStudentDetail(studentId: string) {
     bumpQuestionTotals(t.course_id, t.topic_id, solved, t.correct_count ?? 0, t.wrong_count ?? 0);
   }
 
-  // Karma tasks contribute their per-topic breakdown rows (below) instead
-  // of a single total -- same completion requirement as the loop above,
-  // so a still-pending karma task's breakdown (if any were ever entered
-  // ahead of completion) doesn't leak into the aggregation either.
-  const karmaTaskIds = approvedTasks.filter((t) => t.topic_id === "karma" && isCompletedTask(t)).map((t) => t.id);
-  const { data: breakdownRows } =
-    karmaTaskIds.length > 0
-      ? await supabase
-          .from("student_task_topic_breakdown")
-          .select("course_id, topic_id, total_questions, correct_answers, incorrect_answers")
-          .in("task_id", karmaTaskIds)
-      : { data: [] };
   for (const b of breakdownRows ?? []) {
     bumpQuestionTotals(b.course_id, b.topic_id, b.total_questions, b.correct_answers, b.incorrect_answers);
   }

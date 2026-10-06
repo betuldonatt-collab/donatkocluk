@@ -72,6 +72,9 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
         .from("task_resources")
         .select("task_id, resource_id, order_index, student_tasks!inner(student_id)")
         .eq("student_tasks.student_id", studentId)
+        // Only the visible week's tasks need their resources -- not every task the student ever had.
+        .gte("student_tasks.task_date", weekDays[0].date)
+        .lte("student_tasks.task_date", weekDays[6].date)
         .order("order_index", { ascending: true }),
       supabase
         .from("student_events")
