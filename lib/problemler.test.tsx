@@ -7,6 +7,7 @@ vi.mock("@/app/student/kaynak-takibi/actions", () => new Proxy({}, { get: (_t, k
 import { EditableCourseTable } from "@/app/coach/students/[id]/_components/editable-course-table";
 import { defaultTaskFormValue, TaskFormFields } from "@/app/coach/students/[id]/_components/kanban/task-form-fields";
 import { CourseTable } from "@/app/student/kaynak-takibi/_components/course-table";
+import { ProblemlerSubtopicSelect } from "@/components/problemler-subtopic-select";
 import { findCourseById, findTopicById, topicOptionsForCourse } from "./curriculum";
 import { flattenSelectionRows } from "./curriculum/rows";
 import {
@@ -228,5 +229,27 @@ describe("the Kaynak Takibi parent row 'Problemler' with cumulative stats", () =
       <CourseTable course={fizik} resources={[]} progress={{}} topicStats={{ byTopic: {}, karma: stat(0, 0, 0, 0) }} onAddResource={async () => {}} onToggle={() => {}} />,
     );
     expect(html).not.toContain("data-problemler-parent");
+  });
+});
+
+describe("the shared second step (coach form and student 'Ek Çalışma Ekle')", () => {
+  const html = (courseId: string, topicId: string) =>
+    renderToStaticMarkup(<ProblemlerSubtopicSelect course={findCourseById(courseId)!} topicId={topicId} onChange={() => {}} />);
+
+  it("renders the optional picker for Problemler (general or a subtopic) with the eight subtopics", () => {
+    for (const topicId of [PROBLEMLER_MASTER_ID, SUB[5].id]) {
+      const out = html(PROBLEMLER_COURSE_ID, topicId);
+      expect(out).toContain("Problem türü (opsiyonel)");
+      expect(out).toContain("Genel (tüm problemler)");
+      for (const t of SUB) expect(out).toContain(t.name);
+    }
+    expect(html(PROBLEMLER_COURSE_ID, SUB[5].id)).toMatch(/<option value="tyt-matematik-u1-t5" selected/);
+    expect(html(PROBLEMLER_COURSE_ID, PROBLEMLER_MASTER_ID)).toMatch(/<option value="" selected/);
+  });
+
+  it("renders nothing for another topic or another course", () => {
+    expect(html(PROBLEMLER_COURSE_ID, "tyt-matematik-u0-t0")).toBe("");
+    expect(html(PROBLEMLER_COURSE_ID, "")).toBe("");
+    expect(html("tyt-fizik", PROBLEMLER_MASTER_ID)).toBe("");
   });
 });

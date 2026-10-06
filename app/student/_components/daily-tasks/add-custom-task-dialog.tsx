@@ -19,6 +19,8 @@ import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actio
 import { createRichCustomTask, getMyResourcesForCourse, type RichTaskType } from "../../actions";
 import { ResourceCombobox, type ResourceOption } from "./resource-combobox";
 import { SmartCombobox } from "./smart-combobox";
+import { ProblemlerSubtopicSelect } from "@/components/problemler-subtopic-select";
+import { mainTopicOptions, problemlerMainValue } from "@/lib/curriculum/problemler";
 import type { StudentTask } from "./types";
 import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
@@ -598,15 +600,18 @@ export function AddCustomTaskDialog({
                 {showTopic && (
                   <div className="space-y-1.5">
                     <Label>Konu</Label>
+                    {/* TYT Matematik: "Problemler (Genel)" is chosen as a whole; the specific problem subtopics are
+                        not listed here but reached through the secondary picker below. */}
                     <SmartCombobox
-                      options={topicOptions}
-                      value={value.topicId}
+                      options={mainTopicOptions(course, topicOptions)}
+                      value={problemlerMainValue(course, value.topicId)}
                       onChange={(topicId) => set({ topicId })}
                       placeholder="Konu ara..."
                       ariaLabel="Konu seç"
                     />
                   </div>
                 )}
+                {showTopic && <ProblemlerSubtopicSelect course={course} topicId={value.topicId} onChange={(topicId) => set({ topicId })} />}
               </div>
             )}
 
