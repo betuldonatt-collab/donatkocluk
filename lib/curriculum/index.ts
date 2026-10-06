@@ -186,6 +186,36 @@ export function courseDisplayName(courseId: string | null | undefined, name: str
   return prefix && !name.startsWith(prefix) ? prefix + name : name;
 }
 
+// Courses a task can be assigned from must be listed ONCE: AYT Matematik / Geometri exist for both Sayısal and EA, and
+// AYT Edebiyat / Tarih 1 / Coğrafya 1 for both EA and Sözel, with the same name (and the same topics). The duplicate
+// is dropped; where the student's own AYT track has a variant, that is the one kept (so an EA student's "AYT
+// Matematik" is the EA course, which keeps their karne breakdown under the right track), otherwise the first.
+export function dedupeCoursesByLabel(courses: Course[], aytTrack: Track | null = null): Course[] {
+  const kept = new Map<string, Course>();
+  const inTrack = (c: Course) =>
+    aytTrack !== null && [...AYT_COURSES_BY_TRACK[aytTrack], ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytTrack]].some((t) => t.id === c.id);
+  for (const course of courses) {
+    const label = courseDisplayName(course.id, course.name);
+    const current = kept.get(label);
+    if (!current || (inTrack(course) && !inTrack(current))) kept.set(label, course);
+  }
+  return [...kept.values()];
+}
+
+// The "Ders" options of a YKS student's task form (the coach's "Yeni görev ekle" and the student's "Ek Çalışma Ekle"):
+// the combined branch-exam courses first (only for a Branş Denemesi), then the atomic ones -- each course once. A
+// combined course whose name equals an atomic one's ("AYT Matematik" = Matematik + Geometri, vs. the Matematik
+// course alone) is a different thing, so its label says what it combines.
+export function yksCourseOptions(input: { atomic: Course[]; macros: Course[]; aytTrack: Track | null }): { id: string; label: string }[] {
+  const atomicOptions = dedupeCoursesByLabel(input.atomic, input.aytTrack).map((c) => ({ id: c.id, label: courseDisplayName(c.id, c.name) }));
+  const atomicLabels = new Set(atomicOptions.map((o) => o.label));
+  const macroOptions = dedupeCoursesByLabel(input.macros, input.aytTrack).map((c) => {
+    const label = courseDisplayName(c.id, c.name);
+    return { id: c.id, label: atomicLabels.has(label) ? label + " (" + c.units.map((u) => u.unit).join(" + ") + ")" : label };
+  });
+  return [...macroOptions, ...atomicOptions];
+}
+
 export function isBranchExamMacroCourseId(courseId: string | null | undefined): boolean {
   return BRANCH_EXAM_MACRO_COURSES.some((c) => c.id === courseId);
 }

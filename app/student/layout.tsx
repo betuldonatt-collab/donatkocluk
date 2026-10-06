@@ -3,6 +3,8 @@ import { fetchStudentAnnouncements } from "@/lib/announcements";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
+import { AytTrackProvider } from "@/components/ayt-track-context";
+import { aytTrackOf } from "@/lib/curriculum";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { fetchIsGraduate } from "@/lib/graduate";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
@@ -55,7 +57,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
   const [, { data: profile }] = await Promise.all([
     touchPresence(view.effectiveUserId, isImpersonating),
     createClient().then((supabase) =>
-      supabase.from("profiles").select("full_name, exam_type").eq("id", view.effectiveUserId).maybeSingle(),
+      supabase.from("profiles").select("full_name, exam_type, academic_track").eq("id", view.effectiveUserId).maybeSingle(),
     ),
   ]);
   const fullName = profile?.full_name ?? null;
@@ -75,6 +77,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
 
   return (
     <MaarifGradeProvider value={maarifGrade}>
+    <AytTrackProvider value={aytTrackOf(profile?.academic_track as string | null | undefined)}>
     <div className="flex flex-1 flex-col">
       {isImpersonating && (
         <>
@@ -92,6 +95,7 @@ export default async function StudentLayout({ children }: LayoutProps<"/student"
           to the student, and an admin must never drive their timer). */}
       {!isImpersonating && <ActiveFocusSessionWidget />}
     </div>
+    </AytTrackProvider>
     </MaarifGradeProvider>
   );
 }

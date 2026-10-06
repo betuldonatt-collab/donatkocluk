@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, courseDisplayName, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, type Course } from "@/lib/curriculum";
+import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, yksCourseOptions, type Course, type Track } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import type { ExamType } from "@/lib/exam-type";
 import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actions";
@@ -22,6 +22,7 @@ import { SmartCombobox } from "./smart-combobox";
 import type { StudentTask } from "./types";
 import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { useAytTrack } from "@/components/ayt-track-context";
 
 // Atomic TYT/AYT courses only -- deliberately NOT Paragraf/Problem's
 // routine pseudo-courses (which already have their own dedicated page).
@@ -34,12 +35,10 @@ import { useMaarifGrade } from "@/components/maarif-grade-context";
 // atomic tab in the student's own Kaynak Takibi.
 const ALL_COURSES: Course[] = [...TYT_COURSES, ...AYT_COURSES_BY_TRACK.sayisal, ...AYT_COURSES_BY_TRACK.ea, ...AYT_COURSES_BY_TRACK.sozel];
 
-// Macro branch-exam courses ("TYT Fen") already carry their full display
-// name -- unlike every atomic course, which stores a bare name ("Fizik")
-// and relies on this prefix. Prefixing a macro course's name too would
-// double up ("TYT TYT Fen").
-function courseLabel(course: Course) {
-  return courseDisplayName(course.id, course.name);
+// The YKS Ders list, each course once (Matematik / Geometri / Edebiyat / Tarih 1 / Coğrafya 1 exist for two AYT
+// tracks -- the student's own track's variant is kept), Mantık and Geometri included. Same builder as the coach's form.
+export function studentYksCourseOptions(isBranchExam: boolean, aytTrack: Track | null): { id: string; label: string }[] {
+  return yksCourseOptions({ atomic: ALL_COURSES, macros: isBranchExam ? BRANCH_EXAM_MACRO_COURSES : [], aytTrack });
 }
 
 const TASK_TYPE_OPTIONS: { value: RichTaskType; label: string }[] = [
@@ -189,6 +188,7 @@ export function AddCustomTaskDialog({
   // A 9th grader (profiles.is_maarif9) sees ONLY the 9th-grade courses here;
   // everyone else is unchanged.
   const maarifGrade = useMaarifGrade();
+  const aytTrack = useAytTrack();
   const isMaarif9 = maarifGrade !== null;
   const gradeCourses = maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : [];
   const singleGeneralExamFormat = isLgs || isMaarif9;
@@ -241,7 +241,7 @@ export function AddCustomTaskDialog({
     ? maarifCourseOptions(maarifGrade)
     : isLgs
       ? lgsCourseOptions()
-      : courseList.map((c) => ({ id: c.id, label: courseLabel(c) }));
+      : studentYksCourseOptions(isBranchExam, aytTrack);
   const course = courseList.find((c) => c.id === value.courseId) ?? courseList[0];
   const topicOptions = topicOptionsForCourse(course);
 
