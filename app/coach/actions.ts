@@ -21,7 +21,7 @@ import {
   type PhotoDecision,
 } from "@/lib/task-evidence";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
-import { findCourseById, findTopicById, isBranchExamMacroCourseId } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
@@ -81,19 +81,10 @@ async function requireUser(supabase: SupabaseClient) {
 function buildTaskTitle(courseId: string | null | undefined, topicId: string | null | undefined): string {
   const course = findCourseById(courseId);
   if (!course) return "Görev";
-  // Macro branch-exam courses ("TYT Fen") already carry their full display
-  // name -- unlike every atomic course, which stores a bare name ("Fizik")
-  // and relies on this prefix. Prefixing a macro course's name too would
-  // double up ("TYT TYT Fen").
-  const prefix = isBranchExamMacroCourseId(courseId)
-    ? ""
-    : courseId?.startsWith("tyt-")
-      ? "TYT "
-      : courseId?.startsWith("ayt-")
-        ? "AYT "
-        : "";
+  // "TYT Fizik" for an atomic course, "TYT Fen" as it is for a combined one (courseDisplayName never doubles the prefix).
+  const name = courseDisplayName(courseId, course.name);
   const topic = findTopicById(courseId, topicId);
-  return topic ? `${prefix}${course.name} — ${topic.name}` : `${prefix}${course.name}`;
+  return topic ? `${name} — ${topic.name}` : name;
 }
 
 // "Genel Deneme" has no course/topic at all -- per the coach's request,

@@ -172,6 +172,15 @@ export const BRANCH_EXAM_MACRO_COURSES: Course[] = [
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.sozel,
 ];
 
+// A course's name as shown next to a task: the TYT / AYT atomic courses store a bare name ("Fizik") and show it
+// with their exam prefix ("TYT Fizik"); the combined branch-exam courses ("TYT Fen", "AYT Matematik") already carry
+// the prefix in their name and must not get it twice ("TYT TYT Fen"). Every place that builds or shows such a name
+// goes through this one function, so the prefix can never double up -- whatever course it is.
+export function courseDisplayName(courseId: string | null | undefined, name: string): string {
+  const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
+  return prefix && !name.startsWith(prefix) ? prefix + name : name;
+}
+
 export function isBranchExamMacroCourseId(courseId: string | null | undefined): boolean {
   return BRANCH_EXAM_MACRO_COURSES.some((c) => c.id === courseId);
 }

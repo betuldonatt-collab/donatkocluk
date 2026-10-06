@@ -18,7 +18,7 @@ import {
 
 import { TaskDescription } from "@/components/task-description";
 import { cn } from "@/lib/utils";
-import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ResizeHandle } from "@/components/ui/resize-handle";
 import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
@@ -34,8 +34,7 @@ function courseLabel(courseId: string | null): string | null {
   if (courseId === "kitap-okuma") return null;
   const course = findCourseById(courseId);
   if (!course) return null;
-  const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
-  return `${prefix}${course.name}`;
+  return courseDisplayName(courseId, course.name);
 }
 
 const TASK_TYPE_ICONS = {

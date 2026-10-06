@@ -5,7 +5,7 @@ import { CalendarDays } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { findCourseById } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
 
 export type ProgramTaskType = "question_bank" | "video" | "topic_study" | "branch_exam" | "general_exam" | "extra_custom";
@@ -47,8 +47,7 @@ const TASK_TYPE_LABELS: Record<ProgramTaskType, string> = {
 function subjectLabel(courseId: string | null) {
   const course = findCourseById(courseId);
   if (!course) return null;
-  const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
-  return `${prefix}${course.name}`;
+  return courseDisplayName(courseId, course.name);
 }
 
 // "Course + Task Type" (e.g. "TYT Türkçe - Soru Çözümü") -- task.title

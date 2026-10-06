@@ -23,7 +23,7 @@ import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { checkQuestionBankSave, durationOnlyCountsRequired, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf } from "@/lib/date";
-import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import {
   EVIDENCE_BUCKET,
   EVIDENCE_MAX_BYTES,
@@ -1235,9 +1235,10 @@ function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): stri
   }
 
   const course = findCourseById(v.courseId);
-  const prefix = v.courseId?.startsWith("tyt-") ? "TYT " : v.courseId?.startsWith("ayt-") ? "AYT " : "";
+  // "TYT Fizik" for an atomic course, "TYT Fen" as it is for a combined one (courseDisplayName never doubles the prefix).
+  const name = course ? courseDisplayName(v.courseId, course.name) : "";
   const topic = v.taskType === "branch_exam" ? null : findTopicById(v.courseId, v.topicId);
-  const base = !course ? "Görev" : topic ? `${prefix}${course.name} — ${topic.name}` : `${prefix}${course.name}`;
+  const base = !course ? "Görev" : topic ? `${name} — ${topic.name}` : name;
 
   if (v.taskType === "branch_exam") {
     const pub = v.branchExamPublisher?.trim();

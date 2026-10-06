@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, isBranchExamMacroCourseId, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, type Course } from "@/lib/curriculum";
+import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, courseDisplayName, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, type Course } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import type { ExamType } from "@/lib/exam-type";
 import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actions";
@@ -39,8 +39,7 @@ const ALL_COURSES: Course[] = [...TYT_COURSES, ...AYT_COURSES_BY_TRACK.sayisal, 
 // and relies on this prefix. Prefixing a macro course's name too would
 // double up ("TYT TYT Fen").
 function courseLabel(course: Course) {
-  if (isBranchExamMacroCourseId(course.id)) return course.name;
-  return `${course.id.startsWith("tyt-") ? "TYT " : course.id.startsWith("ayt-") ? "AYT " : ""}${course.name}`;
+  return courseDisplayName(course.id, course.name);
 }
 
 const TASK_TYPE_OPTIONS: { value: RichTaskType; label: string }[] = [

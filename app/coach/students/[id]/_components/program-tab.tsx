@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Clock, Lock, Pencil, Plus, SquareArrowOutUpR
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { weekDates } from "@/lib/date";
 import { getStudentTasksForWeek, type StudentFixedTask } from "../../../actions";
@@ -61,9 +61,9 @@ function taskLabel(task: DetailTask) {
   if (task.course_id === "kitap-okuma") return task.title;
   const course = findCourseById(task.course_id);
   if (!course) return task.title;
-  const prefix = task.course_id?.startsWith("tyt-") ? "TYT " : task.course_id?.startsWith("ayt-") ? "AYT " : "";
+  const name = courseDisplayName(task.course_id, course.name);
   const topic = findTopicById(task.course_id, task.topic_id);
-  return topic ? `${prefix}${course.name} — ${topic.name}` : `${prefix}${course.name}`;
+  return topic ? `${name} — ${topic.name}` : name;
 }
 
 // Read-only weekly glance -- the coach edits the schedule on the

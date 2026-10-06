@@ -7,7 +7,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
-import { KARMA_TOPIC_ID, findCourseById, isLgsCourseId } from "@/lib/curriculum";
+import { KARMA_TOPIC_ID, courseDisplayName, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor, generalExamCourseIdsForTitle } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import { courseHasBuckets, maarifSelectionNodes } from "@/lib/curriculum/maarif-selection";
@@ -123,8 +123,7 @@ function bucketSubjectCompletion(tasks: DetailTask[]): Map<string, { courseName:
 
 function courseLabelFor(courseId: string): string {
   const course = findCourseById(courseId);
-  const prefix = courseId.startsWith("tyt-") ? "TYT " : courseId.startsWith("ayt-") ? "AYT " : "";
-  return `${prefix}${course?.name ?? courseId}`;
+  return course ? courseDisplayName(courseId, course.name) : courseId;
 }
 
 // Merges the weekly and all-time per-course buckets into one row per

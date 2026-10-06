@@ -1,7 +1,7 @@
 import { PlayCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { findCourseById, findTopicById } from "@/lib/curriculum";
+import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { TaskDescription } from "@/components/task-description";
 import type { DetailTask } from "../../types";
@@ -27,8 +27,7 @@ export function courseLabel(courseId: string | null) {
   if (courseId === "kitap-okuma") return null;
   const course = findCourseById(courseId);
   if (!course) return null;
-  const prefix = courseId?.startsWith("tyt-") ? "TYT " : courseId?.startsWith("ayt-") ? "AYT " : "";
-  return `${prefix}${course.name}`;
+  return courseDisplayName(courseId, course.name);
 }
 
 // Thick, full-saturation border for task-completion status -- previously

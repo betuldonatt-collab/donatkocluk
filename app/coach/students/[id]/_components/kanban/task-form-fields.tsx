@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   AYT_COURSES_BY_TRACK,
   BRANCH_EXAM_MACRO_COURSES,
+  courseDisplayName,
   findCourseById,
   isBranchExamMacroCourseId,
   isLgsCourseId,
@@ -45,8 +46,7 @@ export const ALL_COURSES: Course[] = [
 // and relies on this prefix. Prefixing a macro course's name too would
 // double up ("TYT TYT Fen").
 export function courseLabel(course: Course) {
-  if (isBranchExamMacroCourseId(course.id)) return course.name;
-  return `${course.id.startsWith("tyt-") ? "TYT " : course.id.startsWith("ayt-") ? "AYT " : ""}${course.name}`;
+  return courseDisplayName(course.id, course.name);
 }
 
 // "Video İzleme" used to be its own selectable type; it's now folded
