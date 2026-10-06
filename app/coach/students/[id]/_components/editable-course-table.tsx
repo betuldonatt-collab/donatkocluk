@@ -24,8 +24,8 @@ import { collapsePipelineMapForRows, perTopicStepsFor, type PipelineBinding } fr
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { flattenSelectionRows, isFlatRows } from "@/lib/curriculum/rows";
-import { problemlerParentLayout, sumTopicStats } from "@/lib/curriculum/problemler";
-import { ProblemlerParentRow } from "@/components/problemler-parent-row";
+import { groupParentLayout, sumTopicStats } from "@/lib/curriculum/topic-groups";
+import { TopicGroupParentRow } from "@/components/topic-group-parent-row";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
 
@@ -139,8 +139,8 @@ export function EditableCourseTable({
   // never one row per raw Alt Konu/topic for those courses; everything
   // else (YKS, Maarif) renders exactly as many rows as it always did.
   const rows = flattenSelectionRows(course);
-  // TYT Matematik's "Problemler" unit gets a parent row with the whole section's cumulative stats.
-  const { parentBefore, unitSpan } = problemlerParentLayout(course, rows);
+  // A grouped unit (Problemler, Dalgalar, Trigonometri, ...) gets a parent row with the whole group's cumulative stats.
+  const { parentBefore, unitSpan } = groupParentLayout(course, rows);
   const isMaarif = isMaarifCourseId(course.id);
   const maarifGrade = useMaarifGrade();
   // A flat Maarif TYT course (Türkçe) has no Ünite column.
@@ -269,8 +269,9 @@ export function EditableCourseTable({
               ) : rows.map((row) => (
                 <Fragment key={row.id}>
                 {parentBefore.get(row.id) && (
-                  <ProblemlerParentRow
-                    stat={sumTopicStats(topicStats.byTopic, parentBefore.get(row.id)!.memberTopicIds)}
+                  <TopicGroupParentRow
+                    label={parentBefore.get(row.id)!.unitLabel}
+                stat={sumTopicStats(topicStats.byTopic, parentBefore.get(row.id)!.memberTopicIds)}
                     unitRowSpan={parentBefore.get(row.id)!.unitRowSpan}
                     resourceCount={resources.length}
                     startFiller={pipeline ? pipeline.config.start.length : 0}

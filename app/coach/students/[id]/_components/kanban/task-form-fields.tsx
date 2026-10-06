@@ -27,9 +27,9 @@ import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
-import { ProblemlerSubtopicSelect } from "@/components/problemler-subtopic-select";
+import { TopicGroupSelect } from "@/components/topic-group-select";
 import { isSoruCozumuLike } from "@/lib/task-types";
-import { mainTopicOptions, problemlerMainValue } from "@/lib/curriculum/problemler";
+import { mainTopicOptions, mainValueOf } from "@/lib/curriculum/topic-groups";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
 import type { DetailTask } from "../../types";
@@ -632,18 +632,18 @@ export function TaskFormFields({
           {showTopic && (
             <div className="space-y-1.5">
               <Label>Konu</Label>
-              {/* TYT Matematik: "Problemler (Genel)" is chosen as a whole; the specific problem subtopics are not
+              {/* A grouped unit ("Problemler (Genel)", "Trigonometri (Genel)", ...) is chosen as a whole; its subtopics are not
                   listed here but reached through the secondary picker below it. */}
               <SmartCombobox
                 options={mainTopicOptions(course, topicOptions)}
-                value={problemlerMainValue(course, value.topicId)}
+                value={mainValueOf(course, value.topicId)}
                 onChange={(topicId) => set({ topicId })}
                 placeholder="Konu ara..."
                 ariaLabel="Konu seç"
               />
             </div>
           )}
-          {showTopic && <ProblemlerSubtopicSelect course={course} topicId={value.topicId} onChange={(topicId) => set({ topicId })} />}
+          {showTopic && <TopicGroupSelect course={course} topicId={value.topicId} onChange={(topicId) => set({ topicId })} />}
         </div>
       )}
 

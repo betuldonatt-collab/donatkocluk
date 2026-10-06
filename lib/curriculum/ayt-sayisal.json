@@ -143,6 +143,10 @@
         "unit": "Trigonometri",
         "topics": [
           {
+            "id": "ayt-matematik-sayisal-genel-u2",
+            "name": "Trigonometri (Genel)"
+          },
+          {
             "id": "ayt-matematik-u2-t0",
             "name": "Yönlü Açılar, Trigonometrik Fonksiyonlar",
             "frequency": {
@@ -743,6 +747,10 @@
         "unit": "Modern Atom Teorisi",
         "topics": [
           {
+            "id": "ayt-kimya-genel-u0",
+            "name": "Modern Atom Teorisi (Genel)"
+          },
+          {
             "id": "ayt-kimya-u0-t0",
             "name": "Atomun Kuantum Modeli",
             "frequency": {
@@ -809,6 +817,10 @@
         "unit": "Sıvı Çözeltiler ve Çözünürlük",
         "topics": [
           {
+            "id": "ayt-kimya-genel-u2",
+            "name": "Sıvı Çözeltiler ve Çözünürlük (Genel)"
+          },
+          {
             "id": "ayt-kimya-u2-t0",
             "name": "Derişim Birimleri",
             "frequency": {
@@ -855,6 +867,10 @@
       {
         "unit": "Kimyasal Tepkimelerde Enerji",
         "topics": [
+          {
+            "id": "ayt-kimya-genel-u3",
+            "name": "Kimyasal Tepkimelerde Enerji (Genel)"
+          },
           {
             "id": "ayt-kimya-u3-t0",
             "name": "Tepkimelerde Isı Değişimi",
@@ -903,6 +919,10 @@
         "unit": "Denge",
         "topics": [
           {
+            "id": "ayt-kimya-genel-u4",
+            "name": "Denge (Genel)"
+          },
+          {
             "id": "ayt-kimya-u4-t0",
             "name": "Kimyasal Denge",
             "frequency": {
@@ -949,6 +969,10 @@
       {
         "unit": "Kimya ve Elektrik",
         "topics": [
+          {
+            "id": "ayt-kimya-genel-u5",
+            "name": "Kimya ve Elektrik (Genel)"
+          },
           {
             "id": "ayt-kimya-u5-t0",
             "name": "İndirgenme - Yükseltgenme Tepkimelerinde Elektrik Akımı",
@@ -1024,6 +1048,10 @@
       {
         "unit": "Organik Kimya",
         "topics": [
+          {
+            "id": "ayt-kimya-genel-u6",
+            "name": "Organik Kimya (Genel)"
+          },
           {
             "id": "ayt-kimya-u6-t0",
             "name": "Karbon Kimyasına Giriş",
@@ -1204,6 +1232,10 @@
         "unit": "Genden Proteine",
         "topics": [
           {
+            "id": "ayt-biyoloji-genel-u2",
+            "name": "Genden Proteine (Genel)"
+          },
+          {
             "id": "ayt-biyoloji-u2-t0",
             "name": "Nükleik Asitlerin Keşfi ve Önemi",
             "frequency": {
@@ -1236,6 +1268,10 @@
       {
         "unit": "Canlılarda Enerji Dönüşümleri",
         "topics": [
+          {
+            "id": "ayt-biyoloji-genel-u3",
+            "name": "Canlılarda Enerji Dönüşümleri (Genel)"
+          },
           {
             "id": "ayt-biyoloji-u3-t0",
             "name": "Canlılık ve Enerji",
@@ -1297,6 +1333,10 @@
       {
         "unit": "Bitki Biyolojisi",
         "topics": [
+          {
+            "id": "ayt-biyoloji-genel-u4",
+            "name": "Bitki Biyolojisi (Genel)"
+          },
           {
             "id": "ayt-biyoloji-u4-t0",
             "name": "Bitkilerin Yapısı",

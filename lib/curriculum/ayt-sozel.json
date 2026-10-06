@@ -397,6 +397,10 @@
         "unit": "İnsanlığın İlk Dönemleri",
         "topics": [
           {
+            "id": "ayt-tarih-1-sozel-genel-u1",
+            "name": "İnsanlığın İlk Dönemleri (Genel)"
+          },
+          {
             "id": "ayt-tarih-1-u1-t0",
             "name": "İlk Çağda Başlıca Medeniyet Havzaları",
             "frequency": {
@@ -420,6 +424,10 @@
       {
         "unit": "İlk ve Orta Çağlarda Türk Dünyası",
         "topics": [
+          {
+            "id": "ayt-tarih-1-sozel-genel-u2",
+            "name": "İlk ve Orta Çağlarda Türk Dünyası (Genel)"
+          },
           {
             "id": "ayt-tarih-1-u2-t0",
             "name": "Coğrafya ile Oluşan Yaşam Tarzı",
@@ -445,6 +453,10 @@
       {
         "unit": "İslam Medeniyetinin Doğuşu",
         "topics": [
+          {
+            "id": "ayt-tarih-1-sozel-genel-u3",
+            "name": "İslam Medeniyetinin Doğuşu (Genel)"
+          },
           {
             "id": "ayt-tarih-1-u3-t0",
             "name": "İslamiyet Yayılıyor",
@@ -473,6 +485,10 @@
         "unit": "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
         "topics": [
           {
+            "id": "ayt-tarih-1-sozel-genel-u4",
+            "name": "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri (Genel)"
+          },
+          {
             "id": "ayt-tarih-1-u4-t0",
             "name": "İslamiyetin Türk Devlet ve Toplum Yapısına Etkisi",
             "frequency": {
@@ -499,6 +515,10 @@
         "unit": "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
         "topics": [
           {
+            "id": "ayt-tarih-1-sozel-genel-u5",
+            "name": "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi (Genel)"
+          },
+          {
             "id": "ayt-tarih-1-u5-t0",
             "name": "Anadolu'nun İlk Türk Siyasi Teşekkülleri",
             "frequency": {
@@ -517,6 +537,10 @@
       {
         "unit": "Beylikten Devlete Osmanlı Siyaseti",
         "topics": [
+          {
+            "id": "ayt-tarih-1-sozel-genel-u6",
+            "name": "Beylikten Devlete Osmanlı Siyaseti (Genel)"
+          },
           {
             "id": "ayt-tarih-1-u6-t0",
             "name": "Devletleşme Sürecinde Osmanlı - Bizans İlişkileri",
@@ -581,6 +605,10 @@
         "unit": "Uluslararası İlişkilerde Denge Stratejisi",
         "topics": [
           {
+            "id": "ayt-tarih-1-sozel-genel-u8",
+            "name": "Uluslararası İlişkilerde Denge Stratejisi (Genel)"
+          },
+          {
             "id": "ayt-tarih-1-u8-t0",
             "name": "Osmanlı Devletine Yönelik Tehditler",
             "frequency": {
@@ -614,6 +642,10 @@
         "unit": "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
         "topics": [
           {
+            "id": "ayt-tarih-1-sozel-genel-u10",
+            "name": "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya (Genel)"
+          },
+          {
             "id": "ayt-tarih-1-u10-t0",
             "name": "Mustafa Kemal'in Lider Olarak Yetişmesinde Etkili Koşullar",
             "frequency": {
@@ -643,6 +675,10 @@
       {
         "unit": "Milli Mücadele",
         "topics": [
+          {
+            "id": "ayt-tarih-1-sozel-genel-u11",
+            "name": "Milli Mücadele (Genel)"
+          },
           {
             "id": "ayt-tarih-1-u11-t0",
             "name": "Milli Mücadeleye Hazırlık Dönemi",
@@ -688,6 +724,10 @@
       {
         "unit": "Atatürkçülük ve Türk İnkılabı",
         "topics": [
+          {
+            "id": "ayt-tarih-1-sozel-genel-u12",
+            "name": "Atatürkçülük ve Türk İnkılabı (Genel)"
+          },
           {
             "id": "ayt-tarih-1-u12-t0",
             "name": "Atatürk İlkeleri",

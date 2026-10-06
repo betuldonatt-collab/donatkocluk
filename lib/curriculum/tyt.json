@@ -863,6 +863,10 @@
         "unit": "Dalgalar",
         "topics": [
           {
+            "id": "tyt-fizik-genel-u1",
+            "name": "Dalgalar (Genel)"
+          },
+          {
             "id": "tyt-fizik-u1-t0",
             "name": "Dalgalara Giriş",
             "frequency": {
@@ -897,6 +901,10 @@
       {
         "unit": "Optik",
         "topics": [
+          {
+            "id": "tyt-fizik-genel-u2",
+            "name": "Optik (Genel)"
+          },
           {
             "id": "tyt-fizik-u2-t0",
             "name": "Aydınlanma",
@@ -1066,6 +1074,10 @@
         "unit": "Temel Bileşenler/ Yaşam Bilimi Biyoloji",
         "topics": [
           {
+            "id": "tyt-biyoloji-genel-u0",
+            "name": "Temel Bileşenler/ Yaşam Bilimi Biyoloji (Genel)"
+          },
+          {
             "id": "tyt-biyoloji-u0-t0",
             "name": "Canlıların Ortak Özellikleri",
             "frequency": {
@@ -1121,6 +1133,10 @@
         "unit": "Hücre",
         "topics": [
           {
+            "id": "tyt-biyoloji-genel-u1",
+            "name": "Hücre (Genel)"
+          },
+          {
             "id": "tyt-biyoloji-u1-t0",
             "name": "Hücre, Çekirdek ve Sitoplazma",
             "frequency": {
@@ -1155,6 +1171,10 @@
       {
         "unit": "Canlılar Dünyası",
         "topics": [
+          {
+            "id": "tyt-biyoloji-genel-u2",
+            "name": "Canlılar Dünyası (Genel)"
+          },
           {
             "id": "tyt-biyoloji-u2-t0",
             "name": "Canlılığın Çeşitliliği ve Sınıflandırılması",
@@ -1203,6 +1223,10 @@
         "unit": "Hücre Bölünmeleri",
         "topics": [
           {
+            "id": "tyt-biyoloji-genel-u3",
+            "name": "Hücre Bölünmeleri (Genel)"
+          },
+          {
             "id": "tyt-biyoloji-u3-t0",
             "name": "Mitoz",
             "frequency": {
@@ -1247,6 +1271,10 @@
       {
         "unit": "Ekosistem Ekolojisi",
         "topics": [
+          {
+            "id": "tyt-biyoloji-genel-u4",
+            "name": "Ekosistem Ekolojisi (Genel)"
+          },
           {
             "id": "tyt-biyoloji-u4-t0",
             "name": "Ekolojik Kavramlar",
