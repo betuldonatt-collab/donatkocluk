@@ -8,6 +8,7 @@
 import { findCourseById, isLgsCourseId } from "./curriculum";
 import { lgsSelectionNodes } from "./curriculum/lgs-selection";
 import { courseHasBuckets, maarifSelectionNodes } from "./curriculum/maarif-selection";
+import { MAARIF_TYT_MERGED_COURSES } from "./curriculum/maarif-tyt";
 import { LGS_SUBJECT_GROUPS, MAARIF7_SUBJECT_GROUPS, TYT_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 
 export type GelisimHaritasiRow = {
@@ -59,6 +60,8 @@ const GENERAL_EXAM_COURSE_IDS = new Set([
   ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
   // The 7th grade's Genel Deneme covers its six courses (maarif7-*), like LGS's does.
   ...MAARIF7_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
+  // The 11th grade's Genel Deneme is analysed against the merged Maarif TYT courses.
+  ...MAARIF_TYT_MERGED_COURSES.map((c) => c.id),
 ]);
 
 export type TrialExam = { id: string; task_date: string; task_type: string; course_id: string | null };

@@ -4,10 +4,13 @@ import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { computeGelisimHaritasi, type GelisimHaritasiRow } from "@/lib/gelisim-haritasi";
 import type { ExamType } from "@/lib/exam-type";
 import { getStudentExamType } from "@/lib/student-exam-type";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { GelisimHaritasi } from "../_components/gelisim-haritasi";
 
 async function fetchGelisimHaritasi(userId: string, examType: ExamType): Promise<GelisimHaritasiRow[]> {
   const supabase = await createClient();
+  // An 11th grader's map covers its own and the Maarif TYT courses; every other cohort keeps what it had.
+  const maarifGrade = await fetchMaarifGrade(supabase, userId);
   // Soft coach approval: exclude a student's own pending self-created
   // exams from this analytics view until a coach approves them (see
   // app/coach/actions.ts's approveStudentTask); coach-assigned exams
@@ -28,7 +31,7 @@ async function fetchGelisimHaritasi(userId: string, examType: ExamType): Promise
       ? await supabase.from("student_task_topic_mistakes").select("task_id, course_id, topic_id, status").in("task_id", examIds)
       : { data: [] };
 
-  return computeGelisimHaritasi(curriculumCourseIdsFor(examType), exams, mistakeRows ?? []);
+  return computeGelisimHaritasi(curriculumCourseIdsFor(examType, maarifGrade === 11 ? 11 : null), exams, mistakeRows ?? []);
 }
 
 export default async function GelisimHaritasiPage() {

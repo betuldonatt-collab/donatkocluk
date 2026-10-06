@@ -158,11 +158,12 @@ describe("3. the Konu Performans Haritası of 9th and 10th graders", () => {
     }
   });
 
-  it("keeps the 7th grade, LGS, YKS and the 11th grade as before", () => {
+  it("keeps the 7th grade, LGS and YKS as before", () => {
     expect(curriculumCourseIdsFor("YKS", 7)).toBe(MAARIF7_CURRICULUM_COURSE_IDS);
     expect(curriculumCourseIdsFor("LGS")).toBe(LGS_CURRICULUM_COURSE_IDS);
     expect(curriculumCourseIdsFor("YKS")).toBe(YKS_CURRICULUM_COURSE_IDS);
-    expect(curriculumCourseIdsFor("YKS", 11)).toBe(YKS_CURRICULUM_COURSE_IDS);
+    // the 11th grade has its own list now (its courses + Maarif TYT), see lib/gelisim-haritasi-11.test.tsx
+    expect(curriculumCourseIdsFor("YKS", 11)).not.toBe(YKS_CURRICULUM_COURSE_IDS);
   });
 
   it("a general exam counts toward the courses of its own cohort (the topic map's denominator)", () => {

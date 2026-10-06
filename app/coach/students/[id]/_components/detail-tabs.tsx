@@ -35,6 +35,9 @@ const RANGE_FILTERED_TABS = new Set(["analiz", "gelisim-haritasi", "grafikler"])
 // The 7th grade is the exception: its own six courses / subjects (LGS-style distribution) are wired through
 // all of them, so none of its tabs is hidden (Yazılılar is separately hidden for graduates).
 const MAARIF9_HIDDEN_TABS = new Set(["gelisim-haritasi", "grafikler", "karneler"]);
+// The 11th grade's Gelişim Haritası works (its own courses and the Maarif TYT courses are wired into the map, see
+// curriculumCourseIdsFor); Grafikler and Karneler stay hidden for it.
+const MAARIF11_HIDDEN_TABS = new Set(["grafikler", "karneler"]);
 const NO_HIDDEN_TABS = new Set<string>();
 
 export function DetailTabs({
@@ -92,7 +95,7 @@ export function DetailTabs({
   // 9th graders (is_maarif9): the TYT/AYT-specific analytics/tracking tabs are
   // hidden; Program and Görüşmeler remain.
   const maarifGrade = useMaarifGrade();
-  const hiddenTabs = new Set(maarifGrade !== null && maarifGrade !== 7 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS);
+  const hiddenTabs = new Set(maarifGrade === 11 ? MAARIF11_HIDDEN_TABS : maarifGrade !== null && maarifGrade !== 7 ? MAARIF9_HIDDEN_TABS : NO_HIDDEN_TABS);
   if (!schoolExams) hiddenTabs.add("yazililar");
   const [activeTab, setActiveTab] = useState(hiddenTabs.has(initialTab) ? "program" : initialTab);
   // One shared filter for Analiz / Gelişim Haritası / Grafikler -- lifted
