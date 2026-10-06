@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { KARMA_TOPIC_ID } from "@/lib/curriculum";
+import { bridgeProblemRoutine } from "@/lib/curriculum/problemler";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { getStudentExamType } from "@/lib/student-exam-type";
@@ -95,6 +96,10 @@ export default async function KaynakTakibiPage() {
         entry.topicStats.byTopic[row.topic_id] = stat;
       }
     }
+
+    // The standalone "Problem" routine's results are TYT Matematik's "Problemler (Genel)" (lib/curriculum/problemler.ts)
+    // -- only for a student whose Kaynak Takibi shows the TYT courses (a plain YKS student).
+    bridgeProblemRoutine(courseData, courseEntry, examType !== "LGS" && maarifGrade === null);
   }
 
   // Same source as the per-topic/Karma rows below (every course's

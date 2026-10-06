@@ -425,6 +425,10 @@
         "unit": "Problemler",
         "topics": [
           {
+            "id": "tyt-matematik-problemler",
+            "name": "Problemler (Genel)"
+          },
+          {
             "id": "tyt-matematik-u1-t0",
             "name": "Sayı-Kesir Problemleri",
             "frequency": {

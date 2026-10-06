@@ -1,6 +1,7 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { fetchSchoolExams } from "@/lib/school-exams-data";
+import { bridgeProblemRoutine } from "@/lib/curriculum/problemler";
 import { AytTrackProvider } from "@/components/ayt-track-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import Link from "next/link";
@@ -399,6 +400,9 @@ async function fetchStudentDetail(studentId: string) {
       entry.topicStats.byTopic[row.topic_id] = stat;
     }
   }
+  // The standalone "Problem" routine's results are TYT Matematik's "Problemler (Genel)" (lib/curriculum/problemler.ts)
+  // -- only for a student whose Kaynak Takibi shows the TYT courses (a plain YKS student).
+  bridgeProblemRoutine(courseResourceData, courseEntry, examType !== "LGS" && maarifGrade === null);
 
   const weekStats: DayStat[] = (dailyStatsRows ?? []).map((r) => ({
     date: r.entry_date,

@@ -27,6 +27,7 @@ import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
+import { mainTopicOptions, PROBLEMLER_COURSE_ID, PROBLEMLER_MASTER_ID, problemlerMainValue, problemlerSubtopics } from "@/lib/curriculum/problemler";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
 import type { DetailTask } from "../../types";
@@ -627,13 +628,34 @@ export function TaskFormFields({
           {showTopic && (
             <div className="space-y-1.5">
               <Label>Konu</Label>
+              {/* TYT Matematik: "Problemler (Genel)" is chosen as a whole; the specific problem subtopics are not
+                  listed here but reached through the secondary picker below it. */}
               <SmartCombobox
-                options={topicOptions}
-                value={value.topicId}
+                options={mainTopicOptions(course, topicOptions)}
+                value={problemlerMainValue(course, value.topicId)}
                 onChange={(topicId) => set({ topicId })}
                 placeholder="Konu ara..."
                 ariaLabel="Konu seç"
               />
+            </div>
+          )}
+          {showTopic && course.id === PROBLEMLER_COURSE_ID && problemlerMainValue(course, value.topicId) === PROBLEMLER_MASTER_ID && (
+            <div className="space-y-1.5 sm:col-start-2">
+              <Label htmlFor="problemler-subtopic">Problem türü (opsiyonel)</Label>
+              <select
+                id="problemler-subtopic"
+                value={value.topicId === PROBLEMLER_MASTER_ID ? "" : value.topicId}
+                onChange={(e) => set({ topicId: e.target.value || PROBLEMLER_MASTER_ID })}
+                className="border-input bg-background flex h-10 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none md:h-9"
+                aria-label="Problem türü seç"
+              >
+                <option value="">Genel (tüm problemler)</option>
+                {problemlerSubtopics(course).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>
