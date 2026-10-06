@@ -172,6 +172,11 @@ export const BRANCH_EXAM_MACRO_COURSES: Course[] = [
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.sozel,
 ];
 
+// profiles.academic_track ("yks_sayisal" ...) as an AYT track; null for anything else (LGS, Maarif, YDT, unset).
+export function aytTrackOf(academicTrack: string | null | undefined): Track | null {
+  return academicTrack === "yks_sayisal" ? "sayisal" : academicTrack === "yks_ea" ? "ea" : academicTrack === "yks_sozel" ? "sozel" : null;
+}
+
 // A course's name as shown next to a task: the TYT / AYT atomic courses store a bare name ("Fizik") and show it
 // with their exam prefix ("TYT Fizik"); the combined branch-exam courses ("TYT Fen", "AYT Matematik") already carry
 // the prefix in their name and must not get it twice ("TYT TYT Fen"). Every place that builds or shows such a name

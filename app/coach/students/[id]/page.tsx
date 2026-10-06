@@ -1,13 +1,14 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { fetchSchoolExams } from "@/lib/school-exams-data";
+import { AytTrackProvider } from "@/components/ayt-track-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
-import { KARMA_TOPIC_ID, courseDisplayName, findCourseById, isLgsCourseId } from "@/lib/curriculum";
+import { KARMA_TOPIC_ID, aytTrackOf, courseDisplayName, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor, generalExamCourseIdsForTitle } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
 import { courseHasBuckets, maarifSelectionNodes } from "@/lib/curriculum/maarif-selection";
@@ -642,6 +643,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
 
   return (
     <MaarifGradeProvider value={maarifGrade}>
+      <AytTrackProvider value={aytTrackOf((detail?.profile as { academic_track?: string | null } | undefined)?.academic_track)}>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href="/coach/students"
@@ -716,6 +718,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
           </>
         )}
       </div>
+      </AytTrackProvider>
     </MaarifGradeProvider>
   );
 }

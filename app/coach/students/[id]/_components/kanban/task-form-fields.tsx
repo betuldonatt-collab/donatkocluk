@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
+  AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
   AYT_COURSES_BY_TRACK,
   BRANCH_EXAM_MACRO_COURSES,
   courseDisplayName,
@@ -20,10 +21,12 @@ import {
   TYT_COURSES,
   topicOptionsForCourse,
   type Course,
+  type Track,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import { MAARIF_GRADES, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { useAytTrack } from "@/components/ayt-track-context";
 import type { ExamType } from "@/lib/exam-type";
 import { fetchYoutubeTitle, type AssignableTaskType } from "../../../../actions";
 import type { DetailTask } from "../../types";
@@ -112,10 +115,30 @@ function emptyResourceRow(): TaskFormResource {
 // routine pseudo-courses -- never Problem, which is a YKS routine. YKS is
 // exactly what it always was, minus the LGS courses now living in
 // ALL_COURSES for lookups.
+// Courses a task can be assigned from must be listed ONCE: AYT Matematik / Geometri exist for both Sayısal and EA, and
+// AYT Edebiyat / Tarih 1 / Coğrafya 1 for both EA and Sözel, which used to show up twice with the same name. The
+// duplicate is dropped; where the student's own AYT track has a variant, that is the one kept (so an EA student's
+// "AYT Matematik" is the EA course), otherwise the first.
+export function dedupeCoursesByLabel(courses: Course[], aytTrack: Track | null = null): Course[] {
+  const kept = new Map<string, Course>();
+  const inTrack = (c: Course) =>
+    aytTrack !== null && [...AYT_COURSES_BY_TRACK[aytTrack], ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytTrack]].some((t) => t.id === c.id);
+  for (const course of courses) {
+    const label = courseLabel(course);
+    const current = kept.get(label);
+    if (!current || (inTrack(course) && !inTrack(current))) kept.set(label, course);
+  }
+  return [...kept.values()];
+}
+
+// AYT Mantık is part of the Sözel Felsefe group, not a standalone subject a coach assigns a task for.
+const NOT_ASSIGNABLE_COURSE_IDS = new Set(["ayt-mantik"]);
+
 export function courseOptionsFor(
   examType: ExamType,
   isBranchExam: boolean,
   maarifGrade: MaarifGrade | null = null,
+  aytTrack: Track | null = null,
 ): { id: string; label: string; group?: string }[] {
   // A Maarif student is offered ONLY their own grade's courses (9th and 10th
   // grade never mix).
@@ -126,10 +149,22 @@ export function courseOptionsFor(
       ...ROUTINE_COURSES.filter((c) => c.id !== "problem").map((c) => ({ id: c.id, label: c.name })),
     ];
   }
-  const atomic = ALL_COURSES.filter(
-    (c) => !isBranchExamMacroCourseId(c.id) && !isLgsCourseId(c.id) && c.id !== YENI_NESIL_MAT_DOZU_ID,
+  const atomic = dedupeCoursesByLabel(
+    ALL_COURSES.filter(
+      (c) => !isBranchExamMacroCourseId(c.id) && !isLgsCourseId(c.id) && c.id !== YENI_NESIL_MAT_DOZU_ID && !NOT_ASSIGNABLE_COURSE_IDS.has(c.id),
+    ),
+    aytTrack,
   );
-  return (isBranchExam ? [...BRANCH_EXAM_MACRO_COURSES, ...atomic] : atomic).map((c) => ({ id: c.id, label: courseLabel(c) }));
+  const atomicOptions = atomic.map((c) => ({ id: c.id, label: courseLabel(c) }));
+  if (!isBranchExam) return atomicOptions;
+  // The combined branch-exam courses lead the list. One whose name equals an atomic course's ("AYT Matematik" =
+  // Matematik + Geometri vs. the Matematik course alone) is a different thing, so its label says what it combines.
+  const atomicLabels = new Set(atomicOptions.map((o) => o.label));
+  const macroOptions = dedupeCoursesByLabel(BRANCH_EXAM_MACRO_COURSES, aytTrack).map((c) => {
+    const label = courseLabel(c);
+    return { id: c.id, label: atomicLabels.has(label) ? label + " (" + c.units.map((u) => u.unit).join(" + ") + ")" : label };
+  });
+  return [...macroOptions, ...atomicOptions];
 }
 
 export function firstCourseIdFor(examType: ExamType, maarifGrade: MaarifGrade | null = null): string {
@@ -413,7 +448,7 @@ export function TaskFormFields({
   // happens only here, in the branch_exam-only display list (see
   // courseOptionsFor). LGS has no macro subjects -- its branş denemeleri
   // are per single subject.
-  const courseOptions = courseOptionsFor(examType, isBranchExam, maarifGrade);
+  const courseOptions = courseOptionsFor(examType, isBranchExam, maarifGrade, useAytTrack());
   // A course's resources are split by kind (0044) -- branch_exam tasks
   // only ever offer that course's branch-trial inventory, question_bank
   // tasks only ever offer its plain study resources. The two pools are

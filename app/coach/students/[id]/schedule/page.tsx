@@ -1,4 +1,6 @@
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
+import { AytTrackProvider } from "@/components/ayt-track-context";
+import { aytTrackOf } from "@/lib/curriculum";
 import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -49,7 +51,7 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
     { data: eventRows },
     { data: fixedTaskRows },
   ] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, exam_type").eq("id", studentId).maybeSingle(),
+      supabase.from("profiles").select("id, full_name, exam_type, academic_track").eq("id", studentId).maybeSingle(),
       supabase
         .from("student_tasks")
         .select("*")
@@ -120,7 +122,7 @@ async function fetchScheduleData(studentId: string, weekDays: { date: string; la
   }
 
   return {
-    profile: profile as { id: string; full_name: string | null; exam_type: ExamType } | null,
+    profile: profile as { id: string; full_name: string | null; exam_type: ExamType; academic_track?: string | null } | null,
     weekTasks: (weekTaskRows ?? []).map((t) => ({ ...t, resource_ids: resourceIdsByTask.get(t.id) ?? [] })) as DetailTask[],
     courseResourceData,
     weekEvents: (eventRows ?? []) as StudentEvent[],
@@ -151,6 +153,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
 
   return (
     <MaarifGradeProvider value={maarifGrade}>
+      <AytTrackProvider value={aytTrackOf(data.profile?.academic_track)}>
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href={`/coach/students/${id}`}
@@ -180,6 +183,7 @@ export default async function SchedulePage(props: PageProps<"/coach/students/[id
           examType={data.profile?.exam_type ?? "YKS"}
         />
       </div>
+      </AytTrackProvider>
     </MaarifGradeProvider>
   );
 }
