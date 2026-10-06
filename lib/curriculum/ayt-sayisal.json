@@ -96,6 +96,10 @@
         "unit": "Sayma ve Olasılık",
         "topics": [
           {
+            "id": "ayt-matematik-sayisal-genel-u1",
+            "name": "Sayma ve Olasılık (Genel)"
+          },
+          {
             "id": "ayt-matematik-u1-t0",
             "name": "Permütasyon - Kombinasyon",
             "frequency": {
@@ -289,6 +293,10 @@
         "unit": "Geometri",
         "topics": [
           {
+            "id": "ayt-geometri-sayisal-genel-u0",
+            "name": "Geometri (Genel)"
+          },
+          {
             "id": "ayt-geometri-sayisal-u0-t0",
             "name": "Üçgen, Çokgen, Dörtgen, Özel Dörtgenler",
             "frequency": {
@@ -321,6 +329,10 @@
       {
         "unit": "Analitik Geometri",
         "topics": [
+          {
+            "id": "ayt-geometri-sayisal-genel-u1",
+            "name": "Analitik Geometri (Genel)"
+          },
           {
             "id": "ayt-geometri-sayisal-u1-t0",
             "name": "Doğrunun Analitik İncelenmesi",
@@ -398,6 +410,10 @@
       {
         "unit": "Kuvvet ve Hareket",
         "topics": [
+          {
+            "id": "ayt-fizik-genel-u0",
+            "name": "Kuvvet ve Hareket (Genel)"
+          },
           {
             "id": "ayt-fizik-u0-t0",
             "name": "Vektörler",
@@ -544,6 +560,10 @@
         "unit": "Elektrik ve Manyetizma",
         "topics": [
           {
+            "id": "ayt-fizik-genel-u1",
+            "name": "Elektrik ve Manyetizma (Genel)"
+          },
+          {
             "id": "ayt-fizik-u1-t0",
             "name": "Elektrik",
             "frequency": {
@@ -604,6 +624,10 @@
       {
         "unit": "Çembersel Hareket",
         "topics": [
+          {
+            "id": "ayt-fizik-genel-u2",
+            "name": "Çembersel Hareket (Genel)"
+          },
           {
             "id": "ayt-fizik-u2-t0",
             "name": "Düzgün Çembersel Hareket",

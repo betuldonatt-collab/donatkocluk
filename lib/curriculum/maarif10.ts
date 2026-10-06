@@ -13,6 +13,7 @@ import type { Course } from "./index";
 import genelDenemeJson from "./maarif10-genel-deneme.json";
 import kaynakTakibiJson from "./maarif10.json";
 import { withCleanNames } from "./topic-name";
+import { withUnitMasters } from "./topic-groups";
 
 export type Maarif10Topic = { id: string; name: string };
 export type Maarif10Unit = { unit: string | null; topics: Maarif10Topic[] };
@@ -35,11 +36,17 @@ export function isMaarif10CourseId(courseId: string | null | undefined): boolean
 }
 
 // The same lists as ordinary Course objects (a null unit label becomes "").
-export const MAARIF10_KAYNAK_COURSES: Course[] = MAARIF10_COURSES.map((c) => ({
+// The lists as the source data defines them (no generated "(Genel)" masters): what the merged "Maarif TYT" courses are built
+// from, so a 10th-grade master never ends up inside a Maarif TYT bucket or unit.
+export const MAARIF10_NATIVE_COURSES: Course[] = MAARIF10_COURSES.map((c) => ({
   id: c.id,
   name: c.name,
   units: c.units.map((u) => ({ unit: u.unit ?? "", topics: u.topics })),
 }));
+
+// What a 10th grader (and the coach assigning to them) sees: every unit with two or more topics also carries its master
+// "<unit> (Genel)" (withUnitMasters, ./topic-groups), like the 9th and 11th grade.
+export const MAARIF10_KAYNAK_COURSES: Course[] = withUnitMasters(MAARIF10_NATIVE_COURSES);
 
 export const MAARIF10_GENEL_DENEME_COURSES: Course[] = MAARIF10_GENEL_DENEME_SUBJECTS.map((s) => ({
   id: s.id,

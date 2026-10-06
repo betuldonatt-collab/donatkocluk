@@ -5,6 +5,7 @@ import { MaarifTableBody } from "@/components/maarif-table-body";
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import { findCourseById } from "./curriculum";
 import { flattenSelectionRows } from "./curriculum/rows";
+import { withoutUnitMasters } from "./curriculum/topic-groups";
 import type { MaarifGrade } from "./maarif-grade";
 import {
   allPipelineSteps,
@@ -15,7 +16,8 @@ import {
   type PipelineMap,
 } from "./topic-pipeline";
 
-const fen = findCourseById("maarif7-fen-bilimleri")!;
+// The native course (the generated "(Genel)" masters would add one row per unit; they have their own tests).
+const fen = withoutUnitMasters(findCourseById("maarif7-fen-bilimleri")!);
 const rows = flattenSelectionRows(fen);
 
 function render(
@@ -89,7 +91,7 @@ describe("7th grade İngilizce (one topic per theme) in the split layout", () =>
 
 describe("7th grade Türkçe (three topics per Tema) in the split layout", () => {
   it("has a topic tick of each kind on every topic line (18) and one resource tick per Tema (6)", () => {
-    const html = render(7, {}, {}, findCourseById("maarif7-turkce")!);
+    const html = render(7, {}, {}, withoutUnitMasters(findCourseById("maarif7-turkce")!));
     expect(count(html, "Okul İlerlemesi")).toBe(18);
     expect(count(html, "Konu Çalışması")).toBe(18);
     expect(count(html, "Soru Çözümü")).toBe(6);

@@ -44,7 +44,8 @@ function groupableLabels(units: { unit: string | null }[]): string[] {
 // "1. Ünite: Kuvvet ve Hareket" -> "Kuvvet ve Hareket" (a Maarif unit label without its number): a topic name must never
 // start with a hierarchy number on screen, and the master topic is a topic. The merged courses tag a unit with its grade
 // ("(9. Sınıf) 1. Ünite: Allah İnsan İlişkisi"): the tag stays, the number goes.
-const UNIT_LABEL_PARTS = /^(\(\d+\. Sınıf\)\s*)?(\d+)\.\s*(Ünite|Tema)\s*:\s*(.*)$/i;
+// (The colon is optional: the 7th grade writes "1. Tema Sayılar ve Nicelikler (1)".)
+const UNIT_LABEL_PARTS = /^(\(\d+\. Sınıf\)\s*)?(\d+)\.\s*(Ünite|Tema)\s*:?\s*(.*)$/i;
 
 function masterBaseName(label: string): { tag: string; title: string; number: string | null } {
   const m = UNIT_LABEL_PARTS.exec(label);
@@ -211,4 +212,60 @@ export function groupParentLayout(
     // a row of an aggregated unit has no stat cells of its own (they are the parent row's one spanning cell)
     hideRowStats: (row) => aggregatedUnits.has(row.unitLabel),
   };
+}
+
+// --- three-step picker ---------------------------------------------------------------------------------------------
+
+// Many Maarif units list their topics under a heading: "Serbest Düşme › Serbest Düşen Cisimler" (the heading, then the
+// topic). For such a group the picker has THREE steps -- Ünite (the master), Başlık, Alt başlık -- instead of showing the
+// long "Heading › Topic" text in the second box. A group whose subtopics carry no heading keeps the two steps.
+export type HeadingEntry =
+  | { kind: "heading"; heading: string; topics: { id: string; label: string }[] }
+  | { kind: "topic"; id: string; label: string };
+
+const HEADING_SEPARATOR = " › ";
+
+// "Serbest Düşme › Serbest Düşen Cisimler" -> heading "Serbest Düşme", leaf "Serbest Düşen Cisimler" (a deeper path keeps
+// the rest together as the leaf); a name without the separator has no heading.
+export function splitTopicHeading(name: string): { heading: string | null; leaf: string } {
+  const parts = name.split(HEADING_SEPARATOR);
+  return parts.length < 2 ? { heading: null, leaf: name } : { heading: parts[0], leaf: parts.slice(1).join(HEADING_SEPARATOR) };
+}
+
+// The group's subtopics as the second step lists them, in curriculum order: each heading once (collecting its topics),
+// and a subtopic without a heading as an entry of its own.
+export function groupHeadingStructure(group: TopicGroup): { hasHeadings: boolean; entries: HeadingEntry[] } {
+  const entries: HeadingEntry[] = [];
+  for (const t of group.members) {
+    const { heading, leaf } = splitTopicHeading(t.name);
+    if (heading === null) {
+      entries.push({ kind: "topic", id: t.id, label: t.name });
+      continue;
+    }
+    const existing = entries.find((e): e is Extract<HeadingEntry, { kind: "heading" }> => e.kind === "heading" && e.heading === heading);
+    if (existing) existing.topics.push({ id: t.id, label: leaf });
+    else entries.push({ kind: "heading", heading, topics: [{ id: t.id, label: leaf }] });
+  }
+  return { hasHeadings: entries.some((e) => e.kind === "heading"), entries };
+}
+
+export const HEADING_VALUE_PREFIX = "h:";
+
+// What choosing `value` in the "Başlık" box does: "" = Genel (back to the unit's master), "h:<heading>" = that heading
+// (the stored topic stays the unit's master until an Alt başlık is chosen -- unless the topic already stored sits under that
+// very heading, which is kept), anything else = a subtopic that has no heading, stored directly. `pickedHeading` is the
+// heading to show open in the next box.
+export function pickSecondStep(
+  group: TopicGroup,
+  currentTopicId: string,
+  value: string,
+): { pickedHeading: string; topicId: string } {
+  if (value === "") return { pickedHeading: "", topicId: group.masterId };
+  if (value.startsWith(HEADING_VALUE_PREFIX)) {
+    const heading = value.slice(HEADING_VALUE_PREFIX.length);
+    const current = group.members.find((t) => t.id === currentTopicId);
+    const keep = current && splitTopicHeading(current.name).heading === heading;
+    return { pickedHeading: heading, topicId: keep ? currentTopicId : group.masterId };
+  }
+  return { pickedHeading: "", topicId: value };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
-import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
+import { MAARIF10_NATIVE_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { coreTopicTitle, topicGroupsForUnit, topicLinesForUnit } from "./topic-display";
@@ -86,7 +86,7 @@ describe("topicLinesForUnit", () => {
 });
 
 describe("9th grade Coğrafya, the cluttered case", () => {
-  const cografya = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-cografya")!;
+  const cografya = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-cografya")!;
   const display = (unitIndex: number) =>
     topicLinesForUnit(cografya.units[unitIndex].topics).map((l) => `${l.kind === "heading" ? "# " : "  "}${l.text}`);
 
@@ -105,7 +105,7 @@ describe("9th grade Coğrafya, the cluttered case", () => {
 });
 
 describe("every Maarif subject", () => {
-  const all = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES, ...MAARIF11_KAYNAK_COURSES, ...MAARIF_TYT_MERGED_COURSES];
+  const all = [...MAARIF9_NATIVE_COURSES, ...MAARIF10_NATIVE_COURSES, ...MAARIF11_KAYNAK_COURSES, ...MAARIF_TYT_MERGED_COURSES];
 
   it("keeps every topic exactly once, in order, and never repeats a heading back to back", () => {
     for (const course of all) {
@@ -158,7 +158,7 @@ describe("topicGroupsForUnit", () => {
 
   it("never loses a topic", () => {
     expect(topicGroupsForUnit([])).toEqual([]);
-    for (const course of [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES, ...MAARIF11_KAYNAK_COURSES]) {
+    for (const course of [...MAARIF9_NATIVE_COURSES, ...MAARIF10_NATIVE_COURSES, ...MAARIF11_KAYNAK_COURSES]) {
       for (const unit of course.units) {
         expect(topicGroupsForUnit(unit.topics).flatMap((g) => g.topics.map((x) => x.id))).toEqual(unit.topics.map((x) => x.id));
       }

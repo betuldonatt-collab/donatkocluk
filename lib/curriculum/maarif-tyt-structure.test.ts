@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { findCourseById, findTopicById } from "./index";
 import { validatePipelineStep } from "../topic-pipeline";
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
-import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
+import { MAARIF10_NATIVE_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { withoutUnitMasters } from "./topic-groups";
@@ -17,7 +17,7 @@ const merged = (id: string) => withoutUnitMasters(MAARIF_TYT_MERGED_COURSES.find
 const tarih = merged("maarif-tyt-tarih");
 const cografya = merged("maarif-tyt-cografya");
 const raw = (prefix: string) =>
-  [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES]
+  [...MAARIF9_NATIVE_COURSES, ...MAARIF10_NATIVE_COURSES]
     .filter((c) => c.id.startsWith(prefix))
     .flatMap((c) => c.units.flatMap((u) => u.topics.map((t) => t.id)));
 const rawTarih = raw("maarif9-tarih").concat(raw("maarif10-tarih"));
@@ -810,13 +810,16 @@ describe("only the subjects with a spec are bucketed", () => {
 
 describe("what stays untouched", () => {
   it("the 9th and 10th graders' own Tarih courses keep their grade-and-unit structure", () => {
-    const raw9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-tarih")!;
-    const raw10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-tarih")!;
+    const raw9 = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-tarih")!;
+    const raw10 = MAARIF10_NATIVE_COURSES.find((c) => c.id === "maarif10-tarih")!;
     expect(raw9.units.map((u) => u.topics.length)).toEqual([4, 5, 4]);
     expect(raw10.units.map((u) => u.topics.length)).toEqual([4, 5, 5]);
     expect(courseHasBuckets(raw9)).toBe(false);
     expect(courseHasBuckets(raw10)).toBe(false);
-    expect(findCourseById("maarif9-tarih")).toBe(raw9);
+    // the registered course is the native one plus the generated "(Genel)" masters, nothing else
+    const registered = findCourseById("maarif9-tarih")!;
+    expect(withoutUnitMasters(registered)).toEqual(raw9);
+    expect(registered).not.toBe(raw9);
   });
 
   it("the 11th grade's own Tarih (the 11. Sınıf tab) is a different course and is unchanged", () => {

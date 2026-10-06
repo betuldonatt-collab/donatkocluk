@@ -29,12 +29,26 @@ const TARIH_UNITS = [
   "Milli Mücadele",
   "Atatürkçülük ve Türk İnkılabı",
 ];
+const EDEBIYAT_UNITS = ["Halk Edebiyatı", "Divan Edebiyatı", "Milli Edebiyat", "Cumhuriyet Şiiri", "Cumhuriyet Hikayesi", "Cumhuriyet Romanı"];
+const COGRAFYA_UNITS = ["Doğal Sistemler", "Beşeri Sistemler", "Küresel Ortam: Bölgeler ve Ülkeler", "Çevre ve Toplum"];
 const EXPECTED: Record<string, string[]> = {
   "tyt-matematik": ["Problemler"],
+  "tyt-turkce": ["Anlam Bilgisi", "İsim Soylu Sözcükler", "Fiiller"],
+  "tyt-geometri": ["Üçgenler", "Dörtgenler ve Çokgenler"],
+  "tyt-cografya": ["Doğal Sistemler", "Beşeri Sistemler", "Küresel Ortam: Bölgeler ve Ülkeler"],
   "tyt-fizik": ["Dalgalar", "Optik"],
   "tyt-biyoloji": ["Temel Bileşenler/ Yaşam Bilimi Biyoloji", "Hücre", "Canlılar Dünyası", "Hücre Bölünmeleri", "Ekosistem Ekolojisi"],
-  "ayt-matematik-sayisal": ["Trigonometri"],
-  "ayt-matematik-ea": ["Trigonometri"],
+  "ayt-matematik-sayisal": ["Sayma ve Olasılık", "Trigonometri"],
+  "ayt-matematik-ea": ["Sayma ve Olasılık", "Trigonometri"],
+  "ayt-fizik": ["Kuvvet ve Hareket", "Elektrik ve Manyetizma", "Çembersel Hareket"],
+  "ayt-geometri-sayisal": ["Geometri", "Analitik Geometri"],
+  "ayt-geometri-ea": ["Geometri", "Analitik Geometri"],
+  "ayt-edebiyat-ea": EDEBIYAT_UNITS,
+  "ayt-edebiyat-sozel": EDEBIYAT_UNITS,
+  "ayt-cografya-1-ea": COGRAFYA_UNITS,
+  "ayt-cografya-1-sozel": COGRAFYA_UNITS,
+  "ayt-cografya-2": COGRAFYA_UNITS,
+  "ayt-felsefe": ["Felsefenin Temel Konuları ve Problemleri"],
   "ayt-kimya": ["Modern Atom Teorisi", "Sıvı Çözeltiler ve Çözünürlük", "Kimyasal Tepkimelerde Enerji", "Denge", "Kimya ve Elektrik", "Organik Kimya"],
   "ayt-biyoloji": ["Genden Proteine", "Canlılarda Enerji Dönüşümleri", "Bitki Biyolojisi"],
   "ayt-tarih-1-ea": TARIH_UNITS,
@@ -120,10 +134,10 @@ describe("the requested exceptions stay flat and fully expanded", () => {
     }
   });
 
-  it("AYT Matematik (Sayısal and EA): Trigonometri is grouped, the rest is flat", () => {
+  it("AYT Matematik (Sayısal and EA): Trigonometri and Sayma ve Olasılık are grouped, the headerless rest is flat", () => {
     for (const id of ["ayt-matematik-sayisal", "ayt-matematik-ea"]) {
       const c = course(id);
-      const g = topicGroups(c)[0];
+      const g = topicGroups(c).find((x) => x.unitLabel === "Trigonometri")!;
       expect(g.members.map((t) => t.name)).toEqual([
         "Yönlü Açılar, Trigonometrik Fonksiyonlar",
         "Cos-Sin Teoremleri, Ters Trigonometrik Fonksiyonlar",
@@ -131,8 +145,10 @@ describe("the requested exceptions stay flat and fully expanded", () => {
         "Trigonometrik Denklemler",
       ]);
       const main = mainTopicOptions(c, topicOptionsForCourse(c)).map((o) => o.label);
-      for (const flat of ["Denklem ve Eşitsizlikler", "Logaritma", "Türev", "İntegral", "Permütasyon - Kombinasyon"]) expect(main, flat).toContain(flat);
+      for (const flat of ["Denklem ve Eşitsizlikler", "Logaritma", "Türev", "İntegral"]) expect(main, flat).toContain(flat);
       expect(main).toContain("Trigonometri (Genel)");
+      expect(main).toContain("Sayma ve Olasılık (Genel)");
+      expect(main).not.toContain("Permütasyon - Kombinasyon"); // a subtopic of Sayma ve Olasılık now
       expect(main).not.toContain("Trigonometrik Denklemler");
     }
   });
@@ -170,7 +186,7 @@ describe("the two-step picker", () => {
     expect(html("tyt-biyoloji", kalitim.id)).toBe("");
     expect(html("ayt-kimya", course("ayt-kimya").units.find((u) => u.unit === "-")!.topics[0].id)).toBe("");
     expect(html("tyt-fizik", "")).toBe("");
-    expect(html("tyt-turkce", "tyt-turkce-u0-t0")).toBe("");
+    expect(html("tyt-kimya", "tyt-kimya-u0-t0")).toBe("");
   });
 
   it("is part of the coach's form for any grouped course", () => {
@@ -214,10 +230,11 @@ describe("Kaynak Takibi: a parent row with the cumulative stats for every groupe
         expect((render(id, {}, student).match(/data-topic-group-parent/g) ?? []).length, id + (student ? " student" : " coach")).toBe(n);
       }
     }
-  });
+    // renders ~30 whole course tables twice: slower than the default 5 s on a busy machine
+  }, 60_000);
 
   it("is absent for every other course", () => {
-    for (const id of ["tyt-turkce", "tyt-kimya", "ayt-fizik", "ayt-edebiyat-ea"]) expect(render(id, {})).not.toContain("data-topic-group-parent");
+    for (const id of ["tyt-kimya", "tyt-tarih", "ayt-tarih-2", "ayt-psikoloji"]) expect(render(id, {})).not.toContain("data-topic-group-parent");
   });
 
   it("TYT Fizik 'Dalgalar': the parent row adds up the master and all five subtopics", () => {

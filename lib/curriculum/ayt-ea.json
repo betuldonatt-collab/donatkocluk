@@ -106,6 +106,10 @@
         "unit": "Halk Edebiyatı",
         "topics": [
           {
+            "id": "ayt-edebiyat-ea-genel-u1",
+            "name": "Halk Edebiyatı (Genel)"
+          },
+          {
             "id": "ayt-edebiyat-u1-t0",
             "name": "Anonim Halk Edebiyatı",
             "frequency": {
@@ -128,6 +132,10 @@
       {
         "unit": "Divan Edebiyatı",
         "topics": [
+          {
+            "id": "ayt-edebiyat-ea-genel-u2",
+            "name": "Divan Edebiyatı (Genel)"
+          },
           {
             "id": "ayt-edebiyat-u2-t0",
             "name": "Divan Edebiyatı Nazım Şekilleri (Biçimleri)",
@@ -196,6 +204,10 @@
         "unit": "Milli Edebiyat",
         "topics": [
           {
+            "id": "ayt-edebiyat-ea-genel-u4",
+            "name": "Milli Edebiyat (Genel)"
+          },
+          {
             "id": "ayt-edebiyat-u4-t0",
             "name": "Milli Edebiyat Şiiri",
             "frequency": {
@@ -231,6 +243,10 @@
       {
         "unit": "Cumhuriyet Şiiri",
         "topics": [
+          {
+            "id": "ayt-edebiyat-ea-genel-u5",
+            "name": "Cumhuriyet Şiiri (Genel)"
+          },
           {
             "id": "ayt-edebiyat-u5-t0",
             "name": "Saf (Öz) Şiir",
@@ -287,6 +303,10 @@
         "unit": "Cumhuriyet Hikayesi",
         "topics": [
           {
+            "id": "ayt-edebiyat-ea-genel-u6",
+            "name": "Cumhuriyet Hikayesi (Genel)"
+          },
+          {
             "id": "ayt-edebiyat-u6-t0",
             "name": "Bireyin İç Dünyasını Esas Alan Hikaye"
           },
@@ -307,6 +327,10 @@
       {
         "unit": "Cumhuriyet Romanı",
         "topics": [
+          {
+            "id": "ayt-edebiyat-ea-genel-u7",
+            "name": "Cumhuriyet Romanı (Genel)"
+          },
           {
             "id": "ayt-edebiyat-u7-t0",
             "name": "Milli - Dini Duyarlılığı Yansıtan Roman"
@@ -787,6 +811,10 @@
         "unit": "Doğal Sistemler",
         "topics": [
           {
+            "id": "ayt-cografya-1-ea-genel-u0",
+            "name": "Doğal Sistemler (Genel)"
+          },
+          {
             "id": "ayt-cografya-1-u0-t0",
             "name": "Ekosistemlerin Özellikleri ve İşleyişi",
             "frequency": {
@@ -815,6 +843,10 @@
       {
         "unit": "Beşeri Sistemler",
         "topics": [
+          {
+            "id": "ayt-cografya-1-ea-genel-u1",
+            "name": "Beşeri Sistemler (Genel)"
+          },
           {
             "id": "ayt-cografya-1-u1-t0",
             "name": "Nüfus Politikaları ve Projeksiyonları",
@@ -896,6 +928,10 @@
         "unit": "Küresel Ortam: Bölgeler ve Ülkeler",
         "topics": [
           {
+            "id": "ayt-cografya-1-ea-genel-u2",
+            "name": "Küresel Ortam: Bölgeler ve Ülkeler (Genel)"
+          },
+          {
             "id": "ayt-cografya-1-u2-t0",
             "name": "Kültür Bölgeleri ve Türk Kültürü",
             "frequency": {
@@ -934,6 +970,10 @@
       {
         "unit": "Çevre ve Toplum",
         "topics": [
+          {
+            "id": "ayt-cografya-1-ea-genel-u3",
+            "name": "Çevre ve Toplum (Genel)"
+          },
           {
             "id": "ayt-cografya-1-u3-t0",
             "name": "Çevre Sorunları ve Geri Dönüşüm",
@@ -1050,6 +1090,10 @@
       {
         "unit": "Sayma ve Olasılık",
         "topics": [
+          {
+            "id": "ayt-matematik-ea-genel-u1",
+            "name": "Sayma ve Olasılık (Genel)"
+          },
           {
             "id": "ayt-matematik-u1-t0",
             "name": "Permütasyon - Kombinasyon",
@@ -1225,6 +1269,10 @@
         "unit": "Geometri",
         "topics": [
           {
+            "id": "ayt-geometri-ea-genel-u0",
+            "name": "Geometri (Genel)"
+          },
+          {
             "id": "ayt-geometri-ea-u0-t0",
             "name": "Üçgen, Çokgen, Dörtgen, Özel Dörtgenler",
             "frequency": {
@@ -1257,6 +1305,10 @@
       {
         "unit": "Analitik Geometri",
         "topics": [
+          {
+            "id": "ayt-geometri-ea-genel-u1",
+            "name": "Analitik Geometri (Genel)"
+          },
           {
             "id": "ayt-geometri-ea-u1-t0",
             "name": "Doğrunun Analitik İncelenmesi",

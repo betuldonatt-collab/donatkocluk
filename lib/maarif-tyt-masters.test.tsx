@@ -108,9 +108,13 @@ describe("where the master sits, and that nothing else moves", () => {
     }
   });
 
-  it("the source courses (9th / 10th grade) and the 11th grade's own courses are untouched", () => {
-    expect(findCourseById("maarif9-fizik")!.units.some((u) => u.topics.some((t) => isMasterId(t.id)))).toBe(false);
-    expect(findCourseById("maarif10-matematik")!.units.some((u) => u.topics.some((t) => isMasterId(t.id)))).toBe(false);
+  it("the 9th / 10th grade courses have masters of their own, and none of them leaks into a merged Maarif TYT course", () => {
+    expect(findCourseById("maarif9-fizik")!.units.some((u) => u.topics.some((t) => isMasterId(t.id)))).toBe(true);
+    for (const c of MAARIF_TYT_MERGED_COURSES) {
+      const masterIds = c.units.flatMap((u) => u.topics.map((t) => t.id)).filter(isMasterId);
+      // only the merged course's own masters (maarif-tyt-<subject>-genel-uN), never a maarif9- / maarif10- one
+      expect(masterIds.every((id) => id.startsWith(c.id + "-genel-u")), c.id).toBe(true);
+    }
   });
 });
 

@@ -7,6 +7,10 @@
         "unit": "Anlam Bilgisi",
         "topics": [
           {
+            "id": "tyt-turkce-genel-u0",
+            "name": "Anlam Bilgisi (Genel)"
+          },
+          {
             "id": "tyt-turkce-u0-t0",
             "name": "Sözcükte Anlam",
             "frequency": {
@@ -129,6 +133,10 @@
         "unit": "İsim Soylu Sözcükler",
         "topics": [
           {
+            "id": "tyt-turkce-genel-u2",
+            "name": "İsim Soylu Sözcükler (Genel)"
+          },
+          {
             "id": "tyt-turkce-u2-t0",
             "name": "İsimler",
             "frequency": {
@@ -163,6 +171,10 @@
       {
         "unit": "Fiiller",
         "topics": [
+          {
+            "id": "tyt-turkce-genel-u3",
+            "name": "Fiiller (Genel)"
+          },
           {
             "id": "tyt-turkce-u3-t0",
             "name": "Fiillerde Kip ve Kişi",
@@ -585,6 +597,10 @@
         "unit": "Üçgenler",
         "topics": [
           {
+            "id": "tyt-geometri-genel-u0",
+            "name": "Üçgenler (Genel)"
+          },
+          {
             "id": "tyt-geometri-u0-t0",
             "name": "Üçgenlerde Temel Kavramlar",
             "frequency": {
@@ -659,6 +675,10 @@
       {
         "unit": "Dörtgenler ve Çokgenler",
         "topics": [
+          {
+            "id": "tyt-geometri-genel-u1",
+            "name": "Dörtgenler ve Çokgenler (Genel)"
+          },
           {
             "id": "tyt-geometri-u1-t0",
             "name": "Çokgenler/ Dörtgenler ve Özellikleri",
@@ -1460,6 +1480,10 @@
         "unit": "Doğal Sistemler",
         "topics": [
           {
+            "id": "tyt-cografya-genel-u0",
+            "name": "Doğal Sistemler (Genel)"
+          },
+          {
             "id": "tyt-cografya-u0-t0",
             "name": "Doğa ve İnsan Etkileşimi",
             "frequency": {
@@ -1605,6 +1629,10 @@
         "unit": "Beşeri Sistemler",
         "topics": [
           {
+            "id": "tyt-cografya-genel-u1",
+            "name": "Beşeri Sistemler (Genel)"
+          },
+          {
             "id": "tyt-cografya-u1-t0",
             "name": "Yerleşmeler",
             "frequency": {
@@ -1651,6 +1679,10 @@
       {
         "unit": "Küresel Ortam: Bölgeler ve Ülkeler",
         "topics": [
+          {
+            "id": "tyt-cografya-genel-u2",
+            "name": "Küresel Ortam: Bölgeler ve Ülkeler (Genel)"
+          },
           {
             "id": "tyt-cografya-u2-t0",
             "name": "Bölgeler",

@@ -119,10 +119,12 @@ describe("the 11th grade's two-level topic structure (Ünite -> Alt Başlık)", 
     expect(main).not.toContain(subtopic.name);
     expect(groupOfTopic(fizik, subtopic.id)?.masterId).toBe(unitMasterId("maarif11-fizik", 0));
 
-    // choosing the master (or one of its subtopics) opens the optional "Alt konu" picker
+    // choosing the master (or one of its subtopics) opens the optional Başlık step (these topics sit under headings, so
+    // there is a third, "Alt başlık" step once a heading is chosen -- see lib/topic-three-step.test.tsx)
     const html = (topicId: string) => renderToStaticMarkup(<TopicGroupSelect course={fizik} topicId={topicId} onChange={() => {}} />);
-    expect(html(unitMasterId("maarif11-fizik", 0))).toContain("Alt konu (opsiyonel)");
-    expect(html(subtopic.id)).toContain(subtopic.name);
+    expect(html(unitMasterId("maarif11-fizik", 0))).toContain("Başlık (opsiyonel)");
+    expect(html(fizik.units[0].topics[0].id)).toContain("Alt başlık (opsiyonel)"); // "Serbest Düşme › ..." sits under a heading
+    expect(html(subtopic.id)).not.toContain("Alt başlık (opsiyonel)"); // "İki Boyutta Sabit İvmeli Hareket" has none
     expect(html("")).toBe("");
   });
 
@@ -134,9 +136,11 @@ describe("the 11th grade's two-level topic structure (Ünite -> Alt Başlık)", 
     }
   });
 
-  it("the 9th / 10th grade and TYT data are untouched by it", () => {
-    expect(findCourseById("maarif10-fizik")!.units.some((u) => u.topics.some((t) => t.id.includes("-genel-u")))).toBe(false);
-    expect(findCourseById("maarif9-matematik")!.units.some((u) => u.topics.some((t) => t.id.includes("-genel-u")))).toBe(false);
+  it("the 9th / 10th grade carry their OWN masters (maarif9-... / maarif10-... ids), never the 11th grade's", () => {
+    const ids = (id: string) => findCourseById(id)!.units.flatMap((u) => u.topics.map((t) => t.id)).filter((x) => x.includes("-genel-u"));
+    expect(ids("maarif10-fizik").every((x) => x.startsWith("maarif10-fizik-genel-u"))).toBe(true);
+    expect(ids("maarif9-matematik").every((x) => x.startsWith("maarif9-matematik-genel-u"))).toBe(true);
+    expect(ids("maarif10-fizik").length).toBeGreaterThan(0);
   });
 });
 

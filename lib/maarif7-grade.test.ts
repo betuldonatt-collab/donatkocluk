@@ -4,6 +4,7 @@ import { findCourseById, isMaarifCourseId } from "./curriculum";
 import { LGS_EXAM_SUBJECTS, MAARIF7_EXAM_QUESTION_TOTAL, MAARIF7_EXAM_SUBJECTS, coursesForMaarif7ExamSubject } from "./curriculum/subject-groups";
 import { isMaarif7CourseId, MAARIF7_KAYNAK_COURSES } from "./curriculum/maarif7";
 import { flattenSelectionRows } from "./curriculum/rows";
+import { withoutUnitMasters } from "./curriculum/topic-groups";
 import { expectedGeneralExamKeys, findGeneralExamTotalMismatch, isGeneralExamScoresIncomplete } from "./exam-results-validation";
 import {
   fetchMaarifGrade,
@@ -65,7 +66,8 @@ describe("7th grade is a Maarif-style grade, with its curriculum still to come",
 });
 
 describe("7th grade Sosyal Bilgiler", () => {
-  const course = findCourseById("maarif7-sosyal-bilgiler")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-sosyal-bilgiler")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-sosyal-bilgiler")!;
 
   it("has the six units and 17 topics exactly as supplied, in order", () => {
     expect(course.units.map((u) => [u.unit, u.topics.map((t) => t.name)])).toEqual([
@@ -119,12 +121,13 @@ describe("7th grade Sosyal Bilgiler", () => {
   });
 
   it("is the course the Sosyal Bilgiler exam subject analyses", () => {
-    expect(coursesForMaarif7ExamSubject("m7_sosyal")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_sosyal")).toEqual([registered]);
   });
 });
 
 describe("7th grade Fen Bilimleri (three levels: Ünite > Konu > Alt konu)", () => {
-  const course = findCourseById("maarif7-fen-bilimleri")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-fen-bilimleri")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-fen-bilimleri")!;
   const SEP = " › ";
 
   it("has the seven units, with headers as supplied, and 26 topic lines", () => {
@@ -213,12 +216,13 @@ describe("7th grade Fen Bilimleri (three levels: Ünite > Konu > Alt konu)", () 
   });
 
   it("is the course the Fen Bilimleri exam subject analyses", () => {
-    expect(coursesForMaarif7ExamSubject("m7_fen")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_fen")).toEqual([registered]);
   });
 });
 
 describe("7th grade Din Kültürü ve Ahlak Bilgisi", () => {
-  const course = findCourseById("maarif7-din-kulturu-ve-ahlak-bilgisi")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-din-kulturu-ve-ahlak-bilgisi")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-din-kulturu-ve-ahlak-bilgisi")!;
 
   it("has the five units and 20 topics exactly as supplied, in order", () => {
     expect(course.name).toBe("7. Sınıf Din Kültürü ve Ahlak Bilgisi");
@@ -263,13 +267,14 @@ describe("7th grade Din Kültürü ve Ahlak Bilgisi", () => {
   });
 
   it("is connected to the exam analysis: the Din Kültürü subject of the 7th-grade Genel Deneme lists it", () => {
-    expect(coursesForMaarif7ExamSubject("m7_din")).toEqual([course]);
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_din")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_din")).toEqual([registered]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_din")).toEqual([registered]);
   });
 });
 
 describe("7th grade İngilizce (Themes only: each Theme is the unit and its single topic)", () => {
-  const course = findCourseById("maarif7-ingilizce")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-ingilizce")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-ingilizce")!;
 
   it("has the eight themes as units, headers exactly as supplied, each with exactly one topic", () => {
     expect(course.name).toBe("7. Sınıf İngilizce");
@@ -293,8 +298,8 @@ describe("7th grade İngilizce (Themes only: each Theme is the unit and its sing
     expect(new Set(ids).size).toBe(8);
     expect(ids[0]).toBe("maarif7-ingilizce-u0-t0");
     expect(ids[7]).toBe("maarif7-ingilizce-u7-t0");
-    expect(coursesForMaarif7ExamSubject("m7_ingilizce")).toEqual([course]);
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_ingilizce")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_ingilizce")).toEqual([registered]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_ingilizce")).toEqual([registered]);
   });
 
   it("is one row per theme in Kaynak Takibi (one topic line each), so the split layout works: 8 topic ticks of each kind, 8 resource ticks", () => {
@@ -305,7 +310,8 @@ describe("7th grade İngilizce (Themes only: each Theme is the unit and its sing
 });
 
 describe("7th grade Türkçe (six Temas, three topics each)", () => {
-  const course = findCourseById("maarif7-turkce")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-turkce")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-turkce")!;
   const THEMES: [string, string[]][] = [["1. Tema: Hayat Boyu Gelişim",["Sözcükte Anlam (Gerçek, Mecaz, Terim Anlam)","Parçada Anlam (Ana Düşünce ve Yardımcı Düşünce)","Fiillerde Anlam Özellikleri (İş, Oluş, Durum Fiilleri)"]],
     ["2. Tema: Bir Hilal Uğruna",["Sözcükler Arası Anlam İlişkileri (Eş, Zıt, Eş Sesli)","Fiillerde Kip (Haber ve Dilek Kipleri)","Fiillerde Kişi ve Çekim"]],
     ["3. Tema: İletişim ve Sosyal İlişkiler",["Cümlede Anlam İlişkileri (Neden-Sonuç, Amaç-Sonuç, Koşul)","Fiillerde Anlam (Zaman) Kayması","Fiilde Yapı (Basit, Türemiş ve Birleşik Fiiller)"]],
@@ -324,8 +330,8 @@ describe("7th grade Türkçe (six Temas, three topics each)", () => {
     expect(new Set(ids).size).toBe(18);
     expect(ids[0]).toBe("maarif7-turkce-u0-t0");
     expect(ids[17]).toBe("maarif7-turkce-u5-t2");
-    expect(coursesForMaarif7ExamSubject("m7_turkce")).toEqual([course]);
-    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_turkce")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_turkce")).toEqual([registered]);
+    expect(MAARIF_GRADES[7].coursesForExamSubject("m7_turkce")).toEqual([registered]);
   });
 
   it("is one row per topic line in Kaynak Takibi, so the split layout has 18 topic lines and 6 resource groups", () => {
@@ -339,7 +345,8 @@ describe("7th grade Türkçe (six Temas, three topics each)", () => {
 });
 
 describe("7th grade Matematik", () => {
-  const course = findCourseById("maarif7-matematik")!;
+  const course = withoutUnitMasters(findCourseById("maarif7-matematik")!); // the native list; the generated "(Genel)" masters are covered by their own tests
+  const registered = findCourseById("maarif7-matematik")!;
 
   it("has the nine themes with the headers exactly as supplied, and 45 topics", () => {
     expect(course.units.map((u) => [u.unit, u.topics.length])).toEqual([
@@ -389,7 +396,7 @@ describe("7th grade Matematik", () => {
   });
 
   it("is the course the Matematik exam subject analyses", () => {
-    expect(coursesForMaarif7ExamSubject("m7_matematik")).toEqual([course]);
+    expect(coursesForMaarif7ExamSubject("m7_matematik")).toEqual([registered]);
   });
 });
 

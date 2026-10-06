@@ -15,8 +15,8 @@
 // modified, nor are the 9th/10th graders' own courses). A topic no bucket claims
 // is never dropped: it becomes a leaf of its own (see alignedUnits).
 import type { Course, Topic, Unit } from "./index";
-import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
+import { MAARIF10_NATIVE_COURSES } from "./maarif10";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
 
 // Where a bucket's topics come from: a unit of a 9th/10th grade course
 // (1-based, in the course's own unit order), either all of it or only some
@@ -601,7 +601,9 @@ export const SUBJECT_SPECS: Record<string, SubjectSpec> = {
   },
 };
 
-const SOURCE_COURSES: Course[] = [...MAARIF9_KAYNAK_COURSES, ...MAARIF10_KAYNAK_COURSES];
+// The NATIVE lists: the generated "(Genel)" masters of the 9th / 10th grade courses must not be claimed by a bucket or show
+// up as leftover leaves here (the merged courses get their own masters, see maarif-tyt.ts).
+const SOURCE_COURSES: Course[] = [...MAARIF9_NATIVE_COURSES, ...MAARIF10_NATIVE_COURSES];
 
 const leafTitle = (name: string) => name.split(" › ").pop()!;
 // Apostrophes and spacing differ between the coach's wording and the sheet's.

@@ -17,8 +17,8 @@
 // maarif10.json) at the time this was written. Felsefe has no 9th-grade
 // counterpart (only introduced in 10th grade in the real curriculum).
 import type { Course, Unit } from "./index";
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
-import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
+import { MAARIF10_NATIVE_COURSES } from "./maarif10";
 import { alignedUnits, SUBJECT_SPECS } from "./maarif-tyt-structure";
 import { withUnitMasters } from "./topic-groups";
 
@@ -77,8 +77,8 @@ export const MAARIF_TYT_MERGED_COURSES: Course[] = withUnitMasters(MERGE_PAIRS.m
   // are built elsewhere (maarif11.ts) and never read SUBJECT_SPECS.)
   const spec = SUBJECT_SPECS[id];
   if (spec) return { id, name, units: alignedUnits(spec) };
-  const c9 = m9Id ? MAARIF9_KAYNAK_COURSES.find((c) => c.id === m9Id) : undefined;
-  const c10 = m10Id ? MAARIF10_KAYNAK_COURSES.find((c) => c.id === m10Id) : undefined;
+  const c9 = m9Id ? MAARIF9_NATIVE_COURSES.find((c) => c.id === m9Id) : undefined;
+  const c10 = m10Id ? MAARIF10_NATIVE_COURSES.find((c) => c.id === m10Id) : undefined;
   return {
     id,
     name,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
-import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
+import { MAARIF10_NATIVE_COURSES } from "./maarif10";
 import { findCourseById } from "./index";
 import { coursesForMaarifTytGroup } from "./subject-groups";
 import { MAARIF_TYT_MERGED_COURSES, isMaarifTytMergedCourseId, splitUnitGradeTag } from "./maarif-tyt";
@@ -19,8 +19,8 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
 
   it("concatenates 9th grade's units before 10th grade's, tagging each with its grade", () => {
     const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
+    const m9 = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m10 = MAARIF10_NATIVE_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
     expect(din.units).toHaveLength(m9.units.length + m10.units.length);
     expect(din.units.slice(0, m9.units.length).every((u) => u.unit.startsWith("(9. Sınıf) "))).toBe(true);
     expect(din.units.slice(m9.units.length).every((u) => u.unit.startsWith("(10. Sınıf) "))).toBe(true);
@@ -28,8 +28,8 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
 
   it("keeps every original topic id untouched, just concatenated (no synthetic ids)", () => {
     const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
+    const m9 = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m10 = MAARIF10_NATIVE_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
     // (the generated "(Genel)" masters, withUnitMasters, are the only ids that are not from the 9th / 10th grade lists)
     const mergedTopicIds = din.units.flatMap((u) => u.topics.map((t) => t.id)).filter((id) => !id.includes("-genel-u"));
     const sourceTopicIds = [...m9.units, ...m10.units].flatMap((u) => u.topics.map((t) => t.id));
@@ -38,15 +38,15 @@ describe("MAARIF_TYT_MERGED_COURSES", () => {
 
   it("pairs 9th grade's Din with 10th grade's differently-named/ided Din Kültürü ve Ahlak Bilgisi", () => {
     const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
+    const m9 = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m10 = MAARIF10_NATIVE_COURSES.find((c) => c.id === "maarif10-din-kulturu-ve-ahlak-bilgisi")!;
     expect(din.name).toBe("Din Kültürü ve Ahlak Bilgisi");
     expect(din.units).toHaveLength(m9.units.length + m10.units.length);
   });
 
   it("Felsefe has no 9th-grade counterpart -- its merged course is 10th grade's units alone", () => {
     const felsefe = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-felsefe")!;
-    const m10 = MAARIF10_KAYNAK_COURSES.find((c) => c.id === "maarif10-felsefe")!;
+    const m10 = MAARIF10_NATIVE_COURSES.find((c) => c.id === "maarif10-felsefe")!;
     expect(felsefe.units).toHaveLength(m10.units.length);
     expect(felsefe.units.every((u) => u.unit.startsWith("(10. Sınıf) "))).toBe(true);
   });
@@ -87,7 +87,7 @@ describe("splitUnitGradeTag", () => {
 
   it("an unstructured merge tags 9th grade's unit labels with the grade and keeps the title", () => {
     const din = MAARIF_TYT_MERGED_COURSES.find((c) => c.id === "maarif-tyt-din-kulturu")!;
-    const m9 = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-din")!;
+    const m9 = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-din")!;
     expect(din.units[0].unit).toBe(`(9. Sınıf) ${m9.units[0].unit}`);
     expect(splitUnitGradeTag(din.units[0].unit)).toEqual({ grade: "9. Sınıf", title: m9.units[0].unit });
   });
@@ -131,8 +131,8 @@ describe("İngilizce is not part of the Maarif curriculum", () => {
   });
 
   it("is gone from the 9th and 10th grade's own course lists and from course lookup", () => {
-    expect(MAARIF9_KAYNAK_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
-    expect(MAARIF10_KAYNAK_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
+    expect(MAARIF9_NATIVE_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
+    expect(MAARIF10_NATIVE_COURSES.some((c) => /ingilizce/.test(c.id))).toBe(false);
     for (const id of ["maarif9-ingilizce", "maarif10-ingilizce", "maarif-tyt-ingilizce"]) {
       expect(findCourseById(id)).toBeNull();
     }

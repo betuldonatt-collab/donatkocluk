@@ -13,6 +13,7 @@
 // ./subject-groups, whose `courseIds` point at these ids. There is no Çıkmış Sorular data for the 7th grade,
 // and none is wanted (no national exam), so that page stays hidden for it.
 import type { Course, Unit } from "./index";
+import { withUnitMasters } from "./topic-groups";
 
 // Topic ids follow the other grades' convention: "<course id>-u<unit index>-t<topic index>", 0-based.
 function buildCourse(id: string, name: string, units: { unit: string; topics: string[] }[]): Course {
@@ -322,7 +323,12 @@ const TURKCE = buildCourse("maarif7-turkce", "7. Sınıf Türkçe", [
 // In the LGS order: the four SÖZEL courses first (Türkçe, Sosyal Bilgiler, Din Kültürü, İngilizce), then the two
 // SAYISAL ones (Matematik, Fen Bilimleri). Every flat list (course pickers, the first course selected by
 // default) therefore reads Sözel-first like LGS's; MAARIF7_SUBJECT_GROUPS (./subject-groups) names the sections.
-export const MAARIF7_KAYNAK_COURSES: Course[] = [TURKCE, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE, MATEMATIK, FEN_BILIMLERI];
+export const MAARIF7_NATIVE_COURSES: Course[] = [TURKCE, SOSYAL_BILGILER, DIN_KULTURU, INGILIZCE, MATEMATIK, FEN_BILIMLERI];
+
+// What a 7th grader (and the coach assigning to them) sees: every unit with two or more topics also carries its master
+// "<unit> (Genel)" (withUnitMasters, ./topic-groups), like the 9th, 10th and 11th grade. İngilizce's eight themes hold one
+// topic each, so it stays a flat list.
+export const MAARIF7_KAYNAK_COURSES: Course[] = withUnitMasters(MAARIF7_NATIVE_COURSES);
 
 export function isMaarif7CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif7-");

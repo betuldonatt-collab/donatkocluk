@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LGS_COURSES, TYT_COURSES, toTurkishTitleCase, type Course } from "./index";
 import { courseHasKonu, flattenCourseRows, flattenSelectionRows } from "./rows";
-import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
+import { MAARIF9_NATIVE_COURSES } from "./maarif9";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 
 const t = (id: string) => ({ id, name: id });
@@ -126,7 +126,7 @@ describe("flattenSelectionRows", () => {
   });
 
   it("a real Maarif course gets one row per heading group, and a unit with no headings stays one row", () => {
-    const course = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-cografya")!;
+    const course = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-cografya")!;
     const rows = flattenSelectionRows(course);
     // Every Coğrafya unit has exactly one heading ("Coğrafya Bilimi", "Harita Okuryazarlığı", ...).
     expect(rows).toHaveLength(course.units.length);
@@ -139,7 +139,7 @@ describe("flattenSelectionRows", () => {
       "Afetler",
       "Bölge ve Bölge Sınırı",
     ]);
-    const matematik = MAARIF9_KAYNAK_COURSES.find((c) => c.id === "maarif9-matematik")!;
+    const matematik = MAARIF9_NATIVE_COURSES.find((c) => c.id === "maarif9-matematik")!;
     expect(flattenSelectionRows(matematik)).toHaveLength(matematik.units.length);
   });
 
@@ -152,7 +152,7 @@ describe("flattenSelectionRows", () => {
   });
 
   it("never drops a topic for Maarif courses either, including the merged Maarif TYT ones", () => {
-    for (const course of [...MAARIF9_KAYNAK_COURSES, ...MAARIF_TYT_MERGED_COURSES]) {
+    for (const course of [...MAARIF9_NATIVE_COURSES, ...MAARIF_TYT_MERGED_COURSES]) {
       const topicIds = course.units.flatMap((u) => u.topics.map((t) => t.id));
       const covered = flattenSelectionRows(course).flatMap((r) => r.memberTopicIds);
       expect(covered.sort()).toEqual([...topicIds].sort());

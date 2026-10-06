@@ -16,6 +16,7 @@ import type { Course } from "./index";
 import genelDenemeJson from "./maarif9-genel-deneme.json";
 import kaynakTakibiJson from "./maarif9.json";
 import { withCleanNames } from "./topic-name";
+import { withUnitMasters } from "./topic-groups";
 
 export type Maarif9Topic = { id: string; name: string };
 export type Maarif9Unit = { unit: string | null; topics: Maarif9Topic[] };
@@ -51,8 +52,15 @@ export const MAARIF9_GENEL_DENEME_COURSES: Course[] = MAARIF9_GENEL_DENEME_SUBJE
 
 // The Kaynak Takibi courses as ordinary Course objects (every unit there
 // carries a Tema/Ünite label; `?? ""` only satisfies the type).
-export const MAARIF9_KAYNAK_COURSES: Course[] = MAARIF9_COURSES.map((c) => ({
+// The lists as the source data defines them (no generated "(Genel)" masters): what the merged "Maarif TYT" courses are built
+// from, so a 9th-grade master never ends up inside a Maarif TYT bucket or unit.
+export const MAARIF9_NATIVE_COURSES: Course[] = MAARIF9_COURSES.map((c) => ({
   id: c.id,
   name: c.name,
   units: c.units.map((u) => ({ unit: u.unit ?? "", topics: u.topics })),
 }));
+
+// What a 9th grader (and the coach assigning to them) sees: every unit with two or more topics also carries its master
+// "<unit> (Genel)" (withUnitMasters, ./topic-groups), so the coach can pick the Ünite as a whole, then a Başlık, then an
+// Alt başlık.
+export const MAARIF9_KAYNAK_COURSES: Course[] = withUnitMasters(MAARIF9_NATIVE_COURSES);
