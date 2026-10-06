@@ -22,7 +22,7 @@ import type { DayStat } from "./_components/daily-stats-summary";
 import type { CourseResourceData } from "./_components/kaynak-takibi-tab";
 import { MissingTasksCard } from "./_components/missing-tasks-card";
 import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
-import { findMissingTasks } from "@/lib/missing-tasks";
+import { findMissingTasks, STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS } from "@/lib/missing-tasks";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
@@ -606,7 +606,7 @@ async function fetchStudentDetail(studentId: string) {
     fixedTasks: (fixedTaskRows ?? []) as StudentFixedTask[],
     allTimeTrackedMinutes,
     // Only LGS tasks need a Kanıt Fotoğrafı (lib/lgs-completion.ts).
-    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: usesPhotoWorkflow({ examType, maarifGrade }) }),
+    missingTasks: findMissingTasks(tasks, today, { requiresPhoto: usesPhotoWorkflow({ examType, maarifGrade }), windowDays: STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS }),
     courseResourceData,
     today,
     weekStats,

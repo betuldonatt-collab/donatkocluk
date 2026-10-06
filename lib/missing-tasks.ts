@@ -6,6 +6,10 @@
 // sessions; this keeps the card about what's actionable now.
 export const MISSING_TASKS_WINDOW_DAYS = 14;
 
+// The "Tamamlanmayan Görevler" card on the coach's student detail page looks back only a week (the coach asked for
+// it): what is actionable in the next session. The coach dashboard's panel keeps the wider window above.
+export const STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS = 7;
+
 export type MissingTaskReason = "no_photo" | "photo_rejected" | "not_done" | "incomplete";
 
 export type MissingTaskInput = {
