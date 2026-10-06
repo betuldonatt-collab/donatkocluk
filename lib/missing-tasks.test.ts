@@ -5,7 +5,6 @@ import {
   groupMissingByDate,
   isKitapOkumaTask,
   MISSING_TASKS_WINDOW_DAYS,
-  STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS,
   type MissingTaskInput,
 } from "./missing-tasks";
 
@@ -27,18 +26,15 @@ function task(over: Partial<MissingTaskInput> & { id: string }): MissingTaskInpu
 const find = (tasks: MissingTaskInput[], requiresPhoto = true) => findMissingTasks(tasks, TODAY, { requiresPhoto });
 
 describe("findMissingTasks", () => {
-  it("the student detail page's card looks back 7 days (the dashboard panel keeps 14)", () => {
-    expect(STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS).toBe(7);
-    expect(MISSING_TASKS_WINDOW_DAYS).toBe(14);
+  it("looks back 7 days everywhere (the student page's card and the dashboard panel share the rule)", () => {
+    expect(MISSING_TASKS_WINDOW_DAYS).toBe(7);
     const tasks = [
       task({ id: "yesterday", task_date: "2026-10-09" }),
       task({ id: "edge7", task_date: "2026-10-03" }), // exactly 7 days back: included
-      task({ id: "day8", task_date: "2026-10-02" }), // 8 days back: out of the 7-day window
-      task({ id: "day13", task_date: "2026-09-27" }), // still inside the dashboard's 14 days
+      task({ id: "day8", task_date: "2026-10-02" }), // 8 days back: out of the window
+      task({ id: "day13", task_date: "2026-09-27" }),
     ];
-    const week = findMissingTasks(tasks, TODAY, { requiresPhoto: true, windowDays: STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS });
-    expect(week.map((m) => m.task.id).sort()).toEqual(["edge7", "yesterday"]);
-    expect(find(tasks).map((m) => m.task.id).sort()).toEqual(["day13", "day8", "edge7", "yesterday"]);
+    expect(find(tasks).map((m) => m.task.id).sort()).toEqual(["edge7", "yesterday"]);
   });
 
   it("lists a past-due pending task with no photo for an LGS student", () => {
@@ -63,7 +59,7 @@ describe("findMissingTasks", () => {
       task({ id: "today", task_date: TODAY }),
       task({ id: "future", task_date: "2026-10-12" }),
       task({ id: "old", task_date: "2026-09-20" }),
-      task({ id: "edge", task_date: "2026-09-26" }), // exactly 14 days back: included
+      task({ id: "edge", task_date: "2026-10-03" }), // exactly 7 days back: included
     ];
     expect(find(tasks).map((m) => m.task.id)).toEqual(["edge"]);
   });

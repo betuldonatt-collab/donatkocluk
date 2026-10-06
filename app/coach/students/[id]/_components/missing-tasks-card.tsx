@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CircleAlert } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { groupMissingByDate, STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS, type MissingTask } from "@/lib/missing-tasks";
+import { groupMissingByDate, MISSING_TASKS_WINDOW_DAYS, type MissingTask } from "@/lib/missing-tasks";
 import { MissingTaskDateGroups, type MissingTaskRow } from "../../../_components/missing-task-groups";
 import type { DetailTask } from "../types";
 
@@ -36,7 +36,7 @@ export function MissingTasksCard({ items, studentId }: { items: MissingTask<Deta
           Tamamlanmayan Görevler ({items.length})
         </CardTitle>
         <p className="text-muted-foreground text-xs">
-          Son {STUDENT_PAGE_MISSING_TASKS_WINDOW_DAYS} günde süresi geçen, tamamlanmayan görevler. Kitap Okuma dahil değildir.{" "}
+          Son {MISSING_TASKS_WINDOW_DAYS} günde süresi geçen, tamamlanmayan görevler. Kitap Okuma dahil değildir.{" "}
           <Link href={`/coach/students/${studentId}?tab=program`} className="text-foreground underline underline-offset-2">
             Programda aç
           </Link>
