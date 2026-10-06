@@ -759,6 +759,8 @@ function TaskModalBody({
       isLgs: photoWorkflow,
     });
     if (!problem) return false;
+    // Outline the Doğru box when it is the one missing.
+    setShowMissingScores(true);
     setError(problem);
     return true;
   }
@@ -1235,7 +1237,7 @@ function TaskModalBody({
               value={correctCount}
               onChange={(v) => handleCountFieldChange("correct", v)}
               disabled={noQuestionsActive}
-              invalid={showMissingScores && task.task_type === "branch_exam" && isBlankScore(correctCount)}
+              invalid={showMissingScores && (task.task_type === "branch_exam" || task.task_type === "question_bank") && isBlankScore(correctCount)}
             />
             <Field
               label="Yanlış"

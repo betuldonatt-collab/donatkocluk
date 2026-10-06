@@ -14,6 +14,9 @@
 export const QUESTION_COUNTS_REQUIRED =
   "Doğru, yanlış ve boş sayılarını gir. Soruları çözmediysen “Soruları çözmedim” kutusunu işaretle.";
 
+// Doğru is the one box that must always be typed (0 is a number); Yanlış and Boş left blank simply count as 0.
+export const QUESTION_CORRECT_REQUIRED = "Doğru kutusunu doldurman gerekiyor. Hiç doğrun yoksa 0 yaz.";
+
 export const NO_QUESTIONS_NEEDS_VIDEO =
   "“Soruları çözmedim” seçeneği için en az bir videoyu izlendi olarak işaretlemelisin. Hiçbir şey yapmadıysan “Yapılmadı”yı seç.";
 
@@ -50,10 +53,12 @@ export function checkQuestionBankSave(input: QuestionBankSaveInput): string | nu
     if (!input.watchedVideo) return NO_QUESTIONS_NEEDS_VIDEO;
     return null;
   }
-  // Any typed count is a normal save: a box left blank counts as 0 (the caller writes the zeros -- see
+  // Doğru must be typed (0 is a number). Yanlış and Boş left blank count as 0 (the caller writes the zeros -- see
   // zeroFillQuestionCounts), whatever the total. Fewer than the target is "Yarım Yapıldı", the target or more
   // "Yapıldı" (computeAutoTaskStatus).
-  if (anyCount) return null;
+  if (input.correct !== null) return null;
+  // Yanlış / Boş typed but Doğru blank: ask for Doğru, and say what to write.
+  if (anyCount) return QUESTION_CORRECT_REQUIRED;
   // Nothing typed at all: the box is the way out where it exists (every cohort but LGS / 7th grade, whose
   // completion rules need the counts), so only there does the message point at it.
   return input.isLgs ? NO_QUESTIONS_NOT_FOR_LGS : QUESTION_COUNTS_REQUIRED;

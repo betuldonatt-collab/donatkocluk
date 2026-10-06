@@ -6,6 +6,7 @@ import {
   NO_QUESTIONS_NEEDS_VIDEO,
   NO_QUESTIONS_NOT_FOR_LGS,
   NO_QUESTIONS_WITH_COUNTS,
+  QUESTION_CORRECT_REQUIRED,
   QUESTION_COUNTS_REQUIRED,
   zeroFillQuestionCounts,
 } from "./question-bank-validation";
@@ -13,11 +14,23 @@ import {
 const base = { correct: null, wrong: null, empty: null, noQuestionsSolved: false, watchedVideo: false, isLgs: false };
 
 describe("checkQuestionBankSave", () => {
-  it("accepts any typed count, whatever the assigned total (fewer or more); a blank box is a 0", () => {
+  it("Doğru must be typed (0 is a number); a blank Yanlış or Boş is just a 0, with no error", () => {
+    expect(checkQuestionBankSave({ ...base, correct: 0 })).toBeNull();
+    expect(checkQuestionBankSave({ ...base, correct: 50 })).toBeNull();
+    expect(checkQuestionBankSave({ ...base, correct: 50, wrong: 10 })).toBeNull();
+    expect(checkQuestionBankSave({ ...base, correct: 50, empty: 3 })).toBeNull();
+    for (const noCorrect of [{ wrong: 0 }, { empty: 3 }, { wrong: 2, empty: 0 }]) {
+      expect(checkQuestionBankSave({ ...base, ...noCorrect })).toBe(QUESTION_CORRECT_REQUIRED);
+    }
+    expect(QUESTION_CORRECT_REQUIRED).toContain("Doğru");
+    expect(QUESTION_CORRECT_REQUIRED).toContain("0 yaz");
+  });
+
+  it("accepts any typed Doğru, whatever the assigned total (fewer or more); the others default to 0", () => {
     expect(checkQuestionBankSave({ ...base, correct: 10, wrong: 2, empty: 0 })).toBeNull();
     expect(checkQuestionBankSave({ ...base, correct: 50, wrong: 10, empty: 0 })).toBeNull(); // 60 of a 100 target: Yarım Yapıldı
     expect(checkQuestionBankSave({ ...base, correct: 90, wrong: 20, empty: 5 })).toBeNull(); // 115 of 100: exceeding is fine
-    for (const partial of [{ correct: 10 }, { wrong: 0 }, { empty: 3 }, { correct: 10, wrong: 2 }, { wrong: 2, empty: 0 }]) {
+    for (const partial of [{ correct: 10 }, { correct: 10, wrong: 2 }, { correct: 0, empty: 4 }]) {
       expect(checkQuestionBankSave({ ...base, ...partial })).toBeNull();
     }
   });
@@ -53,7 +66,8 @@ describe("checkQuestionBankSave", () => {
 
   it("for LGS / 7th grade (no box) an entirely blank form is refused with the plain 'enter the counts' message", () => {
     expect(checkQuestionBankSave({ ...base, isLgs: true })).toBe(NO_QUESTIONS_NOT_FOR_LGS);
-    expect(checkQuestionBankSave({ ...base, isLgs: true, wrong: 1 })).toBeNull();
+    expect(checkQuestionBankSave({ ...base, isLgs: true, wrong: 1 })).toBe(QUESTION_CORRECT_REQUIRED);
+    expect(checkQuestionBankSave({ ...base, isLgs: true, correct: 1 })).toBeNull();
   });
 
   it("LGS never gets the bypass", () => {
