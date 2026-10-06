@@ -22,6 +22,23 @@ export function statusWhenPostponed(status: string): string {
   return status === "pending" ? "not_done" : status;
 }
 
+// Where the copies go: "shift" hands every task out again on ITS OWN day, N days later (+7 = the same weekday next week:
+// a Wednesday task lands on next Wednesday, nothing is piled onto one day); "date" puts them all on one chosen day.
+export type TransferTarget = { mode: "shift"; days: number } | { mode: "date"; date: string };
+
+export const DEFAULT_SHIFT_DAYS = 7;
+
+export function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// The day a task's copy lands on.
+export function targetDateFor(task: { task_date: string }, target: TransferTarget): string {
+  return target.mode === "shift" ? addDaysISO(task.task_date, target.days) : target.date;
+}
+
 const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
 // "2026-10-14" -> "14 Eki"

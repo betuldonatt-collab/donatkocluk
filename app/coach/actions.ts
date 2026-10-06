@@ -20,7 +20,7 @@ import {
   statusAppliedByApproval,
   type PhotoDecision,
 } from "@/lib/task-evidence";
-import { isTransferable, MAX_TRANSFER_TASKS, statusWhenPostponed } from "@/lib/task-transfer";
+import { isTransferable, MAX_TRANSFER_TASKS, statusWhenPostponed, targetDateFor, type TransferTarget } from "@/lib/task-transfer";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
 import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
@@ -1740,23 +1740,28 @@ export async function duplicateAssignedTask(studentId: string, taskId: string, t
 // copy there (pending, no results, no photos -- lib/task-transfer.ts) and the ORIGINAL stays where it was, marked
 // "Ertelendi" (student_tasks.postponed_to, migration 0127). Finished and already-postponed tasks are left out.
 export type TransferAssignedTasksResult =
-  | { ok: true; created: (Record<string, unknown> & { id: string; resource_ids: string[] })[]; postponed: { id: string; status: string; postponed_to: string }[]; skipped: number }
+  | { ok: true; created: (Record<string, unknown> & { id: string; resource_ids: string[] })[]; postponed: { id: string; status: string; postponed_to: string }[]; skipped: number; targetDates: string[] }
   | { ok: false; error: string };
 
 // Returns { ok, error } rather than throwing: a thrown Server Action error reaches the browser as a minified React error in production.
-export async function transferAssignedTasks(studentId: string, taskIds: string[], targetDate: string): Promise<TransferAssignedTasksResult> {
+export async function transferAssignedTasks(studentId: string, taskIds: string[], target: TransferTarget): Promise<TransferAssignedTasksResult> {
   try {
-    return { ok: true, ...(await transferAssignedTasksOrThrow(studentId, taskIds, targetDate)) };
+    return { ok: true, ...(await transferAssignedTasksOrThrow(studentId, taskIds, target)) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }
 }
 
-async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[], targetDate: string) {
+const transferTargetSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("shift"), days: z.number().int().min(1, "Gün sayısı en az 1 olmalı.").max(366, "Gün sayısı çok büyük.") }),
+  z.object({ mode: z.literal("date"), date: weekStartSchema }),
+]);
+
+async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[], targetInput: TransferTarget) {
   await assertNotImpersonating();
   const studentIdV = parseInput(uuidSchema, studentId);
   const taskIdsV = [...new Set(parseInput(z.array(uuidSchema).min(1, "Aktarılacak görev seçilmedi.").max(MAX_TRANSFER_TASKS), taskIds))];
-  const targetDateV = parseInput(weekStartSchema, targetDate);
+  const target = parseInput(transferTargetSchema, targetInput) as TransferTarget;
   const supabase = await createClient();
   const user = await requireUser(supabase);
   await requireCoachAccess(supabase, user.id, studentIdV);
@@ -1771,22 +1776,30 @@ async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[]
     .sort((a, b) => (a.task_date === b.task_date ? a.order_index - b.order_index : a.task_date < b.task_date ? -1 : 1));
   if (originals.length === 0) throw new Error("Seçilen görevler zaten tamamlanmış ya da daha önce ertelenmiş; aktarılacak görev yok.");
 
+  // Every task's own target day: "shift" gives each its own (original day + N), "date" gives them all the one chosen day.
+  const targetDates = originals.map((t) => targetDateFor(t, target));
   const [{ data: resourceRows, error: resError }, startOrderByDate] = await Promise.all([
     supabase.from("task_resources").select("task_id, resource_id, order_index").in("task_id", originals.map((t) => t.id)).order("order_index", { ascending: true }),
-    nextOrderIndexByDate(supabase, studentIdV, [targetDateV]),
+    nextOrderIndexByDate(supabase, studentIdV, targetDates),
   ]);
   if (resError) throw dbError(resError);
   const resourceIdsByTask = new Map<string, string[]>();
   for (const r of resourceRows ?? []) resourceIdsByTask.set(r.task_id, [...(resourceIdsByTask.get(r.task_id) ?? []), r.resource_id]);
 
-  const startOrder = startOrderByDate.get(targetDateV)!;
+  // Each copy goes to the end of its own day, in the board's order (originals are sorted by day, then position).
+  const nextOrder = new Map(startOrderByDate);
+  const orderOf = (date: string) => {
+    const n = nextOrder.get(date) ?? 0;
+    nextOrder.set(date, n + 1);
+    return n;
+  };
   const { data: copies, error: insertError } = await supabase
     .from("student_tasks")
     .insert(
       originals.map((original, i) => ({
         student_id: original.student_id,
         coach_id: user.id,
-        task_date: targetDateV,
+        task_date: targetDates[i],
         task_type: original.task_type,
         title: original.title,
         description: original.description,
@@ -1795,7 +1808,7 @@ async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[]
         total_count: original.total_count,
         duration_minutes: original.duration_minutes,
         video_links: original.video_links,
-        order_index: startOrder + i,
+        order_index: orderOf(targetDates[i]),
         is_coach_assigned: true,
         is_approved_by_coach: true,
       })),
@@ -1814,16 +1827,21 @@ async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[]
     for (const [i, copy] of (copies ?? []).entries()) await linkTaskResources(supabase, [copy.id], resourceIdsByTask.get(originals[i].id));
 
     // A task nobody had marked yet becomes "Yapılmadı"; a half-done one keeps its status. Two updates, one per case.
-    const untouched = originals.filter((t) => statusWhenPostponed(t.status) === t.status).map((t) => t.id);
-    const unmarked = originals.filter((t) => statusWhenPostponed(t.status) !== t.status).map((t) => t.id);
+    // postponed_to is each original's OWN target day, so the updates go one target day at a time (one query per distinct
+    // day -- a week's worth of originals is at most seven).
     const now = new Date().toISOString();
-    for (const [ids, patch] of [
-      [unmarked, { status: "not_done", postponed_to: targetDateV, updated_at: now }],
-      [untouched, { postponed_to: targetDateV, updated_at: now }],
-    ] as const) {
-      if (ids.length === 0) continue;
-      const { error } = await supabase.from("student_tasks").update(patch).in("id", ids);
-      if (error) throw dbError(error);
+    for (const date of new Set(targetDates)) {
+      const ofDay = originals.filter((_, i) => targetDates[i] === date);
+      const unmarked = ofDay.filter((t) => statusWhenPostponed(t.status) !== t.status).map((t) => t.id);
+      const untouched = ofDay.filter((t) => statusWhenPostponed(t.status) === t.status).map((t) => t.id);
+      for (const [ids, patch] of [
+        [unmarked, { status: "not_done", postponed_to: date, updated_at: now }],
+        [untouched, { postponed_to: date, updated_at: now }],
+      ] as const) {
+        if (ids.length === 0) continue;
+        const { error } = await supabase.from("student_tasks").update(patch).in("id", ids);
+        if (error) throw dbError(error);
+      }
     }
   } catch (e) {
     // Never leave the copies without the originals being marked (a second attempt would then hand the work out twice).
@@ -1834,7 +1852,8 @@ async function transferAssignedTasksOrThrow(studentId: string, taskIds: string[]
   revalidatePath(`/coach/students/${studentIdV}`);
   return {
     created: (copies ?? []).map((c, i) => ({ ...c, resource_ids: resourceIdsByTask.get(originals[i].id) ?? [] })),
-    postponed: originals.map((t) => ({ id: t.id, status: statusWhenPostponed(t.status), postponed_to: targetDateV })),
+    postponed: originals.map((t, i) => ({ id: t.id, status: statusWhenPostponed(t.status), postponed_to: targetDates[i] })),
+    targetDates: [...new Set(targetDates)].sort(),
     skipped: taskIdsV.length - originals.length,
   };
 }

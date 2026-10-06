@@ -7,7 +7,6 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
   useDroppable,
   useSensor,
   useSensors,
@@ -63,6 +62,7 @@ import {
   TaskCardBody,
 } from "../_components/kanban/task-card-body";
 import type { ExamType } from "@/lib/exam-type";
+import { boardCollisionDetection } from "@/lib/board-collision";
 import { TaskDrawer, type TaskDrawerState } from "../_components/kanban/task-drawer";
 import { TransferTasksDialog, type TransferSuccess } from "../_components/kanban/transfer-tasks-dialog";
 import { formatShortDate, isTransferable } from "@/lib/task-transfer";
@@ -687,7 +687,7 @@ export function ScheduleBoard({
 
   function handleTransferred(result: TransferSuccess) {
     const postponedById = new Map(result.postponed.map((p) => [p.id, p]));
-    const copiesVisible = weekDays.some((d) => d.date === result.targetDate);
+    const copiesVisible = result.created.every((c) => weekDays.some((d) => d.date === c.task_date));
     setTasks((prev) => [
       ...prev.map((t) => {
         const p = postponedById.get(t.id);
@@ -695,16 +695,22 @@ export function ScheduleBoard({
       }),
       ...(copiesVisible ? (result.created as unknown as DetailTask[]) : []),
     ]);
+    const where =
+      result.target.mode === "shift"
+        ? `bir sonraki haftaya (+${result.target.days} gün, her biri kendi gününe)`
+        : `${formatShortDate(result.target.date)} tarihine`;
     toast.success(
-      `${result.created.length} görev ${formatShortDate(result.targetDate)} tarihine aktarıldı; asıl görevler "Ertelendi" olarak işaretlendi.${
+      `${result.created.length} görev ${where} aktarıldı; asıl görevler "Ertelendi" olarak işaretlendi.${
         copiesVisible ? "" : " Yeni görevleri görmen için o haftaya geçildi."
       }`,
     );
     exitSelectMode();
-    // The copies landed outside the window on screen: jump to a 7-day window starting on the target date so the
-    // coach sees them right away (the board reloads that week from the server).
+    // The copies landed outside the window on screen: jump to the window that holds them so the coach sees them right
+    // away (the board reloads that week from the server). "+N days" keeps the window's own alignment (the same 7 days,
+    // N days later); a single chosen day starts the window on that day.
     if (!copiesVisible) {
-      loadWeek(getWeekDays(result.targetDate)).catch((e) => toast.error(friendlyError(e, "Yeni haftaya geçilemedi; tarih seçiciden o güne git.")));
+      const start = result.target.mode === "shift" ? addDaysISO(weekDays[0].date, result.target.days) : result.target.date;
+      loadWeek(getWeekDays(start)).catch((e) => toast.error(friendlyError(e, "Yeni haftaya geçilemedi; tarih seçiciden o güne git.")));
     }
   }
 
@@ -899,7 +905,7 @@ export function ScheduleBoard({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={boardCollisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

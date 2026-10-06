@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { findMissingTasks } from "./missing-tasks";
-import { formatShortDate, isTransferable, postponedLabel, statusWhenPostponed } from "./task-transfer";
+import { addDaysISO, formatShortDate, isTransferable, postponedLabel, statusWhenPostponed, targetDateFor } from "./task-transfer";
 
 // ---- an in-memory Supabase: just enough of the query builder for transferAssignedTasks ----
 type Row = Record<string, unknown>;
@@ -133,7 +133,7 @@ describe("pure rules", () => {
 describe("transferAssignedTasks", () => {
   it("copies the selected tasks fresh onto the new date and keeps the originals, marked Ertelendi", async () => {
     db.task_resources = [{ task_id: id(1), resource_id: "r1", order_index: 0 }, { task_id: id(1), resource_id: "r2", order_index: 1 }];
-    const result = await transferAssignedTasks(STUDENT, [id(1), id(2)], "2026-10-08");
+    const result = await transferAssignedTasks(STUDENT, [id(1), id(2)], { mode: "date", date: "2026-10-08" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -171,35 +171,35 @@ describe("transferAssignedTasks", () => {
 
   it("appends after what the new day already holds", async () => {
     db.student_tasks.push(task(9, { task_date: "2026-10-08", order_index: 4 }));
-    await transferAssignedTasks(STUDENT, [id(1)], "2026-10-08");
+    await transferAssignedTasks(STUDENT, [id(1)], { mode: "date", date: "2026-10-08" });
     const copy = db.student_tasks.find((t) => t.task_date === "2026-10-08" && t.id !== id(9))!;
     expect(copy.order_index).toBe(5);
   });
 
   it("leaves finished and already-postponed tasks out, and refuses when nothing is left", async () => {
-    const partly = await transferAssignedTasks(STUDENT, [id(1), id(3)], "2026-10-08");
+    const partly = await transferAssignedTasks(STUDENT, [id(1), id(3)], { mode: "date", date: "2026-10-08" });
     expect(partly.ok && partly.created).toHaveLength(1);
     expect(partly.ok && partly.skipped).toBe(1);
     expect(db.student_tasks.find((t) => t.id === id(3))!.postponed_to).toBeNull();
 
     // id(1) is postponed now: a second transfer of it (and the done one) has nothing to do
     const before = db.student_tasks.length;
-    const again = await transferAssignedTasks(STUDENT, [id(1), id(3)], "2026-10-09");
+    const again = await transferAssignedTasks(STUDENT, [id(1), id(3)], { mode: "date", date: "2026-10-09" });
     expect(again.ok).toBe(false);
     expect(db.student_tasks).toHaveLength(before);
   });
 
   it("rejects another student's task, an empty selection and a bad date", async () => {
     db.student_tasks.push(task(7, { student_id: "33333333-3333-4333-8333-333333333333" }));
-    expect((await transferAssignedTasks(STUDENT, [id(1), id(7)], "2026-10-08")).ok).toBe(false);
-    expect((await transferAssignedTasks(STUDENT, [], "2026-10-08")).ok).toBe(false);
-    expect((await transferAssignedTasks(STUDENT, [id(1)], "yarın")).ok).toBe(false);
+    expect((await transferAssignedTasks(STUDENT, [id(1), id(7)], { mode: "date", date: "2026-10-08" })).ok).toBe(false);
+    expect((await transferAssignedTasks(STUDENT, [], { mode: "date", date: "2026-10-08" })).ok).toBe(false);
+    expect((await transferAssignedTasks(STUDENT, [id(1)], { mode: "date", date: "yarın" })).ok).toBe(false);
     expect(db.student_tasks.filter((t) => t.task_date === "2026-10-08")).toHaveLength(0);
   });
 
   it("rolls the copies back if the originals cannot be marked (a retry must not hand the work out twice)", async () => {
     failures.add("update:student_tasks");
-    const result = await transferAssignedTasks(STUDENT, [id(1), id(2)], "2026-10-08");
+    const result = await transferAssignedTasks(STUDENT, [id(1), id(2)], { mode: "date", date: "2026-10-08" });
     expect(result.ok).toBe(false);
     expect(db.student_tasks.filter((t) => t.task_date === "2026-10-08")).toHaveLength(0);
     expect(db.student_tasks).toHaveLength(4);
@@ -207,7 +207,7 @@ describe("transferAssignedTasks", () => {
 
   it("returns the error instead of throwing", async () => {
     failures.add("insert:student_tasks");
-    const result = await transferAssignedTasks(STUDENT, [id(1)], "2026-10-08");
+    const result = await transferAssignedTasks(STUDENT, [id(1)], { mode: "date", date: "2026-10-08" });
     expect(result).toMatchObject({ ok: false });
   });
 });
@@ -264,5 +264,87 @@ describe("Toplu İşlem on the cards", () => {
     expect(html).toContain("Ertelendi → 14 Eki");
     expect(renderToStaticMarkup(<KanbanTaskCard {...props} task={detail()} selectMode={false} selected={false} />)).not.toContain("Ertelendi");
     expect(renderToStaticMarkup(<RoutineTaskCard {...props} task={detail({ status: "not_done", postponed_to: "2026-10-14" })} selectMode={false} selected={false} />)).toContain("Ertelendi → 14 Eki");
+  });
+});
+
+describe("+7 days: every task moves to the same weekday next week", () => {
+  // Mon 2026-10-05 .. Sun 2026-10-11, several tasks per day, a done one among them
+  beforeEach(() => {
+    db.student_tasks = [
+      task(1, { task_date: "2026-10-05", order_index: 0 }),
+      task(2, { task_date: "2026-10-05", order_index: 1 }),
+      task(3, { task_date: "2026-10-07", order_index: 0 }), // Wednesday
+      task(4, { task_date: "2026-10-07", order_index: 1, status: "half_done" }),
+      task(5, { task_date: "2026-10-09", order_index: 0, status: "not_done" }),
+      task(6, { task_date: "2026-10-09", order_index: 1, status: "done" }),
+      task(7, { task_date: "2026-10-11", order_index: 0 }),
+      task(8, { task_date: "2026-10-15", order_index: 3 }), // already something next week
+    ];
+  });
+  const shift = { mode: "shift", days: 7 } as const;
+  const selected = [id(1), id(2), id(3), id(4), id(5), id(6), id(7)];
+  const copiesOn = (date: string) => db.student_tasks.filter((t) => t.task_date === date && !t.postponed_to && ![id(1), id(2), id(3), id(4), id(5), id(6), id(7), id(8)].includes(t.id as string));
+
+  it("the pure rule: a date plus seven days keeps the weekday, across month and year ends", () => {
+    expect(addDaysISO("2026-10-07", 7)).toBe("2026-10-14");
+    expect(addDaysISO("2026-10-28", 7)).toBe("2026-11-04");
+    expect(addDaysISO("2026-12-30", 7)).toBe("2027-01-06");
+    expect(targetDateFor({ task_date: "2026-10-07" }, { mode: "shift", days: 7 })).toBe("2026-10-14");
+    expect(targetDateFor({ task_date: "2026-10-07" }, { mode: "date", date: "2026-11-01" })).toBe("2026-11-01");
+    const weekday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
+    expect(weekday(addDaysISO("2026-10-07", 7))).toBe(weekday("2026-10-07"));
+  });
+
+  it("each copy lands on its own task's day +7 -- nothing is piled onto one day", async () => {
+    const result = await transferAssignedTasks(STUDENT, selected, shift);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(copiesOn("2026-10-12")).toHaveLength(2); // Monday's two
+    expect(copiesOn("2026-10-14")).toHaveLength(2); // Wednesday's two
+    expect(copiesOn("2026-10-16")).toHaveLength(1); // Friday's not-done one (the done one is skipped)
+    expect(copiesOn("2026-10-18")).toHaveLength(1); // Sunday's
+    for (const d of ["2026-10-13", "2026-10-15", "2026-10-17"]) expect(copiesOn(d)).toHaveLength(0);
+    expect(result.created).toHaveLength(6);
+    expect(result.skipped).toBe(1);
+    expect(result.targetDates).toEqual(["2026-10-12", "2026-10-14", "2026-10-16", "2026-10-18"]);
+  });
+
+  it("each original is marked Ertelendi with ITS OWN new day, and nothing is deleted", async () => {
+    const result = await transferAssignedTasks(STUDENT, selected, shift);
+    expect(result.ok).toBe(true);
+    const row = (n: number) => db.student_tasks.find((t) => t.id === id(n))!;
+    expect(row(1).postponed_to).toBe("2026-10-12");
+    expect(row(3).postponed_to).toBe("2026-10-14");
+    expect(row(5).postponed_to).toBe("2026-10-16");
+    expect(row(7).postponed_to).toBe("2026-10-18");
+    expect(row(6).postponed_to).toBeNull(); // done: left alone
+    // unmarked -> Yapılmadı, half-done keeps its status
+    expect(row(1).status).toBe("not_done");
+    expect(row(4).status).toBe("half_done");
+    expect(db.student_tasks).toHaveLength(8 + 6);
+    if (result.ok) expect(result.postponed.find((p) => p.id === id(3))).toEqual({ id: id(3), status: "not_done", postponed_to: "2026-10-14" });
+  });
+
+  it("copies keep the board's order within their day and go after what the day already holds", async () => {
+    db.student_tasks.push(task(9, { task_date: "2026-10-12", order_index: 4 })); // Monday next week already has a task at 4
+    await transferAssignedTasks(STUDENT, [id(1), id(2)], shift);
+    const monday = db.student_tasks.filter((t) => t.task_date === "2026-10-12").sort((a, b) => (a.order_index as number) - (b.order_index as number));
+    expect(monday.map((t) => [t.description, t.order_index])).toEqual([["Not 9", 4], ["Not 1", 5], ["Not 2", 6]]);
+  });
+
+  it("a month-end task crosses into the next month on the same weekday", async () => {
+    db.student_tasks = [task(1, { task_date: "2026-10-28" })];
+    await transferAssignedTasks(STUDENT, [id(1)], shift);
+    expect(db.student_tasks.find((t) => t.id !== id(1))!.task_date).toBe("2026-11-04");
+  });
+
+  it("rejects a nonsense shift, and the one-day mode still works", async () => {
+    expect((await transferAssignedTasks(STUDENT, [id(1)], { mode: "shift", days: 0 })).ok).toBe(false);
+    expect((await transferAssignedTasks(STUDENT, [id(1)], { mode: "shift", days: 7.5 })).ok).toBe(false);
+    expect((await transferAssignedTasks(STUDENT, [id(1)], { mode: "shift", days: 9999 })).ok).toBe(false);
+    expect(db.student_tasks).toHaveLength(8);
+    const one = await transferAssignedTasks(STUDENT, [id(1), id(3)], { mode: "date", date: "2026-10-20" });
+    expect(one.ok && one.targetDates).toEqual(["2026-10-20"]);
+    expect(db.student_tasks.filter((t) => t.task_date === "2026-10-20")).toHaveLength(2);
   });
 });
