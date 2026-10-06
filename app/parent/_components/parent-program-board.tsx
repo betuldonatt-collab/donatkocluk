@@ -166,7 +166,7 @@ function TaskCard({ task }: { task: ParentProgramTask }) {
   const photos = task.evidence_image_paths.filter((p) => task.photo_urls[p]);
 
   return (
-    <div className={cn("border-border rounded-lg border p-2.5", subjectBackgroundClass(task.course_id, task.task_type))}>
+    <div className={cn("border-border rounded-lg border p-2.5", subjectBackgroundClass(task.course_id, task.task_type, { deepLgs: true }))}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">{task.title}</p>
         <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", status.className)}>

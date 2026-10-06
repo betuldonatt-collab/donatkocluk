@@ -56,3 +56,27 @@ describe("8th grade (LGS): regular courses take the deeper tier on the coach's c
     expect(cardBackgroundClass(task("maarif11-fizik", "question_bank"))).toBe("bg-[var(--subject-fizik)]/12");
   });
 });
+
+describe("the student's own cards and the parent's board follow the same rule", () => {
+  it("student cards: LGS regular courses deeper, Branş Denemesi unchanged, the 11th grade's rule intact, other cohorts unchanged", async () => {
+    const { subjectTintClass } = await import("@/app/student/_components/daily-tasks/types");
+    const tint = (course_id: string, task_type: string) => subjectTintClass({ course_id, task_type } as never);
+    for (const id of LGS_IDS) {
+      expect(tint(id, "question_bank"), id).toMatch(/\/12$/);
+      expect(tint(id, "question_bank"), id).toBe(subjectBackgroundClass(id, "question_bank", { deepLgs: true }));
+      expect(tint(id, "branch_exam"), id).toBe(subjectBackgroundClass(id, "branch_exam"));
+    }
+    expect(tint("maarif11-fizik", "question_bank")).toBe("bg-[var(--subject-fizik)]/12");
+    expect(tint("tyt-fizik", "question_bank")).toBe("bg-[var(--subject-fizik)]/6");
+    expect(tint("maarif9-fizik", "question_bank")).toBe("bg-[var(--subject-fizik)]/6");
+  });
+
+  it("parent board: the program card uses the deeper tier for an LGS course and leaves a Branş Denemesi alone", async () => {
+    const fs = await import("node:fs");
+    const source = fs.readFileSync("app/parent/_components/parent-program-board.tsx", "utf8");
+    expect(source).toContain("subjectBackgroundClass(task.course_id, task.task_type, { deepLgs: true })");
+    // the exception lives in subjectBackgroundClass itself, which the parent board calls
+    expect(subjectBackgroundClass("lgs-fen-bilimleri", "branch_exam", { deepLgs: true })).toMatch(/\/20$/);
+    expect(subjectBackgroundClass("lgs-fen-bilimleri", "question_bank", { deepLgs: true })).toMatch(/\/12$/);
+  });
+});

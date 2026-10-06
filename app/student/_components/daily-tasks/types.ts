@@ -136,5 +136,5 @@ export function statusBorderClass(task: Pick<StudentTask, "status" | "completed"
 // cardBackgroundClass. Renamed from examTintClass: it now colors every
 // task by subject family, not just exams.
 export function subjectTintClass(task: Pick<StudentTask, "task_type" | "course_id">) {
-  return subjectBackgroundClass(task.course_id, task.task_type, { deepMaarif11: true });
+  return subjectBackgroundClass(task.course_id, task.task_type, { deepMaarif11: true, deepLgs: true });
 }
