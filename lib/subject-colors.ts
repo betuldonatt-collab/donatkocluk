@@ -112,6 +112,14 @@ const COURSE_FAMILY: Record<string, SubjectFamily> = {
   "lgs-inkilap-tarihi": "tarih",
   "lgs-din-kulturu": "din",
   "lgs-ingilizce": "ingilizce",
+  // 7th grade (Maarif): the same hues as the 8th grade (LGS) subjects. Sosyal Bilgiler takes İnkılap Tarihi's (the Tarih
+  // family) since it sits in that slot of the exam.
+  "maarif7-turkce": "turkce",
+  "maarif7-sosyal-bilgiler": "tarih",
+  "maarif7-din-kulturu-ve-ahlak-bilgisi": "din",
+  "maarif7-ingilizce": "ingilizce",
+  "maarif7-matematik": "matematik",
+  "maarif7-fen-bilimleri": "fen",
   // 9th grade (Maarif): Kaynak Takibi courses and the Genel Deneme sheet's own
   // subject courses reuse the matching existing family (same hue as the
   // TYT/AYT/LGS subject of the same name).
@@ -234,8 +242,11 @@ export function subjectBackgroundClass(
     if (family) {
       const [tyt, ayt, branch] = FAMILY_CLASSES[family];
       if (taskType === "branch_exam") return branch;
+      // The 7th grade ("maarif7-") is always in the deeper tier, like the 8th grade's regular courses -- on every panel,
+      // no option needed. (A Branş Denemesi was decided above, and the routines before the family lookup.)
       const deep =
         courseId.startsWith("ayt-") ||
+        courseId.startsWith("maarif7-") ||
         (options.deepMaarif11 === true && courseId.startsWith("maarif11-")) ||
         (options.deepLgs === true && courseId.startsWith("lgs-"));
       return deep ? ayt : tyt;
