@@ -141,7 +141,7 @@ describe("the 7th grader's Grafikler", () => {
   const exam = { id: "g1", task_date: "2026-10-01", title: "7. SINIF Genel Deneme - X", task_type: "general_exam", subject_scores: m7Scores } as unknown as DetailTask;
   const html = renderToStaticMarkup(
     <MaarifGradeProvider value={7}>
-      <ChartsTab paragrafEntries={[]} generalExams={[exam]} branchExams={[]} chartRange={{ type: "custom", startDate: "2026-09-01", endDate: "2026-10-31" }} />
+      <ChartsTab studentId="s1" examMistakes={[]} weekDays={[]} courseResourceData={{}} paragrafEntries={[]} generalExams={[exam]} branchExams={[]} chartRange={{ type: "custom", startDate: "2026-09-01", endDate: "2026-10-31" }} />
     </MaarifGradeProvider>,
   );
 

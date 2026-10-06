@@ -90,7 +90,7 @@ describe("2. the 7th grader's Paragraf / Kitap Okuma", () => {
   const charts = (grade: MaarifGrade | null, routines: LgsDailyRoutine[] = []) =>
     renderToStaticMarkup(
       <MaarifGradeProvider value={grade}>
-        <ChartsTab paragrafEntries={[]} generalExams={[]} branchExams={[]} lgsRoutines={routines} chartRange={range} />
+        <ChartsTab studentId="s1" examMistakes={[]} weekDays={[]} courseResourceData={{}} paragrafEntries={[]} generalExams={[]} branchExams={[]} lgsRoutines={routines} chartRange={range} />
       </MaarifGradeProvider>,
     );
 

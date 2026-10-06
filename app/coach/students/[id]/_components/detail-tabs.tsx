@@ -147,9 +147,13 @@ export function DetailTabs({
 
       <TabsContent value="grafikler" className="pt-4">
         <ChartsTab
+          studentId={studentId}
           paragrafEntries={paragrafEntries}
           generalExams={generalExams}
           branchExams={branchExams}
+          examMistakes={examMistakes}
+          weekDays={initialWeekDays}
+          courseResourceData={courseResourceData}
           examType={examType}
           lgsRoutines={lgsRoutines}
           chartRange={chartRange}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +21,9 @@ import {
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { MAARIF_GRADES, maarifCourseSections } from "@/lib/maarif-grade";
+import { ExamDetailDialog } from "./exam-detail-dialog";
+import type { CourseResourceData } from "./kaynak-takibi-tab";
+import { TaskDrawer, type TaskDrawerState } from "./kanban/task-drawer";
 import { DualMetricChart } from "./charts/dual-metric-chart";
 import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
@@ -87,13 +90,23 @@ function TrackToggle<T extends string>({
 }
 
 export function ChartsTab({
+  studentId,
   paragrafEntries,
   generalExams,
   branchExams,
+  examMistakes,
+  weekDays,
+  courseResourceData: initialCourseResourceData,
   examType = "YKS",
   lgsRoutines = [],
   chartRange,
 }: {
+  studentId: string;
+  // Every topic the student marked, per exam -- the popup behind a click on an exam lists them.
+  examMistakes: { task_id: string; course_id: string; topic_id: string }[];
+  // For the edit drawer the popup's "Sonuçları Düzenle" opens.
+  weekDays: { date: string; label: string }[];
+  courseResourceData: CourseResourceData;
   paragrafEntries: ParagrafProblemEntry[];
   generalExams: DetailTask[];
   branchExams: DetailTask[];
@@ -107,6 +120,40 @@ export function ChartsTab({
 }) {
   const isLgs = examType === "LGS";
   const maarifGrade = useMaarifGrade();
+  // The exam whose detail popup is open (a click on a bar / point / history row), and the edit drawer its
+  // "Sonuçları Düzenle" button opens. Saving in the drawer revalidates the page, which refreshes the props below.
+  const [detailExamId, setDetailExamId] = useState<string | null>(null);
+  const [drawerState, setDrawerState] = useState<TaskDrawerState | null>(null);
+  const [courseResourceData, setCourseResourceData] = useState(initialCourseResourceData);
+  const examsById = useMemo(() => new Map([...generalExams, ...branchExams].map((e) => [e.id, e])), [generalExams, branchExams]);
+  const markedTopicsByExam = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const m of examMistakes) {
+      const set = map.get(m.task_id) ?? new Set<string>();
+      set.add(m.topic_id);
+      map.set(m.task_id, set);
+    }
+    return map;
+  }, [examMistakes]);
+  const detailExam = detailExamId ? (examsById.get(detailExamId) ?? null) : null;
+
+  function handleResourceCreated(courseId: string, kind: "study" | "branch_exam", resource: { id: string; name: string }) {
+    setCourseResourceData((prev) => {
+      const current = prev[courseId] ?? {
+        resources: [],
+        branchExamResources: [],
+        progress: {},
+        topicStats: { byTopic: {}, karma: { total: 0, correct: 0, wrong: 0, empty: 0 } },
+      };
+      return {
+        ...prev,
+        [courseId]:
+          kind === "branch_exam"
+            ? { ...current, branchExamResources: [...current.branchExamResources, { ...resource, total_stock: 0, remaining_stock: 0, is_active: true }] }
+            : { ...current, resources: [...current.resources, { ...resource, is_active: true }] },
+      };
+    });
+  }
   // The net rule for everything on this tab: LGS 3 wrong : 1 right, YKS 4 : 1. The 7th grade has the LGS
   // distribution and scoring (MAARIF_GRADES[7].lgsStyleScoring).
   const lgsStyle = isLgs || (maarifGrade !== null && MAARIF_GRADES[maarifGrade].lgsStyleScoring === true);
@@ -220,6 +267,7 @@ export function ChartsTab({
     .slice()
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
     .map((e) => ({
+      id: e.id,
       date: e.task_date,
       values: Object.fromEntries(
         genelGroups.map((g) => {
@@ -262,6 +310,7 @@ export function ChartsTab({
     .slice()
     .sort((a, b) => a.task_date.localeCompare(b.task_date))
     .map((e) => ({
+      id: e.id,
       date: e.task_date,
       a: netOf(e.correct_count ?? 0, e.wrong_count ?? 0),
       b: e.duration_minutes ?? 0,
@@ -377,19 +426,19 @@ export function ChartsTab({
 
           <CardDescription>
             {examMode === "genel"
-              ? "Bölümlerin toplam nete katkısı"
-              : `${selectedBranchCourseName} branş denemesi net ve süre değişimi`}
+              ? "Bölümlerin toplam nete katkısı -- ayrıntı için bir denemeye tıkla"
+              : `${selectedBranchCourseName} branş denemesi net ve süre değişimi -- ayrıntı için bir denemeye tıkla`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {examMode === "genel" ? (
-            <StackedBarChart data={genelBreakdownData} series={genelSeries} />
+            <StackedBarChart data={genelBreakdownData} series={genelSeries} onSelect={(point) => point.id && setDetailExamId(point.id)} />
           ) : bransChartData.length === 0 ? (
             <p className="text-muted-foreground flex h-[200px] items-center justify-center text-sm">
               Bu ders için henüz branş denemesi verisi yok.
             </p>
           ) : (
-            <DualMetricChart data={bransChartData} labelA="Net" labelB="Süre" unitB=" dk" />
+            <DualMetricChart data={bransChartData} labelA="Net" labelB="Süre" unitB=" dk" onSelect={(point) => point.id && setDetailExamId(point.id)} />
           )}
         </CardContent>
       </Card>
@@ -421,7 +470,20 @@ export function ChartsTab({
                 </TableHeader>
                 <TableBody>
                   {generalExamHistory.map((row) => (
-                    <TableRow key={row.id}>
+                    <TableRow
+                      key={row.id}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${row.title} -- ayrıntıyı aç`}
+                      className="hover:bg-muted/50 cursor-pointer"
+                      onClick={() => setDetailExamId(row.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setDetailExamId(row.id);
+                        }
+                      }}
+                    >
                       <TableCell className="whitespace-nowrap">{formatExamDate(row.date)}</TableCell>
                       <TableCell>{row.title}</TableCell>
                       <TableCell className="text-right tabular-nums">{row.correct}</TableCell>
@@ -436,6 +498,33 @@ export function ChartsTab({
           )}
         </CardContent>
       </Card>
+
+      {detailExam && (
+        <ExamDetailDialog
+          exam={detailExam}
+          markedTopicIds={markedTopicsByExam.get(detailExam.id) ?? new Set<string>()}
+          netOf={netOf}
+          onClose={() => setDetailExamId(null)}
+          onEdit={(exam) => {
+            setDetailExamId(null);
+            setDrawerState({ mode: "edit", task: exam });
+          }}
+        />
+      )}
+
+      {drawerState && (
+        <TaskDrawer
+          state={drawerState}
+          onClose={() => setDrawerState(null)}
+          studentId={studentId}
+          weekDays={weekDays}
+          courseResourceData={courseResourceData}
+          onCreated={() => {}}
+          onSaved={() => {}}
+          onResourceCreated={handleResourceCreated}
+          examType={examType}
+        />
+      )}
     </div>
   );
 }

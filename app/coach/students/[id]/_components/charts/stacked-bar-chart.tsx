@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 export type StackedSeries = { key: string; label: string; color: string };
-export type StackedPoint = { date: string; values: Record<string, number> };
+// id: optional identity of what the bar stands for (an exam) -- handed back to onSelect when the bar is clicked.
+export type StackedPoint = { id?: string; date: string; values: Record<string, number> };
 
 const VIEW_W = 480;
 const VIEW_H = 220;
@@ -21,7 +22,16 @@ function formatDate(iso: string) {
 // (heavy wrong answers can push a group below zero) stack downward from
 // the zero line separately so a bad subject can't silently eat into
 // another's segment height.
-export function StackedBarChart({ data, series }: { data: StackedPoint[]; series: StackedSeries[] }) {
+export function StackedBarChart({
+  data,
+  series,
+  onSelect,
+}: {
+  data: StackedPoint[];
+  series: StackedSeries[];
+  // When given, a click (or tap) on a bar reports that bar -- e.g. to open the exam behind it.
+  onSelect?: (point: StackedPoint) => void;
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   if (data.length === 0) {
@@ -45,12 +55,16 @@ export function StackedBarChart({ data, series }: { data: StackedPoint[]; series
   const barWidth = Math.min(40, barSlot * 0.6);
   const hovered = hoverIndex !== null ? data[hoverIndex] : null;
 
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function indexAt(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const fraction = (e.clientX - rect.left) / rect.width;
     const vx = fraction * VIEW_W;
     const i = Math.floor((vx - PAD.left) / barSlot);
-    setHoverIndex(Math.min(data.length - 1, Math.max(0, i)));
+    return Math.min(data.length - 1, Math.max(0, i));
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    setHoverIndex(indexAt(e));
   }
 
   return (
@@ -65,10 +79,11 @@ export function StackedBarChart({ data, series }: { data: StackedPoint[]; series
       </div>
 
       <div
-        className="relative w-full"
+        className={onSelect ? "relative w-full cursor-pointer" : "relative w-full"}
         style={{ aspectRatio: `${VIEW_W} / ${VIEW_H}` }}
         onPointerMove={handlePointerMove}
         onPointerLeave={() => setHoverIndex(null)}
+        onClick={onSelect ? (e) => onSelect(data[indexAt(e)]) : undefined}
       >
         <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="h-full w-full">
           <line x1={PAD.left} x2={VIEW_W - PAD.right} y1={zeroY} y2={zeroY} className="stroke-border" strokeWidth={1} />
@@ -78,7 +93,7 @@ export function StackedBarChart({ data, series }: { data: StackedPoint[]; series
             let posCursor = 0;
             let negCursor = 0;
             return (
-              <g key={d.date}>
+              <g key={d.id ?? d.date}>
                 {series.map((s) => {
                   const v = d.values[s.key] ?? 0;
                   let y0: number;

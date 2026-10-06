@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-type Point = { date: string; a: number; b: number };
+// id: optional identity of what the point stands for (an exam) -- handed back to onSelect when the chart is clicked there.
+type Point = { id?: string; date: string; a: number; b: number };
 
 const VIEW_W = 480;
 const VIEW_H = 200;
@@ -32,6 +33,7 @@ export function DualMetricChart({
   unitB = "",
   colorA = "var(--primary)",
   colorB = "#f59e0b",
+  onSelect,
 }: {
   data: Point[];
   labelA: string;
@@ -40,6 +42,8 @@ export function DualMetricChart({
   unitB?: string;
   colorA?: string;
   colorB?: string;
+  // When given, a click (or tap) reports the point nearest to it -- e.g. to open the exam behind it.
+  onSelect?: (point: Point) => void;
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -65,13 +69,17 @@ export function DualMetricChart({
   const last = data[data.length - 1];
   const hovered = hoverIndex !== null ? data[hoverIndex] : null;
 
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function indexAt(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const fraction = (e.clientX - rect.left) / rect.width;
     const vx = fraction * VIEW_W;
     const relative = (vx - PAD.left) / PLOT_W;
     const i = Math.round(relative * (data.length - 1));
-    setHoverIndex(Math.min(data.length - 1, Math.max(0, i)));
+    return Math.min(data.length - 1, Math.max(0, i));
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    setHoverIndex(indexAt(e));
   }
 
   return (
@@ -88,10 +96,11 @@ export function DualMetricChart({
       </div>
 
       <div
-        className="relative w-full"
+        className={onSelect ? "relative w-full cursor-pointer" : "relative w-full"}
         style={{ aspectRatio: `${VIEW_W} / ${VIEW_H}` }}
         onPointerMove={handlePointerMove}
         onPointerLeave={() => setHoverIndex(null)}
+        onClick={onSelect ? (e) => onSelect(data[indexAt(e)]) : undefined}
       >
         <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="h-full w-full">
           {gridSteps.map((t) => (
