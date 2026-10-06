@@ -99,10 +99,10 @@ describe("İngilizce Kelime Quizi: İngilizce's hue at the deeper tier, on every
     expect(subjectBackgroundClass("ingilizce-quiz", "vocab_quiz")).toBe(expected); // the parent board's own call
   });
 
-  it("leaves every other task alone: a Genel Deneme keeps its colour, a Branş Denemesi its shade, the paragraf routine its grey", () => {
+  it("leaves every other task alone: a Genel Deneme keeps its colour, a Branş Denemesi its shade, a routine its light tier", () => {
     expect(subjectBackgroundClass(null, "general_exam")).toBe("bg-[var(--subject-genel-deneme)]");
     expect(subjectBackgroundClass("lgs-ingilizce", "branch_exam", { deepLgs: true })).toMatch(/\/20$/);
-    expect(subjectBackgroundClass("paragraf", "question_bank")).toBe("bg-slate-500/10");
-    expect(subjectBackgroundClass("kitap-okuma", "reading")).toBe("bg-slate-500/10");
+    expect(subjectBackgroundClass("paragraf", "question_bank")).toBe("bg-[var(--subject-turkce)]/6"); // now Türkçe, lighter tier
+    expect(subjectBackgroundClass("extra-without-course", "extra_custom")).toBe("bg-slate-500/10"); // anything unmapped stays grey
   });
 });

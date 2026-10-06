@@ -195,12 +195,15 @@ const MACRO_CLASSES: Record<string, string> = {
 // (each panel keeps its own function name/call site, per this repo's
 // per-panel UI-duplication convention; only the color data itself is
 // shared here, since it's pure lookup with nothing panel-specific in it).
-// Routines that get a look of their own (instead of the neutral routine grey)
-// so they're recognisable at a glance in the Rutinler lane. Yeni Nesil Mat
-// Dozu is violet -- a hue LGS has no subject family in (Fizik, the only
-// violet family, is YKS-only) -- and stronger than a subject tint.
-const ROUTINE_CLASSES: Record<string, string> = {
-  "yeni-nesil-mat-dozu": "bg-violet-500/25",
+// The daily routines (Rutinler lane) take their subject's hue, ALWAYS in the lighter (TYT) tier -- on every panel and for
+// every grade, whatever the options below say -- so a routine reads as lighter than the heavy study tasks (the deeper AYT /
+// 11. Sınıf / 8th-grade tier) next to it. Paragraf and Kitap Okuma are Türkçe; Problem and Yeni Nesil Mat Dozu are Matematik.
+// (The "Problemler" unit of TYT Matematik is a topic of that course, so it already follows Matematik.)
+const ROUTINE_FAMILY: Record<string, SubjectFamily> = {
+  paragraf: "turkce",
+  "kitap-okuma": "turkce",
+  problem: "matematik",
+  "yeni-nesil-mat-dozu": "matematik",
 };
 
 // `deepMaarif11`: an 11th grader's own ("maarif11-") courses take the deeper (AYT) tier instead of the TYT one, so a
@@ -223,8 +226,8 @@ export function subjectBackgroundClass(
   // grade's regular courses -- the same on every panel (it is LGS-only, so there is nothing to opt in to).
   if (taskType === "vocab_quiz" || courseId === "ingilizce-quiz") return FAMILY_CLASSES.ingilizce[1];
   if (courseId) {
-    const routineClass = ROUTINE_CLASSES[courseId];
-    if (routineClass) return routineClass;
+    const routineFamily = ROUTINE_FAMILY[courseId];
+    if (routineFamily) return FAMILY_CLASSES[routineFamily][0];
     const macroClass = MACRO_CLASSES[courseId];
     if (macroClass) return macroClass;
     const family = COURSE_FAMILY[courseId];
