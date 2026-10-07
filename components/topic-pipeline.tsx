@@ -47,6 +47,7 @@ export function PipelineCells({
   topicId,
   map,
   onToggle,
+  rowSpan,
 }: {
   steps: readonly PipelineStep[];
   courseName: string;
@@ -54,12 +55,14 @@ export function PipelineCells({
   topicId: string;
   map: PipelineMap;
   onToggle: (topicId: string, step: PipelineStepKey) => void;
+  // A unit-level checkbox (LGS Fen) is one cell spanning the unit's Konu rows.
+  rowSpan?: number;
 }) {
   const state = map[topicId];
   return (
     <>
       {steps.map((step, i) => (
-        <TableCell key={step.key} className={cn("text-center", i === 0 && "border-l")}>
+        <TableCell key={step.key} rowSpan={rowSpan} className={cn("text-center", rowSpan && "align-middle", i === 0 && "border-l")}>
           <Checkbox
             checked={state?.[step.key] ?? false}
             onCheckedChange={() => onToggle(topicId, step.key)}

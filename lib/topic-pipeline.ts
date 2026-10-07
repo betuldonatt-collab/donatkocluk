@@ -204,6 +204,28 @@ export function collapsePipelineMapForRows(
   return collapsed;
 }
 
+// LGS Fen Bilimleri: the "end" steps (MEB Kaynağı, Çıkmış Sorular) are ONE checkbox per unit, kept on the unit's master topic.
+// For the progress summary every Konu row of the unit reads those steps from there (the start steps stay per Konu), so the
+// counts match what the table shows. `masterByUnit`: unit label -> master topic id; a row of any other unit is left as it is.
+export function inheritUnitLevelSteps(
+  collapsed: PipelineMap,
+  rows: { id: string; unitLabel: string }[],
+  raw: PipelineMap,
+  steps: readonly PipelineStep[],
+  masterByUnit: Map<string, string>,
+): PipelineMap {
+  if (masterByUnit.size === 0) return collapsed;
+  const out: PipelineMap = { ...collapsed };
+  for (const row of rows) {
+    const masterId = masterByUnit.get(row.unitLabel);
+    if (!masterId) continue;
+    const state: PipelineState = { ...collapsed[row.id] };
+    for (const step of steps) state[step.key] = raw[masterId]?.[step.key] ?? false;
+    out[row.id] = state;
+  }
+  return out;
+}
+
 // The courses whose Kaynak Takibi table has a pipeline for each cohort: the
 // real TYT/AYT subject courses for YKS, the lgs- courses for LGS.
 function yksCourseIds(): Set<string> {

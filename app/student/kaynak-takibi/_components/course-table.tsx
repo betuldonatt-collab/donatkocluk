@@ -32,12 +32,11 @@ import {
   MaarifStatCells,
   MaarifTableBody,
 } from "@/components/maarif-table-body";
-import { collapsePipelineMapForRows, perTopicStepsFor, type PipelineBinding } from "@/lib/topic-pipeline";
+import { collapsePipelineMapForRows, inheritUnitLevelSteps, perTopicStepsFor, type PipelineBinding } from "@/lib/topic-pipeline";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { isFlatRows, kaynakTakibiRows } from "@/lib/curriculum/rows";
-import { groupParentLayout, sumTopicStats, unitTotalTopicIds } from "@/lib/curriculum/topic-groups";
-import { UnitTotalLine } from "@/components/unit-total-line";
+import { groupParentLayout, sumTopicStats, unitLevelGroups } from "@/lib/curriculum/topic-groups";
 import { TopicGroupParentRow } from "@/components/topic-group-parent-row";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 
@@ -53,16 +52,16 @@ function progressKey(topicId: string, resourceId: string) {
 // Compact Toplam/D/Y/B cluster reused for every topic row and the Karma
 // row at the bottom -- deliberately terse (single-letter D/Y/B column
 // heads) since it repeats on every single row of a long topic list.
-function StatCells({ stat }: { stat: TopicStat }) {
+function StatCells({ stat, rowSpan }: { stat: TopicStat; rowSpan?: number }) {
   // A genuine 0 (e.g. 0 wrong on a topic that WAS attempted) must render as
   // "0", not "–" -- only a topic with no recorded total at all is "no data".
   const hasData = stat.total > 0;
   return (
     <>
-      <TableCell className="text-center font-medium tabular-nums">{hasData ? stat.total : "–"}</TableCell>
-      <TableCell className="text-center tabular-nums text-emerald-700">{hasData ? stat.correct : "–"}</TableCell>
-      <TableCell className="text-center tabular-nums text-rose-700">{hasData ? stat.wrong : "–"}</TableCell>
-      <TableCell className="text-center tabular-nums text-amber-700">{hasData ? stat.empty : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn("text-center font-medium tabular-nums", rowSpan && "align-middle")}>{hasData ? stat.total : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn("text-center tabular-nums text-emerald-700", rowSpan && "align-middle")}>{hasData ? stat.correct : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn("text-center tabular-nums text-rose-700", rowSpan && "align-middle")}>{hasData ? stat.wrong : "–"}</TableCell>
+      <TableCell rowSpan={rowSpan} className={cn("text-center tabular-nums text-amber-700", rowSpan && "align-middle")}>{hasData ? stat.empty : "–"}</TableCell>
     </>
   );
 }
@@ -128,15 +127,26 @@ export function CourseTable({
   const rows = kaynakTakibiRows(course);
   // A grouped unit (Problemler, Dalgalar, Trigonometri, ...) gets a parent row with the whole group's cumulative stats.
   const { parentBefore, unitSpan, hideRowStats } = groupParentLayout(course, rows);
-  // LGS Fen Bilimleri shows no master / parent row here: each unit's whole numbers sit under its vertical label instead.
-  const unitTotalIds = unitTotalTopicIds(course);
+  // LGS Fen Bilimleri is laid out per unit: its master / parent row is not shown; the Soru Dağılımı block and the resource /
+  // MEB / Çıkmış Sorular checkboxes are one merged cell per unit (rowSpan over its Konu rows), the master holding the
+  // unit-level ticks; Konu, Okul İlerlemesi and Konu Tekrarı stay one row per Konu.
+  const unitLevel = unitLevelGroups(course);
+  const unitOf = (row: { unitLabel: string }) => unitLevel.get(row.unitLabel);
   const isMaarif = isMaarifCourseId(course.id);
   const maarifGrade = useMaarifGrade();
   // A flat Maarif TYT course (Türkçe) has no Ünite column.
   const flat = isFlatRows(rows);
   // A Maarif unit's Okul İlerlemesi is ticked per subtopic, so it folds with
   // AND (unit done only when every subtopic is) for the summary bar.
-  const collapsedMap = pipeline && collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? perTopicStepsFor(maarifGrade) : []);
+  const collapsedMap =
+    pipeline &&
+    inheritUnitLevelSteps(
+      collapsePipelineMapForRows(rows, pipeline.map, pipeline.config, isMaarif ? perTopicStepsFor(maarifGrade) : []),
+      rows,
+      pipeline.map,
+      pipeline.config.end,
+      new Map([...unitLevel].map(([label, u]) => [label, u.masterId])),
+    );
   const collapsedPipeline = pipeline && collapsedMap && { ...pipeline, map: collapsedMap };
   // Maarif courses render as a spreadsheet-style grid (MaarifTableBody);
   // every other cohort keeps the generic one-row-per-selection-row body.
@@ -233,7 +243,13 @@ export function CourseTable({
                 />
               )}
               <TableRow>
-                {!hideRowStats(row) && <StatCells stat={aggregateStat(topicStats.byTopic, row.memberTopicIds)} />}
+                {unitOf(row) ? (
+                  row.unitRowSpan !== null && (
+                    <StatCells stat={sumTopicStats(topicStats.byTopic, unitOf(row)!.topicIds)} rowSpan={row.unitRowSpan} />
+                  )
+                ) : (
+                  !hideRowStats(row) && <StatCells stat={aggregateStat(topicStats.byTopic, row.memberTopicIds)} />
+                )}
                 {unitSpan(row) !== null && (
                   <TableCell
                     rowSpan={unitSpan(row)!}
@@ -245,13 +261,10 @@ export function CourseTable({
                     {row.unitLabel === "-" ? (
                       "-"
                     ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-2 py-2">
+                      <div className="flex h-full items-center justify-center py-2">
                         <span className="[writing-mode:vertical-rl] rotate-180 font-medium">
                           {row.unitLabel}
                         </span>
-                        {unitTotalIds.has(row.unitLabel) && (
-                          <UnitTotalLine stat={sumTopicStats(topicStats.byTopic, unitTotalIds.get(row.unitLabel)!)} />
-                        )}
                       </div>
                     )}
                   </TableCell>
@@ -274,6 +287,29 @@ export function CourseTable({
                   />
                 )}
                 {resources.map((resource) => {
+                  // LGS Fen: one merged pair of checkboxes per unit, on the first Konu row, bound to the unit's master.
+                  const unit = unitOf(row);
+                  if (unit) {
+                    if (row.unitRowSpan === null) return null;
+                    return (
+                      <Fragment key={resource.id}>
+                        <TableCell rowSpan={row.unitRowSpan} className="border-l text-center align-middle">
+                          <Checkbox
+                            checked={progress[progressKey(unit.masterId, resource.id)]?.solved ?? false}
+                            onCheckedChange={() => onToggle(unit.masterId, resource.id, "solved")}
+                            aria-label={`${course.name} - ${row.unitLabel} - ${resource.name} - Soru Çözümü`}
+                          />
+                        </TableCell>
+                        <TableCell rowSpan={row.unitRowSpan} className="text-center align-middle">
+                          <Checkbox
+                            checked={progress[progressKey(unit.masterId, resource.id)]?.reviewed ?? false}
+                            onCheckedChange={() => onToggle(unit.masterId, resource.id, "reviewed")}
+                            aria-label={`${course.name} - ${row.unitLabel} - ${resource.name} - Kaynak Taraması Yapıldı`}
+                          />
+                        </TableCell>
+                      </Fragment>
+                    );
+                  }
                   const solved = row.memberTopicIds.some((id) => progress[progressKey(id, resource.id)]?.solved);
                   const reviewed = row.memberTopicIds.some((id) => progress[progressKey(id, resource.id)]?.reviewed);
                   return (
@@ -295,16 +331,30 @@ export function CourseTable({
                     </Fragment>
                   );
                 })}
-                {collapsedPipeline && (
-                  <PipelineCells
-                    steps={collapsedPipeline.config.end}
-                    courseName={course.name}
-                    topicName={row.label}
-                    topicId={row.id}
-                    map={collapsedPipeline.map}
-                    onToggle={collapsedPipeline.onToggle}
-                  />
-                )}
+                {collapsedPipeline &&
+                  (unitOf(row) ? (
+                    // LGS Fen: the unit's own MEB Kaynağı / Çıkmış Sorular, one merged cell per unit.
+                    row.unitRowSpan !== null && pipeline && (
+                      <PipelineCells
+                        steps={pipeline.config.end}
+                        courseName={course.name}
+                        topicName={row.unitLabel}
+                        topicId={unitOf(row)!.masterId}
+                        map={pipeline.map}
+                        onToggle={pipeline.onToggle}
+                        rowSpan={row.unitRowSpan}
+                      />
+                    )
+                  ) : (
+                    <PipelineCells
+                      steps={collapsedPipeline.config.end}
+                      courseName={course.name}
+                      topicName={row.label}
+                      topicId={row.id}
+                      map={collapsedPipeline.map}
+                      onToggle={collapsedPipeline.onToggle}
+                    />
+                  ))}
               </TableRow>
             </Fragment>
             ))}

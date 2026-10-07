@@ -163,14 +163,18 @@ export function topicGroups(course: Course | null | undefined): TopicGroup[] {
   return groups;
 }
 
-// LGS Fen Bilimleri: the topic ids behind each unit's total line in Kaynak Takibi, by unit label -- the unit's master and every
-// raw topic its Konu fold. Kaynak Takibi hides the master and parent rows there, so the whole-unit numbers show as a small
-// total under the vertical Ünite label instead (components/unit-total-line.tsx). Empty for every other course.
-export function unitTotalTopicIds(course: Course | null | undefined): Map<string, string[]> {
+// LGS Fen Bilimleri's Kaynak Takibi is laid out per unit: the Soru Dağılımı block and the resource / MEB / Çıkmış Sorular
+// checkboxes are ONE merged cell per unit (rowSpan over its Konu rows), while the Konu name, Okul İlerlemesi and Konu Tekrarı
+// stay one row per Konu. This gives, by unit label: the unit's master topic -- where the unit-level ticks live and are toggled
+// -- and every topic id behind the unit's total (the master and every raw topic its Konu fold). The master has no row of its
+// own there. Empty for every other course, which keeps its one-row-per-topic layout.
+export type UnitLevelGroup = { masterId: string; topicIds: string[] };
+
+export function unitLevelGroups(course: Course | null | undefined): Map<string, UnitLevelGroup> {
   return new Map(
     topicGroups(course)
       .filter((g) => g.allTopicIds !== undefined)
-      .map((g) => [g.unitLabel, g.allTopicIds!] as const),
+      .map((g) => [g.unitLabel, { masterId: g.masterId, topicIds: g.allTopicIds! }] as const),
   );
 }
 
