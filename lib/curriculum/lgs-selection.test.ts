@@ -32,28 +32,30 @@ describe("lgsSelectionNodes", () => {
     for (const n of nodes) expect(allTopicIds.has(n.id)).toBe(true);
   });
 
-  it("Fen Bilimleri: Ünite 1-6 roll up to the Ünite level, Ünite 7 keeps its Konu-level rollup", () => {
+  it("Fen Bilimleri: every Konu of Ünite 1-6 is its own node (a real topic id); Ünite 7 keeps its Konu-level rollup", () => {
     const course = nativeById("lgs-fen-bilimleri");
     const nodes = lgsSelectionNodes(course);
 
-    // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM" in the raw data, Title Cased
-    // here) has no Konu split -- both of its topics roll up under the
-    // Ünite itself now, same as Türkçe/İnkılap.
-    const unit1 = nodes.find((n) => n.label === "1. Ünite: Mevsimler ve İklim");
-    expect(unit1).toMatchObject({ readOnlyNames: ["Mevsimlerin Oluşumu", "İklim ve Hava Hareketleri"] });
-    expect(nodes.find((n) => n.label === "Mevsimlerin Oluşumu")).toBeUndefined(); // no longer its own node
+    // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM" in the raw data) lists its two Konu as topics: each is a selectable node,
+    // nothing is rolled up under the Ünite any more.
+    expect(nodes.filter((n) => n.unitLabel === "1. Ünite: Mevsimler ve İklim")).toMatchObject([
+      { id: "lgs-fen-bilimleri-u0-t0", label: "Mevsimlerin Oluşumu", readOnlyNames: [], memberTopicIds: ["lgs-fen-bilimleri-u0-t0"] },
+      { id: "lgs-fen-bilimleri-u0-t1", label: "İklim ve Hava Hareketleri", readOnlyNames: [], memberTopicIds: ["lgs-fen-bilimleri-u0-t1"] },
+    ]);
+    expect(nodes.find((n) => n.label === "1. Ünite: Mevsimler ve İklim")).toBeUndefined(); // the Ünite itself is not a node
 
     // Ünite 7 ("... ELEKTRİK ...") keeps rolling up at the Konu level.
     const rolledGroup = nodes.find((n) => n.label === "Elektrik Yükleri ve Elektriklenme");
     expect(rolledGroup).toMatchObject({
       readOnlyNames: ["Sürtünme ile Elektriklenme", "Dokunma ile Elektriklenme", "Etki (Tesir) ile Etkilenme"],
     });
-    expect(nodes.find((n) => n.label.startsWith("7. Ünite"))).toBeUndefined(); // Ünite 7 itself is not a node
+    expect(nodes.find((n) => n.label.startsWith("7. Ünite"))).toBeUndefined();
 
-    // One node per Ünite 1-6, plus one per Konu within Ünite 7.
+    // Ünite 1-6: one node per topic; Ünite 7: one per Konu entry (3). 2+5+4+6+6+4 + 3 = 30.
+    const plainTopics = course.units.filter((u) => u.konu === undefined).flatMap((u) => u.topics);
     const unite7KonuCount = course.units.filter((u) => u.konu !== undefined).length;
-    const otherUniteCount = new Set(course.units.filter((u) => u.konu === undefined).map((u) => u.unit)).size;
-    expect(nodes).toHaveLength(otherUniteCount + unite7KonuCount);
+    expect(nodes).toHaveLength(plainTopics.length + unite7KonuCount);
+    expect(nodes).toHaveLength(30);
   });
 
   it("Türkçe and İnkılap Tarihi: selectable node is the Ünite itself (Title Cased), topics become read-only", () => {

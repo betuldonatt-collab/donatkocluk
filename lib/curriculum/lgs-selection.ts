@@ -98,11 +98,13 @@ const DIN_KULTURU_EXEMPT_TOPIC_IDS = new Set([
 //   - Matematik: selectable = Konu (one level below Ünite); every unit in
 //     lgs.json already carries a konu, so this is just "one node per
 //     entry", no cross-entry merging needed.
-//   - Fen Bilimleri: selectable = the Ünite itself for every unit EXCEPT
-//     the last one (Ünite 7 today, the only entry with a Konu split) --
-//     that one keeps the Matematik-style Konu-level rollup instead, one
-//     node per (Ünite, Konu) entry. Everything else in the unit becomes
-//     read-only context either way.
+//   - Fen Bilimleri: selectable = the Konu. Ünite 1-6 list their Konu as
+//     plain topics (the MEB konu list: Mevsimlerin Oluşumu, Katı Basıncı,
+//     ...), so each topic is its own node; Ünite 7 is the only unit whose
+//     entries carry a Konu split, so it keeps the Matematik-style rollup
+//     (one node per (Ünite, Konu) entry, its Alt konu read-only). Every
+//     unit therefore has 2+ nodes and gets a "(Genel)" master
+//     (lib/curriculum/lgs-masters.ts) for the two-step Ünite -> Konu picker.
 //   - Türkçe / İnkılap Tarihi (Sosyal): selectable = the Ünite itself --
 //     every topic inside it becomes read-only context.
 //   - İngilizce: unchanged -- each "Unit N" topic is already Ünite-level
@@ -135,10 +137,17 @@ export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
 function nativeSelectionNodes(course: Course): LgsSelectionNode[] {
   switch (course.id) {
     case "lgs-matematik":
-    case "lgs-fen-bilimleri":
       return course.units.map((u) => {
         const unit = uniteLabel(u.unit);
         return group(u.konu ?? unit, unit, u.topics);
+      });
+
+    case "lgs-fen-bilimleri":
+      return course.units.flatMap((u) => {
+        const unit = uniteLabel(u.unit);
+        // Ünite 1-6 list their Konu as plain topics (Mevsimlerin Oluşumu, Katı Basıncı, ...): each is its own node. Ünite 7
+        // splits into Konu entries whose topics are Alt konu: one rolled-up node per Konu, as for Matematik.
+        return u.konu === undefined ? u.topics.map((t) => leaf(t, unit)) : [group(u.konu, unit, u.topics)];
       });
 
     case "lgs-turkce":
