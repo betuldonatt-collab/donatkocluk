@@ -9,7 +9,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus } from "@/lib/count-fields";
 import { GENERIC_DB_ERROR } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
-import { selectQuizBatch, WORD_MASTERY_STREAK, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
+import { nextWordProgress, selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
 
 // Logs the real error server-side (console + Sentry) and, when it carries a
 // Postgres/PostgREST error code (an RLS denial, a missing grant, a check
@@ -44,17 +44,13 @@ function vocabActionError(label: string, e: unknown): string {
 // client exactly as written.
 type GetVocabQuizBatchResult = { ok: true; words: QuizWord[] } | { ok: false; error: string };
 type GetActiveVocabQuizTaskResult = { ok: true; task: ActiveVocabQuizTask | null } | { ok: false; error: string };
-// isMastered on success tells the UI whether THIS answer was the one that
-// crossed the WORD_MASTERY_STREAK threshold, so the dashboard's mastered
-// count can bump exactly once, right when it actually happens -- not on
-// every correct answer. taskCompleted is the same idea for an assigned
+// nextCount is this word's own correct_count AFTER this answer (unchanged on a miss/skip -- nothing already earned is taken
+// back) -- the quiz session's per-word level dots and the dashboard's tier counters render straight off it, authoritative over
+// whatever they optimistically guessed the instant the answer was given. isMastered / firstCorrect say whether THIS answer
+// crossed the 3rd correct answer / was the word's very first correct one. taskCompleted is the same idea for an assigned
 // vocab_quiz task's own word-count target (see activeTaskId below).
-// nextStreak is this word's own correct_streak AFTER this answer (0 on a
-// miss/skip) -- the quiz session's per-word dot indicator renders straight
-// off this, authoritative over whatever it may have optimistically guessed
-// the instant the answer was given.
 type SubmitAnswerResult =
-  | { ok: true; isMastered: boolean; taskCompleted: boolean; nextStreak: number }
+  | { ok: true; isMastered: boolean; firstCorrect: boolean; taskCompleted: boolean; nextCount: number }
   | { ok: false; error: string };
 
 async function requireUserId() {
@@ -79,9 +75,8 @@ async function requireUserIdReadOnly() {
 const unitNumberSchema = z.number().int().min(1).max(10);
 const batchLimitSchema = z.number().int().min(1).max(50);
 
-// Up to `limit` not-yet-mastered words for this unit, prioritized by
-// lowest correct_streak then longest since last tested (selectQuizBatch,
-// lib/lgs-vocab.ts). Two plain queries instead of one join: lgs_words has
+// Up to `limit` not-yet-mastered words for this unit, in a completely random order (selectQuizBatch, lib/lgs-vocab.ts).
+// Two plain queries instead of one join: lgs_words has
 // no per-student scoping to push down, and a left-join-with-null-or-false
 // filter across two tables isn't a single clean PostgREST filter, while
 // this is a handful of rows either way (a unit's word list is small).
@@ -101,7 +96,7 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
     const wordIds = words.map((w) => w.id);
     const { data: progressRows, error: progressError } = await supabase
       .from("student_word_progress")
-      .select("word_id, correct_streak, is_mastered, last_tested_at")
+      .select("word_id, correct_count, is_mastered, last_tested_at")
       .eq("student_id", userId)
       .in("word_id", wordIds);
     if (progressError) throw progressError;
@@ -109,7 +104,7 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
     const progressByWordId = new Map<string, WordProgressSummary>(
       (progressRows ?? []).map((p) => [
         p.word_id,
-        { correct_streak: p.correct_streak, is_mastered: p.is_mastered, last_tested_at: p.last_tested_at },
+        { correct_count: p.correct_count, is_mastered: p.is_mastered, last_tested_at: p.last_tested_at },
       ]),
     );
     return { ok: true, words: selectQuizBatch(words, progressByWordId, limitV) };
@@ -150,11 +145,10 @@ export async function getActiveVocabQuizTask(unitNumber: number): Promise<GetAct
   }
 }
 
-// Upserts this student's streak for one word: correct extends it by one
-// (mastered once it reaches WORD_MASTERY_STREAK), incorrect (including a "Pas Geç" skip --
-// the caller passes isCorrect: false for that too) resets it to 0.
-// last_tested_at always moves to now, whichever way it went -- both feed
-// selectQuizBatch's own prioritization on the NEXT batch fetch.
+// Upserts this student's progress for one word (nextWordProgress, lib/lgs-vocab.ts): correct adds one to correct_count
+// (mastered once it reaches 3 IN TOTAL, not in a row) and extends the streak; incorrect (including a "Pas Geç" skip -- the
+// caller passes isCorrect: false for that too) leaves correct_count as it is and only resets the streak. last_tested_at
+// always moves to now, whichever way it went.
 //
 // activeTaskId (getActiveVocabQuizTask above) additionally bumps that
 // assigned task's own correct_count by one -- but ONLY on a correct
@@ -177,20 +171,23 @@ export async function submitVocabAnswer(
 
     const { data: existing, error: fetchError } = await supabase
       .from("student_word_progress")
-      .select("correct_streak")
+      .select("correct_count, correct_streak")
       .eq("student_id", userId)
       .eq("word_id", wordIdV)
       .maybeSingle();
     if (fetchError) throw fetchError;
 
-    const nextStreak = isCorrectV ? (existing?.correct_streak ?? 0) + 1 : 0;
-    const isMastered = nextStreak >= WORD_MASTERY_STREAK;
+    const next = nextWordProgress(
+      { correctCount: existing?.correct_count ?? 0, correctStreak: existing?.correct_streak ?? 0 },
+      isCorrectV,
+    );
     const { error } = await supabase.from("student_word_progress").upsert(
       {
         student_id: userId,
         word_id: wordIdV,
-        correct_streak: nextStreak,
-        is_mastered: isMastered,
+        correct_count: next.correctCount,
+        correct_streak: next.correctStreak,
+        is_mastered: next.isMastered,
         last_tested_at: new Date().toISOString(),
       },
       { onConflict: "student_id,word_id" },
@@ -228,7 +225,7 @@ export async function submitVocabAnswer(
 
     revalidatePath("/student/ingilizce-quiz");
     revalidatePath("/student");
-    return { ok: true, isMastered, taskCompleted, nextStreak };
+    return { ok: true, isMastered: next.becameMastered, firstCorrect: next.firstCorrect, taskCompleted, nextCount: next.correctCount };
   } catch (e) {
     return { ok: false, error: vocabActionError("submitVocabAnswer", e) };
   }

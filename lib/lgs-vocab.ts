@@ -46,25 +46,49 @@ export function vocabUnitTitle(unitNumber: number): string {
   return VOCAB_UNIT_TITLES[unitNumber - 1] ?? `${unitNumber}. Ünite`;
 }
 
-// A word is mastered once its correct-answer streak reaches this many in a
-// row (student_word_progress.correct_streak) -- shared so the quiz UI's own
-// per-word dot indicator always renders exactly this many dots, and the
-// server's own mastery check (submitVocabAnswer, app/student/ingilizce-quiz/
-// actions.ts) can never drift from what the dots promise.
-export const WORD_MASTERY_STREAK = 3;
+// A word is mastered once it has been answered correctly this many times IN TOTAL (student_word_progress.correct_count, never
+// reduced by a miss) -- shared so the quiz UI's own per-word dots always render exactly this many levels, and the server's own
+// mastery check (submitVocabAnswer, app/student/ingilizce-quiz/actions.ts) can never drift from what the dots promise.
+// (It used to be 3 correct answers IN A ROW; a miss reset the streak and the student saw no progress until the third.)
+export const WORD_MASTERY_COUNT = 3;
 
-// One row per (student, word) -- a simple spaced-repetition streak.
-// is_mastered flips to true once correct_streak reaches 3; that transition
-// is application logic (a later phase's server action), not enforced at
+// One row per (student, word). correct_count is the number of correct answers ever given (the three mastery tiers and the
+// "words started" progress counter read it: a word with >= 1 counts as started, once and for good); correct_streak is the
+// current run of correct answers, kept for the record. is_mastered is application logic (correct_count >= 3), not enforced at
 // the DB level.
 export type StudentWordProgress = {
   id: string;
   student_id: string;
   word_id: string;
+  correct_count: number;
   correct_streak: number;
   is_mastered: boolean;
   last_tested_at: string | null;
 };
+
+// 0 = never answered correctly, 1 = light, 2 = medium, 3 = mastered (3 or more correct answers).
+export function masteryLevel(correctCount: number): 0 | 1 | 2 | 3 {
+  if (correctCount >= WORD_MASTERY_COUNT) return 3;
+  return correctCount >= 2 ? 2 : correctCount >= 1 ? 1 : 0;
+}
+
+// What one answer does to a word's progress -- the single rule behind submitVocabAnswer. A correct answer adds one to
+// correct_count and extends the streak; a miss (or a "Pas Geç") leaves correct_count exactly as it was -- nothing already
+// earned is taken back -- and only resets the streak. `firstCorrect`: this answer is the word's first correct one ever (the
+// "words started" counter moves exactly then and never again for the same word); `becameMastered`: it crossed the 3rd.
+export function nextWordProgress(
+  previous: { correctCount: number; correctStreak: number },
+  isCorrect: boolean,
+): { correctCount: number; correctStreak: number; isMastered: boolean; firstCorrect: boolean; becameMastered: boolean } {
+  const correctCount = previous.correctCount + (isCorrect ? 1 : 0);
+  return {
+    correctCount,
+    correctStreak: isCorrect ? previous.correctStreak + 1 : 0,
+    isMastered: correctCount >= WORD_MASTERY_COUNT,
+    firstCorrect: isCorrect && previous.correctCount === 0,
+    becameMastered: isCorrect && previous.correctCount < WORD_MASTERY_COUNT && correctCount >= WORD_MASTERY_COUNT,
+  };
+}
 
 // --- Phase 2: answer checking (Levenshtein-tolerant typo forgiveness) ------
 
@@ -147,47 +171,76 @@ export function checkVocabAnswer(userAnswer: string, correctAnswer: string, dire
 
 // --- Phase 2: quiz batch selection -----------------------------------------
 
-// correctStreak rides along so the quiz session's own per-word dot indicator
-// can show where a word already stands (0 up to WORD_MASTERY_STREAK - 1 --
-// selectQuizBatch below already drops anything at/past mastery) the instant
-// its prompt appears, not just after the student's next answer.
-export type QuizWord = Pick<LgsWord, "id" | "english_word" | "turkish_meaning"> & { correctStreak: number };
-export type WordProgressSummary = Pick<StudentWordProgress, "correct_streak" | "is_mastered" | "last_tested_at">;
+// correctCount rides along so the quiz session's own per-word level dots can show where a word already stands (0 up to
+// WORD_MASTERY_COUNT - 1 -- selectQuizBatch below already drops anything mastered) the instant its prompt appears, not just
+// after the student's next answer.
+export type QuizWord = Pick<LgsWord, "id" | "english_word" | "turkish_meaning"> & { correctCount: number };
+export type WordProgressSummary = Pick<StudentWordProgress, "correct_count" | "is_mastered" | "last_tested_at">;
 
-// Pure selection/ordering logic behind getVocabQuizBatch (app/student/
-// ingilizce-quiz/actions.ts) -- kept separate from the Supabase calls so it
-// can be tested directly. Drops mastered words, then sorts by lowest
-// correct_streak first (the words the student struggles with most), and
-// within a tied streak, by the longest since last_tested_at (never-tested
-// words -- no progress row at all -- sort as if last tested at the epoch,
-// so they're practiced before a word tested only slightly less recently).
+// Uniform Fisher-Yates shuffle (a new array; `rng` is injectable for tests).
+export function shuffled<T>(items: readonly T[], rng: () => number = Math.random): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+// Pure selection logic behind getVocabQuizBatch (app/student/ingilizce-quiz/actions.ts) -- kept separate from the Supabase
+// calls so it can be tested directly. Drops mastered words, then takes up to `limit` of the rest in a completely random order:
+// the words are never presented in the list's own (sequential) order, and a fresh batch is a fresh shuffle.
 export function selectQuizBatch(
   words: Pick<LgsWord, "id" | "english_word" | "turkish_meaning">[],
   progressByWordId: Map<string, WordProgressSummary>,
   limit: number,
+  rng: () => number = Math.random,
 ): QuizWord[] {
-  return words
+  const open = words
     .map((w) => ({ word: w, progress: progressByWordId.get(w.id) }))
-    .filter(({ progress }) => !progress?.is_mastered)
-    .sort((x, y) => {
-      const streakDiff = (x.progress?.correct_streak ?? 0) - (y.progress?.correct_streak ?? 0);
-      if (streakDiff !== 0) return streakDiff;
-      const xTime = x.progress?.last_tested_at ? new Date(x.progress.last_tested_at).getTime() : 0;
-      const yTime = y.progress?.last_tested_at ? new Date(y.progress.last_tested_at).getTime() : 0;
-      return xTime - yTime;
-    })
+    .filter(({ progress }) => !progress?.is_mastered);
+  return shuffled(open, rng)
     .slice(0, limit)
     .map(({ word, progress }) => ({
       id: word.id,
       english_word: word.english_word,
       turkish_meaning: word.turkish_meaning,
-      correctStreak: progress?.correct_streak ?? 0,
+      correctCount: progress?.correct_count ?? 0,
     }));
+}
+
+// A word answered wrongly (or skipped with Pas Geç) -- whatever it had earned before -- comes back later in the same session:
+// a copy is queued `gap` words after the current one (or at the very end when fewer remain). Returns the new queue; the
+// original word stays where it was asked. Never queues a second copy while one is already waiting further down.
+export function requeueAfterMiss<T extends { id: string }>(queue: readonly T[], currentIndex: number, missed: T, gap = 3): T[] {
+  if (queue.slice(currentIndex + 1).some((w) => w.id === missed.id)) return [...queue];
+  const at = Math.min(currentIndex + 1 + gap, queue.length);
+  return [...queue.slice(0, at), missed, ...queue.slice(at)];
 }
 
 // --- Phase 2: dashboard mastery stats ---------------------------------------
 
-export type UnitStat = { unitNumber: number; total: number; mastered: number };
+// total: the unit's words. mastered: words with 3 or more correct answers. level1 / level2: words with exactly 1 / exactly 2.
+// "Started" (the progress counter, xx/xxx) is every word with at least one correct answer: level1 + level2 + mastered.
+export type UnitStat = { unitNumber: number; total: number; mastered: number; level1: number; level2: number };
+
+export function unitStarted(stat: UnitStat): number {
+  return stat.level1 + stat.level2 + stat.mastered;
+}
+
+// The unit card's own numbers after one more correct answer moved a word from `previousCount` to `nextCount` correct answers
+// -- so the dashboard is right the moment the student exits the quiz, without a reload. A word's first correct answer is the
+// only one that raises the started counter; later ones only move it between tiers.
+export function applyCorrectToUnitStat(stat: UnitStat, previousCount: number, nextCount: number): UnitStat {
+  const tiers = { level1: stat.level1, level2: stat.level2, mastered: stat.mastered };
+  const key = (c: number) => (c >= WORD_MASTERY_COUNT ? "mastered" : c === 2 ? "level2" : c === 1 ? "level1" : null);
+  const from = key(previousCount);
+  const to = key(nextCount);
+  if (from === to) return stat;
+  if (from) tiers[from] -= 1;
+  if (to) tiers[to] += 1;
+  return { ...stat, ...tiers };
+}
 
 // Fills in units 1-10 always all present (even at 0/0 for a unit with no
 // words loaded yet), in order -- from the ALREADY-AGGREGATED per-unit rows
@@ -201,7 +254,7 @@ export type UnitStat = { unitNumber: number; total: number; mastered: number };
 // large the word bank grows.
 export function fillUnitStats(rows: UnitStat[]): UnitStat[] {
   const stats = new Map<number, UnitStat>();
-  for (let unit = 1; unit <= 10; unit++) stats.set(unit, { unitNumber: unit, total: 0, mastered: 0 });
+  for (let unit = 1; unit <= 10; unit++) stats.set(unit, { unitNumber: unit, total: 0, mastered: 0, level1: 0, level2: 0 });
   for (const r of rows) {
     if (stats.has(r.unitNumber)) stats.set(r.unitNumber, r);
   }

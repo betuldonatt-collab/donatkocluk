@@ -71,38 +71,53 @@ beforeEach(() => {
 });
 
 describe("submitVocabAnswer", () => {
-  it("starts a fresh streak at 1 on a correct answer with no prior progress", async () => {
+  it("the first correct answer counts at once: correct_count 0 -> 1, flagged as the word's first", async () => {
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
     const result = await submitVocabAnswer(WORD, true);
-    expect(result).toMatchObject({ ok: true, nextStreak: 1, isMastered: false });
+    expect(result).toMatchObject({ ok: true, nextCount: 1, firstCorrect: true, isMastered: false });
+    expect(state.upsertPayloads[0]).toMatchObject({ word_id: WORD, correct_count: 1, correct_streak: 1, is_mastered: false });
   });
 
-  it("extends an existing streak by one on a correct answer", async () => {
-    state.existingProgress = { correct_streak: 1 };
+  it("a later correct answer adds one more but is NOT the first again (the progress counter moves once per word)", async () => {
+    state.existingProgress = { correct_count: 1, correct_streak: 1 };
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
     const result = await submitVocabAnswer(WORD, true);
-    expect(result).toMatchObject({ ok: true, nextStreak: 2, isMastered: false });
+    expect(result).toMatchObject({ ok: true, nextCount: 2, firstCorrect: false, isMastered: false });
   });
 
-  it("flips isMastered exactly when the streak reaches WORD_MASTERY_STREAK (3)", async () => {
-    state.existingProgress = { correct_streak: 2 };
+  it("flips isMastered exactly when correct_count reaches 3 in total", async () => {
+    state.existingProgress = { correct_count: 2, correct_streak: 2 };
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
     const result = await submitVocabAnswer(WORD, true);
-    expect(result).toMatchObject({ ok: true, nextStreak: 3, isMastered: true });
+    expect(result).toMatchObject({ ok: true, nextCount: 3, isMastered: true });
+    expect(state.upsertPayloads[0]).toMatchObject({ correct_count: 3, is_mastered: true });
   });
 
-  it("resets the streak to 0 on an incorrect answer (including a Pas Geç skip), never mastered", async () => {
-    state.existingProgress = { correct_streak: 2 };
+  it("counts correct answers in total, not in a row: 2 correct, a miss earlier, then a correct one is mastered", async () => {
+    state.existingProgress = { correct_count: 2, correct_streak: 0 };
+    const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
+    expect(await submitVocabAnswer(WORD, true)).toMatchObject({ ok: true, nextCount: 3, isMastered: true });
+  });
+
+  it("an incorrect answer (including a Pas Geç skip) keeps correct_count and only resets the streak", async () => {
+    state.existingProgress = { correct_count: 2, correct_streak: 2 };
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
     const result = await submitVocabAnswer(WORD, false);
-    expect(result).toMatchObject({ ok: true, nextStreak: 0, isMastered: false });
+    expect(result).toMatchObject({ ok: true, nextCount: 2, firstCorrect: false, isMastered: false });
+    expect(state.upsertPayloads[0]).toMatchObject({ correct_count: 2, correct_streak: 0, is_mastered: false });
   });
 
-  it("upserts the same nextStreak it returns, so the dots and the saved row never disagree", async () => {
-    state.existingProgress = { correct_streak: 1 };
+  it("a miss on a word never answered correctly stays at 0 (no progress is invented)", async () => {
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
-    await submitVocabAnswer(WORD, true);
-    expect(state.upsertPayloads[0]).toMatchObject({ word_id: WORD, correct_streak: 2, is_mastered: false });
+    expect(await submitVocabAnswer(WORD, false)).toMatchObject({ ok: true, nextCount: 0, firstCorrect: false });
+  });
+
+  it("upserts the same nextCount it returns, so the dots and the saved row never disagree", async () => {
+    state.existingProgress = { correct_count: 1, correct_streak: 1 };
+    const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
+    const result = await submitVocabAnswer(WORD, true);
+    expect(state.upsertPayloads[0]).toMatchObject({ word_id: WORD, correct_count: 2, correct_streak: 2, is_mastered: false });
+    expect(result).toMatchObject({ nextCount: 2 });
   });
 
   it("returns a diagnosable error instead of throwing when the save fails", async () => {

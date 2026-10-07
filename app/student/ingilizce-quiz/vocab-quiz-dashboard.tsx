@@ -6,19 +6,20 @@ import { BookOpenCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
-import { pastelGreenForProgress } from "@/lib/progress-colors";
+import { applyCorrectToUnitStat, unitStarted, vocabUnitTitle, type UnitStat } from "@/lib/lgs-vocab";
+import { masteryTierColor, pastelGreenForProgress } from "@/lib/progress-colors";
 import { VocabQuizSession } from "./vocab-quiz-session";
 
 function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
-  const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+  // The counter is every word answered correctly at least once ("started"); the bar splits that into the three mastery tiers --
+  // deepest (3 or more correct answers) first, then medium (2), then light (1) -- so progress shows from the very first
+  // correct answer and visibly deepens as words are practiced.
+  const started = unitStarted(stat);
+  const pct = stat.total > 0 ? Math.round((started / stat.total) * 100) : 0;
+  const share = (n: number) => (stat.total > 0 ? (n / stat.total) * 100 : 0);
   const complete = stat.total > 0 && stat.mastered === stat.total;
-  // The fill "levels up" through soft green shades as mastered grows
-  // (pastelGreenForProgress, lib/lgs-vocab.ts) instead of one flat color at
-  // every percentage -- the completed card's own accent reuses the same
-  // deepest step as a tint, so it reads as the natural top of the same
-  // scale rather than a second, unrelated color.
-  const fillColor = pastelGreenForProgress(pct);
+  // The completed card's own accent reuses the deepest tier as a tint, so it reads as the natural top of the same scale.
+  const fillColor = pastelGreenForProgress(100);
   return (
     <Card
       className={cn(complete && "border-transparent")}
@@ -31,22 +32,34 @@ function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
       <CardContent className="space-y-6">
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between">
-            <span className="text-muted-foreground text-sm">Öğrenildi</span>
-            <span className="text-foreground text-lg font-semibold tabular-nums">
-              {stat.mastered}/{stat.total}
+            <span className="text-muted-foreground text-sm">İlerleme</span>
+            <span className="text-foreground text-lg font-semibold tabular-nums" title="En az bir kez doğru bilinen kelime sayısı">
+              {started}/{stat.total}
             </span>
           </div>
           <div
-            className="bg-secondary h-4 overflow-hidden rounded-full"
+            className="bg-secondary flex h-4 overflow-hidden rounded-full"
             role="progressbar"
             aria-valuenow={pct}
             aria-valuemin={0}
             aria-valuemax={100}
+            aria-label={`${stat.mastered} kelime pekişti, ${stat.level2} kelime 2 kez, ${stat.level1} kelime 1 kez doğru bilindi`}
           >
-            <div
-              className="h-full rounded-full transition-[width,background-color] duration-300"
-              style={{ width: `${pct}%`, backgroundColor: fillColor }}
-            />
+            <div className="h-full transition-[width] duration-300" style={{ width: `${share(stat.mastered)}%`, backgroundColor: masteryTierColor(3) }} />
+            <div className="h-full transition-[width] duration-300" style={{ width: `${share(stat.level2)}%`, backgroundColor: masteryTierColor(2) }} />
+            <div className="h-full transition-[width] duration-300" style={{ width: `${share(stat.level1)}%`, backgroundColor: masteryTierColor(1) }} />
+          </div>
+          <div className="text-muted-foreground flex items-center gap-3 text-xs">
+            {([
+              [1, "1 doğru"],
+              [2, "2 doğru"],
+              [3, "3+ doğru"],
+            ] as const).map(([level, label]) => (
+              <span key={level} className="flex items-center gap-1">
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: masteryTierColor(level) }} />
+                {label}
+              </span>
+            ))}
           </div>
         </div>
         <Button type="button" size="lg" className="w-full text-base" onClick={onStart} disabled={stat.total === 0}>
@@ -64,11 +77,10 @@ export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: Uni
   const [unitStats, setUnitStats] = useState(initialUnitStats);
   const [activeUnit, setActiveUnit] = useState<number | null>(null);
 
-  // Called whenever a word transitions to mastered during a session, so the
-  // dashboard's own counters are correct the moment the student exits back
-  // to it -- without needing a full server round-trip/page reload.
-  function handleWordMastered(unitNumber: number) {
-    setUnitStats((prev) => prev.map((s) => (s.unitNumber === unitNumber ? { ...s, mastered: s.mastered + 1 } : s)));
+  // Called after every correct answer during a session, so the dashboard's own counters (words started, the three tiers) are
+  // correct the moment the student exits back to it -- without needing a full server round-trip/page reload.
+  function handleWordCorrect(unitNumber: number, previousCount: number, nextCount: number) {
+    setUnitStats((prev) => prev.map((s) => (s.unitNumber === unitNumber ? applyCorrectToUnitStat(s, previousCount, nextCount) : s)));
   }
 
   if (activeUnit !== null) {
@@ -76,7 +88,7 @@ export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: Uni
       <VocabQuizSession
         unitNumber={activeUnit}
         onExit={() => setActiveUnit(null)}
-        onWordMastered={() => handleWordMastered(activeUnit)}
+        onWordCorrect={(previousCount, nextCount) => handleWordCorrect(activeUnit, previousCount, nextCount)}
       />
     );
   }

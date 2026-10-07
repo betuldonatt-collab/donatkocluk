@@ -54,6 +54,23 @@ export function pastelGreenForProgress(pct: number, alpha = 1): string {
 const STREAK_DOT_START = { saturation: 40, lightness: 72 };
 const STREAK_DOT_END = PASTEL_GREEN_STEPS[PASTEL_GREEN_STEPS.length - 1];
 
+// --- Mastery tiers (LGS vocab quiz) ------------------------------------------
+//
+// Three levels of one word's mastery -- 1 correct answer (light), 2 (medium), 3 or more (the deepest step, the same shade as a
+// fully-complete bar) -- each a clearly different green, still inside the pastel family. 0 correct answers has no shade.
+export type MasteryLevel = 0 | 1 | 2 | 3;
+
+const MASTERY_TIER_SHADES: Record<1 | 2 | 3, { saturation: number; lightness: number }> = {
+  1: STREAK_DOT_START, // light
+  2: { saturation: 42, lightness: 60 }, // medium
+  3: STREAK_DOT_END, // solid / max mastery
+};
+
+export function masteryTierColor(level: 1 | 2 | 3, alpha = 1): string {
+  const { saturation, lightness } = MASTERY_TIER_SHADES[level];
+  return `hsl(${PASTEL_GREEN_HUE} ${saturation}% ${lightness}% / ${alpha})`;
+}
+
 export function pastelGreenForStreakDot(dotIndex: number, totalDots: number): string {
   const t = totalDots <= 1 ? 1 : dotIndex / (totalDots - 1);
   const saturation = Math.round(STREAK_DOT_START.saturation + (STREAK_DOT_END.saturation - STREAK_DOT_START.saturation) * t);
