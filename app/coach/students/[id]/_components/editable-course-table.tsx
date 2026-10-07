@@ -24,7 +24,8 @@ import { collapsePipelineMapForRows, perTopicStepsFor, type PipelineBinding } fr
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
 import { isFlatRows, kaynakTakibiRows } from "@/lib/curriculum/rows";
-import { groupParentLayout, sumTopicStats } from "@/lib/curriculum/topic-groups";
+import { groupParentLayout, sumTopicStats, unitTotalTopicIds } from "@/lib/curriculum/topic-groups";
+import { UnitTotalLine } from "@/components/unit-total-line";
 import { TopicGroupParentRow } from "@/components/topic-group-parent-row";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { CourseTopicStats, ResourceProgressMap, ResourceRef, TopicStat } from "./kaynak-takibi-tab";
@@ -141,6 +142,8 @@ export function EditableCourseTable({
   const rows = kaynakTakibiRows(course);
   // A grouped unit (Problemler, Dalgalar, Trigonometri, ...) gets a parent row with the whole group's cumulative stats.
   const { parentBefore, unitSpan, hideRowStats } = groupParentLayout(course, rows);
+  // LGS Fen Bilimleri shows no master / parent row here: each unit's whole numbers sit under its vertical label instead.
+  const unitTotalIds = unitTotalTopicIds(course);
   const isMaarif = isMaarifCourseId(course.id);
   const maarifGrade = useMaarifGrade();
   // A flat Maarif TYT course (Türkçe) has no Ünite column.
@@ -292,8 +295,11 @@ export function EditableCourseTable({
                       {row.unitLabel === "-" ? (
                         "-"
                       ) : (
-                        <div className="flex h-full items-center justify-center py-2">
+                        <div className="flex h-full flex-col items-center justify-center gap-2 py-2">
                           <span className="[writing-mode:vertical-rl] rotate-180 font-medium">{row.unitLabel}</span>
+                          {unitTotalIds.has(row.unitLabel) && (
+                            <UnitTotalLine stat={sumTopicStats(topicStats.byTopic, unitTotalIds.get(row.unitLabel)!)} />
+                          )}
                         </div>
                       )}
                     </TableCell>
