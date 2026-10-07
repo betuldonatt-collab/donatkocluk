@@ -83,7 +83,7 @@ describe("lgsSelectionNodes", () => {
   });
 
   it("Din Kültürü: 5 main units are selectable, peygamber/sure items stay individually selectable", () => {
-    const course = nativeById("lgs-din-kulturu");
+    const course = courseById("lgs-din-kulturu");
     const nodes = lgsSelectionNodes(course);
     const groupLabels = nodes.filter((n) => n.readOnlyNames.length > 0).map((n) => n.label);
     expect(groupLabels).toEqual([
