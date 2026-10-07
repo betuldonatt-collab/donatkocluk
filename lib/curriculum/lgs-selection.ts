@@ -16,6 +16,8 @@
 // (assigned before this change) keeps landing on the same node with zero
 // migration.
 import { toTurkishTitleCase, type Course, type Topic } from "./index";
+import { isLgsMasterId } from "./lgs-masters";
+import { setLgsGroupsProvider, type TopicGroup } from "./topic-groups";
 
 // lgs.json's `unit` field is a mix of a bare "N. ÜNİTE" (Matematik, Din
 // Kültürü -- already short/fine either way) and a full ALL CAPS heading
@@ -109,6 +111,28 @@ const DIN_KULTURU_EXEMPT_TOPIC_IDS = new Set([
 //   - Din Kültürü: selectable = one of the 5 main units, EXCEPT the
 //     peygamber/sure items, which stay individually selectable.
 export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
+  // The unit masters ("1. Ünite (Genel)", lib/curriculum/lgs-masters.ts) are entries of their own: the rules below see
+  // the course as lgs.json defines it, and each master becomes the FIRST node of its unit.
+  const masters = course.units.filter((u) => u.topics.length === 1 && isLgsMasterId(u.topics[0].id));
+  if (masters.length === 0) return nativeSelectionNodes(course);
+  const native = nativeSelectionNodes({ ...course, units: course.units.filter((u) => !masters.includes(u)) });
+  const masterNodeByUnit = new Map(
+    masters.map((u) => [uniteLabel(u.unit), leaf(u.topics[0], uniteLabel(u.unit))] as const),
+  );
+  const nodes: LgsSelectionNode[] = [];
+  const placed = new Set<string>();
+  for (const node of native) {
+    const master = masterNodeByUnit.get(node.unitLabel);
+    if (master && !placed.has(node.unitLabel)) {
+      placed.add(node.unitLabel);
+      nodes.push(master);
+    }
+    nodes.push(node);
+  }
+  return nodes;
+}
+
+function nativeSelectionNodes(course: Course): LgsSelectionNode[] {
   switch (course.id) {
     case "lgs-matematik":
     case "lgs-fen-bilimleri":
@@ -144,6 +168,28 @@ export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
       });
   }
 }
+
+// The groups of the Ünite -> Konu picker (lib/curriculum/topic-groups.ts) of an LGS course: a unit with a master is
+// offered as that master, and its second step lists the unit's other selection NODES (never the raw Alt konu topics --
+// each node's id is a real topic id, see the header). `allTopicIds` is every raw topic the group's rows fold, so a
+// Kaynak Takibi parent row totals the same figures its rows show.
+function lgsTopicGroups(course: Course): TopicGroup[] {
+  const nodes = lgsSelectionNodes(course);
+  const groups: TopicGroup[] = [];
+  for (const master of nodes) {
+    if (!isLgsMasterId(master.id)) continue;
+    const members = nodes.filter((n) => n.unitLabel === master.unitLabel && n.id !== master.id);
+    groups.push({
+      unitLabel: master.unitLabel,
+      masterId: master.id,
+      members: members.map((n) => ({ id: n.id, name: n.label })),
+      allTopicIds: [master.id, ...members.flatMap((n) => n.memberTopicIds)],
+    });
+  }
+  return groups;
+}
+
+setLgsGroupsProvider(lgsTopicGroups);
 
 // Folds any real topic id (an old granular one from before this change, or
 // a node's own representative id) onto its selection node's id -- the one

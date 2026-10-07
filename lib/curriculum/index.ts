@@ -16,6 +16,7 @@ import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
+import { withLgsUnitMasters } from "./lgs-masters";
 import { stripKonuNumberPrefix } from "./topic-name";
 
 export type Topic = { id: string; name: string; frequency?: Record<string, number> };
@@ -41,10 +42,14 @@ export const TYT_COURSES: Course[] = tytJson as Course[];
 // collide with, or be mistaken for, a tyt-/ayt- course.
 // The sheet's Konu numbering ("1.1 Çarpanlar ve Katlar") is stripped here so
 // no screen shows it (see ./topic-name); the JSON keeps it for ordering.
-export const LGS_COURSES: Course[] = (lgsJson as Course[]).map((course) => ({
-  ...course,
-  units: course.units.map((u) => (u.konu === undefined ? u : { ...u, konu: stripKonuNumberPrefix(u.konu) })),
-}));
+// Matematik, Fen Bilimleri's 7. Ünite and Din Kültürü also get a "<Ünite> (Genel)" master per unit that offers a choice
+// (lib/curriculum/lgs-masters.ts) -- the first step of their Ünite -> Konu picker.
+export const LGS_COURSES: Course[] = (lgsJson as Course[])
+  .map((course) => ({
+    ...course,
+    units: course.units.map((u) => (u.konu === undefined ? u : { ...u, konu: stripKonuNumberPrefix(u.konu) })),
+  }))
+  .map(withLgsUnitMasters);
 
 export function isLgsCourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("lgs-");

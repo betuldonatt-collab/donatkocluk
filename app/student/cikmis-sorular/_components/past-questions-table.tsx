@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { isLgsCourseId, type Course, type Topic } from "@/lib/curriculum";
+import { withoutLgsMasters } from "@/lib/curriculum/lgs-masters";
 import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
 
 export const PAST_QUESTION_YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
@@ -126,7 +127,8 @@ type Row = {
 // and runs until the next one, and the shared spanning cell shows that
 // one number, exactly like YKS's explicitly-listed grouped units do.
 function flattenLgsRows(course: Course): Row[] {
-  const base = flattenCourseRows(course);
+  // The workbook's own structure: the unit masters of the Ünite -> Konu picker are not rows of the question history.
+  const base = flattenCourseRows(withoutLgsMasters(course));
   const rows: Row[] = base.map((r) => ({ ...r, group: null }));
 
   let start = 0;

@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { LGS_COURSES, toTurkishTitleCase } from "./index";
+import { withoutLgsMasters } from "./lgs-masters";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "./lgs-selection";
 
 function courseById(id: string) {
   const c = LGS_COURSES.find((c) => c.id === id);
   if (!c) throw new Error(`missing course ${id}`);
   return c;
+}
+
+// The course as lgs.json defines it, without the generated unit masters (lib/curriculum/lgs-masters.ts): the rollup rules
+// below are about the workbook's own structure.
+function nativeById(id: string) {
+  return withoutLgsMasters(courseById(id));
 }
 
 describe("lgsSelectionNodes", () => {
@@ -26,7 +33,7 @@ describe("lgsSelectionNodes", () => {
   });
 
   it("Fen Bilimleri: Ünite 1-6 roll up to the Ünite level, Ünite 7 keeps its Konu-level rollup", () => {
-    const course = courseById("lgs-fen-bilimleri");
+    const course = nativeById("lgs-fen-bilimleri");
     const nodes = lgsSelectionNodes(course);
 
     // Ünite 1 ("1. ÜNİTE: MEVSİMLER VE İKLİM" in the raw data, Title Cased
@@ -76,7 +83,7 @@ describe("lgsSelectionNodes", () => {
   });
 
   it("Din Kültürü: 5 main units are selectable, peygamber/sure items stay individually selectable", () => {
-    const course = courseById("lgs-din-kulturu");
+    const course = nativeById("lgs-din-kulturu");
     const nodes = lgsSelectionNodes(course);
     const groupLabels = nodes.filter((n) => n.readOnlyNames.length > 0).map((n) => n.label);
     expect(groupLabels).toEqual([
