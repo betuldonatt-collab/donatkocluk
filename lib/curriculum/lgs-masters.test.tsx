@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import { PastQuestionsTable } from "@/app/student/cikmis-sorular/_components/past-questions-table";
 import { TopicGroupSelect } from "@/components/topic-group-select";
+import { ExamTopicTable } from "@/app/student/deneme-analizleri/_components/exam-topic-table";
 import lgsJson from "./lgs.json";
 import { findTopicById, LGS_COURSES, toTurkishTitleCase, topicOptionsForCourse, type Course } from "./index";
 import { isLgsMasterId, lgsMasterUnitLabels, withLgsUnitMasters, withoutLgsMasters } from "./lgs-masters";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "./lgs-selection";
-import { flattenSelectionRows } from "./rows";
+import { flattenSelectionRows, withGroupHeadings } from "./rows";
 import { groupOfTopic, groupParentLayout, mainTopicOptions, mainValueOf, topicGroups } from "./topic-groups";
 import { allPipelineSteps, pipelineConfigFor, validatePipelineStep } from "../topic-pipeline";
 
@@ -219,5 +220,38 @@ describe("LGS Fen Bilimleri: Kaynak Takibi and Çıkmış Sorular", () => {
     for (const c of LGS_COURSES) {
       expect(renderToStaticMarkup(<PastQuestionsTable course={c} />), c.id).not.toContain("(Genel)");
     }
+  });
+});
+
+describe("LGS Fen Bilimleri: the Ünite is a header row above its Konu in the tables", () => {
+  it("withGroupHeadings: a header per Ünite (7), the Ünite cell spans header + rows; no header for any other LGS course", () => {
+    const items = withGroupHeadings(flattenSelectionRows(course(FEN)));
+    const headings = items.filter((i) => i.kind === "heading");
+    expect(headings.map((h) => h.label)).toEqual(fenUnitLabels());
+    // Ünite 1: header + master + 2 Konu = 4 rows under one Ünite cell
+    expect(items[0]).toMatchObject({ kind: "heading", label: "1. Ünite: Mevsimler ve İklim", unitRowSpan: 4 });
+    expect(items[1]).toMatchObject({ kind: "row", unitRowSpan: null });
+    expect(items.filter((i) => i.unitRowSpan !== null)).toHaveLength(7);
+    for (const id of FLAT_COURSES) {
+      expect(withGroupHeadings(flattenSelectionRows(course(id))).some((i) => i.kind === "heading"), id).toBe(false);
+    }
+  });
+
+  it("the student's and the coach's exam topic table put the header row above each Fen Ünite's Konu; Matematik is untouched", () => {
+    const headerCount = (html: string) => (html.match(/bg-muted\/60 text-xs font-semibold whitespace-normal/g) ?? []).length;
+    const fen = renderToStaticMarkup(<ExamTopicTable course={course(FEN)} exams={[]} mistakesByExam={{}} onOpenExam={() => {}} />);
+    expect(headerCount(fen)).toBe(7);
+    expect(fen).toContain("Mevsimlerin Oluşumu");
+    expect(headerCount(renderToStaticMarkup(<ExamTopicTable course={course("lgs-matematik")} exams={[]} mistakesByExam={{}} onOpenExam={() => {}} />))).toBe(0);
+  });
+
+  it("Çıkmış Sorular: a header row per Fen Ünite (spanning the unit's Konu) and no extra rows elsewhere", () => {
+    const headerRows = (html: string) => (html.match(/text-xs font-semibold whitespace-normal" colSpan="8"/g) ?? []).length;
+    const fen = renderToStaticMarkup(<PastQuestionsTable course={course(FEN)} />);
+    expect(headerRows(fen)).toBe(7);
+    // Ünite 1 (2 Konu): its vertical cell spans the header row + 2 Konu rows
+    expect(fen).toContain('rowSpan="3"');
+    expect(fen).toContain("1. Ünite: Mevsimler ve İklim");
+    for (const id of FLAT_COURSES) expect(headerRows(renderToStaticMarkup(<PastQuestionsTable course={course(id)} />)), id).toBe(0);
   });
 });

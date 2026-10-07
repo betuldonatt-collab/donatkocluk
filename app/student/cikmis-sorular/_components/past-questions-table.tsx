@@ -8,8 +8,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { isLgsCourseId, type Course, type Topic } from "@/lib/curriculum";
-import { withoutLgsMasters } from "@/lib/curriculum/lgs-masters";
+import { isLgsCourseId, toTurkishTitleCase, type Course, type Topic } from "@/lib/curriculum";
+import { lgsMasterUnitLabels, withoutLgsMasters } from "@/lib/curriculum/lgs-masters";
 import { courseHasKonu, flattenCourseRows } from "@/lib/curriculum/rows";
 
 export const PAST_QUESTION_YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
@@ -143,7 +143,21 @@ function flattenLgsRows(course: Course): Row[] {
     }
     start = i;
   }
-  return rows;
+  // A course whose units are parents (LGS Fen Bilimleri): each Ünite gets a header row above its Konu rows, and the Ünite cell
+  // spans the header too.
+  if (lgsMasterUnitLabels(course.id).length === 0) return rows;
+  return rows.flatMap((row): Row[] => {
+    if (row.unitRowSpan === null) return [row];
+    const label = toTurkishTitleCase(row.unitLabel);
+    const header: Row = {
+      topic: { id: `heading::${row.unitLabel}`, name: label },
+      unitLabel: row.unitLabel,
+      unitRowSpan: row.unitRowSpan + 1,
+      group: null,
+      heading: label,
+    };
+    return [header, { ...row, unitRowSpan: null }];
+  });
 }
 
 function isGroupedUnitName(course: Course, unitName: string): boolean {

@@ -88,6 +88,9 @@ export type SelectionRow = {
   // A Maarif TYT bucket's intermediate heading within its unit; undefined for
   // every other course. See withGroupHeadings.
   groupLabel?: string;
+  // LGS Fen Bilimleri: the unit is a parent -- tables show a header row with its label above its rows
+  // (withGroupHeadings), without the rows needing a group heading of their own.
+  unitHeader?: boolean;
   readOnlyNames: string[];
   memberTopicIds: string[];
 };
@@ -106,6 +109,7 @@ function rowsFromNodes(nodes: LgsSelectionNode[]): SelectionRow[] {
         unitLabel: node.unitLabel,
         unitRowSpan: idx === 0 ? block.length : null,
         ...(node.groupLabel !== undefined ? { groupLabel: node.groupLabel } : {}),
+        ...(node.unitHeader ? { unitHeader: true } : {}),
         readOnlyNames: node.readOnlyNames,
         memberTopicIds: node.memberTopicIds,
       });
@@ -139,16 +143,19 @@ export function withGroupHeadings(rows: SelectionRow[]): HeadedRow[] {
     let j = i + 1;
     while (j < rows.length && rows[j].unitRowSpan === null) j++;
     const block = rows.slice(i, j);
-    if (!block.some((r) => r.groupLabel !== undefined)) {
+    // The heading above a row: its intermediate group (Kimya), or -- for a unit that is a parent (LGS Fen) -- the unit itself.
+    const headingOf = (r: SelectionRow) => r.groupLabel ?? (r.unitHeader ? r.unitLabel : undefined);
+    if (!block.some((r) => headingOf(r) !== undefined)) {
       for (const row of block) out.push({ kind: "row", row, unitRowSpan: row.unitRowSpan });
     } else {
       const items: HeadedRow[] = [];
       let previous: string | undefined;
       block.forEach((row, idx) => {
-        if (row.groupLabel !== undefined && row.groupLabel !== previous) {
-          items.push({ kind: "heading", key: `${row.unitLabel}::${idx}::${row.groupLabel}`, label: row.groupLabel, unitLabel: row.unitLabel, unitRowSpan: null });
+        const heading = headingOf(row);
+        if (heading !== undefined && heading !== previous) {
+          items.push({ kind: "heading", key: `${row.unitLabel}::${idx}::${heading}`, label: heading, unitLabel: row.unitLabel, unitRowSpan: null });
         }
-        previous = row.groupLabel;
+        previous = heading;
         items.push({ kind: "row", row, unitRowSpan: null });
       });
       items[0].unitRowSpan = items.length;

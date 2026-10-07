@@ -16,7 +16,7 @@
 // (assigned before this change) keeps landing on the same node with zero
 // migration.
 import { toTurkishTitleCase, type Course, type Topic } from "./index";
-import { isLgsMasterId } from "./lgs-masters";
+import { isLgsMasterId, lgsMasterUnitLabels } from "./lgs-masters";
 import { setLgsGroupsProvider, type TopicGroup } from "./topic-groups";
 
 // lgs.json's `unit` field is a mix of a bare "N. ÜNİTE" (Matematik, Din
@@ -40,6 +40,9 @@ export type LgsSelectionNode = {
   unitLabel: string;
   // A Maarif TYT bucket's intermediate heading within its unit (Unit.group), if any.
   groupLabel?: string;
+  // The tables show this node's Ünite as a header row above its Konu rows (Fen Bilimleri: every unit is a parent with its
+  // Konu listed underneath). See withGroupHeadings in rows.ts.
+  unitHeader?: boolean;
   // Names of every topic this node rolls up, to show as read-only context
   // under `label`. Empty means this node IS a real, individually
   // selectable topic (no rollup happened for it) -- e.g. İngilizce, a Fen
@@ -113,6 +116,12 @@ const DIN_KULTURU_EXEMPT_TOPIC_IDS = new Set([
 //   - Din Kültürü: selectable = one of the 5 main units, EXCEPT the
 //     peygamber/sure items, which stay individually selectable.
 export function lgsSelectionNodes(course: Course): LgsSelectionNode[] {
+  const nodes = selectionNodesWithMasters(course);
+  // A course with unit masters (Fen Bilimleri) reads as Ünite -> Konu everywhere: its tables put each Ünite in a header row.
+  return lgsMasterUnitLabels(course.id).length > 0 ? nodes.map((n) => ({ ...n, unitHeader: true })) : nodes;
+}
+
+function selectionNodesWithMasters(course: Course): LgsSelectionNode[] {
   // The unit masters ("1. Ünite (Genel)", lib/curriculum/lgs-masters.ts) are entries of their own: the rules below see
   // the course as lgs.json defines it, and each master becomes the FIRST node of its unit.
   const masters = course.units.filter((u) => u.topics.length === 1 && isLgsMasterId(u.topics[0].id));
