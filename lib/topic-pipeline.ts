@@ -3,7 +3,7 @@ import { z } from "zod";
 import { MAARIF_GRADES, type MaarifGrade } from "./maarif-grade";
 import { AYT_COURSES_BY_TRACK, TYT_COURSES, findCourseById, isLgsCourseId, type Course } from "@/lib/curriculum";
 import { isMaarifTytMergedCourseId } from "@/lib/curriculum/maarif-tyt";
-import { flattenSelectionRows } from "@/lib/curriculum/rows";
+import { kaynakTakibiRows } from "@/lib/curriculum/rows";
 import type { ExamType } from "@/lib/exam-type";
 
 // The per-topic "learning pipeline" checkboxes on the Kaynak Takibi table.
@@ -154,7 +154,7 @@ export type PipelineSummary = {
 // using the SAME rollup function the table itself renders from, so the two
 // can never disagree on what counts as "one row" for any cohort.
 export function summarizePipeline(course: Course, map: PipelineMap, config: PipelineConfig): PipelineSummary {
-  const rows = flattenSelectionRows(course);
+  const rows = kaynakTakibiRows(course);
   const steps = allPipelineSteps(config);
   const perStep: Partial<Record<PipelineStepKey, number>> = {};
   for (const step of steps) perStep[step.key] = 0;

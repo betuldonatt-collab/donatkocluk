@@ -35,7 +35,7 @@ import {
 import { collapsePipelineMapForRows, perTopicStepsFor, type PipelineBinding } from "@/lib/topic-pipeline";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { isMaarifCourseId, type Course } from "@/lib/curriculum";
-import { flattenSelectionRows, isFlatRows } from "@/lib/curriculum/rows";
+import { isFlatRows, kaynakTakibiRows } from "@/lib/curriculum/rows";
 import { groupParentLayout, sumTopicStats } from "@/lib/curriculum/topic-groups";
 import { TopicGroupParentRow } from "@/components/topic-group-parent-row";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
@@ -124,7 +124,7 @@ export function CourseTable({
   // Konu/Ünite level here (see lib/curriculum/lgs-selection.ts), so this is
   // never one row per raw Alt Konu/topic for those courses; everything
   // else (YKS, Maarif) renders exactly as many rows as it always did.
-  const rows = flattenSelectionRows(course);
+  const rows = kaynakTakibiRows(course);
   // A grouped unit (Problemler, Dalgalar, Trigonometri, ...) gets a parent row with the whole group's cumulative stats.
   const { parentBefore, unitSpan, hideRowStats } = groupParentLayout(course, rows);
   const isMaarif = isMaarifCourseId(course.id);

@@ -5,12 +5,13 @@ import { PastQuestionsTable } from "@/app/student/cikmis-sorular/_components/pas
 import { TopicGroupSelect } from "@/components/topic-group-select";
 import { ExamTopicTable } from "@/app/student/deneme-analizleri/_components/exam-topic-table";
 import lgsJson from "./lgs.json";
-import { findTopicById, LGS_COURSES, toTurkishTitleCase, topicOptionsForCourse, type Course } from "./index";
+import { findCourseById, findTopicById, LGS_COURSES, toTurkishTitleCase, topicOptionsForCourse, type Course } from "./index";
 import { isLgsMasterId, lgsMasterUnitLabels, withLgsUnitMasters, withoutLgsMasters } from "./lgs-masters";
 import { lgsNodeIdForTopicId, lgsSelectionNodes } from "./lgs-selection";
-import { flattenSelectionRows, withGroupHeadings } from "./rows";
+import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
+import { flattenSelectionRows, kaynakTakibiRows, withGroupHeadings } from "./rows";
 import { groupOfTopic, groupParentLayout, mainTopicOptions, mainValueOf, topicGroups } from "./topic-groups";
-import { allPipelineSteps, pipelineConfigFor, validatePipelineStep } from "../topic-pipeline";
+import { allPipelineSteps, pipelineConfigFor, summarizePipeline, validatePipelineStep } from "../topic-pipeline";
 
 const FEN = "lgs-fen-bilimleri";
 const masterId = (n: number) => `lgs-fen-bilimleri-genel-u${n}`;
@@ -253,5 +254,48 @@ describe("LGS Fen Bilimleri: the Ünite is a header row above its Konu in the ta
     expect(fen).toContain('rowSpan="3"');
     expect(fen).toContain("1. Ünite: Mevsimler ve İklim");
     for (const id of FLAT_COURSES) expect(headerRows(renderToStaticMarkup(<PastQuestionsTable course={course(id)} />)), id).toBe(0);
+  });
+});
+
+describe("LGS Fen Bilimleri: Kaynak Takibi shows only the Konu next to the vertical Ünite label", () => {
+  it("no '(Genel)' row and no parent row: exactly the Konu rows, the Ünite cell on the first of them", () => {
+    const fen = course(FEN);
+    const rows = kaynakTakibiRows(fen);
+    const native = flattenSelectionRows(withoutLgsMasters(fen));
+    // identical to the course as it was before any master existed -- ids, labels, spans
+    expect(rows).toEqual(native.map((r) => ({ ...r, unitHeader: true })));
+    expect(rows.some((r) => isLgsMasterId(r.id) || r.label.includes("(Genel)"))).toBe(false);
+    expect(groupParentLayout(fen, rows).parentBefore.size).toBe(0);
+    // Ünite 1: two Konu under one Ünite cell
+    expect(rows[0]).toMatchObject({ label: "Mevsimlerin Oluşumu", unitLabel: "1. Ünite: Mevsimler ve İklim", unitRowSpan: 2 });
+    expect(rows[1]).toMatchObject({ label: "İklim ve Hava Hareketleri", unitRowSpan: null });
+    // Ünite 2: five Konu
+    expect(rows[2]).toMatchObject({ label: "DNA ve Genetik Kod", unitRowSpan: 5 });
+    // every unit's span adds up to its rows
+    let i = 0;
+    while (i < rows.length) {
+      const span = rows[i].unitRowSpan!;
+      expect(rows.slice(i + 1, i + span).every((r) => r.unitRowSpan === null)).toBe(true);
+      i += span;
+    }
+    expect(i).toBe(rows.length);
+  });
+
+  it("the progress summary counts what is on screen (30 Konu rows, no masters)", () => {
+    const summary = summarizePipeline(course(FEN), {}, pipelineConfigFor("LGS", null));
+    expect(summary.totalTopics).toBe(30);
+  });
+
+  it("only Fen changes: every other course keeps exactly its selection rows (other levels keep their parent rows)", () => {
+    for (const id of FLAT_COURSES) expect(kaynakTakibiRows(course(id)), id).toEqual(flattenSelectionRows(course(id)));
+    const tytFizik = findCourseById("tyt-fizik")!;
+    expect(kaynakTakibiRows(tytFizik)).toEqual(flattenSelectionRows(tytFizik));
+    expect(groupParentLayout(tytFizik, kaynakTakibiRows(tytFizik)).parentBefore.size).toBeGreaterThan(0);
+    const maarif = MAARIF_TYT_MERGED_COURSES[0];
+    expect(kaynakTakibiRows(maarif)).toEqual(flattenSelectionRows(maarif));
+  });
+
+  it("the exam tables keep their Ünite header rows (only Kaynak Takibi was cleaned up)", () => {
+    expect(flattenSelectionRows(course(FEN)).some((r) => isLgsMasterId(r.id))).toBe(true);
   });
 });

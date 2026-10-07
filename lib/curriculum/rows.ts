@@ -7,6 +7,7 @@
 // YKS courses have no `konu` level, and come out exactly as before: every
 // unit entry is its own span, "-" (ungrouped) topics are single-row units.
 import { isLgsCourseId, isMaarifCourseId, type Course, type Topic } from "./index";
+import { isLgsMasterId } from "./lgs-masters";
 import { lgsSelectionNodes, type LgsSelectionNode } from "./lgs-selection";
 import { maarifSelectionNodes } from "./maarif-selection";
 
@@ -162,6 +163,26 @@ export function withGroupHeadings(rows: SelectionRow[]): HeadedRow[] {
       out.push(...items);
     }
     i = j;
+  }
+  return out;
+}
+
+// The rows of Kaynak Takibi: the selection rows without the LGS unit masters ("3. Ünite: Basınç (Genel)"). Fen Bilimleri shows
+// only its Konu there, next to the vertical Ünite label -- no "(Genel)" row, and with it no parent row (a parent row needs its
+// master row). The unit cell, which sat on the master (the unit's first row), passes to the first Konu row. Every other
+// course comes back unchanged.
+export function kaynakTakibiRows(course: Course): SelectionRow[] {
+  const rows = flattenSelectionRows(course);
+  if (!isLgsCourseId(course.id) || !rows.some((r) => isLgsMasterId(r.id))) return rows;
+  const out: SelectionRow[] = [];
+  let carriedSpan: number | null = null;
+  for (const row of rows) {
+    if (isLgsMasterId(row.id)) {
+      carriedSpan = row.unitRowSpan === null ? null : row.unitRowSpan - 1;
+      continue;
+    }
+    out.push(carriedSpan !== null ? { ...row, unitRowSpan: carriedSpan } : row);
+    carriedSpan = null;
   }
   return out;
 }
