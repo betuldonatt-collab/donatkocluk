@@ -11,8 +11,8 @@
 --
 -- WHAT MOVES (course_id = 'lgs-fen-bilimleri', topic_id lgs-fen-bilimleri-u<n>-t0 -> lgs-fen-bilimleri-genel-u<n>, n = 0..5):
 --   student_tasks, student_task_topic_mistakes, student_task_topic_breakdown, student_resource_progress,
---   lgs_topic_pipeline_status, coach_task_templates; student_topic_stats (the derived cache) is recomputed for every bucket
---   involved.
+--   lgs_topic_pipeline_status; student_topic_stats (the derived cache) is recomputed for every bucket involved.
+--   (coach_task_templates is NOT part of it: migration 0043 dropped that table.)
 -- WHAT DOES NOT MOVE: Ünite 7 (its entries did not change); any other topic id of Ünite 1-6 (a record saved under, say,
 --   "lgs-fen-bilimleri-u2-t1" names that Konu exactly and now shows under it); every other course; archived Karne snapshots
 --   (student_report_cards.topic_mistakes is a snapshot by design).
@@ -50,7 +50,6 @@ declare
   v_progress_merged int := 0;
   v_pipeline_moved int := 0;
   v_pipeline_merged int := 0;
-  v_templates int := 0;
   v_left_newer int := 0;
   v_before record;
   v_after record;
@@ -98,11 +97,6 @@ begin
     from public.lgs_topic_pipeline_status p join m0129_map m on m.old_id = p.topic_id
     where p.course_id = 'lgs-fen-bilimleri' and p.updated_at < (select cutoff from m0129_params);
 
-  create temporary table m0129_templates on commit drop as
-    select c.id, m.new_id
-    from public.coach_task_templates c join m0129_map m on m.old_id = c.topic_id
-    where c.course_id = 'lgs-fen-bilimleri' and c.created_at < (select cutoff from m0129_params);
-
   -- Backups of exactly the rows about to change.
   create schema if not exists migration_backups;
   create table if not exists migration_backups.m0129_student_tasks as
@@ -115,8 +109,6 @@ begin
     select p.* from public.student_resource_progress p where p.id in (select id from m0129_progress);
   create table if not exists migration_backups.m0129_pipeline as
     select p.* from public.lgs_topic_pipeline_status p where p.id in (select id from m0129_pipeline);
-  create table if not exists migration_backups.m0129_templates as
-    select c.* from public.coach_task_templates c where c.id in (select id from m0129_templates);
   create table if not exists migration_backups.m0129_topic_stats as
     select s.* from public.student_topic_stats s
     where s.course_id = 'lgs-fen-bilimleri'
@@ -201,11 +193,7 @@ begin
   update public.lgs_topic_pipeline_status p set topic_id = x.new_id from m0129_pipeline x where p.id = x.id;
   get diagnostics v_pipeline_moved = row_count;
 
-  -- 6. The coach's quick-add templates.
-  update public.coach_task_templates c set topic_id = x.new_id from m0129_templates x where c.id = x.id;
-  get diagnostics v_templates = row_count;
-
-  -- 7. student_topic_stats is a derived cache (written by recompute_student_topic_stats, never by a trigger): rebuild every
+  -- 6. student_topic_stats is a derived cache (written by recompute_student_topic_stats, never by a trigger): rebuild every
   --    bucket involved with the same rule that function uses -- done / half_done, coach-assigned or approved.
   insert into public.student_topic_stats (student_id, course_id, topic_id, total_count, correct_count, wrong_count, empty_count)
   select b.student_id, b.course_id, b.topic_id,
@@ -226,7 +214,7 @@ begin
     total_count = excluded.total_count, correct_count = excluded.correct_count,
     wrong_count = excluded.wrong_count, empty_count = excluded.empty_count, updated_at = now();
 
-  -- 8. Checks. Any failure raises -> the whole block rolls back.
+  -- 7. Checks. Any failure raises -> the whole block rolls back.
   for v_before in select * from m0129_before loop
     select coalesce(sum(total_count), 0) as total, coalesce(sum(correct_count), 0) as correct,
            coalesce(sum(wrong_count), 0) as wrong, coalesce(sum(empty_count), 0) as empty
@@ -252,8 +240,6 @@ begin
        where p.course_id = 'lgs-fen-bilimleri' and p.updated_at < (select cutoff from m0129_params))
     + (select count(*) from public.lgs_topic_pipeline_status p join m0129_map m on m.old_id = p.topic_id
        where p.course_id = 'lgs-fen-bilimleri' and p.updated_at < (select cutoff from m0129_params))
-    + (select count(*) from public.coach_task_templates c join m0129_map m on m.old_id = c.topic_id
-       where c.course_id = 'lgs-fen-bilimleri' and c.created_at < (select cutoff from m0129_params))
   into v_leftover;
   if v_leftover <> 0 then
     raise exception '% pre-cutoff records are still on an old id -- rolled back', v_leftover;
@@ -266,12 +252,11 @@ begin
     + (select count(*) from public.student_task_topic_breakdown b join m0129_map m on m.old_id = b.topic_id where b.course_id = 'lgs-fen-bilimleri')
     + (select count(*) from public.student_resource_progress p join m0129_map m on m.old_id = p.topic_id where p.course_id = 'lgs-fen-bilimleri')
     + (select count(*) from public.lgs_topic_pipeline_status p join m0129_map m on m.old_id = p.topic_id where p.course_id = 'lgs-fen-bilimleri')
-    + (select count(*) from public.coach_task_templates c join m0129_map m on m.old_id = c.topic_id where c.course_id = 'lgs-fen-bilimleri')
   into v_left_newer;
 
-  raise notice 'm0129 done. student_tasks moved: %; mistakes moved % (merged into existing master marks: %); breakdown moved % (merged %); resource progress moved % (merged %); pipeline moved % (merged %); templates moved %; newer records left on the first Konu: %',
+  raise notice 'm0129 done. student_tasks moved: %; mistakes moved % (merged into existing master marks: %); breakdown moved % (merged %); resource progress moved % (merged %); pipeline moved % (merged %); newer records left on the first Konu: %',
     v_tasks, v_mistakes_moved, v_mistakes_merged, v_breakdown_moved, v_breakdown_merged,
-    v_progress_moved, v_progress_merged, v_pipeline_moved, v_pipeline_merged, v_templates, v_left_newer;
+    v_progress_moved, v_progress_merged, v_pipeline_moved, v_pipeline_merged, v_left_newer;
 end
 $mig$;
 
@@ -299,6 +284,6 @@ order by m.old_id;
 --   insert into public.student_task_topic_mistakes select * from migration_backups.m0129_mistakes b
 --     where not exists (select 1 from public.student_task_topic_mistakes k where k.id = b.id);   -- rows removed by a merge
 --   (same two statements, per table, for m0129_breakdown / m0129_resource_progress / m0129_pipeline -- then restore the merged-into
---    master rows' counts/ticks from your own knowledge or drop the merged increments -- and m0129_templates)
+--    master rows' counts/ticks from your own knowledge or drop the merged increments)
 --   then rebuild student_topic_stats from migration_backups.m0129_topic_stats (or run scripts/backfill-student-topic-stats.mjs).
 --   When you are happy: drop schema migration_backups cascade;
