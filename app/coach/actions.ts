@@ -7,6 +7,7 @@ import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
 import { isValidISODateOnly } from "@/lib/chart-range";
+import { canConfirmMeeting } from "@/lib/meeting-window";
 import { countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED } from "@/lib/exam-results-validation";
 import { normalizeLgsScores } from "@/lib/lgs-exam";
@@ -138,6 +139,12 @@ function addDaysISO(dateStr: string, days: number) {
 
 // --- Session evaluation (post-meeting CRM) -----------------------------
 
+// "Görüşme gerçekleşti mi?" opens only after the meeting's start + 30 minutes (lib/meeting-window.ts) -- the banner hides it
+// until then, and the server refuses it too, so an early request cannot slip through.
+function assertMeetingCanBeEvaluated(scheduledAt: string) {
+  if (!canConfirmMeeting(scheduledAt, new Date())) throw new Error("Görüşme başladıktan 30 dakika sonra değerlendirilebilir.");
+}
+
 // "Görüşme Gerçekleşti": records the note, then runs both automations.
 // Automation 1 always fires (one "Ara Görüşme" 3 days out). Automation 2
 // fires on every 4th completed session for this student (4, 8, 12, ...).
@@ -169,6 +176,7 @@ export async function evaluateSessionCompleted(sessionId: string, notes: string)
     .eq("id", sessionIdV)
     .single();
   if (fetchError) throw dbError(fetchError);
+  assertMeetingCanBeEvaluated(existing.scheduled_at);
 
   // Mirrored into coach_notes (type='main_session') so this evaluation
   // shows up in the unified student-detail timeline alongside manually
@@ -266,6 +274,13 @@ export async function evaluateSessionMissed(
   const reasonTypeV = parseInput(missedReasonSchema, reasonType);
   const reasonNoteV = parseInput(z.string().trim().max(1000).nullable(), reasonNote);
   const supabase = await createClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("coaching_sessions")
+    .select("scheduled_at")
+    .eq("id", sessionIdV)
+    .single();
+  if (fetchError) throw dbError(fetchError);
+  assertMeetingCanBeEvaluated(existing.scheduled_at);
   const { data, error } = await supabase
     .from("coaching_sessions")
     .update({

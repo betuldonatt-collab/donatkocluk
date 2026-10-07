@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Calendar, Video } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { meetingJoinState } from "@/lib/meeting-window";
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "Şimdi";
@@ -18,7 +19,8 @@ function formatCountdown(ms: number) {
 }
 
 // Full-width banner at the top of Ana Sayfa — the join button stays
-// disabled until the exact scheduled_at instant, no early lead window.
+// disabled until the exact scheduled_at instant (no early lead window), is live for exactly 10 minutes from
+// then, and is gone afterwards (lib/meeting-window.ts).
 export function NextSessionCard({
   scheduledAt,
   meetingUrl,
@@ -46,7 +48,8 @@ export function NextSessionCard({
 
   const target = new Date(scheduledAt).getTime();
   const diff = target - now;
-  const canJoin = diff <= 0 && !!meetingUrl;
+  const joinState = meetingJoinState(scheduledAt, now);
+  const canJoin = joinState === "open" && !!meetingUrl;
 
   const formattedDate = new Date(scheduledAt).toLocaleString("tr-TR", {
     weekday: "long",
@@ -67,14 +70,18 @@ export function NextSessionCard({
             Yaklaşan Koçluk Seansı
           </p>
           <p className="text-foreground text-sm font-medium">{formattedDate}</p>
-          <p className="text-foreground text-lg font-semibold tabular-nums">{formatCountdown(diff)}</p>
+          <p className="text-foreground text-lg font-semibold tabular-nums">
+            {joinState === "closed" ? "Görüşme başladı" : formatCountdown(diff)}
+          </p>
         </div>
       </div>
 
       {/* Right-aligned to match the Coach panel's own "Sıradaki Görüşme"
           banner: date/time (and here, the countdown) on the left, the join
           action as the sole element on the right. */}
-      {canJoin ? (
+      {joinState === "closed" ? (
+        <p className="text-muted-foreground shrink-0 text-xs sm:ml-auto">Katılım süresi doldu.</p>
+      ) : canJoin ? (
         <Button asChild className="shrink-0 sm:ml-auto">
           <a href={meetingUrl!} target="_blank" rel="noopener noreferrer">
             <Video className="size-4" />

@@ -16,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { canConfirmMeeting, confirmOpensAt, meetingJoinState } from "@/lib/meeting-window";
 import { evaluateSessionCompleted, evaluateSessionMissed } from "../../actions";
 import { MISSED_REASON_LABELS, type CoachingSession, type CoachTask, type MissedReason, type RosterStudent } from "../types";
 
@@ -32,8 +33,9 @@ export function MeetingBanner({
   const [happenedOpen, setHappenedOpen] = useState(false);
   const [missedOpen, setMissedOpen] = useState(false);
 
+  // Every second: the join button goes live at the exact start minute and the evaluation opens right after the 30th.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -48,7 +50,10 @@ export function MeetingBanner({
 
   const student = roster.find((s) => s.id === session.student_id);
   const studentName = student?.full_name ?? "Öğrenci";
-  const isPast = new Date(session.scheduled_at).getTime() <= now;
+  // Görüşmeye Katıl: live from the scheduled start for 10 minutes. Görüşme gerçekleşti mi?: only after start + 30 minutes
+  // (lib/meeting-window.ts).
+  const joinState = meetingJoinState(session.scheduled_at, now);
+  const canEvaluate = canConfirmMeeting(session.scheduled_at, now);
 
   const formattedDate = new Date(session.scheduled_at).toLocaleString("tr-TR", {
     weekday: "long",
@@ -58,7 +63,7 @@ export function MeetingBanner({
     minute: "2-digit",
   });
 
-  if (!isPast) {
+  if (!canEvaluate) {
     return (
       // A plain div, not a Link, now that there are two separate actions in
       // here (go to the student's page, or join the meeting) -- an anchor
@@ -73,14 +78,23 @@ export function MeetingBanner({
             <Calendar className="text-primary size-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Sıradaki Görüşme</p>
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              {joinState === "before" ? "Sıradaki Görüşme" : "Görüşme Başladı"}
+            </p>
             <p className="text-foreground truncate text-sm font-medium">
               {studentName} — {formattedDate}
             </p>
           </div>
         </Link>
 
-        {session.meeting_url ? (
+        {joinState === "closed" ? (
+          // The 10-minute join window has passed: no button any more, and the evaluation is not open yet.
+          <p className="text-muted-foreground shrink-0 text-xs sm:ml-auto">
+            Katılım süresi doldu · Değerlendirme saat{" "}
+            {confirmOpensAt(session.scheduled_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} sonrasında
+            açılır.
+          </p>
+        ) : joinState === "open" && session.meeting_url ? (
           <Button asChild className="shrink-0 sm:ml-auto">
             <a href={session.meeting_url} target="_blank" rel="noopener noreferrer">
               <Video className="size-4" />
@@ -88,6 +102,7 @@ export function MeetingBanner({
             </a>
           </Button>
         ) : (
+          // Before the start (or with no link): visible but not active.
           <Button disabled className="shrink-0 sm:ml-auto">
             <Video className="size-4" />
             Görüşmeye Katıl
