@@ -129,11 +129,17 @@ export type QuizDirection = "en_to_tr" | "tr_to_en";
 // a compound word's hyphen ("well-known", "x-ray") is easy to drop by
 // accident, and the source data itself sometimes carries one, so stripping
 // it on BOTH sides means a student typing it either way always matches.
+// An ampersand and the word "and" are the same thing: "&" (with or without spaces around it) and a standalone "and" both
+// become " and ", on both sides, so "Black & White", "Black and White" and "black&white" all match each other -- whichever
+// of them the database or the student happens to use. Runs of whitespace collapse to one space.
 function normalizeForDirection(s: string, direction: QuizDirection): string {
   return s
     .trim()
     .toLocaleLowerCase(direction === "tr_to_en" ? "en-US" : "tr-TR")
-    .replace(/-/g, "");
+    .replace(/-/g, "")
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // Some lgs_words rows record more than one acceptable meaning for the same

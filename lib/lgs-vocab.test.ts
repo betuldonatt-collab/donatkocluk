@@ -111,6 +111,39 @@ describe("checkVocabAnswer", () => {
   });
 });
 
+describe("checkVocabAnswer: '&' and 'and' are the same", () => {
+  it("'Black & White' in the database accepts 'black and white' and the ampersand version, in either direction of the pair", () => {
+    expect(checkVocabAnswer("black and white", "Black & White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("Black & White", "Black & White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("black&white", "Black & White", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+
+  it("'Black and White' in the database accepts the ampersand version too", () => {
+    expect(checkVocabAnswer("black & white", "Black and White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("BLACK AND WHITE", "Black and White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("black&white", "Black and White", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+
+  it("works with extra spaces, and inside a slash-separated list of meanings", () => {
+    expect(checkVocabAnswer("  black   and   white ", "Black & White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("salt and pepper", "tuz ve biber / Salt & Pepper", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+
+  it("applies on the Turkish side too (an ampersand in a Turkish meaning)", () => {
+    expect(checkVocabAnswer("anne & baba", "Anne & Baba", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("anne and baba", "Anne & Baba", "en_to_tr")).toBe("EXACT_MATCH");
+  });
+
+  it("still does not accept a genuinely different answer, and the typo rule still applies after normalising", () => {
+    expect(checkVocabAnswer("black or white", "Black & White", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("black white", "Black & White", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("black and whitee", "Black & White", "tr_to_en")).toBe("ACCEPTED_TYPO");
+    // 'and' inside another word is not touched
+    expect(checkVocabAnswer("sandwich", "sandwich", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("sandwich", "sand & wich", "tr_to_en")).toBe("INCORRECT");
+  });
+});
+
 describe("selectQuizBatch", () => {
   const words = [
     { id: "w1", english_word: "apple", turkish_meaning: "elma" },
