@@ -1066,11 +1066,12 @@ export type DailyStopwatchRanking = {
 // Kronometre Yarışması widget -- calls the get_daily_stopwatch_ranking()
 // security-definer function (migration 0054, extended in 0079 for the
 // yesterday_winner_* columns) rather than querying student_tasks/profiles
-// directly, since RLS has no student-to-student read policy at all. The
-// function itself resolves the caller's own coach and returns only these
-// scalars (never a per-student list), so there's nothing further to
-// restrict here -- a student with no coach gets participantCount: 0 and
-// every other field null, not an error.
+// directly, since RLS has no student-to-student read policy at all. Since
+// migration 0131 the function ranks the caller against every active student
+// of the same group (matched by group name) whichever coach they belong to;
+// it returns only these scalars (never a per-student list), so there's
+// nothing further to restrict here -- a student with no coach gets
+// participantCount: 0 and every other field null, not an error.
 export async function getDailyStopwatchRanking(): Promise<DailyStopwatchRanking> {
   const supabase = await createClient();
   await requireUser(supabase);
