@@ -256,7 +256,60 @@ export function fillUnitStats(rows: UnitStat[]): UnitStat[] {
   const stats = new Map<number, UnitStat>();
   for (let unit = 1; unit <= 10; unit++) stats.set(unit, { unitNumber: unit, total: 0, mastered: 0, level1: 0, level2: 0 });
   for (const r of rows) {
-    if (stats.has(r.unitNumber)) stats.set(r.unitNumber, r);
+    // Every number is coerced: a count that is missing, null or not a number (an RPC row that does not carry it) becomes 0
+    // instead of poisoning the sums ("NaN/217") and the bar widths.
+    if (stats.has(r.unitNumber)) {
+      stats.set(r.unitNumber, {
+        unitNumber: r.unitNumber,
+        total: finiteCount(r.total),
+        mastered: finiteCount(r.mastered),
+        level1: finiteCount(r.level1),
+        level2: finiteCount(r.level2),
+      });
+    }
   }
   return [...stats.values()];
+}
+
+function finiteCount(n: unknown): number {
+  const v = Number(n);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+// The dashboard's per-unit numbers. `totals` is what get_lgs_vocab_unit_stats returns (one row per unit with words: its word
+// count, and -- from migration 0130 -- the tier counts). `progress` is the student's own student_word_progress rows with their
+// unit; when it is available the three tiers are counted from those rows (the single source of truth: 1 correct answer, 2, 3 or
+// more), so the dashboard never depends on the RPC's extra columns being present. Without it (that read failed) the RPC's own
+// tier counts are used, coerced to numbers.
+export function buildUnitStats(
+  totals: { unit_number: number; total: number; mastered?: number | null; level1?: number | null; level2?: number | null }[],
+  progress: { unit_number: number; correct_count: number }[] | null,
+): UnitStat[] {
+  const tiers = new Map<number, { mastered: number; level1: number; level2: number }>();
+  for (const p of progress ?? []) {
+    const t = tiers.get(p.unit_number) ?? { mastered: 0, level1: 0, level2: 0 };
+    const level = masteryLevel(finiteCount(p.correct_count));
+    if (level === 3) t.mastered += 1;
+    else if (level === 2) t.level2 += 1;
+    else if (level === 1) t.level1 += 1;
+    tiers.set(p.unit_number, t);
+  }
+  return fillUnitStats(
+    totals.map((r) => {
+      const own = progress ? (tiers.get(r.unit_number) ?? { mastered: 0, level1: 0, level2: 0 }) : null;
+      return {
+        unitNumber: r.unit_number,
+        total: r.total,
+        mastered: own ? own.mastered : (r.mastered ?? 0),
+        level1: own ? own.level1 : (r.level1 ?? 0),
+        level2: own ? own.level2 : (r.level2 ?? 0),
+      };
+    }),
+  );
+}
+
+// A finished session in numbers: how many DIFFERENT words were presented and how many answers it took (a missed word is asked
+// again, so attempts can exceed the words -- "17 attempts for 10 words", never "17 out of 10").
+export function summarizeSession(queue: readonly { id: string }[], attempts: number): { uniqueWords: number; attempts: number } {
+  return { uniqueWords: new Set(queue.map((w) => w.id)).size, attempts };
 }

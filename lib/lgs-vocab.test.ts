@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyCorrectToUnitStat,
+  buildUnitStats,
   checkVocabAnswer,
   fillUnitStats,
   levenshteinDistance,
@@ -10,6 +11,7 @@ import {
   requeueAfterMiss,
   selectQuizBatch,
   shuffled,
+  summarizeSession,
   unitStarted,
   vocabUnitTitle,
   WORD_MASTERY_COUNT,
@@ -321,5 +323,60 @@ describe("vocabUnitTitle", () => {
 describe("WORD_MASTERY_COUNT", () => {
   it("is 3, matching the quiz's own 'answer it right 3 times' rule (in total, not in a row)", () => {
     expect(WORD_MASTERY_COUNT).toBe(3);
+  });
+});
+
+describe("fillUnitStats: never NaN", () => {
+  it("a row that lacks (or garbles) the tier counts becomes zeros, so started and the bar widths stay numbers", () => {
+    const [unit1] = fillUnitStats([
+      { unitNumber: 1, total: 217, mastered: 12, level1: undefined as unknown as number, level2: null as unknown as number },
+    ]);
+    expect(unit1).toEqual({ unitNumber: 1, total: 217, mastered: 12, level1: 0, level2: 0 });
+    expect(unitStarted(unit1)).toBe(12);
+    expect(Number.isNaN(unitStarted(fillUnitStats([{ unitNumber: 2, total: 5 } as unknown as UnitStat])[1]))).toBe(false);
+  });
+});
+
+describe("buildUnitStats", () => {
+  const totals = [
+    { unit_number: 1, total: 217 }, // an RPC row WITHOUT mastered / level columns at all
+    { unit_number: 2, total: 40, mastered: 7, level1: 3, level2: 2 },
+  ];
+
+  it("counts the three tiers from the student's own progress rows (1 correct, 2, 3 or more), whatever the RPC carried", () => {
+    const progress = [
+      { unit_number: 1, correct_count: 1 },
+      { unit_number: 1, correct_count: 1 },
+      { unit_number: 1, correct_count: 2 },
+      { unit_number: 1, correct_count: 3 },
+      { unit_number: 1, correct_count: 9 },
+      { unit_number: 2, correct_count: 2 },
+      { unit_number: 1, correct_count: 0 }, // never answered correctly: not started
+    ];
+    const [u1, u2] = buildUnitStats(totals, progress);
+    expect(u1).toEqual({ unitNumber: 1, total: 217, level1: 2, level2: 1, mastered: 2 });
+    expect(unitStarted(u1)).toBe(5);
+    expect(u2).toEqual({ unitNumber: 2, total: 40, level1: 0, level2: 1, mastered: 0 }); // progress wins over the RPC's own tiers
+  });
+
+  it("a unit with no progress rows is 0 started out of its total", () => {
+    const [u1] = buildUnitStats(totals, []);
+    expect(u1).toEqual({ unitNumber: 1, total: 217, level1: 0, level2: 0, mastered: 0 });
+  });
+
+  it("when the progress read failed it falls back to the RPC's tier counts, coerced -- never NaN", () => {
+    const [u1, u2] = buildUnitStats(totals, null);
+    expect(u1).toEqual({ unitNumber: 1, total: 217, level1: 0, level2: 0, mastered: 0 });
+    expect(u2).toEqual({ unitNumber: 2, total: 40, level1: 3, level2: 2, mastered: 7 });
+    expect(unitStarted(u2)).toBe(12);
+  });
+});
+
+describe("summarizeSession", () => {
+  it("counts the different words presented and the attempts -- a re-queued word is one word, several attempts", () => {
+    const queue = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "b" }, { id: "a" }, { id: "b" }];
+    expect(summarizeSession(queue, 6)).toEqual({ uniqueWords: 3, attempts: 6 });
+    expect(summarizeSession([{ id: "a" }, { id: "b" }], 2)).toEqual({ uniqueWords: 2, attempts: 2 });
+    expect(summarizeSession([], 0)).toEqual({ uniqueWords: 0, attempts: 0 });
   });
 });

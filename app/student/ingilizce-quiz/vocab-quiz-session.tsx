@@ -11,6 +11,7 @@ import {
   checkVocabAnswer,
   masteryLevel,
   requeueAfterMiss,
+  summarizeSession,
   vocabUnitTitle,
   WORD_MASTERY_COUNT,
   type AnswerResult,
@@ -136,6 +137,25 @@ function AnswerFeedbackContent({
         </Button>
       )}
     </div>
+  );
+}
+
+// The final screen's sentence: the DIFFERENT words presented and the answers it took (a missed word is asked again, so
+// attempts can exceed the words).
+export function SessionResultText({ uniqueWords, attempts }: { uniqueWords: number; attempts: number }) {
+  return (
+    <p className="text-foreground text-sm">
+      {attempts === uniqueWords ? (
+        <>
+          <span className="font-semibold text-emerald-700">{uniqueWords}</span> kelimenin hepsini ilk denemede doğru bildin.
+        </>
+      ) : (
+        <>
+          <span className="font-semibold text-emerald-700">{uniqueWords}</span> kelimeyi{" "}
+          <span className="font-semibold text-emerald-700">{attempts}</span> denemede doğru bildin.
+        </>
+      )}
+    </p>
   );
 }
 
@@ -376,17 +396,16 @@ export function VocabQuizSession({
   }
 
   if (phase === "summary") {
-    const correctCount = results.filter((r) => r !== "INCORRECT").length;
+    // A missed word is asked again until it is right, so the final screen counts the DIFFERENT words presented and the answers
+    // it took -- never "17 out of 10".
+    const { uniqueWords, attempts } = summarizeSession(batch, results.length);
     return (
       <Window>
         <CardHeader>
           <CardTitle className="text-base">{vocabUnitTitle(unitNumber)} -- Tur Tamamlandı</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-foreground text-sm">
-            {results.length} kelimeden <span className="font-semibold text-emerald-700">{correctCount}</span> tanesini
-            doğru bildin.
-          </p>
+          <SessionResultText uniqueWords={uniqueWords} attempts={attempts} />
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={loadBatch}>
               Çalışmaya Devam Et
