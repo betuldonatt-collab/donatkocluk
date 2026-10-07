@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
-import { isLgsCourseId, type Course } from "@/lib/curriculum";
+import type { Course } from "@/lib/curriculum";
 import {
   groupHeadingStructure,
   groupOfTopic,
@@ -32,38 +32,24 @@ export function TopicGroupSelect({ course, topicId, onChange }: { course: Course
   const structure = groupHeadingStructure(group);
   if (!structure.hasHeadings) {
     const isProblemler = course.id === PROBLEMLER_COURSE_ID && group.unitLabel === PROBLEMLER_UNIT_LABEL;
-    return <FlatSubtopicSelect group={group} topicId={topicId} onChange={onChange} isProblemler={isProblemler} isLgs={isLgsCourseId(course.id)} />;
+    return <FlatSubtopicSelect group={group} topicId={topicId} onChange={onChange} isProblemler={isProblemler} />;
   }
   // keyed by the master: switching to another unit starts the heading step afresh
   return <HeadedSubtopicSelect key={group.masterId} group={group} topicId={topicId} onChange={onChange} />;
 }
 
-function FlatSubtopicSelect({
-  group,
-  topicId,
-  onChange,
-  isProblemler,
-  isLgs,
-}: {
-  group: TopicGroup;
-  topicId: string;
-  onChange: (id: string) => void;
-  isProblemler: boolean;
-  // An LGS unit's second step lists its Konu (the unit's selection nodes), not Alt konu.
-  isLgs: boolean;
-}) {
-  const stepName = isProblemler ? "Problem türü" : isLgs ? "Konu" : "Alt konu";
+function FlatSubtopicSelect({ group, topicId, onChange, isProblemler }: { group: TopicGroup; topicId: string; onChange: (id: string) => void; isProblemler: boolean }) {
   return (
     <div className="space-y-1.5 sm:col-start-2">
-      <Label htmlFor="topic-group-subtopic">{stepName} (opsiyonel)</Label>
+      <Label htmlFor="topic-group-subtopic">{isProblemler ? "Problem türü (opsiyonel)" : "Alt konu (opsiyonel)"}</Label>
       <select
         id="topic-group-subtopic"
         value={topicId === group.masterId ? "" : topicId}
         onChange={(e) => onChange(e.target.value || group.masterId)}
         className={SELECT_CLASS}
-        aria-label={`${stepName} seç`}
+        aria-label={isProblemler ? "Problem türü seç" : "Alt konu seç"}
       >
-        <option value="">{isProblemler ? "Genel (tüm problemler)" : isLgs ? "Genel (ünitenin tamamı)" : "Genel"}</option>
+        <option value="">{isProblemler ? "Genel (tüm problemler)" : "Genel"}</option>
         {group.members.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}

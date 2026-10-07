@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { LGS_COURSES, TYT_COURSES, toTurkishTitleCase, type Course } from "./index";
-import { withoutLgsMasters } from "./lgs-masters";
 import { courseHasKonu, flattenCourseRows, flattenSelectionRows } from "./rows";
 import { MAARIF9_NATIVE_COURSES } from "./maarif9";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
@@ -71,7 +70,7 @@ describe("flattenSelectionRows", () => {
   });
 
   it("collapses LGS Matematik to one row per Konu, spanning the Ünite column across its Konu rows", () => {
-    const course = withoutLgsMasters(LGS_COURSES.find((c) => c.id === "lgs-matematik")!);
+    const course = LGS_COURSES.find((c) => c.id === "lgs-matematik")!;
     const rows = flattenSelectionRows(course);
     // 12 (unit, konu) entries in lgs.json -> 12 selectable rows, never one per Alt Konu.
     expect(rows).toHaveLength(course.units.length);

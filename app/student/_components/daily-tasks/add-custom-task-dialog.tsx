@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
-import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, isLgsCourseId, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, yksCourseOptions, type Course, type Track } from "@/lib/curriculum";
+import { AYT_COURSES_BY_TRACK, BRANCH_EXAM_MACRO_COURSES, LGS_COURSES, TYT_COURSES, topicOptionsForCourse, yksCourseOptions, type Course, type Track } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
 import type { ExamType } from "@/lib/exam-type";
 import { addOwnBranchExamResource, addResource } from "../../kaynak-takibi/actions";
@@ -605,15 +605,15 @@ export function AddCustomTaskDialog({
                 )}
                 {showTopic && (
                   <div className="space-y-1.5">
-                    <Label>{isLgsCourseId(course?.id) ? "Ünite" : "Konu"}</Label>
+                    <Label>Konu</Label>
                     {/* A grouped unit ("Problemler (Genel)", "Trigonometri (Genel)", ...) is chosen as a whole; its subtopics are
-                        not listed here but reached through the secondary picker below. An LGS course's first step is its Ünite. */}
+                        not listed here but reached through the secondary picker below. */}
                     <SmartCombobox
                       options={mainTopicOptions(course, topicOptions)}
                       value={mainValueOf(course, value.topicId)}
                       onChange={(topicId) => set({ topicId })}
-                      placeholder={isLgsCourseId(course?.id) ? "Ünite ara..." : "Konu ara..."}
-                      ariaLabel={isLgsCourseId(course?.id) ? "Ünite seç" : "Konu seç"}
+                      placeholder="Konu ara..."
+                      ariaLabel="Konu seç"
                     />
                   </div>
                 )}
