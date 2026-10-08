@@ -15,7 +15,7 @@ describe("subjectCoefficient", () => {
     expect(subjectCoefficient("lgs-fen-bilimleri")).toBe(1.5);
     expect(subjectCoefficient("tyt-fen-macro")).toBe(1.5);
     expect(subjectCoefficient("tyt-matematik")).toBe(2);
-    expect(subjectCoefficient("ayt-geometri-ea")).toBe(2);
+    expect(subjectCoefficient("ayt-geometri")).toBe(2);
     expect(subjectCoefficient("problem")).toBe(2);
     expect(subjectCoefficient("yeni-nesil-mat-dozu")).toBe(2);
   });

@@ -149,7 +149,7 @@ describe("colour: 11. Sınıf deeper, Maarif TYT lighter (coach cards and the st
   it("an 11th-grade course takes the deeper (AYT) tier, a Maarif TYT course the lighter one", () => {
     expect(subjectBackgroundClass("maarif11-matematik", "question_bank", deep)).toBe("bg-[var(--subject-matematik)]/12");
     expect(subjectBackgroundClass("maarif-tyt-matematik", "question_bank", deep)).toBe("bg-[var(--subject-matematik)]/6");
-    expect(subjectBackgroundClass("ayt-matematik-sayisal", "question_bank", deep)).toBe(subjectBackgroundClass("maarif11-matematik", "question_bank", deep));
+    expect(subjectBackgroundClass("ayt-matematik", "question_bank", deep)).toBe(subjectBackgroundClass("maarif11-matematik", "question_bank", deep));
     // same subject hue, so the pair still reads as one subject in two weights
     for (const [m11, tyt] of [
       ["maarif11-fizik", "maarif-tyt-fizik"],

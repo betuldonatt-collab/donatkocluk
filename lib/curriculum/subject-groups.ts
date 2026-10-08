@@ -145,7 +145,7 @@ export const AYT_SUBJECT_GROUPS_BY_TRACK: Record<
   { key: AytSubjectGroupKey; label: string; courseIds: string[]; questions: number }[]
 > = {
   sayisal: [
-    { key: "ayt_matematik", label: "Matematik", courseIds: ["ayt-matematik-sayisal", "ayt-geometri-sayisal"], questions: 40 },
+    { key: "ayt_matematik", label: "Matematik", courseIds: ["ayt-matematik", "ayt-geometri"], questions: 40 },
     { key: "ayt_fizik", label: "Fizik", courseIds: ["ayt-fizik"], questions: 14 },
     { key: "ayt_kimya", label: "Kimya", courseIds: ["ayt-kimya"], questions: 13 },
     { key: "ayt_biyoloji", label: "Biyoloji", courseIds: ["ayt-biyoloji"], questions: 13 },
@@ -154,16 +154,16 @@ export const AYT_SUBJECT_GROUPS_BY_TRACK: Record<
     {
       key: "ayt_ea_sozel1",
       label: "Türk Dili ve Edebiyatı - Sosyal Bilimler 1",
-      courseIds: ["ayt-edebiyat-ea", "ayt-tarih-1-ea", "ayt-cografya-1-ea"],
+      courseIds: ["ayt-edebiyat", "ayt-tarih-1", "ayt-cografya-1"],
       questions: 40,
     },
-    { key: "ayt_ea_matematik", label: "Matematik", courseIds: ["ayt-matematik-ea", "ayt-geometri-ea"], questions: 40 },
+    { key: "ayt_ea_matematik", label: "Matematik", courseIds: ["ayt-matematik", "ayt-geometri"], questions: 40 },
   ],
   sozel: [
     {
       key: "ayt_sozel_sozel1",
       label: "Türk Dili ve Edebiyatı - Sosyal Bilimler 1",
-      courseIds: ["ayt-edebiyat-sozel", "ayt-tarih-1-sozel", "ayt-cografya-1-sozel"],
+      courseIds: ["ayt-edebiyat", "ayt-tarih-1", "ayt-cografya-1"],
       questions: 40,
     },
     {

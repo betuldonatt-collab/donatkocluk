@@ -20,12 +20,15 @@ import {
   coursesForMaarifTytGroup,
 } from "./subject-groups";
 
+// Each id once: the AYT subjects shared by two fields are one course now.
 export const YKS_CURRICULUM_COURSE_IDS: string[] = [
-  ...TYT_COURSES.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
-  ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
-  ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
+  ...new Set([
+    ...TYT_COURSES.map((c) => c.id),
+    ...AYT_COURSES_BY_TRACK.sayisal.map((c) => c.id),
+    ...AYT_COURSES_BY_TRACK.ea.map((c) => c.id),
+    ...AYT_COURSES_BY_TRACK.sozel.map((c) => c.id),
+    ...BRANCH_EXAM_MACRO_COURSES.map((c) => c.id),
+  ]),
 ];
 
 export const LGS_CURRICULUM_COURSE_IDS: string[] = LGS_COURSES.map((c) => c.id);

@@ -5,6 +5,10 @@ import tytJson from "./tyt.json";
 import aytSayisalJson from "./ayt-sayisal.json";
 import aytEaJson from "./ayt-ea.json";
 import aytSozelJson from "./ayt-sozel.json";
+// The five AYT subjects that belong to two fields (Matematik, Geometri: Sayısal + EA; Edebiyat, Tarih 1, Coğrafya 1: EA + Sözel) --
+// ONE course each, with one set of topic ids, listed under every field that has it. (ayt-sayisal / ayt-ea / ayt-sozel.json keep only
+// what is specific to their field; the EA field has no course of its own.)
+import aytSharedJson from "./ayt-shared.json";
 // lgs.json is generated once from the "8. Sınıf - Taslak Dosyası" workbook's
 // Kaynak Takibi sheet (not by parse-curriculum.mjs) -- same shape, plus the
 // optional `konu` level below.
@@ -63,10 +67,24 @@ export const TRACK_LABELS: Record<Track, string> = {
   sozel: "Sözel",
 };
 
+const sharedAyt = (id: string): Course => {
+  const course = (aytSharedJson as Course[]).find((c) => c.id === id);
+  if (!course) throw new Error(`missing shared AYT course ${id}`);
+  return course;
+};
+
+// The same course OBJECT sits in every field's list that has it, so a subject is never a track-specific copy.
 export const AYT_COURSES_BY_TRACK: Record<Track, Course[]> = {
-  sayisal: aytSayisalJson as Course[],
-  ea: aytEaJson as Course[],
-  sozel: aytSozelJson as Course[],
+  sayisal: [sharedAyt("ayt-matematik"), sharedAyt("ayt-geometri"), ...(aytSayisalJson as Course[])],
+  ea: [
+    sharedAyt("ayt-edebiyat"),
+    sharedAyt("ayt-tarih-1"),
+    sharedAyt("ayt-cografya-1"),
+    sharedAyt("ayt-matematik"),
+    sharedAyt("ayt-geometri"),
+    ...(aytEaJson as Course[]),
+  ],
+  sozel: [sharedAyt("ayt-edebiyat"), sharedAyt("ayt-tarih-1"), sharedAyt("ayt-cografya-1"), ...(aytSozelJson as Course[])],
 };
 
 // Synthetic, non-curriculum "courses" for the coach's daily routines --
@@ -131,29 +149,19 @@ export const TYT_BRANCH_EXAM_MACRO_COURSES: Course[] = [
   macroCourse("tyt-fen-macro", "TYT Fen", coursesById(TYT_COURSES, ["tyt-fizik", "tyt-kimya", "tyt-biyoloji"])),
 ];
 
+// "AYT Matematik" (Matematik + Geometri) and "AYT Sos 1" (Edebiyat + Tarih 1 + Coğrafya 1) are the same combined branch exam in the
+// two fields that have them: one macro course each, like the subjects they combine.
+const AYT_MATEMATIK_MACRO = macroCourse("ayt-matematik-macro", "AYT Matematik", [sharedAyt("ayt-matematik"), sharedAyt("ayt-geometri")]);
+const AYT_SOS1_MACRO = macroCourse("ayt-sos1-macro", "AYT Sos 1", [sharedAyt("ayt-edebiyat"), sharedAyt("ayt-tarih-1"), sharedAyt("ayt-cografya-1")]);
+
 export const AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK: Record<Track, Course[]> = {
   sayisal: [
-    macroCourse(
-      "ayt-matematik-sayisal-macro",
-      "AYT Matematik",
-      coursesById(aytSayisalJson as Course[], ["ayt-matematik-sayisal", "ayt-geometri-sayisal"]),
-    ),
+    AYT_MATEMATIK_MACRO,
     macroCourse("ayt-fen-sayisal-macro", "AYT Fen", coursesById(aytSayisalJson as Course[], ["ayt-fizik", "ayt-kimya", "ayt-biyoloji"])),
   ],
-  ea: [
-    macroCourse("ayt-matematik-ea-macro", "AYT Matematik", coursesById(aytEaJson as Course[], ["ayt-matematik-ea", "ayt-geometri-ea"])),
-    macroCourse(
-      "ayt-sos1-ea-macro",
-      "AYT Sos 1",
-      coursesById(aytEaJson as Course[], ["ayt-edebiyat-ea", "ayt-tarih-1-ea", "ayt-cografya-1-ea"]),
-    ),
-  ],
+  ea: [AYT_MATEMATIK_MACRO, AYT_SOS1_MACRO],
   sozel: [
-    macroCourse(
-      "ayt-sos1-sozel-macro",
-      "AYT Sos 1",
-      coursesById(aytSozelJson as Course[], ["ayt-edebiyat-sozel", "ayt-tarih-1-sozel", "ayt-cografya-1-sozel"]),
-    ),
+    AYT_SOS1_MACRO,
     macroCourse(
       "ayt-sos2-sozel-macro",
       "AYT Sos 2",
@@ -170,12 +178,18 @@ export const AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK: Record<Track, Course[]> = {
   ],
 };
 
-export const BRANCH_EXAM_MACRO_COURSES: Course[] = [
+// Each course once: a macro shared by two fields sits in both fields' lists.
+function uniqueById(courses: Course[]): Course[] {
+  const seen = new Set<string>();
+  return courses.filter((c) => !seen.has(c.id) && !!seen.add(c.id));
+}
+
+export const BRANCH_EXAM_MACRO_COURSES: Course[] = uniqueById([
   ...TYT_BRANCH_EXAM_MACRO_COURSES,
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.sayisal,
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.ea,
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.sozel,
-];
+]);
 
 // profiles.academic_track ("yks_sayisal" ...) as an AYT track; null for anything else (LGS, Maarif, YDT, unset).
 export function aytTrackOf(academicTrack: string | null | undefined): Track | null {
@@ -199,10 +213,9 @@ export function courseDisplayName(courseId: string | null | undefined, name: str
   return prefix && !name.startsWith(prefix) ? prefix + name : name;
 }
 
-// Courses a task can be assigned from must be listed ONCE: AYT Matematik / Geometri exist for both Sayısal and EA, and
-// AYT Edebiyat / Tarih 1 / Coğrafya 1 for both EA and Sözel, with the same name (and the same topics). The duplicate
-// is dropped; where the student's own AYT track has a variant, that is the one kept (so an EA student's "AYT
-// Matematik" is the EA course, which keeps their karne breakdown under the right track), otherwise the first.
+// Courses a task can be assigned from must be listed ONCE. AYT Matematik / Geometri (Sayısal + EA) and AYT Edebiyat / Tarih 1 /
+// Coğrafya 1 (EA + Sözel) are single courses now, so the same course reaching this list through two fields is one entry; labels that
+// coincide for different courses (an atomic and a combined "AYT Matematik") keep the first, preferring the student's own AYT track.
 export function dedupeCoursesByLabel(courses: Course[], aytTrack: Track | null = null): Course[] {
   const kept = new Map<string, Course>();
   const inTrack = (c: Course) =>
@@ -233,7 +246,7 @@ export function isBranchExamMacroCourseId(courseId: string | null | undefined): 
   return BRANCH_EXAM_MACRO_COURSES.some((c) => c.id === courseId);
 }
 
-const ALL_COURSES: Course[] = [
+const ALL_COURSES: Course[] = uniqueById([
   ...TYT_COURSES,
   ...AYT_COURSES_BY_TRACK.sayisal,
   ...AYT_COURSES_BY_TRACK.ea,
@@ -241,7 +254,7 @@ const ALL_COURSES: Course[] = [
   ...LGS_COURSES,
   ...ROUTINE_COURSES,
   ...BRANCH_EXAM_MACRO_COURSES,
-];
+]);
 
 // Maarif (9th/10th/11th-grade, and the 11th grade's merged "Maarif TYT" tab)
 // courses are looked up as a fallback only -- they are deliberately NOT

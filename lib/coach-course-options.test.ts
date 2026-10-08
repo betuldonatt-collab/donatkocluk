@@ -45,7 +45,7 @@ for (const [formName, build] of FORMS) {
           expect(all).toContain("TYT Geometri");
           expect(all).toContain("AYT Geometri");
           expect(options.some((o) => o.id === "tyt-geometri")).toBe(true);
-          expect(options.some((o) => o.id === "ayt-geometri-sayisal" || o.id === "ayt-geometri-ea")).toBe(true);
+          expect(options.some((o) => o.id === "ayt-geometri")).toBe(true);
         });
 
         it("keeps the TYT subjects and AYT Fizik / Kimya / Biyoloji", () => {
@@ -66,18 +66,15 @@ for (const [formName, build] of FORMS) {
       expect(labels(options)).toContain("AYT Sos 2");
     });
 
-    it("keeps the student's own track's variant of a shared course", () => {
+    it("a shared AYT subject is ONE course whatever the student's track (no track-specific copies)", () => {
       const idOf = (track: Track | null, label: string) => build(false, track).find((o) => o.label === label)?.id;
-      expect(idOf("sayisal", "AYT Matematik")).toBe("ayt-matematik-sayisal");
-      expect(idOf("ea", "AYT Matematik")).toBe("ayt-matematik-ea");
-      expect(idOf("ea", "AYT Geometri")).toBe("ayt-geometri-ea");
-      expect(idOf("sayisal", "AYT Geometri")).toBe("ayt-geometri-sayisal");
-      expect(idOf("sozel", "AYT Edebiyat")).toBe("ayt-edebiyat-sozel");
-      expect(idOf("ea", "AYT Edebiyat")).toBe("ayt-edebiyat-ea");
-      expect(idOf("sozel", "AYT Tarih 1")).toBe("ayt-tarih-1-sozel");
-      // no known track: the first one (Sayısal for Matematik / Geometri, EA for Edebiyat / Tarih 1 / Coğrafya 1)
-      expect(idOf(null, "AYT Matematik")).toBe("ayt-matematik-sayisal");
-      expect(idOf(null, "AYT Edebiyat")).toBe("ayt-edebiyat-ea");
+      for (const track of [null, "sayisal", "ea", "sozel"] as const) {
+        expect(idOf(track, "AYT Matematik"), String(track)).toBe("ayt-matematik");
+        expect(idOf(track, "AYT Geometri"), String(track)).toBe("ayt-geometri");
+        expect(idOf(track, "AYT Edebiyat"), String(track)).toBe("ayt-edebiyat");
+        expect(idOf(track, "AYT Tarih 1"), String(track)).toBe("ayt-tarih-1");
+        expect(idOf(track, "AYT Coğrafya 1"), String(track)).toBe("ayt-cografya-1");
+      }
     });
   });
 }

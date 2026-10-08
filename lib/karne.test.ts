@@ -63,7 +63,7 @@ describe("computeTytScoreBreakdown", () => {
 
   it("excludes AYT course_id-tagged rows and AYT general exams entirely", () => {
     const tasks: KarneScoreTask[] = [
-      { task_date: "2026-01-05", course_id: "ayt-matematik-sayisal", correct_count: 40, wrong_count: 0, empty_count: 0 },
+      { task_date: "2026-01-05", course_id: "ayt-matematik", correct_count: 40, wrong_count: 0, empty_count: 0 },
     ];
     const exams: KarneGeneralExam[] = [
       { task_date: "2026-01-05", title: "AYT Genel Deneme - 345", subject_scores: { ayt_matematik: { correct: 20, wrong: 8, empty: 2 } } },
@@ -95,8 +95,8 @@ describe("computeAytScoreBreakdown", () => {
 
   it("sums course_id-tagged practice rows into their AYT track+subject group", () => {
     const tasks: KarneScoreTask[] = [
-      { task_date: "2026-01-05", course_id: "ayt-matematik-sayisal", correct_count: 30, wrong_count: 5, empty_count: 5 },
-      { task_date: "2026-01-10", course_id: "ayt-geometri-sayisal", correct_count: 10, wrong_count: 2, empty_count: 3 },
+      { task_date: "2026-01-05", course_id: "ayt-matematik", correct_count: 30, wrong_count: 5, empty_count: 5 },
+      { task_date: "2026-01-10", course_id: "ayt-geometri", correct_count: 10, wrong_count: 2, empty_count: 3 },
       { task_date: "2026-01-15", course_id: "ayt-fizik", correct_count: 20, wrong_count: 1, empty_count: 0 },
     ];
     const result = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END);
@@ -122,17 +122,36 @@ describe("computeAytScoreBreakdown", () => {
     expect(result[0].total).toEqual({ correct: 30, wrong: 10, empty: 3 });
   });
 
-  it("keeps EA and Sözel separate even though they share a group label (Türk Dili ve Edebiyatı - Sosyal Bilimler 1)", () => {
+  it("a shared course (Edebiyat: EA + Sözel) counts in the STUDENT's own field -- EA and Sözel stay separate cards", () => {
+    const tasks: KarneScoreTask[] = [{ task_date: "2026-01-05", course_id: "ayt-edebiyat", correct_count: 10, wrong_count: 0, empty_count: 0 }];
+    const ea = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END, "ea");
+    expect(ea.map((r) => r.track)).toEqual(["ea"]);
+    expect(ea[0].bySubject.find((r) => r.key === "ayt_ea_sozel1")!.correct).toBe(10);
+    const sozel = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END, "sozel");
+    expect(sozel.map((r) => r.track)).toEqual(["sozel"]);
+    expect(sozel[0].bySubject.find((r) => r.key === "ayt_sozel_sozel1")!.correct).toBe(10);
+  });
+
+  it("Matematik / Geometri (Sayısal + EA): an EA student's practice lands in the EA Matematik section, a Sayısal student's in Sayısal", () => {
     const tasks: KarneScoreTask[] = [
-      { task_date: "2026-01-05", course_id: "ayt-edebiyat-ea", correct_count: 10, wrong_count: 0, empty_count: 0 },
-      { task_date: "2026-01-06", course_id: "ayt-edebiyat-sozel", correct_count: 5, wrong_count: 0, empty_count: 0 },
+      { task_date: "2026-01-05", course_id: "ayt-matematik", correct_count: 12, wrong_count: 3, empty_count: 0 },
+      { task_date: "2026-01-06", course_id: "ayt-geometri", correct_count: 8, wrong_count: 1, empty_count: 1 },
     ];
-    const result = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END);
-    expect(result.map((r) => r.track).sort()).toEqual(["ea", "sozel"]);
-    const eaGroup = result.find((r) => r.track === "ea")!.bySubject.find((r) => r.key === "ayt_ea_sozel1")!;
-    expect(eaGroup.correct).toBe(10);
-    const sozelGroup = result.find((r) => r.track === "sozel")!.bySubject.find((r) => r.key === "ayt_sozel_sozel1")!;
-    expect(sozelGroup.correct).toBe(5);
+    const ea = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END, "ea");
+    expect(ea.map((r) => r.track)).toEqual(["ea"]);
+    expect(ea[0].bySubject.find((r) => r.key === "ayt_ea_matematik")).toMatchObject({ correct: 20, wrong: 4, empty: 1 });
+    const sayisal = computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END, "sayisal");
+    expect(sayisal.map((r) => r.track)).toEqual(["sayisal"]);
+    expect(sayisal[0].bySubject.find((r) => r.key === "ayt_matematik")).toMatchObject({ correct: 20, wrong: 4, empty: 1 });
+  });
+
+  it("without a known track, a shared course follows the field of the period's Genel Denemeler, then falls back to the first field", () => {
+    const tasks: KarneScoreTask[] = [{ task_date: "2026-01-05", course_id: "ayt-edebiyat", correct_count: 6, wrong_count: 0, empty_count: 0 }];
+    const sozelExam: KarneGeneralExam[] = [
+      { task_date: "2026-01-10", title: "AYT Genel Deneme - 1", subject_scores: { ayt_sozel_sozel1: { correct: 20, wrong: 5, empty: 0 } } },
+    ];
+    expect(computeAytScoreBreakdown(tasks, sozelExam, RANGE_START, RANGE_END, null).map((r) => r.track)).toEqual(["sozel"]);
+    expect(computeAytScoreBreakdown(tasks, [], RANGE_START, RANGE_END, null).map((r) => r.track)).toEqual(["ea"]);
   });
 
   it("excludes TYT course_id-tagged rows and TYT general exams entirely", () => {

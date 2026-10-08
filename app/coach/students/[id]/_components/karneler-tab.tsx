@@ -22,7 +22,7 @@ import {
   type Track,
 } from "@/lib/curriculum";
 import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
-import { CYCLE_DAYS, inclusiveDaySpan, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
+import { CYCLE_DAYS, inclusiveDaySpan, karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
 import { cn } from "@/lib/utils";
 import { approveReportCard, deleteReportCard, generateCycleReportCard, type CoachReportCardRow } from "../../../actions";
 import { LineChart } from "./charts/line-chart";
@@ -422,7 +422,7 @@ function CourseChips({ courses, selectedId, onSelect }: { courses: Course[]; sel
 }
 
 function TopicGrid({ courseId, rows }: { courseId: string; rows: KarneTopicRow[] }) {
-  const courseRows = rows.filter((r) => r.courseId === courseId).sort((a, b) => b.count - a.count);
+  const courseRows = karneTopicRowsForCourse(rows, courseId);
   if (courseRows.length === 0 || courseRows[0].windowSize === 0) {
     return <p className="text-muted-foreground text-sm">Bu dönemde bu ders için deneme kaydı yok.</p>;
   }

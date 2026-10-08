@@ -21,7 +21,7 @@ describe("8th grade (LGS): regular courses take the deeper tier on the coach's c
       expect(deep.replace(/\/12$/, ""), id).toBe(light.replace(/\/6$/, ""));
       expect(light).not.toBe("bg-slate-500/10");
     }
-    expect(subjectBackgroundClass("lgs-matematik", "question_bank", { deepLgs: true })).toBe(subjectBackgroundClass("ayt-matematik-sayisal", "question_bank"));
+    expect(subjectBackgroundClass("lgs-matematik", "question_bank", { deepLgs: true })).toBe(subjectBackgroundClass("ayt-matematik", "question_bank"));
   });
 
   it("a Branş Denemesi keeps exactly the shade it has now, with or without the option", () => {

@@ -23,7 +23,7 @@ import {
 } from "@/lib/task-evidence";
 import { isTransferable, MAX_TRANSFER_TASKS, statusWhenPostponed, targetDateFor, type TransferTarget } from "@/lib/task-transfer";
 import { creditedSecondsFromMinutes, formatFocusDuration } from "@/lib/focus-approval";
-import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
+import { aytTrackOf, courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
@@ -3200,7 +3200,7 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   await requireCoachAccess(supabase, user.id, studentIdV);
 
   const [{ data: profile }, { data: link }, { data: lastCycle }, { data: openDraft }] = await Promise.all([
-    supabase.from("profiles").select("coaching_start_date, exam_type").eq("id", studentIdV).maybeSingle(),
+    supabase.from("profiles").select("coaching_start_date, exam_type, academic_track").eq("id", studentIdV).maybeSingle(),
     supabase.from("coach_students").select("created_at").eq("coach_id", user.id).eq("student_id", studentIdV).maybeSingle(),
     supabase
       .from("student_report_cards")
@@ -3336,7 +3336,7 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
         tyt: { current: currentNet.tyt, previous: previousStats?.tyt.current ?? null },
         ayt: { current: currentNet.ayt, previous: previousStats?.ayt.current ?? null },
         scoreBreakdown: computeTytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
-        aytScoreBreakdown: computeAytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd),
+        aytScoreBreakdown: computeAytScoreBreakdown(exams, exams as KarneGeneralExam[], rangeStart, rangeEnd, aytTrackOf(profile?.academic_track)),
         totalDurationMinutes,
       };
 

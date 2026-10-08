@@ -1,6 +1,5 @@
 "use client";
 
-import { mergeSiblingTopicStats } from "@/lib/curriculum/sibling-courses";
 import { useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { toast } from "sonner";
@@ -229,9 +228,6 @@ function ActiveCourseTable({
   updateBranchExamStock: (courseId: string, resourceId: string, totalStock: number, remainingStock: number) => void;
 }) {
   const data = getData(course.id);
-  // A subject shared by two fields (Matematik / Geometri: Sayısal + EA; Edebiyat / Tarih 1 / Coğrafya 1: EA + Sözel) shows the
-  // question statistics recorded under either field's course -- display only (lib/curriculum/sibling-courses.ts).
-  const topicStats = mergeSiblingTopicStats(course.id, (id) => getData(id).topicStats, data.topicStats);
 
   return (
     <>
@@ -239,7 +235,7 @@ function ActiveCourseTable({
         course={course}
         resources={data.resources}
         progress={data.progress}
-        topicStats={topicStats}
+        topicStats={data.topicStats}
         onAddResource={(name) => addResource(course.id, name)}
         onToggle={(topic, resourceId, field) => toggleProgress(course.id, topic, resourceId, field)}
         pipeline={{

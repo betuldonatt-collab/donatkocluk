@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
 import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
-import type { KarneSubjectScoreRow, KarneTopicRow, NetSummary } from "@/lib/karne";
+import { karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
@@ -161,7 +161,7 @@ function CourseChips({ courses, selectedId, onSelect }: { courses: Course[]; sel
 }
 
 function TopicGrid({ courseId, rows }: { courseId: string; rows: KarneTopicRow[] }) {
-  const courseRows = rows.filter((r) => r.courseId === courseId).sort((a, b) => b.count - a.count);
+  const courseRows = karneTopicRowsForCourse(rows, courseId);
   if (courseRows.length === 0 || courseRows[0].windowSize === 0) {
     return <p className="text-muted-foreground text-sm">Bu dönemde bu ders için deneme kaydı yok.</p>;
   }

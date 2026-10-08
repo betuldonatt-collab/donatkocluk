@@ -1,5 +1,10 @@
 // Parses the three "Taslak Dosyası" workbooks into lib/curriculum/*.json.
 //
+// NOTE (2026-10): the five AYT subjects shared by two fields (Matematik, Geometri: Sayısal + EA; Edebiyat, Tarih 1, Coğrafya 1: EA + Sözel)
+// now live ONCE in lib/curriculum/ayt-shared.json (one course id, one set of topic ids; migration 0133), and ayt-sayisal / ayt-ea /
+// ayt-sozel.json keep only their field-specific courses. This script still emits the old per-field copies, and the "(Genel)" master topics
+// were added to the JSON by hand, so DO NOT regenerate those files without redoing both -- see the memory note project-shared-ayt-subjects.
+//
 // Each *Kaynak Takibi sheet packs every course into ONE sheet as sequential
 // row-blocks (not one course per sheet): a course-header row ("TYT TÜRKÇE"),
 // then a "Konu Çalışması" sub-header row, then topic rows where column A is

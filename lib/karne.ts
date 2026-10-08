@@ -8,6 +8,7 @@
 // membership rule as gelisim-haritasi.ts, kept identical on purpose so a
 // topic's color means the same thing in both features.
 import { findCourseById, TRACK_LABELS, type Track } from "./curriculum";
+import { canonicalCourseId, canonicalTopicId } from "./curriculum/legacy-course-ids";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   inferAytTrackFromScores,
@@ -30,6 +31,27 @@ export type KarneTopicRow = {
   count: number;
   windowSize: number;
 };
+
+// The topic rows of ONE course for the Karne screens. A snapshot saved before the shared AYT subjects became single courses (migration
+// 0133) carries the old per-field ids ("ayt-matematik-sayisal" / "ayt-matematik-ea", masters and Geometri topics likewise); snapshots are
+// archives and are never rewritten, so they are read through the unified ids here. A topic that appears under both old courses becomes
+// one row: the mistake counts add up (a student's mistakes were tagged to one field's course), the window is the larger of the two
+// (both windows count the same Genel Denemeler; only branch exams of that course differ).
+export function karneTopicRowsForCourse(rows: KarneTopicRow[], courseId: string): KarneTopicRow[] {
+  const merged = new Map<string, KarneTopicRow>();
+  for (const row of rows) {
+    if (canonicalCourseId(row.courseId) !== courseId) continue;
+    const topicId = canonicalTopicId(row.topicId);
+    const existing = merged.get(topicId);
+    if (!existing) {
+      merged.set(topicId, { ...row, courseId, topicId });
+    } else {
+      existing.count += row.count;
+      existing.windowSize = Math.max(existing.windowSize, row.windowSize);
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.count - a.count);
+}
 
 export type KarneExam = { id: string; task_date: string; task_type: string; course_id: string | null };
 export type KarneMistakeRow = { task_id: string; course_id: string; topic_id: string };
@@ -341,18 +363,49 @@ export type KarneTrackScoreBreakdown = {
 
 const AYT_TRACKS: Track[] = ["sayisal", "ea", "sozel"];
 
-const AYT_COURSE_TO_SUBJECT_GROUP = new Map<string, { track: Track; key: AytSubjectGroupKey }>(
-  AYT_TRACKS.flatMap((track) =>
-    AYT_SUBJECT_GROUPS_BY_TRACK[track].flatMap((g) => g.courseIds.map((courseId) => [courseId, { track, key: g.key }] as const)),
-  ),
-);
+// A course can sit in the exam sections of more than one field now (Matematik / Geometri: Sayısal + EA; Edebiyat / Tarih 1 / Coğrafya 1:
+// EA + Sözel), so a course maps to a LIST of {track, section} -- see pickAytSection for how practice on one is attributed.
+const AYT_COURSE_TO_SUBJECT_GROUPS = new Map<string, { track: Track; key: AytSubjectGroupKey }[]>();
+for (const track of AYT_TRACKS) {
+  for (const g of AYT_SUBJECT_GROUPS_BY_TRACK[track]) {
+    for (const courseId of g.courseIds) {
+      const list = AYT_COURSE_TO_SUBJECT_GROUPS.get(courseId) ?? [];
+      list.push({ track, key: g.key });
+      AYT_COURSE_TO_SUBJECT_GROUPS.set(courseId, list);
+    }
+  }
+}
+
+// Practice on a course that belongs to several fields counts in the student's OWN field (profiles.academic_track); without it, in the
+// field their Genel Denemeler of the period were taken in; failing both, the first field that has the course.
+function pickAytSection(
+  courseId: string,
+  studentTrack: Track | null,
+  examTracks: Set<Track>,
+): { track: Track; key: AytSubjectGroupKey } | null {
+  const candidates = AYT_COURSE_TO_SUBJECT_GROUPS.get(courseId);
+  if (!candidates || candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  return (
+    candidates.find((c) => c.track === studentTrack) ??
+    candidates.find((c) => examTracks.has(c.track)) ??
+    candidates[0]
+  );
+}
 
 export function computeAytScoreBreakdown(
   tasks: KarneScoreTask[],
   exams: KarneGeneralExam[],
   rangeStart: string,
   rangeEnd: string,
+  studentTrack: Track | null = null,
 ): KarneTrackScoreBreakdown[] {
+  const examTracks = new Set<Track>();
+  for (const e of exams) {
+    if (e.task_date < rangeStart || e.task_date > rangeEnd || !e.subject_scores || parseGeneralExamTrack(e.title) !== "ayt") continue;
+    const inferred = inferAytTrackFromScores(e.subject_scores);
+    if (inferred) examTracks.add(inferred);
+  }
   const byTrack = new Map<Track, Map<AytSubjectGroupKey, { correct: number; wrong: number; empty: number }>>();
   function bucketFor(track: Track, key: AytSubjectGroupKey) {
     const trackMap = byTrack.get(track) ?? new Map<AytSubjectGroupKey, { correct: number; wrong: number; empty: number }>();
@@ -364,7 +417,7 @@ export function computeAytScoreBreakdown(
 
   for (const t of tasks) {
     if (t.task_date < rangeStart || t.task_date > rangeEnd || !t.course_id) continue;
-    const mapped = AYT_COURSE_TO_SUBJECT_GROUP.get(t.course_id);
+    const mapped = pickAytSection(t.course_id, studentTrack, examTracks);
     if (!mapped) continue;
     const bucket = bucketFor(mapped.track, mapped.key);
     bucket.correct += t.correct_count ?? 0;

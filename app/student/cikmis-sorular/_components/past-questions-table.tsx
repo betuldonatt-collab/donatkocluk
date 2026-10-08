@@ -42,10 +42,8 @@ const FREQUENCY_GROUP_UNITS: Record<string, "*" | string[]> = {
   "tyt-fizik": ["Dalgalar", "Optik"],
   "tyt-biyoloji": "*",
   "tyt-cografya": "*",
-  "ayt-matematik-sayisal": ["Sayma ve Olasılık", "Trigonometri"],
-  "ayt-matematik-ea": ["Sayma ve Olasılık", "Trigonometri"],
-  "ayt-geometri-sayisal": ["Geometri", "Analitik Geometri", "Uzay Geometri"],
-  "ayt-geometri-ea": ["Geometri", "Analitik Geometri", "Uzay Geometri"],
+  "ayt-matematik": ["Sayma ve Olasılık", "Trigonometri"],
+  "ayt-geometri": ["Geometri", "Analitik Geometri", "Uzay Geometri"],
   "ayt-fizik": ["Kuvvet ve Hareket", "Elektrik ve Manyetizma", "Çembersel Hareket"],
   "ayt-kimya": [
     "Modern Atom Teorisi",
@@ -61,7 +59,7 @@ const FREQUENCY_GROUP_UNITS: Record<string, "*" | string[]> = {
     "Canlılarda Enerji Dönüşümleri",
     "Bitki Biyolojisi",
   ],
-  "ayt-edebiyat-ea": [
+  "ayt-edebiyat": [
     "Halk Edebiyatı",
     "Divan Edebiyatı",
     "Milli Edebiyat",
@@ -69,15 +67,7 @@ const FREQUENCY_GROUP_UNITS: Record<string, "*" | string[]> = {
     "Cumhuriyet Hikayesi",
     "Cumhuriyet Romanı",
   ],
-  "ayt-edebiyat-sozel": [
-    "Halk Edebiyatı",
-    "Divan Edebiyatı",
-    "Milli Edebiyat",
-    "Cumhuriyet Şiiri",
-    "Cumhuriyet Hikayesi",
-    "Cumhuriyet Romanı",
-  ],
-  "ayt-tarih-1-ea": [
+  "ayt-tarih-1": [
     "İnsanlığın İlk Dönemleri",
     "İlk ve Orta Çağlarda Türk Dünyası",
     "İslam Medeniyetinin Doğuşu",
@@ -90,21 +80,7 @@ const FREQUENCY_GROUP_UNITS: Record<string, "*" | string[]> = {
     "Atatürkçülük ve Türk İnkılabı",
     "İki Savaş Arası Dönemde Türkiye ve Dünya",
   ],
-  "ayt-tarih-1-sozel": [
-    "İnsanlığın İlk Dönemleri",
-    "İlk ve Orta Çağlarda Türk Dünyası",
-    "İslam Medeniyetinin Doğuşu",
-    "Türklerin İslamiyeti Kabulü ve İlk Türk İslam Devletleri",
-    "Yerleşme ve Devletleşme Sürecinde Selçuklu Türkiyesi",
-    "Beylikten Devlete Osmanlı Siyaseti",
-    "Uluslararası İlişkilerde Denge Stratejisi",
-    "20. Yüzyıl Başlarında Osmanlı Devleti ve Dünya",
-    "Milli Mücadele",
-    "Atatürkçülük ve Türk İnkılabı",
-    "İki Savaş Arası Dönemde Türkiye ve Dünya",
-  ],
-  "ayt-cografya-1-ea": "*",
-  "ayt-cografya-1-sozel": "*",
+  "ayt-cografya-1": "*",
   "ayt-cografya-2": "*",
 };
 
