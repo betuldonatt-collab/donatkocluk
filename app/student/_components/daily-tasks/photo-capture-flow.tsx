@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type CSSProperties, type Ref } from "react";
 import { Camera, Check, Crop, ImagePlus, Loader2, Plus, RotateCcw, RotateCw, SwitchCamera, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,18 +38,23 @@ export type StagedPhoto = {
 };
 export type UploadProgress = { phase: "compress" | "upload"; index: number; total: number } | null;
 export type UploadOutcome = { error: { message: string; detail?: string } | null };
+// What the parent can do without opening the flow first: the main screen's own "Galeriden Seç" button
+// stages the picked files here and then opens the flow on its gallery.
+export type PhotoCaptureHandle = { addFiles: (files: File[]) => number; stagedCount: () => number };
 
 type View = "camera" | "gallery" | "edit";
 
 let nextId = 0;
 
 export function PhotoCaptureFlow({
+  handleRef,
   open,
   onOpenChange,
   knownSignatures,
   progress,
   onUpload,
 }: {
+  handleRef?: Ref<PhotoCaptureHandle>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   // Signatures of the photos already uploaded to the task (so the same file is not added twice).
@@ -88,6 +93,8 @@ export function PhotoCaptureFlow({
     setError(null);
     return staged.length;
   }
+
+  useImperativeHandle(handleRef, () => ({ addFiles, stagedCount: () => photosRef.current.length }));
 
   function removePhoto(id: string) {
     const gone = photosRef.current.find((p) => p.id === id);

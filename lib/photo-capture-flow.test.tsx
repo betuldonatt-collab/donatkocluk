@@ -77,3 +77,11 @@ describe("the staging gallery of the photo flow", () => {
     expect(html).toContain("2 fotoğrafı yükle");
   });
 });
+
+describe("no photo limit", () => {
+  it("the gallery lists and uploads any number of staged photos", () => {
+    const html = render({ photos: staged(120) });
+    expect(html.match(/alt="Fotoğraf \d+"/g)).toHaveLength(120);
+    expect(html).toContain("120 fotoğrafı yükle");
+  });
+});

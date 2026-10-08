@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, Hourglass, X } from "lucide-react";
+import { AlertTriangle, Camera, Hourglass, ImagePlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { EvidenceLightbox, REJECTED_PHOTO_TEXT } from "@/components/evidence-lig
 import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
 import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../../actions";
-import { PhotoCaptureFlow, type StagedPhoto, type UploadOutcome } from "./photo-capture-flow";
+import { PhotoCaptureFlow, type PhotoCaptureHandle, type StagedPhoto, type UploadOutcome } from "./photo-capture-flow";
 
 // The duplicate message moved next to the flow that raises it.
 export { DUPLICATE_PHOTO_MESSAGE } from "./photo-capture-flow";
@@ -74,6 +74,8 @@ export function EvidenceUploader({
   onChange: (next: { paths: string[]; reviewStatus: ReviewStatus; status: string; photoStatus: PhotoStatus }) => void;
 }) {
   const [flowOpen, setFlowOpen] = useState(false);
+  const flowRef = useRef<PhotoCaptureHandle>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [urls, setUrls] = useState<string[]>([]);
   const [busy, setBusy] = useState<{ phase: "compress" | "upload"; index: number; total: number } | null>(null);
   const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
@@ -269,9 +271,30 @@ export function EvidenceUploader({
           <Camera className="size-4" />
           Fotoğraf Ekle
         </Button>
+        <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => galleryRef.current?.click()}>
+          <ImagePlus className="size-4" />
+          Galeriden Seç
+        </Button>
       </div>
 
+      {/* The plain picker straight from the task screen: no limit on how many photos are picked; they land in the flow's staging gallery. */}
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (files.length === 0) return;
+          const added = flowRef.current?.addFiles(files) ?? 0;
+          if (added > 0 || (flowRef.current?.stagedCount() ?? 0) > 0) setFlowOpen(true);
+        }}
+      />
+
       <PhotoCaptureFlow
+        handleRef={flowRef}
         open={flowOpen}
         onOpenChange={setFlowOpen}
         knownSignatures={() => Object.values({ ...loadSignatures(taskId, paths), ...sessionSignatures.current })}
