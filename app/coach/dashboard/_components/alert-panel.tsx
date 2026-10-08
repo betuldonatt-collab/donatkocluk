@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ClipboardCheck, TrendingDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { showCohortPanel, type CoachCohorts } from "@/lib/coach-cohorts";
 import type { PendingFocusReview, PendingStudentTask } from "../../actions";
 import type { PendingCourseRemoval } from "../../school-exam-actions";
 import type { CoachAlerts } from "../types";
@@ -57,12 +58,19 @@ export function AlertPanel({
   pendingApprovals,
   focusReviews,
   courseRemovals,
+  cohorts,
 }: {
   alerts: CoachAlerts;
   pendingApprovals: (PendingStudentTask & { studentId: string; studentName: string | null })[];
   focusReviews: PendingFocusReview[];
   courseRemovals: PendingCourseRemoval[];
+  // The groups this coach has active students in. A group's own panels (YKS / LGS / 7. Sınıf approvals, LGS + 7. Sınıf missing
+  // tasks) are not rendered at all for a group the coach does not manage.
+  cohorts: CoachCohorts;
 }) {
+  const yksApprovals = pendingApprovals.filter((t) => t.studentExamType !== "LGS" && !t.studentIsMaarif7);
+  const lgsApprovals = pendingApprovals.filter((t) => t.studentExamType === "LGS");
+  const maarif7Approvals = pendingApprovals.filter((t) => t.studentExamType !== "LGS" && t.studentIsMaarif7);
   const totalAlerts =
     alerts.inactive.length +
     alerts.lowPerformance.length +
@@ -116,10 +124,12 @@ export function AlertPanel({
           href: `/coach/students/${a.student.id}?tab=karneler`,
         }))}
       />
-      <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS" && !t.studentIsMaarif7)} />
-      <PendingApprovalsPanel title="LGS Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType === "LGS")} />
-      <PendingApprovalsPanel title="7. Sınıf Onay Bekleyen Görevler" tasks={pendingApprovals.filter((t) => t.studentExamType !== "LGS" && t.studentIsMaarif7)} />
-      <LgsMissingTasksPanel alerts={alerts.lgsMissingTasks} />
+      {showCohortPanel(cohorts.yks, yksApprovals.length) && <PendingApprovalsPanel title="YKS Onay Bekleyen Görevler" tasks={yksApprovals} />}
+      {showCohortPanel(cohorts.lgs, lgsApprovals.length) && <PendingApprovalsPanel title="LGS Onay Bekleyen Görevler" tasks={lgsApprovals} />}
+      {showCohortPanel(cohorts.maarif7, maarif7Approvals.length) && (
+        <PendingApprovalsPanel title="7. Sınıf Onay Bekleyen Görevler" tasks={maarif7Approvals} />
+      )}
+      {showCohortPanel(cohorts.lgs || cohorts.maarif7, alerts.lgsMissingTasks.length) && <LgsMissingTasksPanel alerts={alerts.lgsMissingTasks} />}
     </div>
   );
 }

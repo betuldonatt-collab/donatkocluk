@@ -3,6 +3,7 @@ import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
 import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS, type MissingTaskInput } from "@/lib/missing-tasks";
 import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
+import { coachCohorts, NO_COHORTS, type CoachCohorts } from "@/lib/coach-cohorts";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import {
   getPendingFocusReviews,
@@ -245,7 +246,7 @@ async function fetchDashboardData(
   const [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }, gradeById, { data: pastDueTaskRows }] =
     studentIds.length > 0
       ? await Promise.all([
-          supabase.from("profiles").select("id, full_name, exam_type").in("id", studentIds),
+          supabase.from("profiles").select("id, full_name, exam_type, is_active").in("id", studentIds),
           supabase
             .from("student_tasks")
             .select("student_id, updated_at, created_at")
@@ -305,6 +306,8 @@ async function fetchDashboardData(
 
   return {
     roster,
+    // Which groups (LGS / 7. Sınıf / YKS) this coach has active students in -- the dashboard only shows those groups' panels.
+    cohorts: coachCohorts(roster, gradeById),
     bannerSession: (bannerSessionRows?.[0] ?? null) as CoachingSession | null,
     weekSessions: (weekSessionRows ?? []) as CoachingSession[],
     weekBlocks: (weekBlockRows ?? []) as CalendarBlock[],
@@ -327,6 +330,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
   const emptyDashboard: [
     {
       roster: RosterStudent[];
+      cohorts: CoachCohorts;
       bannerSession: CoachingSession | null;
       weekSessions: CoachingSession[];
       weekBlocks: CalendarBlock[];
@@ -338,6 +342,7 @@ export default async function CoachDashboardPage(props: PageProps<"/coach/dashbo
   ] = [
     {
       roster: [],
+      cohorts: NO_COHORTS,
       bannerSession: null,
       weekSessions: [],
       weekBlocks: [],

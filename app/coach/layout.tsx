@@ -8,6 +8,7 @@ import { fetchStopwatchCompetitionRoster, fetchYesterdaysStopwatchWinner, type S
 import { AnnouncementCenter } from "./_components/announcements/announcement-center";
 import { StopwatchSideWidget } from "./_components/stopwatch/stopwatch-side-widget";
 import { CoachSidebar } from "./_components/coach-sidebar";
+import { coachCohortsFromRoster } from "@/lib/coach-cohorts";
 
 // Throttled to once per PRESENCE_THROTTLE_MS -- see the matching comment
 // in app/student/layout.tsx for why. coach_profiles has no row-creation
@@ -30,7 +31,7 @@ async function touchCoachPresence(supabase: Awaited<ReturnType<typeof createClie
 async function fetchLayoutData(effectiveUserId: string, realUserId: string, isImpersonating: boolean) {
   const supabase = await createClient();
 
-  const [{ count }, { data: profile }] = await Promise.all([
+  const [{ count }, { data: profile }, { data: rosterLinks, error: rosterError }] = await Promise.all([
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
@@ -40,12 +41,22 @@ async function fetchLayoutData(effectiveUserId: string, realUserId: string, isIm
     // the actual logged-in person, not whichever coach an admin might
     // currently be viewing as.
     supabase.from("profiles").select("full_name").eq("id", realUserId).maybeSingle(),
+    // Which groups this coach has students in (LGS / 7. Sınıf / YKS), for the sidebar's exam countdowns: one embedded read.
+    supabase
+      .from("coach_students")
+      .select("student_id, profiles!student_id(exam_type, is_active, is_maarif7)")
+      .eq("coach_id", effectiveUserId),
     // Presence touch is a write -- never fires while impersonating,
     // regardless of who the real caller is.
     isImpersonating ? Promise.resolve(null) : touchCoachPresence(supabase, effectiveUserId),
   ]);
 
-  return { unreadCount: count ?? 0, fullName: profile?.full_name ?? null };
+  return {
+    unreadCount: count ?? 0,
+    fullName: profile?.full_name ?? null,
+    // null when the roster read failed: the sidebar then shows both countdowns, as it always did.
+    cohorts: rosterError ? null : coachCohortsFromRoster(rosterLinks as Parameters<typeof coachCohortsFromRoster>[0]),
+  };
 }
 
 export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
@@ -61,11 +72,12 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
   // their empty state for one render is a fine trade for that.
   let unreadCount = 0;
   let fullName: string | null = null;
+  let cohorts: ReturnType<typeof coachCohortsFromRoster> = null;
   let announcements: Awaited<ReturnType<typeof fetchCoachAnnouncements>> = [];
   let stopwatchRoster: StopwatchRosterRow[] = [];
   let yesterdaysWinner: YesterdaysStopwatchWinner = null;
   try {
-    [{ unreadCount, fullName }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
+    [{ unreadCount, fullName, cohorts }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
       fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
       fetchCoachAnnouncements(),
       // Skipped while impersonating for the same reason announcements is --
@@ -96,7 +108,7 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
           <ImpersonationLockStyles />
         </>
       )}
-      <DashboardShell sidebar={<CoachSidebar unreadCount={unreadCount} fullName={fullName} />}>
+      <DashboardShell sidebar={<CoachSidebar unreadCount={unreadCount} fullName={fullName} cohorts={cohorts} />}>
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />

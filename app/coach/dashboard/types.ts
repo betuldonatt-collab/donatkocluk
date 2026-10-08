@@ -48,6 +48,8 @@ export type RosterStudent = {
   id: string;
   full_name: string | null;
   exam_type?: "YKS" | "LGS";
+  // false for a deactivated student (profiles.is_active) -- they no longer count for which groups the coach manages.
+  is_active?: boolean | null;
 };
 
 export type InactiveAlert = { student: RosterStudent };

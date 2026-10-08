@@ -9,6 +9,7 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { TourTrigger } from "@/components/ui/platform-tour";
 import { LogoutButton } from "@/components/logout-button";
 import { YksCountdown } from "@/components/ui/yks-countdown";
+import type { CoachCohorts } from "@/lib/coach-cohorts";
 import { COACH_LANDING_PATH, COACH_NAV_ITEMS, COACH_WELCOME_STEP } from "@/lib/tour-steps";
 import { useIsMobileViewport } from "@/lib/use-is-mobile-viewport";
 import { useMobileNavOpen } from "@/lib/use-mobile-nav-open";
@@ -26,7 +27,16 @@ const NAV_ITEMS = [
   { href: "/coach/settings", label: "Ayarlar", icon: Settings },
 ];
 
-export function CoachSidebar({ unreadCount = 0, fullName = null }: { unreadCount?: number; fullName?: string | null }) {
+export function CoachSidebar({
+  unreadCount = 0,
+  fullName = null,
+  cohorts = null,
+}: {
+  unreadCount?: number;
+  fullName?: string | null;
+  // The groups the coach has active students in; null (unknown) shows both countdowns as before.
+  cohorts?: CoachCohorts | null;
+}) {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebarCollapsed();
   const { open: mobileOpen, setOpen: setMobileOpen } = useMobileNavOpen();
@@ -50,12 +60,12 @@ export function CoachSidebar({ unreadCount = 0, fullName = null }: { unreadCount
         <BrandLogo className="size-6" contrastBg />
         {!effectiveCollapsed && <span className="font-semibold">Donat Koçluk</span>}
       </div>
-      {/* A coach's roster spans both cohorts, so both countdowns show
-          stacked here -- unlike the student sidebar, there's no single
-          "which exam" to pick for a panel-wide widget. Each pill already
-          carries its own mx-3/mb-3 spacing, so they stack directly. */}
-      {!effectiveCollapsed && <YksCountdown variant="coach" examType="YKS" />}
-      {!effectiveCollapsed && <YksCountdown variant="coach" examType="LGS" />}
+      {/* One countdown per exam the coach actually has students for (YKS, LGS -- the 7th grade counts down to the LGS), stacked
+          here since there's no single "which exam" to pick for a panel-wide widget; a coach with only Lise students sees no LGS
+          pill and vice versa. Unknown groups (null) show both, as before. Each pill already carries its own mx-3/mb-3 spacing,
+          so they stack directly. */}
+      {!effectiveCollapsed && (!cohorts || cohorts.yks) && <YksCountdown variant="coach" examType="YKS" />}
+      {!effectiveCollapsed && (!cohorts || cohorts.lgs || cohorts.maarif7) && <YksCountdown variant="coach" examType="LGS" />}
       <nav className="flex flex-col gap-1 px-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);

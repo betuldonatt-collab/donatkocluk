@@ -7,6 +7,7 @@ import { DailyChecklist } from "./_components/daily-checklist";
 import { MeetingBanner } from "./_components/meeting-banner";
 import { WeeklyCalendar } from "./_components/weekly-calendar";
 import type { CalendarBlock, CoachAlerts, CoachingSession, CoachTask, RosterStudent } from "./types";
+import type { CoachCohorts } from "@/lib/coach-cohorts";
 import type { PendingFocusReview, PendingStudentTask } from "../actions";
 import type { PendingCourseRemoval } from "../school-exam-actions";
 
@@ -14,6 +15,7 @@ export function DashboardClient({
   today,
   weekDays,
   roster,
+  cohorts,
   bannerSession,
   weekSessions,
   weekBlocks,
@@ -26,6 +28,7 @@ export function DashboardClient({
   today: string;
   weekDays: { date: string; label: string }[];
   roster: RosterStudent[];
+  cohorts: CoachCohorts;
   bannerSession: CoachingSession | null;
   weekSessions: CoachingSession[];
   weekBlocks: CalendarBlock[];
@@ -65,7 +68,7 @@ export function DashboardClient({
     <div className="space-y-6">
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Kuşbakışı</h2>
-        <AlertPanel alerts={alerts} pendingApprovals={pendingApprovals} focusReviews={focusReviews} courseRemovals={courseRemovals} />
+        <AlertPanel alerts={alerts} pendingApprovals={pendingApprovals} focusReviews={focusReviews} courseRemovals={courseRemovals} cohorts={cohorts} />
       </div>
 
       <MeetingBanner session={banner} roster={roster} onEvaluated={handleEvaluated} />
