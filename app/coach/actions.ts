@@ -28,6 +28,7 @@ import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
+import { fetchAllPages } from "@/lib/paged-select";
 import { resolveCycles, type ProgressLock } from "@/lib/completion";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
@@ -3529,11 +3530,16 @@ const stopwatchMonthSchema = z.object({
 // impersonation anyway (the whole panel renders inside a disabled
 // <fieldset> then) -- this split is purely for getting the initial
 // render right.
+//
+// `dailyOnly` is for the coach layout's side widget, which shows today's minutes, the live dot and the rank and nothing else:
+// the layout re-renders after every coach Server Action, and reading the whole month's task rows for the entire roster each time
+// was the heaviest read of every coach render. With it, only today's rows are read and weeklyMinutes / monthlyMinutes are 0.
 export async function fetchStopwatchCompetitionRoster(
   supabase: SupabaseClient,
   coachId: string,
   year: number,
   month: number,
+  options: { dailyOnly?: boolean } = {},
 ): Promise<StopwatchRosterRow[]> {
   const { year: yearV, month: monthV } = parseInput(stopwatchMonthSchema, { year, month });
   const { data: rosterLinks } = await supabase.from("coach_students").select("student_id").eq("coach_id", coachId);
@@ -3551,7 +3557,7 @@ export async function fetchStopwatchCompetitionRoster(
   const monthStart = `${yearV}-${String(monthV).padStart(2, "0")}-01`;
   const nextMonth = monthV === 12 ? { y: yearV + 1, m: 1 } : { y: yearV, m: monthV + 1 };
   const monthEndExclusive = `${nextMonth.y}-${String(nextMonth.m).padStart(2, "0")}-01`;
-  const rangeStart = monthStart < weekStart ? monthStart : weekStart;
+  const rangeStart = options.dailyOnly ? logicalToday : monthStart < weekStart ? monthStart : weekStart;
   // logicalToday can briefly run ONE calendar day ahead of `today` (during
   // the UTC 23:00-23:59 hour, i.e. 02:00-02:59 Turkey time, right after
   // the shifted boundary but before literal UTC midnight) -- a task
@@ -3571,6 +3577,8 @@ export async function fetchStopwatchCompetitionRoster(
   // null -- the actual cause of every name in the Kronometre Yarışması
   // widget rendering as "—". Also added the missing error check itself,
   // so a future regression here fails loudly instead of silently again.
+  // The task rows are read in pages: a month of tracked tasks for a whole roster is well past PostgREST's 1000-row cut-off, which
+  // silently dropped the rest and under-counted the weekly / monthly totals.
   const [{ data: profiles, error: profilesError }, { data: taskRows }, { data: rankRows, error: rankError }] = await Promise.all([
     supabase
       .from("profiles")
@@ -3578,12 +3586,16 @@ export async function fetchStopwatchCompetitionRoster(
         "id, full_name, sinif_sube, active_focus_heartbeat_at, last_active_at, competition_group_id, competition_status, student_groups!profiles_competition_group_id_fkey(name)",
       )
       .in("id", studentIds),
-    supabase
-      .from("student_tasks")
-      .select("student_id, task_date, tracked_duration_minutes")
-      .in("student_id", studentIds)
-      .gte("task_date", rangeStart)
-      .lte("task_date", rangeEnd),
+    fetchAllPages<{ student_id: string; task_date: string; tracked_duration_minutes: number | null }>((from, to, withCount) =>
+      supabase
+        .from("student_tasks")
+        .select("student_id, task_date, tracked_duration_minutes", withCount ? { count: "exact" } : undefined)
+        .in("student_id", studentIds)
+        .gte("task_date", rangeStart)
+        .lte("task_date", rangeEnd)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     // Global daily rank in the shared pool + the pool's overall 1st place student when they are another coach's (migration 0132;
     // a coach cannot read the other coach's students directly, so this is a security-definer function).
     supabase.rpc("get_coach_stopwatch_ranking", { p_coach_id: coachId }),

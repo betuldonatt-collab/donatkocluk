@@ -80,6 +80,8 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
     [{ unreadCount, fullName, cohorts }, announcements, stopwatchRoster, yesterdaysWinner] = await Promise.all([
       fetchLayoutData(effectiveUserId, realUserId, isImpersonating),
       fetchCoachAnnouncements(),
+      // Daily-only: the widget shows today's minutes, the live dot and the rank (weekly/monthly belong to /coach/stopwatch, which
+      // reads them itself) -- see fetchStopwatchCompetitionRoster.
       // Skipped while impersonating for the same reason announcements is --
       // the whole panel renders inside a disabled <fieldset> then anyway,
       // so there's nothing for this widget to usefully show.
@@ -87,7 +89,7 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
         ? Promise.resolve([] as StopwatchRosterRow[])
         : (async () => {
             const supabase = await createClient();
-            return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+            return fetchStopwatchCompetitionRoster(supabase, effectiveUserId, now.getUTCFullYear(), now.getUTCMonth() + 1, { dailyOnly: true });
           })(),
       isImpersonating
         ? Promise.resolve(null as YesterdaysStopwatchWinner)

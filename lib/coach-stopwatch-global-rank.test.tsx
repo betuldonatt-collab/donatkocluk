@@ -60,8 +60,8 @@ describe("get_coach_stopwatch_ranking (migration 0132): the student's own daily 
 // --- the roster fetch ----------------------------------------------------------------------------------------------------------
 type Row = Record<string, unknown>;
 
-function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown; own?: string[] }) {
-  const calls: { rpc: { name: string; args: Record<string, unknown> }[] } = { rpc: [] };
+function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown; own?: string[]; tasks?: Row[] }) {
+  const calls: { rpc: { name: string; args: Record<string, unknown> }[]; taskGte: string[]; taskPages: number } = { rpc: [], taskGte: [], taskPages: 0 };
   const own = opts.own ?? ["own1", "own2", "own3"];
   const tables: Record<string, Row[]> = {
     coach_students: own.map((student_id) => ({ student_id })),
@@ -75,13 +75,26 @@ function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown; own?: str
       competition_status: id === "passive1" ? "passive" : "active",
       student_groups: { name: "Lise" },
     })),
-    student_tasks: [],
+    student_tasks: opts.tasks ?? [],
   };
   const client = {
     from(table: string) {
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "in", "gte", "lte", "order"]) b[m] = () => b;
-      b.then = (resolve: (v: unknown) => unknown) => resolve({ data: tables[table] ?? [], error: null });
+      let window: [number, number] | null = null;
+      for (const m of ["select", "eq", "in", "lte", "order"]) b[m] = () => b;
+      b.gte = (_col: string, value: string) => {
+        if (table === "student_tasks") calls.taskGte.push(value);
+        return b;
+      };
+      b.range = (from: number, to: number) => {
+        window = [from, to];
+        return b;
+      };
+      b.then = (resolve: (v: unknown) => unknown) => {
+        const all = tables[table] ?? [];
+        if (table === "student_tasks" && window) calls.taskPages += 1;
+        return resolve({ data: window ? all.slice(window[0], window[1] + 1) : all, error: null, count: all.length });
+      };
       return b;
     },
     rpc(name: string, args: Record<string, unknown>) {
@@ -100,6 +113,31 @@ const r = (student_id: string, is_own: boolean, daily_minutes: number, global_ra
   daily_minutes,
   global_rank,
   pool_size,
+});
+
+describe("fetchStopwatchCompetitionRoster: what it reads", () => {
+  const manyTasks = (n: number, date: string): Row[] =>
+    Array.from({ length: n }, (_, i) => ({ id: i, student_id: "own1", task_date: date, tracked_duration_minutes: 1 }));
+
+  it("the month's task rows are read in pages, so a long month is not cut at 1000 rows (weekly / monthly totals add up)", async () => {
+    const monthStart = "2026-10-01";
+    const { client, calls } = fakeSupabase({ rank: [], tasks: manyTasks(2500, monthStart) });
+    const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
+    expect(calls.taskPages).toBe(3);
+    expect(roster.find((x) => x.studentId === "own1")?.monthlyMinutes).toBe(2500);
+  });
+
+  it("dailyOnly (the coach layout's widget) reads only from today's logical day on -- not the month -- and still returns today's minutes", async () => {
+    const full = fakeSupabase({ rank: [] });
+    await fetchStopwatchCompetitionRoster(full.client as never, "coachA", 2026, 10);
+    const daily = fakeSupabase({ rank: [] });
+    const rows = await fetchStopwatchCompetitionRoster(daily.client as never, "coachA", 2026, 10, { dailyOnly: true });
+    // the lower bound of the task read is the logical day itself (the page reads from the start of the week/month)
+    expect(full.calls.taskGte[0] <= daily.calls.taskGte[0]).toBe(true);
+    expect(daily.calls.taskGte[0]).toBe(new Date(Date.now() + 3600_000).toISOString().slice(0, 10));
+    expect(rows).toHaveLength(3);
+    expect(rows.every((x) => x.weeklyMinutes === 0 && x.monthlyMinutes === 0)).toBe(true);
+  });
 });
 
 describe("fetchStopwatchCompetitionRoster: the global daily rank, kept as the database gave it", () => {

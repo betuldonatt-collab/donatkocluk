@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { isLiveNow } from "@/lib/focus-live-status";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 import { cn } from "@/lib/utils";
 import {
   createStudentGroup,
@@ -88,15 +89,13 @@ export function StopwatchRosterTable({
 
   useEffect(() => {
     const tickId = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
-    const pollId = setInterval(async () => {
-      const statuses = await getCoachLiveFocusStatuses();
-      setHeartbeats(new Map(statuses.map((s) => [s.studentId, s.activeFocusHeartbeatAt])));
-    }, LIVE_POLL_INTERVAL_MS);
-    return () => {
-      clearInterval(tickId);
-      clearInterval(pollId);
-    };
+    return () => clearInterval(tickId);
   }, []);
+  // Polled only while this tab is on screen (and once on return).
+  useVisibleInterval(async () => {
+    const statuses = await getCoachLiveFocusStatuses();
+    setHeartbeats(new Map(statuses.map((s) => [s.studentId, s.activeFocusHeartbeatAt])));
+  }, LIVE_POLL_INTERVAL_MS);
 
   function handleMonthChange(nextYear: number, nextMonth: number) {
     setYear(nextYear);

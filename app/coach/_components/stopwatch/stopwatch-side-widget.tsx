@@ -6,6 +6,7 @@ import { ChevronRight, Crown, Timer } from "lucide-react";
 
 import { useCoachStopwatchWidgetCollapsed } from "@/lib/use-coach-stopwatch-widget-collapsed";
 import { isLiveNow } from "@/lib/focus-live-status";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 import { cn } from "@/lib/utils";
 import { getCoachLiveFocusStatuses, type StopwatchRosterRow, type YesterdaysStopwatchWinner } from "../../actions";
 
@@ -77,17 +78,19 @@ export function StopwatchSideWidget({
   useEffect(() => {
     if (!showWidget) return;
     const tickId = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
-    const pollId = setInterval(() => {
+    return () => clearInterval(tickId);
+  }, [showWidget]);
+  // The live dot is polled only while this tab is on screen (and once on return).
+  useVisibleInterval(
+    () => {
       startTransition(async () => {
         const statuses = await getCoachLiveFocusStatuses();
         setHeartbeats(new Map(statuses.map((s) => [s.studentId, s.activeFocusHeartbeatAt])));
       });
-    }, LIVE_POLL_INTERVAL_MS);
-    return () => {
-      clearInterval(tickId);
-      clearInterval(pollId);
-    };
-  }, [showWidget]);
+    },
+    LIVE_POLL_INTERVAL_MS,
+    showWidget,
+  );
 
   if (!showWidget) return null;
 
