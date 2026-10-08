@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Crown, Timer, Trophy } from "lucide-react";
 
 import { useStopwatchWidgetCollapsed } from "@/lib/use-stopwatch-widget-collapsed";
 import { subscribeTick } from "@/lib/background-ticker";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 import { getRunningFocusSessions, type DailyStopwatchRanking, type RunningFocusSession } from "../../actions";
 
 // How often this widget re-reads the student's own running/paused sessions
@@ -14,7 +15,11 @@ import { getRunningFocusSessions, type DailyStopwatchRanking, type RunningFocusS
 // isn't mounted for some reason. A paused session's contribution never
 // changes on its own, so polling (rather than reacting to every click) is
 // simple and "good enough": the total catches up within one interval of any
-// Süre Tut / Mola Ver / Bitir, on this tab or another.
+// Süre Tut / Mola Ver / Bitir, on this tab or another. The poll is a READ-ONLY
+// display refresh (getRunningFocusSessions only selects): it never records
+// time -- that is the floating focus widget's heartbeat and the server-side
+// wall clock -- so it runs only while this tab is visible, and once the moment
+// the tab comes back (nothing is on screen in a hidden tab to keep fresh).
 const POLL_INTERVAL_MS = 10_000;
 
 type LiveSession = RunningFocusSession & { fetchedAt: number };
@@ -66,25 +71,18 @@ export function StopwatchWidget({ ranking }: { ranking: DailyStopwatchRanking })
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [now, setNow] = useState(() => Date.now());
 
+  const load = useCallback(() => {
+    getRunningFocusSessions()
+      .then((rows) => {
+        const fetchedAt = Date.now();
+        setSessions(rows.map((s) => ({ ...s, fetchedAt })));
+      })
+      .catch(() => {});
+  }, []);
   useEffect(() => {
-    if (!onStudentPage) return;
-    let cancelled = false;
-    function load() {
-      getRunningFocusSessions()
-        .then((rows) => {
-          if (cancelled) return;
-          const fetchedAt = Date.now();
-          setSessions(rows.map((s) => ({ ...s, fetchedAt })));
-        })
-        .catch(() => {});
-    }
-    load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [onStudentPage]);
+    if (onStudentPage) load();
+  }, [onStudentPage, load]);
+  useVisibleInterval(load, POLL_INTERVAL_MS, onStudentPage);
 
   // Ticks only while something is actually running -- a purely paused
   // contribution is frozen, so there's nothing to animate for it.

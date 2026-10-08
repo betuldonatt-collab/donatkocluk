@@ -5,6 +5,7 @@ import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS, type MissingTaskInput } fr
 import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
 import { coachCohorts, NO_COHORTS, type CoachCohorts } from "@/lib/coach-cohorts";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
+import { fetchStudentActivity, NO_ACTIVITY, type StudentActivity } from "@/lib/coach-dashboard-activity";
 import {
   getPendingFocusReviews,
   getPendingStudentTasks,
@@ -67,8 +68,7 @@ function isoTimestampDaysAgo(days: number) {
 // shape and the bucketing logic can each be read on their own.
 function buildCoachAlerts(
   roster: RosterStudent[],
-  recentActivityRows: { student_id: string; updated_at: string; created_at: string }[],
-  prevWeekTaskRows: { student_id: string; status: string }[],
+  activity: StudentActivity,
   missingExamRows: {
     id: string;
     student_id: string;
@@ -90,23 +90,11 @@ function buildCoachAlerts(
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
-  // A row only counts as genuine activity if it was touched after creation
-  // -- a freshly-assigned, never-opened task inserts with updated_at ===
-  // created_at and shouldn't count as the student being "active".
-  const activeIds = new Set(
-    recentActivityRows
-      .filter((r) => new Date(r.updated_at).getTime() !== new Date(r.created_at).getTime())
-      .map((r) => r.student_id),
-  );
+  // "Active" = a task touched after its creation in the last 3 days, and last week's done/total per student -- both counted by the
+  // database (lib/coach-dashboard-activity.ts, migration 0134), live on every render.
+  const { activeIds, prevWeek: prevWeekBuckets } = activity;
   const inactive = roster.filter((s) => !activeIds.has(s.id)).map((student) => ({ student }));
 
-  const prevWeekBuckets = new Map<string, { done: number; total: number }>();
-  for (const r of prevWeekTaskRows) {
-    const b = prevWeekBuckets.get(r.student_id) ?? { done: 0, total: 0 };
-    b.total += 1;
-    if (r.status === "done") b.done += 1;
-    prevWeekBuckets.set(r.student_id, b);
-  }
   const lowPerformance = roster.flatMap((student) => {
     const b = prevWeekBuckets.get(student.id);
     if (!b || b.total === 0) return [];
@@ -243,21 +231,11 @@ async function fetchDashboardData(
   const prevWeekMonday = addDaysISO(todayWeek[0].date, -7);
   const prevWeekSunday = addDaysISO(todayWeek[0].date, -1);
 
-  const [{ data: profiles }, { data: recentActivityRows }, { data: prevWeekTaskRows }, { data: missingExamRows }, gradeById, { data: pastDueTaskRows }] =
+  const [{ data: profiles }, activity, { data: missingExamRows }, gradeById, { data: pastDueTaskRows }] =
     studentIds.length > 0
       ? await Promise.all([
           supabase.from("profiles").select("id, full_name, exam_type, is_active").in("id", studentIds),
-          supabase
-            .from("student_tasks")
-            .select("student_id, updated_at, created_at")
-            .in("student_id", studentIds)
-            .gte("updated_at", isoTimestampDaysAgo(3)),
-          supabase
-            .from("student_tasks")
-            .select("student_id, status")
-            .in("student_id", studentIds)
-            .gte("task_date", prevWeekMonday)
-            .lte("task_date", prevWeekSunday),
+          fetchStudentActivity(supabase, studentIds, { recentSince: isoTimestampDaysAgo(3), prevFrom: prevWeekMonday, prevTo: prevWeekSunday }),
           // analysis_pending is the exact same flag the student side sets
           // (task-modal.tsx) and clears (only once the topic-mistake
           // analysis step is actually completed, by the student OR now by
@@ -284,7 +262,7 @@ async function fetchDashboardData(
             .gte("task_date", addDaysISO(today, -MISSING_TASKS_WINDOW_DAYS))
             .in("status", ["pending", "not_done"]),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, new Map<string, number | null>(), { data: [] }];
+      : [{ data: [] }, NO_ACTIVITY, { data: [] }, new Map<string, number | null>(), { data: [] }];
 
   const roster = (profiles ?? []) as RosterStudent[];
 
@@ -295,8 +273,7 @@ async function fetchDashboardData(
 
   const alerts = buildCoachAlerts(
     roster,
-    recentActivityRows ?? [],
-    prevWeekTaskRows ?? [],
+    activity,
     missingExamRows ?? [],
     pendingReportCardRows ?? [],
     (lgsTaskRows ?? []) as (MissingTaskInput & { student_id: string; title: string })[],
