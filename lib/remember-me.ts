@@ -5,16 +5,42 @@ import type { CookieOptions } from "@supabase/ssr";
 // every subsequent auth-cookie rewrite (see applyRememberMeCookieOptions
 // below, called from both lib/supabase/server.ts and
 // lib/supabase/middleware.ts). This is what makes it a SLIDING window --
-// an active user's session keeps pushing 30 days further out every time
-// they're refreshed, rather than expiring on a fixed clock from the
-// moment they logged in. Only 30 CONSECUTIVE days with no visit at all
-// (no refresh ever fires, so nothing ever re-extends either cookie) lets
-// both this marker and the Supabase session cookie it describes actually
-// expire.
+// an active user's session keeps pushing its expiry further out every
+// time it is refreshed, rather than expiring on a fixed clock from the
+// moment they logged in.
+//
+// STAYING SIGNED IN IS THE DEFAULT. Until 2026-10 the session was a
+// browser-session cookie unless the box was ticked (and the box was
+// unticked by default), so closing the tab or the home-screen app logged
+// everyone out. Now only an explicit opt-out ("remember_me" = "0", written
+// when the box is unticked at sign-in) gives the old session-cookie
+// behavior; no marker at all (existing logins, a cleared marker) counts as
+// "remember". The lifetime is 400 days -- the longest a browser will keep
+// a cookie (Chrome caps it there, and it is @supabase/ssr's own default).
+// The session then ends only on an explicit logout (signOut revokes the
+// refresh tokens), or after 400 days with no visit at all.
 export const REMEMBER_ME_COOKIE_NAME = "remember_me";
-export const REMEMBER_ME_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+export const REMEMBER_ME_OPT_OUT_VALUE = "0";
+export const REMEMBER_ME_MAX_AGE_SECONDS = 60 * 60 * 24 * 400; // 400 days
 
-// Computed fresh on every call, not a fixed constant -- always means "30
+// The marker's value -> whether the session is remembered. Only the explicit
+// opt-out turns it off.
+export function isRememberMe(markerValue: string | undefined): boolean {
+  return markerValue !== REMEMBER_ME_OPT_OUT_VALUE;
+}
+
+// A browser-session cookie (no Max-Age/Expires): the opt-out marker dies with the browser session,
+// exactly like the auth cookies it describes.
+export function rememberMeOptOutCookieOptions(): CookieOptions {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+  };
+}
+
+// Computed fresh on every call, not a fixed constant -- always means "400
 // days from right now," paired alongside maxAge below as a defense-in-depth
 // hedge for iOS/Safari (WebKit) cookie-persistence quirks. Max-Age is fully
 // supported by modern Safari, but Expires is the older, more universally

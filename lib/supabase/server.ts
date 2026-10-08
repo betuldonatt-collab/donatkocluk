@@ -1,9 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { perfFetch } from "@/lib/perf-log";
-import { applyRememberMeCookieOptions, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
+import { applyRememberMeCookieOptions, isRememberMe, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
 
-export async function createClient() {
+// `options.rememberMe` is for the sign-in action only: it says outright whether this login is remembered, instead of relying on
+// reading back the marker cookie it has just written in the same request.
+export async function createClient(options?: { rememberMe?: boolean }) {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -18,7 +20,7 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            const rememberMe = cookieStore.get(REMEMBER_ME_COOKIE_NAME)?.value === "1";
+            const rememberMe = options?.rememberMe ?? isRememberMe(cookieStore.get(REMEMBER_ME_COOKIE_NAME)?.value);
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, applyRememberMeCookieOptions(name, options, rememberMe)),
             );

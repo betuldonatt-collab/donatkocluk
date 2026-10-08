@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { perfFetch } from "@/lib/perf-log";
-import { applyRememberMeCookieOptions, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
+import { applyRememberMeCookieOptions, isRememberMe, REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
 
 const ROLE_HOME: Record<string, string> = {
   student: "/student",
@@ -24,7 +24,7 @@ export async function updateSession(request: NextRequest) {
 
   // Snapshot before any refresh below can touch request.cookies -- same
   // reasoning as hadAuthCookie further down.
-  const rememberMe = request.cookies.get(REMEMBER_ME_COOKIE_NAME)?.value === "1";
+  const rememberMe = isRememberMe(request.cookies.get(REMEMBER_ME_COOKIE_NAME)?.value);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

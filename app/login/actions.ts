@@ -7,7 +7,7 @@ import * as Sentry from "@sentry/nextjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { clearImpersonationCookie } from "@/lib/impersonation";
-import { REMEMBER_ME_COOKIE_NAME, rememberMeCookieOptions } from "@/lib/remember-me";
+import { REMEMBER_ME_COOKIE_NAME, REMEMBER_ME_OPT_OUT_VALUE, rememberMeCookieOptions, rememberMeOptOutCookieOptions } from "@/lib/remember-me";
 import { dbError } from "@/lib/errors";
 import { normalizeTurkishPhone } from "@/lib/phone";
 import { nonEmptyText, parseInput } from "@/lib/validation";
@@ -71,20 +71,19 @@ export async function signIn(
     return { error: LOCKOUT_MESSAGE };
   }
 
-  // "Beni Hatırla" -- set (or clear, if this login on this browser is now
-  // unchecked after a previous one had it checked) BEFORE createClient()
-  // below so its own setAll (lib/supabase/server.ts) sees the marker
-  // already in this same request's cookie store the moment
-  // signInWithPassword triggers it to write the session cookies.
+  // "Beni Hatırla" (ticked by default on the form): a remembered login keeps its session cookies for 400 days, sliding, until
+  // an explicit logout (lib/remember-me.ts). Unticking is the opt-out for a shared computer: a "0" marker, and the session
+  // cookies then end with the browser session. The choice is also handed to createClient() directly, so the session cookies
+  // written by signInWithPassword below never depend on reading the marker back within this same request.
   const rememberMe = formData.get("rememberMe") === "on";
   const cookieStore = await cookies();
   if (rememberMe) {
     cookieStore.set(REMEMBER_ME_COOKIE_NAME, "1", rememberMeCookieOptions());
   } else {
-    cookieStore.delete(REMEMBER_ME_COOKIE_NAME);
+    cookieStore.set(REMEMBER_ME_COOKIE_NAME, REMEMBER_ME_OPT_OUT_VALUE, rememberMeOptOutCookieOptions());
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ rememberMe });
   const { data: signInData, error } = await supabase.auth.signInWithPassword({ phone, password });
 
   if (error) {

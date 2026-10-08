@@ -113,12 +113,13 @@ export function LoginForm({
             {signInState.error && (
               <p className="text-destructive text-sm">{signInState.error}</p>
             )}
-            {/* Unchecked by default -- a shared/public computer shouldn't
-                stay signed in for 30 days just because someone logged in
-                on it once. See lib/remember-me.ts for what checking this
-                actually does (a sliding 30-day session, not a fixed one). */}
+            {/* Checked by default -- people stay signed in (a sliding 400-day
+                session, until they press Çıkış) even after closing the tab or
+                the home-screen app. Unticking it is the opt-out for a shared
+                computer: the session then ends when the browser closes.
+                See lib/remember-me.ts. */}
             <div className="flex items-center gap-2">
-              <Checkbox id="signin-remember-me" name="rememberMe" />
+              <Checkbox id="signin-remember-me" name="rememberMe" defaultChecked />
               <Label htmlFor="signin-remember-me" className="text-muted-foreground text-sm font-normal">
                 Beni Hatırla
               </Label>
