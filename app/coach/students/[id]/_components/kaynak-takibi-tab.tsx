@@ -1,5 +1,6 @@
 "use client";
 
+import { mergeSiblingTopicStats } from "@/lib/curriculum/sibling-courses";
 import { useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { toast } from "sonner";
@@ -258,13 +259,16 @@ export function KaynakTakibiTab({
         render={(course) => {
           const courseId = course.id;
           const courseData = getData(courseId);
+          // A subject shared by two fields (Matematik / Geometri: Sayısal + EA; Edebiyat / Tarih 1 / Coğrafya 1: EA + Sözel) shows
+          // the question statistics recorded under either field's course -- display only (lib/curriculum/sibling-courses.ts).
+          const topicStats = mergeSiblingTopicStats(courseId, (id) => getData(id).topicStats, courseData.topicStats);
           return (
             <>
               <EditableCourseTable
                 course={course}
                 resources={courseData.resources}
                 progress={courseData.progress}
-                topicStats={courseData.topicStats}
+                topicStats={topicStats}
                 onAddResource={(name) => handleAddResource(courseId, name)}
                 onToggle={(topicId, resourceId, field) => handleToggle(courseId, topicId, resourceId, field)}
                 onArchiveResource={(resourceId) => handleArchiveResource(courseId, resourceId)}
