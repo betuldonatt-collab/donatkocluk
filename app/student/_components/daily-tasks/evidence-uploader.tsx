@@ -1,22 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, Hourglass, ImagePlus, X } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle, Camera, Hourglass, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { EvidenceLightbox, REJECTED_PHOTO_TEXT } from "@/components/evidence-lightbox";
 import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
-import { splitDuplicateFiles } from "@/lib/task-evidence";
 import { getTaskEvidenceUrls, removeTaskEvidence, uploadTaskEvidence } from "../../actions";
+import { PhotoCaptureFlow, type StagedPhoto, type UploadOutcome } from "./photo-capture-flow";
+
+// The duplicate message moved next to the flow that raises it.
+export { DUPLICATE_PHOTO_MESSAGE } from "./photo-capture-flow";
 
 // "Kanıt Fotoğrafı": the student attaches photos of their finished work (e.g. a
 // solved test page) to the task. Every photo is shrunk in the browser first
 // (lib/image-compress.ts) so a phone photo of several MB becomes a few hundred KB
-// before it ever reaches Storage. Two entry points: the camera (capture) and the
-// gallery/files. There is no limit on the number of photos.
+// before it ever reaches Storage. One entry point, "Fotoğraf Ekle", opens the full-screen
+// multi-photo flow (photo-capture-flow.tsx): continuous in-app camera, a staging gallery,
+// crop/rotate, and one button that uploads everything staged. There is no limit on the
+// number of photos.
 //
 // A task with photos is not completed on the student's say-so: marking it done
 // holds it for the coach's approval (updateTaskProgress), and this component
@@ -28,7 +32,6 @@ type ReviewStatus = "none" | "pending" | "approved" | "rejected";
 // time) is refused. The photos in Storage are recompressed copies, so their
 // original identity is remembered per task in this browser (path -> signature)
 // and forgotten again when a photo is deleted.
-export const DUPLICATE_PHOTO_MESSAGE = "aynı fotoğrafı yükledin kontrol et.";
 
 const signatureKey = (taskId: string) => `evidence-signatures:${taskId}`;
 
@@ -70,8 +73,7 @@ export function EvidenceUploader({
   // the coach).
   onChange: (next: { paths: string[]; reviewStatus: ReviewStatus; status: string; photoStatus: PhotoStatus }) => void;
 }) {
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
+  const [flowOpen, setFlowOpen] = useState(false);
   const [urls, setUrls] = useState<string[]>([]);
   const [busy, setBusy] = useState<{ phase: "compress" | "upload"; index: number; total: number } | null>(null);
   const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
@@ -102,62 +104,56 @@ export function EvidenceUploader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, pathsKey]);
 
-  // The gallery picker allows several photos at once. They are compressed and
-  // uploaded one after another (each upload appends to the task's photo list, so
-  // running them in parallel would overwrite each other); the first failure stops
-  // the batch and says which photo and which step failed.
-  async function handleFiles(picked: File[]) {
-    let files = picked;
-    if (files.length === 0) return;
+  // Uploads the photos staged in the capture flow. They are compressed and uploaded one
+  // after another (each upload appends to the task's photo list, so running them in
+  // parallel would overwrite each other); the first failure stops the batch and says
+  // which photo and which step failed -- the flow keeps the rest staged for a retry.
+  async function uploadStaged(photos: StagedPhoto[], onPhotoDone: (id: string) => void): Promise<UploadOutcome> {
     setError(null);
-
-    // Refuse a file that is already on this task (or repeated inside this pick).
-    const signatures = { ...loadSignatures(taskId, paths), ...sessionSignatures.current };
-    const { fresh, duplicates } = splitDuplicateFiles(files, Object.values(signatures));
-    if (duplicates > 0) toast.warning(DUPLICATE_PHOTO_MESSAGE);
-    files = fresh.map((f) => f.file);
-    if (files.length === 0) return;
-
     let uploaded = 0;
-    for (const [i, file] of files.entries()) {
-      const label = files.length > 1 ? `${i + 1}. fotoğraf: ` : "";
+    for (const [i, photo] of photos.entries()) {
+      const label = photos.length > 1 ? `${i + 1}. fotoğraf: ` : "";
       try {
-        setBusy({ phase: "compress", index: i + 1, total: files.length });
-        const compressed = await compressImage(file);
-        setBusy({ phase: "upload", index: i + 1, total: files.length });
+        setBusy({ phase: "compress", index: i + 1, total: photos.length });
+        const compressed = await compressImage(photo.file);
+        setBusy({ phase: "upload", index: i + 1, total: photos.length });
         const form = new FormData();
         form.set("taskId", taskId);
         form.set("file", compressed);
         const result = await uploadTaskEvidence(form);
         if (!result.ok) {
           console.error("[evidence upload] server refused the photo:", result);
-          setError({ message: label + result.error, detail: result.detail });
-          break;
+          setBusy(null);
+          return { error: { message: label + result.error, detail: result.detail } };
         }
         uploaded += 1;
         // Remember which original file became this stored photo.
         const newPath = result.paths[result.paths.length - 1];
-        sessionSignatures.current[newPath] = fresh[i].signature;
-        saveSignatures(taskId, { ...loadSignatures(taskId, result.paths), [newPath]: fresh[i].signature });
+        sessionSignatures.current[newPath] = photo.signature;
+        saveSignatures(taskId, { ...loadSignatures(taskId, result.paths), [newPath]: photo.signature });
         onChange({
           paths: result.paths,
           reviewStatus: result.reviewStatus as ReviewStatus,
           status: result.status,
           photoStatus: result.photoStatus,
         });
+        onPhotoDone(photo.id);
       } catch (e) {
         // Thrown here (not returned by the action): the browser could not decode or
         // shrink the photo, or the request itself failed (too large, offline).
         console.error("[evidence upload] client-side failure:", e);
-        setError({
-          message: label + "Fotoğraf işlenemedi veya gönderilemedi. Başka bir fotoğraf dene.",
-          detail: `client · ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`.slice(0, 220),
-        });
-        break;
+        setBusy(null);
+        return {
+          error: {
+            message: label + "Fotoğraf işlenemedi veya gönderilemedi. Başka bir fotoğraf dene.",
+            detail: `client · ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`.slice(0, 220),
+          },
+        };
       }
     }
-    if (files.length > 1 && uploaded > 0) console.info(`[evidence upload] ${uploaded}/${files.length} photos uploaded`);
+    if (photos.length > 1 && uploaded > 0) console.info(`[evidence upload] ${uploaded}/${photos.length} photos uploaded`);
     setBusy(null);
+    return { error: null };
   }
 
   async function handleRemove(path: string) {
@@ -269,38 +265,18 @@ export function EvidenceUploader({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => cameraRef.current?.click()}>
+        <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => setFlowOpen(true)}>
           <Camera className="size-4" />
-          Fotoğraf Çek
-        </Button>
-        <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => galleryRef.current?.click()}>
-          <ImagePlus className="size-4" />
-          Galeriden Seç
+          Fotoğraf Ekle
         </Button>
       </div>
 
-      {/* capture="environment" opens the phone's rear camera directly; the second input is the plain picker. */}
-      <input
-        ref={cameraRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          void handleFiles(Array.from(e.target.files ?? []));
-          e.target.value = "";
-        }}
-      />
-      <input
-        ref={galleryRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          void handleFiles(Array.from(e.target.files ?? []));
-          e.target.value = "";
-        }}
+      <PhotoCaptureFlow
+        open={flowOpen}
+        onOpenChange={setFlowOpen}
+        knownSignatures={() => Object.values({ ...loadSignatures(taskId, paths), ...sessionSignatures.current })}
+        progress={busy}
+        onUpload={uploadStaged}
       />
 
       {busy && (

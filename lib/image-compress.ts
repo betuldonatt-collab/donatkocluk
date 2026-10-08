@@ -13,7 +13,10 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
 }
 
-async function decode(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; close: () => void }> {
+export type DecodedImage = { source: CanvasImageSource; width: number; height: number; close: () => void };
+
+// Also used by the photo editor (lib/photo-edit.ts) to draw the rotated / cropped result.
+export async function decodeImageFile(file: File): Promise<DecodedImage> {
   if (typeof createImageBitmap === "function") {
     try {
       // "from-image" applies the EXIF orientation, so a portrait phone photo is not sideways.
@@ -38,7 +41,7 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
 // Resolves to a JPEG File no larger than `targetBytes` when that is achievable;
 // otherwise the smallest attempt (the server still enforces its own hard cap).
 export async function compressImage(file: File, targetBytes: number = EVIDENCE_TARGET_BYTES): Promise<File> {
-  const decoded = await decode(file);
+  const decoded = await decodeImageFile(file);
   try {
     let smallest: Blob | null = null;
     for (const maxSide of MAX_SIDE_STEPS) {
