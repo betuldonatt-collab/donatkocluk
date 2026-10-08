@@ -165,17 +165,20 @@ export function StopwatchRosterTable({
 
   const visibleRoster = useMemo(() => {
     if (groupFilter === ALL_FILTER) return roster;
-    if (groupFilter === UNGROUPED_FILTER) return roster.filter((r) => r.competitionGroupId === null);
-    return roster.filter((r) => r.competitionGroupId === groupFilter);
-  }, [roster, groupFilter]);
+    // The other coach's 1st place student has no group of THIS coach: it belongs under the tab of the same-named group (or
+    // under "Grupsuz" when its pool is the ungrouped one).
+    const nameKey = (name: string | null) => name?.trim().toLowerCase() ?? null;
+    if (groupFilter === UNGROUPED_FILTER) {
+      return roster.filter((r) => (r.isOtherCoachStudent ? nameKey(r.competitionGroupName) === null : r.competitionGroupId === null));
+    }
+    const selectedKey = nameKey(groups.find((g) => g.id === groupFilter)?.name ?? null);
+    return roster.filter((r) => (r.isOtherCoachStudent ? nameKey(r.competitionGroupName) === selectedKey : r.competitionGroupId === groupFilter));
+  }, [roster, groupFilter, groups]);
 
-  // The trophy always goes to whoever is actually #1 among students the
-  // coach hasn't excluded -- a passive student may well have the most
-  // minutes (that's often exactly why they were flagged), but they don't
-  // get the crown, matching how they're excluded from the student-facing
-  // ranking too (get_daily_stopwatch_ranking). Computed within whatever
-  // group tab is currently visible, so switching tabs re-crowns per group.
-  const trophyStudentId = visibleRoster.find((r) => r.competitionStatus === "active" && r.monthlyMinutes > 0)?.studentId ?? null;
+  // The trophy goes to whoever is #1 in their pool GLOBALLY (globalRank 1, any coach's student) -- a passive student may well
+  // have the most minutes (that's often exactly why they were flagged), but they are not in the pool and get no crown, matching
+  // how they're excluded from the student-facing ranking too (get_daily_stopwatch_ranking).
+  const isTrophyRow = (r: StopwatchRosterRow) => r.globalRank === 1 && r.competitionStatus === "active" && r.monthlyMinutes > 0;
 
   return (
     <div className="space-y-4">
@@ -258,6 +261,7 @@ export function StopwatchRosterTable({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-border text-muted-foreground border-b text-left text-xs font-semibold tracking-wide uppercase">
+                    <th className="px-4 py-3">Sıra</th>
                     <th className="px-4 py-3">Öğrenci</th>
                     <th className="px-4 py-3">Sınıf/Şube</th>
                     <th className="px-4 py-3">Grup</th>
@@ -278,10 +282,34 @@ export function StopwatchRosterTable({
                     const heartbeatAt = heartbeats.has(row.studentId) ? (heartbeats.get(row.studentId) ?? null) : row.activeFocusHeartbeatAt;
                     const live = isLiveNow(heartbeatAt, now);
                     const isPassive = row.competitionStatus === "passive";
+                    // The other coach's 1st place student: shown with their rank and month total only -- no group / status
+                    // controls, live status or class (none of that is theirs to change or see).
+                    if (row.isOtherCoachStudent) {
+                      return (
+                        <tr key={row.studentId} className="border-border/60 bg-muted/20 border-b last:border-0" data-other-coach-winner>
+                          <td className="text-foreground px-4 py-3 font-semibold tabular-nums">{row.globalRank ?? "—"}</td>
+                          <td className="text-foreground px-4 py-3 font-medium">
+                            {isTrophyRow(row) && <span className="mr-1.5">🏆</span>}
+                            {row.fullName ?? "—"}
+                            <span className="text-muted-foreground ml-2 text-xs font-normal">Diğer koçun öğrencisi</span>
+                          </td>
+                          <td className="text-muted-foreground px-4 py-3">—</td>
+                          <td className="text-muted-foreground px-4 py-3 text-xs">{row.competitionGroupName ?? "Grupsuz"}</td>
+                          <td className="px-4 py-3" />
+                          <td className="px-4 py-3" />
+                          <td className="text-muted-foreground px-4 py-3 text-right">—</td>
+                          <td className="text-muted-foreground px-4 py-3 text-right">—</td>
+                          <td className="text-foreground px-4 py-3 text-right font-semibold tabular-nums">
+                            {formatMinutesLabel(row.monthlyMinutes)}
+                          </td>
+                        </tr>
+                      );
+                    }
                     return (
                       <tr key={row.studentId} className={cn("border-border/60 border-b last:border-0", isPassive && "opacity-60")}>
+                        <td className="text-foreground px-4 py-3 font-semibold tabular-nums">{row.globalRank ?? "—"}</td>
                         <td className="text-foreground px-4 py-3 font-medium">
-                          {row.studentId === trophyStudentId && <span className="mr-1.5">🏆</span>}
+                          {isTrophyRow(row) && <span className="mr-1.5">🏆</span>}
                           {row.fullName ?? "—"}
                         </td>
                         <td className="text-muted-foreground px-4 py-3">{row.sinifSube || "—"}</td>

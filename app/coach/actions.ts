@@ -3493,6 +3493,14 @@ export type StopwatchRosterRow = {
   competitionGroupId: string | null;
   competitionGroupName: string | null;
   competitionStatus: CompetitionStatus;
+  // The student's GLOBAL rank for the selected month among everyone in their pool -- active students of ANY coach in the same
+  // group (matched by name, see migration 0131/0132) -- and the pool's size. null for a passive student (not in a pool) or when
+  // the ranking could not be read. NOT the position in this coach's own list.
+  globalRank: number | null;
+  poolSize: number | null;
+  // true for the ONE kind of student a coach sees that is not theirs: the overall 1st place student of a pool the coach has
+  // students in (migration 0132). Read-only in the table; never in the dashboard widget.
+  isOtherCoachStudent: boolean;
 };
 
 const stopwatchMonthSchema = z.object({
@@ -3562,7 +3570,7 @@ export async function fetchStopwatchCompetitionRoster(
   // null -- the actual cause of every name in the Kronometre Yarışması
   // widget rendering as "—". Also added the missing error check itself,
   // so a future regression here fails loudly instead of silently again.
-  const [{ data: profiles, error: profilesError }, { data: taskRows }] = await Promise.all([
+  const [{ data: profiles, error: profilesError }, { data: taskRows }, { data: rankRows, error: rankError }] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -3575,8 +3583,24 @@ export async function fetchStopwatchCompetitionRoster(
       .in("student_id", studentIds)
       .gte("task_date", rangeStart)
       .lte("task_date", rangeEnd),
+    // Global rank in the shared pool + the pool's overall 1st place student when they are another coach's (migration 0132; a
+    // coach cannot read the other coach's students directly, so this is a security-definer function).
+    supabase.rpc("get_coach_stopwatch_ranking", { p_coach_id: coachId, p_month_start: monthStart, p_month_end: monthEndExclusive }),
   ]);
   if (profilesError) throw dbError(profilesError);
+  // A failed ranking read never breaks the page: the table simply shows no ranks and no other-coach winner.
+  if (rankError) console.error("[stopwatch roster] global ranking read failed:", rankError);
+  type RankRow = {
+    student_id: string;
+    full_name: string | null;
+    is_own: boolean;
+    group_name: string | null;
+    monthly_minutes: number;
+    global_rank: number;
+    pool_size: number;
+  };
+  const rankings = rankError ? [] : ((rankRows ?? []) as RankRow[]);
+  const rankByStudent = new Map(rankings.filter((r) => r.is_own).map((r) => [r.student_id, r]));
 
   const totalsByStudent = new Map<string, { daily: number; weekly: number; monthly: number }>();
   for (const id of studentIds) totalsByStudent.set(id, { daily: 0, weekly: 0, monthly: 0 });
@@ -3597,25 +3621,50 @@ export async function fetchStopwatchCompetitionRoster(
     ]),
   );
 
-  return studentIds
-    .map((id) => {
-      const totals = totalsByStudent.get(id)!;
-      const profile = profileById.get(id);
-      return {
-        studentId: id,
-        fullName: profile?.full_name ?? null,
-        sinifSube: profile?.sinif_sube ?? null,
-        dailyMinutes: totals.daily,
-        weeklyMinutes: totals.weekly,
-        monthlyMinutes: totals.monthly,
-        activeFocusHeartbeatAt: profile?.active_focus_heartbeat_at ?? null,
-        lastActiveAt: profile?.last_active_at ?? null,
-        competitionGroupId: profile?.competition_group_id ?? null,
-        competitionGroupName: profile?.student_groups?.name ?? null,
-        competitionStatus: profile?.competition_status ?? "active",
-      };
-    })
-    .sort((a, b) => b.monthlyMinutes - a.monthlyMinutes);
+  const ownRows: StopwatchRosterRow[] = studentIds.map((id) => {
+    const totals = totalsByStudent.get(id)!;
+    const profile = profileById.get(id);
+    const ranking = rankByStudent.get(id);
+    return {
+      studentId: id,
+      fullName: profile?.full_name ?? null,
+      sinifSube: profile?.sinif_sube ?? null,
+      dailyMinutes: totals.daily,
+      weeklyMinutes: totals.weekly,
+      monthlyMinutes: totals.monthly,
+      activeFocusHeartbeatAt: profile?.active_focus_heartbeat_at ?? null,
+      lastActiveAt: profile?.last_active_at ?? null,
+      competitionGroupId: profile?.competition_group_id ?? null,
+      competitionGroupName: profile?.student_groups?.name ?? null,
+      competitionStatus: profile?.competition_status ?? "active",
+      globalRank: ranking?.global_rank ?? null,
+      poolSize: ranking?.pool_size ?? null,
+      isOtherCoachStudent: false,
+    };
+  });
+
+  // The one exception to "a coach only sees their own students": the overall 1st place student of a pool the coach is in,
+  // when that student belongs to another coach. Only the name and the month's total are known (and shown) for them.
+  const otherCoachWinners: StopwatchRosterRow[] = rankings
+    .filter((r) => !r.is_own)
+    .map((r) => ({
+      studentId: r.student_id,
+      fullName: r.full_name,
+      sinifSube: null,
+      dailyMinutes: 0,
+      weeklyMinutes: 0,
+      monthlyMinutes: r.monthly_minutes,
+      activeFocusHeartbeatAt: null,
+      lastActiveAt: null,
+      competitionGroupId: null,
+      competitionGroupName: r.group_name,
+      competitionStatus: "active" as const,
+      globalRank: r.global_rank,
+      poolSize: r.pool_size,
+      isOtherCoachStudent: true,
+    }));
+
+  return [...ownRows, ...otherCoachWinners].sort((a, b) => b.monthlyMinutes - a.monthlyMinutes);
 }
 
 // The month picker's client-triggered entry point -- see

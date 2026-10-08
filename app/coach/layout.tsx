@@ -100,7 +100,9 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
         {isImpersonating ? <fieldset disabled className="contents">{children}</fieldset> : children}
       </DashboardShell>
       <AnnouncementCenter announcements={announcements} />
-      <StopwatchSideWidget roster={stopwatchRoster} yesterdaysWinner={yesterdaysWinner} />
+      {/* The dashboard widget lists the coach's own students only (live status needs their own data); the other coach's
+          1st place student appears in the /coach/stopwatch table. */}
+      <StopwatchSideWidget roster={stopwatchRoster.filter((r) => !r.isOtherCoachStudent)} yesterdaysWinner={yesterdaysWinner} />
     </div>
   );
 }
