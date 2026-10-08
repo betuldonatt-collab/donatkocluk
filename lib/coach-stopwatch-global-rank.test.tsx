@@ -13,37 +13,56 @@ import { StopwatchRosterTable } from "@/app/coach/stopwatch/_components/stopwatc
 // --- the SQL (migration 0132) ------------------------------------------------------------------------------------------------
 const sql = readFileSync(new URL("../supabase/migrations/0132_coach_stopwatch_global_ranking.sql", import.meta.url), "utf8");
 const body = sql.slice(sql.indexOf("as $$"), sql.indexOf("$$;"));
+const studentSql = readFileSync(new URL("../supabase/migrations/0131_stopwatch_ranking_across_coaches.sql", import.meta.url), "utf8");
+const studentBody = studentSql.slice(studentSql.indexOf("as $$"), studentSql.indexOf("$$;"));
 
-describe("get_coach_stopwatch_ranking (migration 0132)", () => {
-  it("is limited to the coach themself (or an admin)", () => {
+describe("get_coach_stopwatch_ranking (migration 0132): the student's own daily rank", () => {
+  it("is limited to the coach themself (or an admin) and takes no month any more", () => {
     expect(body).toMatch(/p_coach_id = \(select auth\.uid\(\)\) or public\.is_admin\(\)/);
+    expect(sql).toContain("create or replace function public.get_coach_stopwatch_ranking(p_coach_id uuid)");
+    expect(sql).toContain("drop function if exists public.get_coach_stopwatch_ranking(uuid, date, date);");
+    expect(body).not.toContain("p_month");
   });
 
-  it("ranks inside the pool -- active students of ANY coach in the same group name -- partitioned by the group name key", () => {
-    expect(body).toContain("lower(btrim(g.name))");
-    expect(body).toMatch(/rank\(\) over \(partition by t\.group_key order by t\.monthly_minutes desc\)/);
+  it("measures TODAY on the same logical day and with the same expression as the student's get_daily_stopwatch_ranking", () => {
+    for (const piece of [
+      "((now() at time zone 'utc') + interval '1 hour')::date as logical_today",
+      "st.task_date = (select logical_today from bounds)",
+      "(coalesce(sum(st.tracked_duration_seconds), 0) / 60)::int",
+    ]) {
+      expect(body, piece).toContain(piece);
+      expect(studentBody, piece).toContain(piece.replace(/^st\.task_date/, "st.task_date").replace("(coalesce(sum(st.tracked_duration_seconds), 0) / 60)::int", "(coalesce(sum(st.tracked_duration_seconds), 0) / 60)::int"));
+    }
+    // not the month, not tracked_duration_minutes
+    expect(body).not.toContain("tracked_duration_minutes");
+    expect(body).not.toContain("monthly");
+  });
+
+  it("pools like the student ranking: active students with a coach, same group name (null-safe), ranked with rank() and the 0-minutes-last rule", () => {
     expect(body).toContain("p.competition_status = 'active'");
+    expect(body).toContain("lower(btrim(g.name))");
+    expect(body).toMatch(/rank\(\) over \(partition by t\.group_key order by t\.daily_minutes desc\)/);
+    expect(body).toMatch(/when r\.daily_minutes = 0 then r\.pool_size/);
+    expect(studentBody).toMatch(/rank\(\) over \(order by total_minutes desc\)/);
+    expect(studentBody).toContain("when (select total_minutes from my_total) = 0");
   });
 
-  it("returns the coach's own students plus ONLY a pool's 1st place student(s) of someone else -- never 2nd, 3rd, ...", () => {
-    expect(body).toMatch(/where r\.is_own\s+or \(r\.raw_rank = 1 and r\.monthly_minutes > 0\)/);
-    // pools are only those the coach has students in
+  it("ranks over the WHOLE pool first and only then drops the other coach's students -- so a hidden 3rd leaves ranks 1, 2, 4, 5", () => {
+    expect(body.indexOf("rank() over")).toBeGreaterThan(-1);
+    // the visibility filter is applied after the ranked CTE, never inside it
+    expect(body.indexOf("where r.is_own")).toBeGreaterThan(body.indexOf("rank() over"));
+    expect(body).toMatch(/where r\.is_own\s+or \(r\.raw_rank = 1 and r\.daily_minutes > 0\)/);
+    // pools are only those the coach has students in; nobody of another coach below 1st is returned
     expect(body).toContain("select distinct group_key from members where is_own");
-  });
-
-  it("measures the month with the same column and window the coach's monthly column uses; 0 minutes = last place", () => {
-    expect(body).toContain("tracked_duration_minutes");
-    expect(body).toMatch(/st\.task_date >= p_month_start and st\.task_date < p_month_end/);
-    expect(body).toMatch(/when r\.monthly_minutes = 0 then r\.pool_size/);
   });
 });
 
 // --- the roster fetch ----------------------------------------------------------------------------------------------------------
 type Row = Record<string, unknown>;
 
-function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown }) {
+function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown; own?: string[] }) {
   const calls: { rpc: { name: string; args: Record<string, unknown> }[] } = { rpc: [] };
-  const own = ["own1", "own2", "own3"];
+  const own = opts.own ?? ["own1", "own2", "own3"];
   const tables: Record<string, Row[]> = {
     coach_students: own.map((student_id) => ({ student_id })),
     profiles: own.map((id, i) => ({
@@ -53,7 +72,7 @@ function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown }) {
       active_focus_heartbeat_at: null,
       last_active_at: null,
       competition_group_id: "g1",
-      competition_status: i === 2 ? "passive" : "active",
+      competition_status: id === "passive1" ? "passive" : "active",
       student_groups: { name: "Lise" },
     })),
     student_tasks: [],
@@ -73,38 +92,69 @@ function fakeSupabase(opts: { rank: Row[] | null; rankError?: unknown }) {
   return { client, calls };
 }
 
-const RANK_ROWS = [
-  { student_id: "own1", full_name: "Öğrenci 1", is_own: true, group_name: "Lise", monthly_minutes: 600, global_rank: 5, pool_size: 9 },
-  { student_id: "own2", full_name: "Öğrenci 2", is_own: true, group_name: "Lise", monthly_minutes: 0, global_rank: 9, pool_size: 9 },
-  { student_id: "other1", full_name: "Başka Koçun Öğrencisi", is_own: false, group_name: "Lise", monthly_minutes: 4000, global_rank: 1, pool_size: 9 },
-];
+const r = (student_id: string, is_own: boolean, daily_minutes: number, global_rank: number, pool_size = 9): Row => ({
+  student_id,
+  full_name: `Ad ${student_id}`,
+  is_own,
+  group_name: "Lise",
+  daily_minutes,
+  global_rank,
+  pool_size,
+});
 
-describe("fetchStopwatchCompetitionRoster: global rank and the one visible student of the other coach", () => {
-  it("asks the ranking function for this coach and the selected month's window", async () => {
-    const { client, calls } = fakeSupabase({ rank: RANK_ROWS });
+describe("fetchStopwatchCompetitionRoster: the global daily rank, kept as the database gave it", () => {
+  it("asks the ranking function for this coach only (the rank does not depend on the month picked)", async () => {
+    const { client, calls } = fakeSupabase({ rank: [] });
     await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
-    expect(calls.rpc).toEqual([{ name: "get_coach_stopwatch_ranking", args: { p_coach_id: "coachA", p_month_start: "2026-10-01", p_month_end: "2026-11-01" } }]);
+    expect(calls.rpc).toEqual([{ name: "get_coach_stopwatch_ranking", args: { p_coach_id: "coachA" } }]);
+    await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 3);
+    expect(calls.rpc[1].args).toEqual({ p_coach_id: "coachA" });
   });
 
-  it("an own student shows their GLOBAL rank (5th of 9), not their place in the coach's own list", async () => {
-    const { client } = fakeSupabase({ rank: RANK_ROWS });
+  it("pool 1-a, 2-a, 3-b, 4-a, 5-a: the coach sees ranks 1, 2, 4, 5 -- the hidden 3rd leaves a gap, 4-a is NOT renumbered to 3", async () => {
+    const { client } = fakeSupabase({
+      own: ["a1", "a2", "a4", "a5"],
+      // the database returns the coach's own rows and (only) the pool's 1st place student of the other coach -- here the 1st is
+      // the coach's own, so b3 is not returned at all
+      rank: [r("a1", true, 300, 1), r("a2", true, 240, 2), r("a4", true, 90, 4), r("a5", true, 60, 5)],
+    });
     const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
-    const own1 = roster.find((r) => r.studentId === "own1")!;
-    expect(own1).toMatchObject({ globalRank: 5, poolSize: 9, isOtherCoachStudent: false });
-    expect(roster.find((r) => r.studentId === "own2")).toMatchObject({ globalRank: 9, poolSize: 9 });
-    // a passive student is not in a pool: no rank
-    expect(roster.find((r) => r.studentId === "own3")).toMatchObject({ globalRank: null, poolSize: null, competitionStatus: "passive" });
+    expect(roster.map((x) => [x.studentId, x.globalRank])).toEqual([["a1", 1], ["a2", 2], ["a4", 4], ["a5", 5]]);
+    expect(roster.some((x) => x.isOtherCoachStudent)).toBe(false);
+    expect(roster.find((x) => x.studentId === "a4")?.poolSize).toBe(9);
   });
 
-  it("the other coach's 1st place student is included -- flagged, rank 1 -- and nobody else of theirs", async () => {
-    const { client } = fakeSupabase({ rank: RANK_ROWS });
+  it("when the other coach's student is 1st, they are shown as 1st and the coach's students keep their absolute ranks (2, 3, 5)", async () => {
+    const { client } = fakeSupabase({
+      own: ["a2", "a3", "a5"],
+      rank: [r("b1", false, 400, 1), r("a2", true, 240, 2), r("a3", true, 180, 3), r("a5", true, 60, 5)],
+    });
     const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
-    const others = roster.filter((r) => r.isOtherCoachStudent);
-    expect(others).toHaveLength(1);
-    expect(others[0]).toMatchObject({ studentId: "other1", fullName: "Başka Koçun Öğrencisi", globalRank: 1, monthlyMinutes: 4000, competitionGroupName: "Lise" });
-    expect(roster).toHaveLength(4); // 3 own + 1 winner
-    // sorted by the month's minutes, the winner on top
-    expect(roster[0].studentId).toBe("other1");
+    expect(roster.map((x) => [x.studentId, x.globalRank, x.isOtherCoachStudent])).toEqual([
+      ["b1", 1, true],
+      ["a2", 2, false],
+      ["a3", 3, false],
+      ["a5", 5, false],
+    ]);
+    expect(roster[0]).toMatchObject({ fullName: "Ad b1", dailyMinutes: 400, competitionGroupName: "Lise" });
+  });
+
+  it("is listed in rank order whatever the order the rows arrive in, and never renumbers", async () => {
+    const { client } = fakeSupabase({ own: ["a5", "a2", "a4"], rank: [r("a5", true, 60, 5), r("a2", true, 240, 2), r("a4", true, 90, 4)] });
+    const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
+    expect(roster.map((x) => x.globalRank)).toEqual([2, 4, 5]);
+  });
+
+  it("an own student's minutes today are the ranking's own figure (what their widget shows)", async () => {
+    const { client } = fakeSupabase({ own: ["a1"], rank: [r("a1", true, 77, 3)] });
+    const [row] = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
+    expect(row).toMatchObject({ dailyMinutes: 77, globalRank: 3 });
+  });
+
+  it("a passive student has no rank and comes after the ranked ones", async () => {
+    const { client } = fakeSupabase({ own: ["a1", "passive1"], rank: [r("a1", true, 10, 4)] });
+    const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
+    expect(roster.map((x) => [x.studentId, x.globalRank])).toEqual([["a1", 4], ["passive1", null]]);
   });
 
   it("when the ranking cannot be read the page still works: own students, no ranks, nobody else's", async () => {
@@ -112,15 +162,15 @@ describe("fetchStopwatchCompetitionRoster: global rank and the one visible stude
     const { client } = fakeSupabase({ rank: null, rankError: { code: "42883", message: "function does not exist" } });
     const roster = await fetchStopwatchCompetitionRoster(client as never, "coachA", 2026, 10);
     expect(roster).toHaveLength(3);
-    expect(roster.every((r) => r.globalRank === null && !r.isOtherCoachStudent)).toBe(true);
+    expect(roster.every((x) => x.globalRank === null && !x.isOtherCoachStudent)).toBe(true);
   });
 });
 
 // --- the table ----------------------------------------------------------------------------------------------------------------
-const base: Omit<StopwatchRosterRow, "studentId" | "fullName" | "monthlyMinutes" | "globalRank" | "isOtherCoachStudent"> = {
+const base: Omit<StopwatchRosterRow, "studentId" | "fullName" | "dailyMinutes" | "globalRank" | "isOtherCoachStudent"> = {
   sinifSube: "11-A",
-  dailyMinutes: 30,
   weeklyMinutes: 120,
+  monthlyMinutes: 900,
   activeFocusHeartbeatAt: null,
   lastActiveAt: null,
   competitionGroupId: "g1",
@@ -131,39 +181,47 @@ const base: Omit<StopwatchRosterRow, "studentId" | "fullName" | "monthlyMinutes"
 
 describe("the coach's stopwatch table", () => {
   const roster: StopwatchRosterRow[] = [
-    { ...base, studentId: "other1", fullName: "Başka Koçun Öğrencisi", monthlyMinutes: 4000, globalRank: 1, isOtherCoachStudent: true, competitionGroupId: null },
-    { ...base, studentId: "own1", fullName: "Benim Öğrencim", monthlyMinutes: 600, globalRank: 5, isOtherCoachStudent: false },
-    { ...base, studentId: "own2", fullName: "Diğer Öğrencim", monthlyMinutes: 300, globalRank: 7, isOtherCoachStudent: false },
+    { ...base, studentId: "other1", fullName: "Başka Koçun Öğrencisi", dailyMinutes: 400, globalRank: 1, isOtherCoachStudent: true, competitionGroupId: null, monthlyMinutes: 0, weeklyMinutes: 0 },
+    { ...base, studentId: "own2", fullName: "Benim Öğrencim", dailyMinutes: 240, globalRank: 2, isOtherCoachStudent: false },
+    { ...base, studentId: "own4", fullName: "Dördüncü Öğrencim", dailyMinutes: 90, globalRank: 4, isOtherCoachStudent: false },
+    { ...base, studentId: "own5", fullName: "Beşinci Öğrencim", dailyMinutes: 60, globalRank: 5, isOtherCoachStudent: false },
   ];
   const html = renderToStaticMarkup(
     <StopwatchRosterTable initialRoster={roster} initialGroups={[{ id: "g1", name: "Lise" } as never]} initialYear={2026} initialMonth={10} />,
   );
 
-  it("has a rank column, and each own student shows the GLOBAL rank (5 and 7, not 1 and 2)", () => {
+  it("shows each rank exactly as given -- 1, 2, 4, 5 -- with the gap where the hidden student would be", () => {
     expect(html).toContain(">Sıra<");
-    expect(html).toMatch(/tabular-nums">5<\/td><td[^>]*>Benim Öğrencim/);
-    expect(html).toMatch(/tabular-nums">7<\/td><td[^>]*>Diğer Öğrencim/);
+    const ranks = [...html.matchAll(/font-semibold tabular-nums">(\d+)<\/td><td/g)].map((m) => Number(m[1]));
+    expect(ranks).toEqual([1, 2, 4, 5]);
+    expect(html).toMatch(/tabular-nums">4<\/td><td[^>]*>Dördüncü Öğrencim/);
+    expect(html).not.toMatch(/tabular-nums">3<\/td><td/);
   });
 
-  it("shows the other coach's 1st place student -- as 1st, labelled, without any controls -- and the trophy goes to them", () => {
+  it("shows the other coach's 1st place student -- as 1st, labelled, with today's minutes, without any controls -- and the trophy goes to them", () => {
     expect(html).toContain("Başka Koçun Öğrencisi");
     expect(html).toContain("Diğer koçun öğrencisi");
     expect(html).toContain("data-other-coach-winner");
     expect(html.match(/🏆/g)).toHaveLength(1);
     expect(html.indexOf("🏆")).toBeLessThan(html.indexOf("Benim Öğrencim"));
-    // only the two own students have the group <select> and the Aktif/Pasif button
     const tbody = html.slice(html.indexOf("<tbody"));
-    expect(tbody.match(/<select/g)).toHaveLength(2);
-    expect(html.match(/title="Yarışmadan çıkarmak için tıkla"/g)).toHaveLength(2);
+    expect(tbody.match(/<select/g)).toHaveLength(3); // the three own students only
+    expect(tbody.match(/title="Yarışmadan çıkarmak için tıkla"/g)).toHaveLength(3);
+    expect(tbody).toContain("6 sa 40 dk"); // 400 minutes today
   });
 
-  it("without another coach's winner the table lists just the coach's own students", () => {
-    const own = roster.filter((r) => !r.isOtherCoachStudent);
+  it("without another coach's winner there is no extra row, and a coach's own #1 gets the trophy", () => {
+    const own = roster.filter((x) => !x.isOtherCoachStudent).map((x) => (x.studentId === "own2" ? { ...x, globalRank: 1 } : x));
     const ownHtml = renderToStaticMarkup(
       <StopwatchRosterTable initialRoster={own} initialGroups={[{ id: "g1", name: "Lise" } as never]} initialYear={2026} initialMonth={10} />,
     );
     expect(ownHtml).not.toContain("Diğer koçun öğrencisi");
-    expect(ownHtml).not.toContain("Başka Koçun Öğrencisi");
-    expect(ownHtml.match(/🏆/g) ?? []).toHaveLength(0); // nobody of theirs is 1st globally
+    expect(ownHtml.match(/🏆/g)).toHaveLength(1);
+    expect(ownHtml.indexOf("🏆")).toBeLessThan(ownHtml.indexOf("Benim Öğrencim") + 1);
+  });
+
+  it("no trophy for a rank-1 student with no time today (a solo pool that has not started)", () => {
+    const idle: StopwatchRosterRow[] = [{ ...base, studentId: "own1", fullName: "Henüz Başlamadı", dailyMinutes: 0, globalRank: 1, isOtherCoachStudent: false, poolSize: 1 }];
+    expect(renderToStaticMarkup(<StopwatchRosterTable initialRoster={idle} initialGroups={[]} initialYear={2026} initialMonth={10} />)).not.toContain("🏆");
   });
 });

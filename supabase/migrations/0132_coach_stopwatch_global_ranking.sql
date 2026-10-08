@@ -1,31 +1,36 @@
--- Kronometre Yarışması, coach panel: each of a coach's own students gets their GLOBAL rank in the shared pool (see 0131), and the
--- overall 1st place student of a pool is visible to a coach even when that student belongs to the other coach.
+-- Kronometre Yarışması, coach panel: each of a coach's own students gets the SAME rank their own widget shows (the global DAILY rank in
+-- the shared pool, see 0131), and the overall 1st place student of a pool is visible to a coach even when that student belongs to the
+-- other coach.
+--
+-- This mirrors get_daily_stopwatch_ranking() (0131) exactly, so the number a coach reads equals the number the student sees:
+--   * MEASURE: today's tracked time on the same logical day (02:00 Turkey time), (sum(tracked_duration_seconds) / 60)::int.
+--   * POOL: active students (with a coach) of the same group NAME, case-insensitive and trimmed; ungrouped students form one pool.
+--   * RANK: rank() over the WHOLE pool (ties share a rank), and a student with 0 minutes today is shown in last place (the pool
+--     size) -- the same override the student-side ranking applies.
+-- The rank is computed here, over the entire pool, BEFORE anything is hidden: when the pool is 1-a, 2-a, 3-b, 4-a, 5-a ('a' = this
+-- coach's students, 'b' = the other coach's), the coach gets ranks 1, 2, 4 and 5 -- 3-b is not returned, but 4-a still reads 4.
 --
 -- A coach cannot read another coach's students (RLS), so this is a security-definer function that returns exactly:
---   * one row per ACTIVE student of the given coach -- with their rank among everyone in the same pool (any coach), by the
---     total of the selected month, and the pool's size;
+--   * one row per ACTIVE student of the given coach: their global rank, the pool's size and their minutes today;
 --   * plus, for the pools the coach has students in, the pool's 1st place student(s) when they belong to someone else
---     (is_own = false). Nobody else of the other coach -- 2nd, 3rd, ... -- is ever returned.
--- A passive student of the coach is simply not in a pool, so gets no row (the app shows no rank for them), as in the student-side
--- ranking.
---
--- POOL = active students (with a coach) of the same group NAME, case-insensitive and trimmed -- the same rule as 0131; ungrouped
--- students form one pool. MEASURE = the sum of student_tasks.tracked_duration_minutes over the month (the same column and window
--- the coach's table shows in its monthly column). RANK = rank() within the pool (ties share a rank); a student with 0 minutes in
--- the month is shown in last place (the pool size), the same rule as the student-side leaderboard.
+--     (is_own = false) and have tracked time today. Nobody else of the other coach -- 2nd, 3rd, ... -- is ever returned.
+-- A passive student of the coach is not in a pool, so gets no row (the app shows no rank for them), as on the student side.
 --
 -- p_coach_id must be the caller (or the caller an admin, for impersonation); anyone else gets no rows.
 --
+-- Replaces the first version of this function, which took a month window (and ranked by the month); that one is dropped.
 -- Idempotent: safe to run more than once.
--- Rollback: drop function public.get_coach_stopwatch_ranking(uuid, date, date);
+-- Rollback: drop function public.get_coach_stopwatch_ranking(uuid);
 
-create or replace function public.get_coach_stopwatch_ranking(p_coach_id uuid, p_month_start date, p_month_end date)
+drop function if exists public.get_coach_stopwatch_ranking(uuid, date, date);
+
+create or replace function public.get_coach_stopwatch_ranking(p_coach_id uuid)
 returns table (
   student_id uuid,
   full_name text,
   is_own boolean,
   group_name text,
-  monthly_minutes int,
+  daily_minutes int,
   global_rank int,
   pool_size int
 )
@@ -34,7 +39,10 @@ security definer
 set search_path = public
 stable
 as $$
-  with allowed as (
+  with bounds as (
+    select ((now() at time zone 'utc') + interval '1 hour')::date as logical_today
+  ),
+  allowed as (
     select 1 as ok where p_coach_id = (select auth.uid()) or public.is_admin()
   ),
   members as (
@@ -59,17 +67,17 @@ as $$
   totals as (
     select
       m.student_id, m.full_name, m.group_name, m.group_key, m.is_own,
-      coalesce(sum(st.tracked_duration_minutes), 0)::int as monthly_minutes
+      (coalesce(sum(st.tracked_duration_seconds), 0) / 60)::int as daily_minutes
     from members m
     left join public.student_tasks st
-      on st.student_id = m.student_id and st.task_date >= p_month_start and st.task_date < p_month_end
+      on st.student_id = m.student_id and st.task_date = (select logical_today from bounds)
     where m.group_key in (select group_key from pools) or (m.group_key is null and exists (select 1 from pools where group_key is null))
     group by m.student_id, m.full_name, m.group_name, m.group_key, m.is_own
   ),
   ranked as (
     select
       t.*,
-      rank() over (partition by t.group_key order by t.monthly_minutes desc) as raw_rank,
+      rank() over (partition by t.group_key order by t.daily_minutes desc) as raw_rank,
       count(*) over (partition by t.group_key)::int as pool_size
     from totals t
   )
@@ -78,20 +86,25 @@ as $$
     r.full_name,
     r.is_own,
     r.group_name,
-    r.monthly_minutes,
-    case when r.monthly_minutes = 0 then r.pool_size else r.raw_rank::int end as global_rank,
+    r.daily_minutes,
+    case when r.daily_minutes = 0 then r.pool_size else r.raw_rank::int end as global_rank,
     r.pool_size
   from ranked r
   where r.is_own
-     or (r.raw_rank = 1 and r.monthly_minutes > 0);
+     or (r.raw_rank = 1 and r.daily_minutes > 0);
 $$;
 
-grant execute on function public.get_coach_stopwatch_ranking(uuid, date, date) to authenticated;
+grant execute on function public.get_coach_stopwatch_ranking(uuid) to authenticated;
 
 notify pgrst, 'reload schema';
 
--- Verification: expect true, and (as the coach) only your own students plus at most the 1st place student of each pool.
-select exists (
-  select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.proname = 'get_coach_stopwatch_ranking'
-) as rpc_exists;
+-- Verification: expect true, true (the month-window version is gone, the daily one exists).
+select
+  exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'get_coach_stopwatch_ranking' and p.pronargs = 1
+  ) as daily_rpc_exists,
+  not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'get_coach_stopwatch_ranking' and p.pronargs = 3
+  ) as month_version_gone;

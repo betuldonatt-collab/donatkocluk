@@ -3493,9 +3493,10 @@ export type StopwatchRosterRow = {
   competitionGroupId: string | null;
   competitionGroupName: string | null;
   competitionStatus: CompetitionStatus;
-  // The student's GLOBAL rank for the selected month among everyone in their pool -- active students of ANY coach in the same
-  // group (matched by name, see migration 0131/0132) -- and the pool's size. null for a passive student (not in a pool) or when
-  // the ranking could not be read. NOT the position in this coach's own list.
+  // The student's GLOBAL DAILY rank -- exactly the rank their own widget shows (get_daily_stopwatch_ranking) -- among everyone in
+  // their pool: active students of ANY coach in the same group (matched by name, see migration 0131/0132). It is computed over
+  // the whole pool and never recomputed here, so hiding the other coach's students leaves gaps (1, 2, 4, 5), not 1, 2, 3, 4.
+  // The pool's size comes with it. null for a passive student (not in a pool) or when the ranking could not be read.
   globalRank: number | null;
   poolSize: number | null;
   // true for the ONE kind of student a coach sees that is not theirs: the overall 1st place student of a pool the coach has
@@ -3583,9 +3584,9 @@ export async function fetchStopwatchCompetitionRoster(
       .in("student_id", studentIds)
       .gte("task_date", rangeStart)
       .lte("task_date", rangeEnd),
-    // Global rank in the shared pool + the pool's overall 1st place student when they are another coach's (migration 0132; a
-    // coach cannot read the other coach's students directly, so this is a security-definer function).
-    supabase.rpc("get_coach_stopwatch_ranking", { p_coach_id: coachId, p_month_start: monthStart, p_month_end: monthEndExclusive }),
+    // Global daily rank in the shared pool + the pool's overall 1st place student when they are another coach's (migration 0132;
+    // a coach cannot read the other coach's students directly, so this is a security-definer function).
+    supabase.rpc("get_coach_stopwatch_ranking", { p_coach_id: coachId }),
   ]);
   if (profilesError) throw dbError(profilesError);
   // A failed ranking read never breaks the page: the table simply shows no ranks and no other-coach winner.
@@ -3595,7 +3596,7 @@ export async function fetchStopwatchCompetitionRoster(
     full_name: string | null;
     is_own: boolean;
     group_name: string | null;
-    monthly_minutes: number;
+    daily_minutes: number;
     global_rank: number;
     pool_size: number;
   };
@@ -3629,7 +3630,9 @@ export async function fetchStopwatchCompetitionRoster(
       studentId: id,
       fullName: profile?.full_name ?? null,
       sinifSube: profile?.sinif_sube ?? null,
-      dailyMinutes: totals.daily,
+      // A ranked student's minutes today are the ranking's own figure -- the very number their widget shows -- so the coach
+      // reads the same minutes next to the same rank.
+      dailyMinutes: ranking ? ranking.daily_minutes : totals.daily,
       weeklyMinutes: totals.weekly,
       monthlyMinutes: totals.monthly,
       activeFocusHeartbeatAt: profile?.active_focus_heartbeat_at ?? null,
@@ -3644,16 +3647,16 @@ export async function fetchStopwatchCompetitionRoster(
   });
 
   // The one exception to "a coach only sees their own students": the overall 1st place student of a pool the coach is in,
-  // when that student belongs to another coach. Only the name and the month's total are known (and shown) for them.
+  // when that student belongs to another coach. Only the name and today's minutes are known (and shown) for them.
   const otherCoachWinners: StopwatchRosterRow[] = rankings
     .filter((r) => !r.is_own)
     .map((r) => ({
       studentId: r.student_id,
       fullName: r.full_name,
       sinifSube: null,
-      dailyMinutes: 0,
+      dailyMinutes: r.daily_minutes,
       weeklyMinutes: 0,
-      monthlyMinutes: r.monthly_minutes,
+      monthlyMinutes: 0,
       activeFocusHeartbeatAt: null,
       lastActiveAt: null,
       competitionGroupId: null,
@@ -3664,7 +3667,14 @@ export async function fetchStopwatchCompetitionRoster(
       isOtherCoachStudent: true,
     }));
 
-  return [...ownRows, ...otherCoachWinners].sort((a, b) => b.monthlyMinutes - a.monthlyMinutes);
+  // In rank order, so the "Sıra" column reads 1, 2, 4, 5 top to bottom: the global daily rank first (ties by minutes today, then
+  // the month's total); students without a rank (passive) after the ranked ones, by the month's total as before.
+  return [...ownRows, ...otherCoachWinners].sort((a, b) => {
+    if (a.globalRank !== null && b.globalRank !== null && a.globalRank !== b.globalRank) return a.globalRank - b.globalRank;
+    if (a.globalRank !== null && b.globalRank === null) return -1;
+    if (a.globalRank === null && b.globalRank !== null) return 1;
+    return b.dailyMinutes - a.dailyMinutes || b.monthlyMinutes - a.monthlyMinutes;
+  });
 }
 
 // The month picker's client-triggered entry point -- see

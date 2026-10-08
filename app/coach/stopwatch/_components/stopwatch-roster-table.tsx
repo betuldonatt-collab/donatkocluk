@@ -175,10 +175,10 @@ export function StopwatchRosterTable({
     return roster.filter((r) => (r.isOtherCoachStudent ? nameKey(r.competitionGroupName) === selectedKey : r.competitionGroupId === groupFilter));
   }, [roster, groupFilter, groups]);
 
-  // The trophy goes to whoever is #1 in their pool GLOBALLY (globalRank 1, any coach's student) -- a passive student may well
-  // have the most minutes (that's often exactly why they were flagged), but they are not in the pool and get no crown, matching
-  // how they're excluded from the student-facing ranking too (get_daily_stopwatch_ranking).
-  const isTrophyRow = (r: StopwatchRosterRow) => r.globalRank === 1 && r.competitionStatus === "active" && r.monthlyMinutes > 0;
+  // The trophy goes to whoever is #1 in their pool GLOBALLY today (globalRank 1 with time tracked today, any coach's student) -- a
+  // passive student may well have the most minutes (that's often exactly why they were flagged), but they are not in the pool
+  // and get no crown, matching how they're excluded from the student-facing ranking too (get_daily_stopwatch_ranking).
+  const isTrophyRow = (r: StopwatchRosterRow) => r.globalRank === 1 && r.competitionStatus === "active" && r.dailyMinutes > 0;
 
   return (
     <div className="space-y-4">
@@ -297,11 +297,9 @@ export function StopwatchRosterTable({
                           <td className="text-muted-foreground px-4 py-3 text-xs">{row.competitionGroupName ?? "Grupsuz"}</td>
                           <td className="px-4 py-3" />
                           <td className="px-4 py-3" />
+                          <td className="px-4 py-3 text-right tabular-nums">{formatMinutesLabel(row.dailyMinutes)}</td>
                           <td className="text-muted-foreground px-4 py-3 text-right">—</td>
                           <td className="text-muted-foreground px-4 py-3 text-right">—</td>
-                          <td className="text-foreground px-4 py-3 text-right font-semibold tabular-nums">
-                            {formatMinutesLabel(row.monthlyMinutes)}
-                          </td>
                         </tr>
                       );
                     }
