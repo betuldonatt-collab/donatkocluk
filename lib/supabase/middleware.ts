@@ -12,6 +12,21 @@ const ROLE_HOME: Record<string, string> = {
 
 const PROTECTED_ROLES = Object.keys(ROLE_HOME);
 
+// The pages a person lands on when they open the site or the home-screen app (the PWA's start_url is "/"): the panel chooser,
+// the sign-in page, the team chooser. A person who is ALREADY signed in has no business on any of them -- they are sent straight to
+// their panel. Without this, closing the tab / the app and opening it again showed the chooser, which looks exactly like being
+// logged out even though the session cookie was fine (the real cause of the "I am logged out whenever I close the app" reports).
+const ENTRY_PATHS = new Set(["/", "/login", "/team"]);
+
+// A redirect response of the proxy must carry the cookies the session refresh above just wrote: getUser() may have rotated the
+// refresh token, and a redirect built from scratch would drop the new tokens -- the browser would keep the already-used old
+// refresh token, and the next request would fail (reuse detection) and log the person out.
+function redirectKeepingCookies(request: NextRequest, supabaseResponse: NextResponse, pathname: string) {
+  const response = NextResponse.redirect(new URL(pathname, request.url));
+  supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+  return response;
+}
+
 // @supabase/ssr's default cookie name is `sb-<project-ref>-auth-token`,
 // chunked into `.0`/`.1`/... for a large JWT. This does NOT match the
 // transient `-code-verifier` cookie used mid-OAuth -- that's a different
@@ -93,7 +108,7 @@ export async function updateSession(request: NextRequest) {
 
       // No auth cookie at all -- genuinely unauthenticated.
       console.error("[proxy] no user in middleware", { path, routeRole });
-      return NextResponse.redirect(new URL("/", request.url));
+      return redirectKeepingCookies(request, supabaseResponse, "/");
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -119,7 +134,18 @@ export async function updateSession(request: NextRequest) {
         profileError: profileError?.message ?? null,
       });
       const home = profile?.role ? ROLE_HOME[profile.role] : "/";
-      return NextResponse.redirect(new URL(home, request.url));
+      return redirectKeepingCookies(request, supabaseResponse, home);
+    }
+  }
+
+  // Already signed in and opening the site / sign-in page: straight to the panel. Only for plain page loads (GET): the sign-in
+  // form itself is a Server Action POSTed to /login and must never be redirected. A deactivated account, or one without a valid
+  // role, is left on the page (the panels sign it out / send it to /login themselves), so this can never loop.
+  if (user && !routeRole && ENTRY_PATHS.has(path) && request.method === "GET") {
+    const { data: profile } = await supabase.from("profiles").select("role, is_active").eq("id", user.id).maybeSingle();
+    const role = profile?.role as string | null | undefined;
+    if (role && role in ROLE_HOME && profile?.is_active !== false) {
+      return redirectKeepingCookies(request, supabaseResponse, ROLE_HOME[role]);
     }
   }
 

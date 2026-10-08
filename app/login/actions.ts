@@ -153,6 +153,11 @@ export async function signOut(role?: string): Promise<void> {
   }
   const cookieStore = await cookies();
   cookieStore.delete(REMEMBER_ME_COOKIE_NAME);
+  // Belt and braces: the proxy sends a signed-in person away from /login, so a session cookie that somehow survived signOut would
+  // bounce them straight back into the panel. Remove every Supabase auth cookie explicitly as well.
+  for (const { name } of cookieStore.getAll()) {
+    if (/^sb-.*-auth-token(\.\d+)?$/.test(name)) cookieStore.delete(name);
+  }
   await clearImpersonationCookie();
   const safeRole = role && role in ROLE_HOME ? role : "";
   redirect(safeRole ? `/login?role=${safeRole}` : "/login");
