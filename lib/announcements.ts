@@ -119,3 +119,33 @@ export async function fetchActiveRsvpRequiredAnnouncements(): Promise<CoachAnnou
   const rows = await fetchActiveAnnouncementRows();
   return rows.filter((a) => a.requires_rsvp);
 }
+
+export type EventListing = CoachAnnouncement & {
+  is_active: boolean;
+  expiry_date: string | null;
+  // False once the announcement has left the "active, inside its display window" set the other panels show.
+  isCurrent: boolean;
+};
+
+// Every RSVP-gated event, past and expired ones included, newest first (an event with no date last). The coach's /coach/events page
+// uses it so attendance can be entered or corrected retroactively: the plain "active" query above hides an announcement after its
+// expiry date, and the roll call must stay reachable after that. `isCurrent` marks the ones that are still in the active window.
+// Capped at the most recent EVENT_LISTING_LIMIT events to keep the page bounded.
+export const EVENT_LISTING_LIMIT = 80;
+
+export async function fetchAllRsvpRequiredEvents(): Promise<EventListing[]> {
+  const supabase = await createClient();
+  const today = todayISO();
+  const sevenDaysOut = addDaysISO(today, 7);
+  const { data } = await supabase
+    .from("announcements")
+    .select("id, title, content, event_date, event_time, requires_rsvp, is_active, expiry_date")
+    .eq("requires_rsvp", true)
+    .order("event_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(EVENT_LISTING_LIMIT);
+  return (data ?? []).map((a) => ({
+    ...(a as Omit<EventListing, "isCurrent">),
+    isCurrent: a.is_active === true && (a.expiry_date === null || a.expiry_date >= today) && (a.event_date === null || a.event_date <= sevenDaysOut),
+  }));
+}

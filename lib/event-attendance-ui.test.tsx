@@ -3,12 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/coach/events/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
 vi.mock("../app/coach/events/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
+vi.mock("@/app/coach/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
+vi.mock("@/app/coach/school-exam-actions", () => ({ decideCourseRemoval: vi.fn() }));
+vi.mock("@/app/coach/school-grade-actions", () => ({ saveSchoolGradeForStudent: vi.fn(), setSchoolGradeLock: vi.fn() }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/x", useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
 
 import { Dialog } from "@/components/ui/dialog";
 import { RollCall, type RollCallStudent } from "@/app/coach/events/_components/attendance-dialog";
 import { SessionDots } from "@/app/coach/events/_components/event-attendance-section";
-import { EventAttendanceCard } from "@/app/parent/karne/[id]/event-attendance-card";
-import { buildParentEventAttendance } from "@/lib/event-attendance";
+import { EventAttendanceCard } from "@/components/event-attendance-card";
+import { KarneDetailClient as StudentKarneDetail } from "@/app/student/deneme-analizleri/karne/[id]/karne-detail-client";
+import { KarneDetailClient as ParentKarneDetail } from "@/app/parent/karne/[id]/karne-detail-client";
+import { ReportCardReview } from "@/app/coach/students/[id]/_components/karneler-tab";
+import { buildParentEventAttendance, eventsInRange } from "@/lib/event-attendance";
 
 const students: RollCallStudent[] = [
   { studentId: "s1", studentName: "Ayşe Yılmaz", rsvp: "attending", marks: { 1: "attended", 2: "not_attended" } },
@@ -109,5 +116,107 @@ describe("the parent's report card: Etkinlik Katılımı", () => {
 
   it("is not shown at all when the period has no event attendance", () => {
     expect(renderToStaticMarkup(<EventAttendanceCard events={[]} />)).toBe("");
+  });
+});
+
+describe("locking (Kilitle)", () => {
+  const html = (locked: boolean) =>
+    renderToStaticMarkup(
+      <Dialog open>
+        <RollCall eventId="e1" eventTitle="Seminer" savedSessionCount={2} locked={locked} students={students} onSaved={() => {}} />
+      </Dialog>,
+    );
+
+  it("an open roll call offers Kaydet and Kilitle, and its marks can be changed", () => {
+    const out = html(false);
+    expect(out).toContain("Kilitle");
+    expect(out).toContain("Kaydet");
+    expect(out).not.toContain("kilitlendi");
+    expect(out).not.toMatch(/<button[^>]*disabled=""[^>]*aria-label="Ayşe Yılmaz — 1\. oturum: Geldi"/);
+  });
+
+  it("a locked roll call is read-only: banner, every Geldi/Gelmedi button disabled, no Kaydet, no Kilitle, no way to change the session count", () => {
+    const out = html(true);
+    expect(out).toContain("Bu etkinliğin yoklaması kilitlendi");
+    expect(out).toContain("yoklama kilitli, salt okunur");
+    const cellButtons = out.match(/<button[^>]*aria-label="[^"]+ — \d\. oturum: (?:Geldi|Gelmedi)"[^>]*>/g) ?? [];
+    expect(cellButtons).toHaveLength(3 * 2 * 2);
+    for (const b of cellButtons) expect(b, b).toContain("disabled");
+    expect(out).not.toContain("Kaydet");
+    expect(out).not.toContain(">Kilitle<");
+    expect(out).not.toContain("Oturum sayısını değiştir");
+    // the saved marks are still shown
+    expect(out).toMatch(/aria-pressed="true"[^>]*aria-label="Ayşe Yılmaz — 1\. oturum: Geldi"|aria-label="Ayşe Yılmaz — 1\. oturum: Geldi"[^>]*aria-pressed="true"/);
+  });
+});
+
+describe("the same Etkinlik Katılımı section on every report card view", () => {
+  const events = buildParentEventAttendance({
+    announcements: [{ id: "a1", title: "Deneme Semineri", event_date: "2026-10-05" }],
+    configs: [{ announcement_id: "a1", session_count: 2 }],
+    attendance: [
+      { announcement_id: "a1", session_number: 1, status: "attended", marked_at: "2026-10-05T10:00:00Z" },
+      { announcement_id: "a1", session_number: 2, status: "not_attended", marked_at: "2026-10-05T10:00:00Z" },
+    ],
+    rsvps: [{ announcement_id: "a1", response: "attending", decline_reason: null }],
+    rangeStart: "2026-10-01",
+    rangeEnd: "2026-10-31",
+  });
+
+  it("shows the event title and the event date explicitly next to the session records", () => {
+    const out = renderToStaticMarkup(<EventAttendanceCard events={events} />);
+    expect(out).toContain("Etkinlik");
+    expect(out).toContain("Deneme Semineri");
+    expect(out).toContain("Etkinlik Tarihi:");
+    expect(out).toContain("5 Ekim 2026");
+  });
+
+  const detailProps = {
+    cycleNumber: 1,
+    rangeStart: "2026-10-01",
+    rangeEnd: "2026-10-31",
+    approvedAt: "2026-10-31T10:00:00Z",
+    coachNotes: null,
+    stats: { tyt: { current: 40, previous: null }, ayt: { current: 30, previous: null } } as never,
+    topicRows: [],
+  };
+
+  it("the parent's karne has it", () => {
+    const out = renderToStaticMarkup(<ParentKarneDetail {...detailProps} eventAttendance={events} />);
+    expect(out).toContain("Etkinlik Katılımı");
+    expect(out).toContain("Deneme Semineri");
+  });
+
+  it("the student's karne has it", () => {
+    const out = renderToStaticMarkup(<StudentKarneDetail {...detailProps} eventAttendance={events} />);
+    expect(out).toContain("Etkinlik Katılımı");
+    expect(out).toContain("Deneme Semineri");
+    expect(out).toContain("Etkinlik Tarihi:");
+    expect(out).toMatch(/1\. Oturum:[\s\S]*?Katıldı/);
+  });
+
+  it("the coach's karne has it, and shows only the events of that card's period", () => {
+    const cycle = {
+      id: "c1",
+      cycle_number: 1,
+      range_start: "2026-10-01",
+      range_end: "2026-10-31",
+      status: "approved",
+      approved_at: "2026-10-31T10:00:00Z",
+      coach_notes: null,
+      stats: detailProps.stats,
+      topic_mistakes: [],
+      generated_at: "2026-10-31T10:00:00Z",
+    } as never;
+    const inPeriod = renderToStaticMarkup(<ReportCardReview cycle={cycle} eventAttendance={eventsInRange(events, "2026-10-01", "2026-10-31")} onApproved={() => {}} onDeleted={() => {}} />);
+    expect(inPeriod).toContain("Etkinlik Katılımı");
+    expect(inPeriod).toContain("Deneme Semineri");
+    const otherPeriod = renderToStaticMarkup(<ReportCardReview cycle={cycle} eventAttendance={eventsInRange(events, "2026-11-01", "2026-11-30")} onApproved={() => {}} onDeleted={() => {}} />);
+    expect(otherPeriod).not.toContain("Etkinlik Katılımı");
+  });
+
+  it("no event in the period: the section is not shown on any of them", () => {
+    expect(renderToStaticMarkup(<StudentKarneDetail {...detailProps} eventAttendance={[]} />)).not.toContain("Etkinlik Katılımı");
+    expect(renderToStaticMarkup(<ParentKarneDetail {...detailProps} />)).not.toContain("Etkinlik Katılımı");
   });
 });

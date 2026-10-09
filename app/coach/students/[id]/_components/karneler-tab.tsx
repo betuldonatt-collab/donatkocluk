@@ -23,6 +23,8 @@ import {
 } from "@/lib/curriculum";
 import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
 import { CYCLE_DAYS, inclusiveDaySpan, karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
+import { eventsInRange, type ParentEventAttendance } from "@/lib/event-attendance";
+import { EventAttendanceCard } from "@/components/event-attendance-card";
 import { cn } from "@/lib/utils";
 import { approveReportCard, deleteReportCard, generateCycleReportCard, type CoachReportCardRow } from "../../../actions";
 import { LineChart } from "./charts/line-chart";
@@ -48,11 +50,14 @@ const STATUS_CLASSES: Record<CoachReportCardRow["status"], string> = {
 export function KarnelerTab({
   studentId,
   cycles: initialCycles,
+  eventAttendance = [],
   defaultRange,
   allTimeTrackedMinutes,
 }: {
   studentId: string;
   cycles: CoachReportCardRow[];
+  // The student's event attendance over their whole history; every report card shows the events of its own period.
+  eventAttendance?: ParentEventAttendance[];
   defaultRange: KarneRange | null;
   // All-time sum of tracked_duration_seconds across every task this
   // student has ever had, regardless of cycle -- a genuinely different
@@ -209,7 +214,12 @@ export function KarnelerTab({
 
                 {isExpanded && (
                   <div className="border-border border-t p-4">
-                    <ReportCardReview cycle={cycle} onApproved={handleApproved} onDeleted={handleDeleted} />
+                    <ReportCardReview
+                      cycle={cycle}
+                      eventAttendance={eventsInRange(eventAttendance, cycle.range_start, cycle.range_end)}
+                      onApproved={handleApproved}
+                      onDeleted={handleDeleted}
+                    />
                   </div>
                 )}
               </div>
@@ -445,10 +455,13 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: KarneTopicRow[]
 
 export function ReportCardReview({
   cycle,
+  eventAttendance = [],
   onApproved,
   onDeleted,
 }: {
   cycle: CoachReportCardRow;
+  // The events of this card's period (Etkinlik Katılımı), session by session.
+  eventAttendance?: ParentEventAttendance[];
   onApproved: (updated: CoachReportCardRow) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -518,6 +531,8 @@ export function ReportCardReview({
   return (
     <div className="space-y-4">
       {stats.totalDurationMinutes !== undefined && <TotalDurationCard totalDurationMinutes={stats.totalDurationMinutes} />}
+
+      <EventAttendanceCard events={eventAttendance} />
 
       {isMaarif11Card ? (
         <div className="space-y-2">

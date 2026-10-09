@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
+import type { ParentEventAttendance } from "@/lib/event-attendance";
 import type { DetailSession, DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 import type { CoachReportCardRow, StudentFixedTask } from "../../../actions";
 import { AnalyticsTab } from "./analytics-tab";
@@ -52,6 +53,7 @@ export function DetailTabs({
   today,
   initialWeekStats,
   karneCycles,
+  eventAttendance = [],
   defaultKarneRange,
   allTimeTrackedMinutes,
   initialTab,
@@ -78,6 +80,8 @@ export function DetailTabs({
   today: string;
   initialWeekStats: DayStat[];
   karneCycles: CoachReportCardRow[];
+  // The student's event attendance over their whole history (each report card filters its own period).
+  eventAttendance?: ParentEventAttendance[];
   defaultKarneRange: { rangeStart: string; rangeEnd: string } | null;
   allTimeTrackedMinutes: number;
   initialTab: string;
@@ -185,6 +189,7 @@ export function DetailTabs({
         <KarnelerTab
           studentId={studentId}
           cycles={karneCycles}
+          eventAttendance={eventAttendance}
           defaultRange={defaultKarneRange}
           allTimeTrackedMinutes={allTimeTrackedMinutes}
         />

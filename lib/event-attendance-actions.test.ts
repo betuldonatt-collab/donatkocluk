@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Op = { table: string; op: "select" | "upsert" | "delete"; payload?: unknown; filters: [string, string, unknown][]; options?: unknown };
+type Op = { table: string; op: "select" | "upsert" | "insert" | "delete"; payload?: unknown; filters: [string, string, unknown][]; options?: unknown };
 let ops: Op[] = [];
 let roster: string[] = [];
 let announcementExists = true;
-let failOn: { table: string; op: Op["op"] } | null = null;
+let failOn: { table: string; op: Op["op"]; message?: string; code?: string } | null = null;
+// existing session count of the event (null = never set) and the locks that exist for it
+let existingCount: number | null = null;
+let locks: { coach_id: string; locked_at?: string }[] = [];
 
 vi.mock("@/lib/impersonation", () => ({ assertNotImpersonating: async () => {} }));
 vi.mock("@sentry/nextjs", () => ({ captureException: () => {} }));
@@ -21,6 +24,11 @@ vi.mock("@/lib/supabase/server", () => ({
         op.options = options;
         return b;
       };
+      b.insert = (payload: unknown) => {
+        op.op = "insert";
+        op.payload = payload;
+        return b;
+      };
       b.delete = () => {
         op.op = "delete";
         return b;
@@ -31,21 +39,29 @@ vi.mock("@/lib/supabase/server", () => ({
           return b;
         };
       }
-      const finish = () => {
+      const finish = (single: boolean) => {
         ops.push(op);
-        if (failOn && failOn.table === table && failOn.op === op.op) return { data: null, error: { message: "boom", code: "XX000" } };
-        if (table === "coach_students") return { data: roster.map((student_id) => ({ student_id })), error: null };
+        if (failOn && failOn.table === table && failOn.op === op.op) {
+          return { data: null, error: { message: failOn.message ?? "boom", code: failOn.code ?? "XX000" } };
+        }
+        if (table === "coach_students") return { data: roster.map((student_id) => ({ student_id })), error: null, count: roster.length };
         if (table === "announcements") return { data: announcementExists ? { id: "x" } : null, error: null };
+        if (table === "announcement_attendance_config" && op.op === "select") {
+          return { data: existingCount === null ? null : { session_count: existingCount }, error: null };
+        }
+        if (table === "announcement_attendance_locks" && op.op === "select") {
+          return { data: single ? (locks.find((l) => l.coach_id === "coach1") ?? null) : locks, error: null };
+        }
         return { data: null, error: null };
       };
-      b.maybeSingle = async () => finish();
-      b.then = (resolve: (v: unknown) => unknown) => resolve(finish());
+      b.maybeSingle = async () => finish(true);
+      b.then = (resolve: (v: unknown) => unknown) => resolve(finish(false));
       return b;
     },
   }),
 }));
 
-import { saveEventAttendance } from "@/app/coach/events/actions";
+import { lockEventAttendance, saveEventAttendance } from "@/app/coach/events/actions";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const S1 = "22222222-2222-4222-8222-222222222222";
@@ -57,6 +73,8 @@ beforeEach(() => {
   roster = [S1, S2];
   announcementExists = true;
   failOn = null;
+  existingCount = null;
+  locks = [];
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -141,5 +159,82 @@ describe("saveEventAttendance: the roll call is saved in one go", () => {
     const r = await saveEventAttendance(A, 1, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
     expect(r.success).toBe(false);
     expect(typeof (r as { error: string }).error).toBe("string");
+  });
+
+  it("works for a past event too: nothing in the action looks at the event's date or whether it is still active (retroactive entry)", async () => {
+    const r = await saveEventAttendance(A, 1, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
+    expect(r).toEqual({ success: true, sessionCount: 1 });
+    // the only thing asked of the event is that it exists
+    const eventReads = ops.filter((o) => o.table === "announcements");
+    expect(eventReads).toHaveLength(1);
+    expect(eventReads[0].filters).toEqual([["eq", "id", A]]);
+  });
+});
+
+describe("saveEventAttendance: a locked roll call is final", () => {
+  it("this coach's lock refuses the save before anything is written", async () => {
+    locks = [{ coach_id: "coach1" }];
+    const r = await saveEventAttendance(A, 1, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
+    expect(r).toEqual({ success: false, error: "Bu etkinliğin yoklaması kilitli; artık değiştirilemez." });
+    expect(writes()).toEqual([]);
+  });
+
+  it("another coach's lock freezes the session count (a different count is refused) but not this coach's own marks", async () => {
+    locks = [{ coach_id: "otherCoach" }];
+    existingCount = 2;
+    const refused = await saveEventAttendance(A, 3, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
+    expect(refused).toMatchObject({ success: false });
+    expect((refused as { error: string }).error).toContain("oturum sayısı artık değiştirilemez");
+    expect(writes()).toEqual([]);
+
+    const ok = await saveEventAttendance(A, 2, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
+    expect(ok).toEqual({ success: true, sessionCount: 2 });
+    // the same count is not even written again
+    expect(writes().some((o) => o.table === "announcement_attendance_config")).toBe(false);
+    expect(writes().some((o) => o.table === "announcement_attendance" && o.op === "upsert")).toBe(true);
+  });
+
+  it("the database guard's refusal (migration 0135) comes back as the same clear message, not a generic error", async () => {
+    failOn = { table: "announcement_attendance", op: "upsert", message: "attendance_locked: bu etkinliğin yoklaması kilitli, değiştirilemez." };
+    const r = await saveEventAttendance(A, 1, [{ studentId: S1, sessionNumber: 1, status: "attended" }]);
+    expect(r).toEqual({ success: false, error: "Bu etkinliğin yoklaması kilitli; artık değiştirilemez." });
+  });
+});
+
+describe("lockEventAttendance (Kilitle)", () => {
+  it("locks this coach's roll call once a session count exists", async () => {
+    existingCount = 2;
+    locks = [{ coach_id: "coach1", locked_at: "2026-10-09T10:00:00Z" }];
+    const r = await lockEventAttendance(A);
+    expect(r).toEqual({ success: true, lockedAt: "2026-10-09T10:00:00Z" });
+    const insert = writes().find((o) => o.table === "announcement_attendance_locks");
+    expect(insert).toMatchObject({ op: "insert", payload: { announcement_id: A, coach_id: "coach1" } });
+  });
+
+  it("is refused before a roll call was ever saved (no session count yet)", async () => {
+    const r = await lockEventAttendance(A);
+    expect(r).toEqual({ success: false, error: "Önce oturum sayısını belirleyip yoklamayı kaydet." });
+    expect(writes()).toEqual([]);
+  });
+
+  it("is refused for a coach with no students, and for a malformed id", async () => {
+    roster = [];
+    existingCount = 1;
+    expect((await lockEventAttendance(A)).success).toBe(false);
+    expect((await lockEventAttendance("nope")).success).toBe(false);
+    expect(writes()).toEqual([]);
+  });
+
+  it("locking an already locked roll call is not an error", async () => {
+    existingCount = 1;
+    locks = [{ coach_id: "coach1", locked_at: "2026-10-09T10:00:00Z" }];
+    failOn = { table: "announcement_attendance_locks", op: "insert", code: "23505", message: "duplicate key" };
+    const r = await lockEventAttendance(A);
+    expect(r).toEqual({ success: true, lockedAt: "2026-10-09T10:00:00Z" });
+  });
+
+  it("there is no unlock action", async () => {
+    const actions = await import("@/app/coach/events/actions");
+    expect(Object.keys(actions).sort()).toEqual(["lockEventAttendance", "saveEventAttendance"]);
   });
 });

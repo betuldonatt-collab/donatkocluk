@@ -7,7 +7,7 @@ function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-// The "Etkinlik Katılımı" section of the parent's report card: for every event of the period the coach took attendance for, the
+// The "Etkinlik Katılımı" section of a report card -- the SAME section on the parent's, the student's and the coach's view: for every event of the period the coach took attendance for, the
 // session-by-session roll call ("1. Oturum: Katıldı, 2. Oturum: Katılmadı") next to what the student said in the RSVP -- and a red
 // warning when they said they would come and did not (a milder amber one when they missed only some sessions).
 // Pure markup (no state), so it also prints with the rest of the card.
@@ -30,9 +30,12 @@ export function EventAttendanceCard({ events }: { events: ParentEventAttendance[
               )}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="space-y-0.5">
+                  <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Etkinlik</p>
                   <p className="text-foreground text-sm font-semibold">{event.title}</p>
-                  <p className="text-muted-foreground text-xs">{formatDate(event.date)}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Etkinlik Tarihi: <span className="text-foreground font-medium">{formatDate(event.date)}</span>
+                  </p>
                 </div>
                 <p className="text-muted-foreground text-xs">
                   Öğrencinin yanıtı: <span className="text-foreground font-medium">{rsvpLabel(event.rsvp)}</span>

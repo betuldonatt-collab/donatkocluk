@@ -13,7 +13,7 @@ import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, type Course, type Trac
 import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
 import { karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
 import type { ParentEventAttendance } from "@/lib/event-attendance";
-import { EventAttendanceCard } from "./event-attendance-card";
+import { EventAttendanceCard } from "@/components/event-attendance-card";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });

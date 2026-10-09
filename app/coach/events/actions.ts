@@ -24,6 +24,17 @@ import { SESSION_COUNT_MAX } from "@/lib/event-attendance";
 // one of these two plain, JSON-serializable shapes, and the dialog checks
 // `.success` instead of relying on try/catch around the call.
 export type SaveAttendanceResult = { success: true; sessionCount: number } | { success: false; error: string };
+export type LockAttendanceResult = { success: true; lockedAt: string } | { success: false; error: string };
+
+const LOCKED_MESSAGE = "Bu etkinliğin yoklaması kilitli; artık değiştirilemez.";
+const COUNT_FROZEN_MESSAGE = "Bir koç yoklamayı kilitlediği için bu etkinliğin oturum sayısı artık değiştirilemez.";
+
+// The database guard (migration 0135) raises "attendance_locked: ..." when a write hits a locked roll call or the frozen session count;
+// that is an expected outcome, not an error to log -- anything else goes through dbError (which logs and masks it).
+function failure(error: { message?: string }): { success: false; error: string } {
+  if (typeof error.message === "string" && error.message.includes("attendance_locked")) return { success: false, error: LOCKED_MESSAGE };
+  return { success: false, error: dbError(error as never).message };
+}
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -76,7 +87,7 @@ export async function saveEventAttendance(
 
     // The coach's whole roster: every student in the marks must be on it (RLS would refuse the writes anyway, but the person gets a clear message).
     const { data: rosterLinks, error: rosterError } = await supabase.from("coach_students").select("student_id").eq("coach_id", user.id);
-    if (rosterError) return { success: false, error: dbError(rosterError).message };
+    if (rosterError) return failure(rosterError);
     const rosterIds = new Set((rosterLinks ?? []).map((l) => l.student_id as string));
     if (input.marks.some((m) => !rosterIds.has(m.studentId))) throw new Error("Bu öğrenci sana atanmamış.");
 
@@ -85,15 +96,31 @@ export async function saveEventAttendance(
       .select("id")
       .eq("id", input.announcementId)
       .maybeSingle();
-    if (announcementError) return { success: false, error: dbError(announcementError).message };
+    if (announcementError) return failure(announcementError);
     if (!announcement) throw new Error("Etkinlik bulunamadı.");
 
-    // 1. The event's session count (shared by every coach).
-    const { error: configError } = await supabase.from("announcement_attendance_config").upsert(
-      { announcement_id: input.announcementId, session_count: input.sessionCount, updated_by: user.id, updated_at: new Date().toISOString() },
-      { onConflict: "announcement_id" },
-    );
-    if (configError) return { success: false, error: dbError(configError).message };
+    // A locked roll call is final (the database refuses the writes too; this just gives the clear message first).
+    const { data: lockRows, error: lockError } = await supabase.from("announcement_attendance_locks").select("coach_id").eq("announcement_id", input.announcementId);
+    if (lockError) return failure(lockError);
+    if ((lockRows ?? []).some((l) => l.coach_id === user.id)) return { success: false, error: LOCKED_MESSAGE };
+    const someoneLocked = (lockRows ?? []).length > 0;
+
+    // 1. The event's session count (shared by every coach). Once any coach has locked the event it is frozen: the same count is fine,
+    //    a different one is refused.
+    const { data: existingConfig, error: existingConfigError } = await supabase
+      .from("announcement_attendance_config")
+      .select("session_count")
+      .eq("announcement_id", input.announcementId)
+      .maybeSingle();
+    if (existingConfigError) return failure(existingConfigError);
+    if (existingConfig?.session_count !== input.sessionCount) {
+      if (someoneLocked) return { success: false, error: COUNT_FROZEN_MESSAGE };
+      const { error: configError } = await supabase.from("announcement_attendance_config").upsert(
+        { announcement_id: input.announcementId, session_count: input.sessionCount, updated_by: user.id, updated_at: new Date().toISOString() },
+        { onConflict: "announcement_id" },
+      );
+      if (configError) return failure(configError);
+    }
 
     // 2. Sessions that no longer exist (the count was lowered): their records go, for this coach's roster.
     if (rosterIds.size > 0) {
@@ -103,7 +130,7 @@ export async function saveEventAttendance(
         .eq("announcement_id", input.announcementId)
         .in("student_id", [...rosterIds])
         .gt("session_number", input.sessionCount);
-      if (trimError) return { success: false, error: dbError(trimError).message };
+      if (trimError) return failure(trimError);
     }
 
     // The last mark for a (student, session) wins.
@@ -122,7 +149,7 @@ export async function saveEventAttendance(
         .eq("announcement_id", input.announcementId)
         .eq("session_number", sessionNumber)
         .in("student_id", studentIds);
-      if (error) return { success: false, error: dbError(error).message };
+      if (error) return failure(error);
     }
 
     // 4. The marks.
@@ -139,7 +166,7 @@ export async function saveEventAttendance(
         })),
         { onConflict: "announcement_id,student_id,session_number" },
       );
-      if (error) return { success: false, error: dbError(error).message };
+      if (error) return failure(error);
     }
 
     // No revalidatePath: the dialog applies the saved state to the page's own
@@ -148,6 +175,49 @@ export async function saveEventAttendance(
     return { success: true, sessionCount: input.sessionCount };
   } catch (e) {
     console.error("[coach events attendance]", e);
+    Sentry.captureException(e);
+    return { success: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
+  }
+}
+
+// Kilitle: this coach's roll call for the event becomes final -- read-only for everybody from then on (the database enforces it, see
+// migration 0135). The session count has to exist (a roll call was saved at least once). There is deliberately no way to undo it.
+export async function lockEventAttendance(announcementId: string): Promise<LockAttendanceResult> {
+  try {
+    await assertNotImpersonating();
+    const announcementIdV = parseInput(uuidSchema, announcementId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+
+    const { count: rosterCount, error: rosterError } = await supabase
+      .from("coach_students")
+      .select("student_id", { count: "exact", head: true })
+      .eq("coach_id", user.id);
+    if (rosterError) return failure(rosterError);
+    if (!rosterCount) throw new Error("Öğrencin olmadığı için yoklamayı kilitleyemezsin.");
+
+    const { data: config, error: configError } = await supabase
+      .from("announcement_attendance_config")
+      .select("session_count")
+      .eq("announcement_id", announcementIdV)
+      .maybeSingle();
+    if (configError) return failure(configError);
+    if (!config) throw new Error("Önce oturum sayısını belirleyip yoklamayı kaydet.");
+
+    const { error } = await supabase.from("announcement_attendance_locks").insert({ announcement_id: announcementIdV, coach_id: user.id });
+    // 23505 = already locked: the outcome the person wanted, so not an error.
+    if (error && error.code !== "23505") return failure(error);
+
+    const { data: lock, error: readError } = await supabase
+      .from("announcement_attendance_locks")
+      .select("locked_at")
+      .eq("announcement_id", announcementIdV)
+      .eq("coach_id", user.id)
+      .maybeSingle();
+    if (readError) return failure(readError);
+    return { success: true, lockedAt: (lock?.locked_at as string | undefined) ?? new Date().toISOString() };
+  } catch (e) {
+    console.error("[coach events attendance lock]", e);
     Sentry.captureException(e);
     return { success: false, error: e instanceof Error ? e.message : GENERIC_DB_ERROR };
   }

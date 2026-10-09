@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildParentEventAttendance, parseSessionCount, rsvpLabel, sessionStatusLabel, summarizeStudentEvent } from "./event-attendance";
-import { fetchParentEventAttendance } from "./parent-event-attendance";
+import { fetchStudentEventAttendance } from "./student-event-attendance";
 
 describe("parseSessionCount", () => {
   it("accepts whole numbers 1..20 (numbers or numeric text)", () => {
@@ -128,7 +128,7 @@ describe("buildParentEventAttendance", () => {
   });
 });
 
-describe("fetchParentEventAttendance", () => {
+describe("fetchStudentEventAttendance", () => {
   function fakeClient(tables: Record<string, { data: unknown[] | null; error?: unknown }>) {
     return {
       from(table: string) {
@@ -147,7 +147,7 @@ describe("fetchParentEventAttendance", () => {
       announcement_attendance_config: { data: [{ announcement_id: "a1", session_count: 1 }] },
       announcement_rsvps: { data: [{ announcement_id: "a1", response: "attending", decline_reason: null }] },
     });
-    const events = await fetchParentEventAttendance(client as never, "s1", "2026-10-01", "2026-10-31");
+    const events = await fetchStudentEventAttendance(client as never, "s1", "2026-10-01", "2026-10-31");
     expect(events).toHaveLength(1);
     expect(events[0].summary.noShow).toBe(true);
   });
@@ -155,7 +155,7 @@ describe("fetchParentEventAttendance", () => {
   it("a failed read gives no events instead of breaking the report card", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const client = fakeClient({ announcement_attendance: { data: null, error: { message: "column session_number does not exist" } } });
-    expect(await fetchParentEventAttendance(client as never, "s1", "2026-10-01", "2026-10-31")).toEqual([]);
+    expect(await fetchStudentEventAttendance(client as never, "s1", "2026-10-01", "2026-10-31")).toEqual([]);
   });
 });
 
@@ -177,5 +177,29 @@ describe("migration 0135", () => {
     expect(sql).toContain("attendance_config_coach_write");
     expect(sql).toContain("attendance_config_admin_all");
     expect(sql).toContain("notify pgrst, 'reload schema';");
+  });
+});
+
+describe("migration 0135: locking", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/0135_attendance_sessions.sql", import.meta.url), "utf8");
+
+  it("one lock per (event, coach), created by the coach themself, with NO update/delete policy for coaches (no unlock from the app)", () => {
+    expect(sql).toContain("create table if not exists public.announcement_attendance_locks");
+    expect(sql).toContain("primary key (announcement_id, coach_id)");
+    expect(sql).toMatch(/attendance_locks_coach_insert[\s\S]*for insert to authenticated[\s\S]*coach_id = \(select auth\.uid\(\)\)/);
+    expect(sql).not.toMatch(/attendance_locks_coach_(update|delete|all)/);
+  });
+
+  it("a trigger freezes the attendance rows of a locked coach's students for everyone, but lets cascades (deleting the event or the student) through", () => {
+    expect(sql).toContain("create trigger announcement_attendance_guard_locked");
+    expect(sql).toMatch(/before insert or update or delete on public\.announcement_attendance/);
+    expect(sql).toContain("pg_trigger_depth() > 1");
+    expect(sql).toMatch(/guard_locked_attendance\(\)[\s\S]*security definer/);
+    expect(sql).toContain("raise exception 'attendance_locked:");
+  });
+
+  it("once anyone has locked an event its session count is frozen", () => {
+    expect(sql).toContain("create trigger announcement_attendance_config_guard_locked");
+    expect(sql).toContain("new.session_count is distinct from old.session_count");
   });
 });

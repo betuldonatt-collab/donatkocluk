@@ -68,6 +68,11 @@ export type ParentEventAttendance = {
   summary: StudentEventSummary;
 };
 
+// The events of a period out of a longer list (the coach's page reads the student's whole history once and filters per report card).
+export function eventsInRange(events: ParentEventAttendance[], rangeStart: string, rangeEnd: string): ParentEventAttendance[] {
+  return events.filter((e) => e.date >= rangeStart && e.date <= rangeEnd);
+}
+
 type AnnouncementRow = { id: string; title: string; event_date: string | null };
 type ConfigRow = { announcement_id: string; session_count: number };
 type AttendanceRow = { announcement_id: string; session_number: number; status: AttendanceStatus; marked_at: string };

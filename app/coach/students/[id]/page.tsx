@@ -26,6 +26,7 @@ import { MissingTasksCard } from "./_components/missing-tasks-card";
 import { PendingFocusReviewsCard } from "./_components/pending-focus-reviews-card";
 import { findMissingTasks, MISSING_TASKS_WINDOW_DAYS } from "@/lib/missing-tasks";
 import { fetchAllPages } from "@/lib/paged-select";
+import { fetchStudentEventAttendance } from "@/lib/student-event-attendance";
 import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
@@ -202,6 +203,7 @@ async function fetchStudentDetail(studentId: string) {
     { data: coachLink },
     { data: lgsRoutineRows },
     { data: pipelineRows, error: pipelineError },
+    eventAttendance,
   ] = await Promise.all([
       // The student's WHOLE task history, slim: only the columns the percentages / question totals need (HISTORY_COLUMNS),
       // read in pages so a long history is neither dragged over the wire as full rows nor cut at the API's row cap.
@@ -335,6 +337,8 @@ async function fetchStudentDetail(studentId: string) {
             .order("topic_id", { ascending: true })
             .range(from, to) as unknown as PromiseLike<{ data: PipelineRow[] | null; error: unknown; count?: number | null }>,
       ),
+      // The student's event attendance (Yoklama) over their whole history; each report card shows the events of its own period.
+      fetchStudentEventAttendance(supabase, studentId, "0000-01-01", "9999-12-31"),
     ]);
 
   // A missing pipeline table reads as empty.
@@ -660,6 +664,7 @@ async function fetchStudentDetail(studentId: string) {
     today,
     weekStats,
     karneCycles: (reportCardRows ?? []) as CoachReportCardRow[],
+    eventAttendance,
     // reportCardRows is ordered cycle_number descending, so [0] is the
     // latest cycle -- same "chain off the last cycle" rule as
     // generateCycleReportCard's own default, computed here only to seed
@@ -744,6 +749,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   today={detail.today}
                   initialWeekStats={detail.weekStats}
                   karneCycles={detail.karneCycles}
+                  eventAttendance={detail.eventAttendance}
                   defaultKarneRange={detail.defaultKarneRange}
                   allTimeTrackedMinutes={detail.allTimeTrackedMinutes}
                   initialTab={initialTab}

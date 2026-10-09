@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,10 @@ export type EventData = {
   title: string;
   eventDate: string | null;
   eventTime: string | null;
+  // False for an event that has left the active window (past / expired): still open for retroactive entry.
+  isCurrent: boolean;
+  // When this coach locked the roll call (null = open). A locked roll call is read-only.
+  lockedAt: string | null;
   // How many sessions the event has, once a coach has said so (null = not asked yet).
   sessionCount: number | null;
   attending: EventStudentRow[];
@@ -100,9 +104,16 @@ export function EventAttendanceSection({ event }: { event: EventData }) {
     ...data.pending.map((r) => ({ row: r, rsvp: null as RsvpResponse | null })),
   ].map(({ row, rsvp }) => ({ studentId: row.studentId, studentName: row.studentName, rsvp, marks: row.marks }));
 
-  function handleSaved(sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>) {
+  function handleSaved(sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>, lockedAt?: string) {
     const apply = (rows: EventStudentRow[]) => rows.map((r) => ({ ...r, marks: marksByStudent[r.studentId] ?? r.marks }));
-    setData((prev) => ({ ...prev, sessionCount, attending: apply(prev.attending), notAttending: apply(prev.notAttending), pending: apply(prev.pending) }));
+    setData((prev) => ({
+      ...prev,
+      sessionCount,
+      lockedAt: lockedAt ?? prev.lockedAt,
+      attending: apply(prev.attending),
+      notAttending: apply(prev.notAttending),
+      pending: apply(prev.pending),
+    }));
   }
 
   const hasStudents = students.length > 0;
@@ -111,7 +122,16 @@ export function EventAttendanceSection({ event }: { event: EventData }) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div className="space-y-1">
-          <CardTitle className="text-base">{data.title}</CardTitle>
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            {data.title}
+            {!data.isCurrent && <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">Geçmiş etkinlik</span>}
+            {data.lockedAt && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                <Lock className="size-3" />
+                Kilitli
+              </span>
+            )}
+          </CardTitle>
           {data.eventDate && (
             <p className="text-muted-foreground text-xs">
               {formatEventDate(data.eventDate)}
@@ -121,8 +141,8 @@ export function EventAttendanceSection({ event }: { event: EventData }) {
           )}
         </div>
         <Button type="button" size="sm" variant="outline" disabled={!hasStudents} onClick={() => setOpen(true)}>
-          <ClipboardCheck className="size-4" />
-          {data.sessionCount === null ? "Yoklama Al" : "Yoklamayı Düzenle"}
+          {data.lockedAt ? <Lock className="size-4" /> : <ClipboardCheck className="size-4" />}
+          {data.lockedAt ? "Yoklamayı Gör" : data.sessionCount === null ? "Yoklama Al" : "Yoklamayı Düzenle"}
         </Button>
       </CardHeader>
       <CardContent>
@@ -139,6 +159,7 @@ export function EventAttendanceSection({ event }: { event: EventData }) {
         eventId={data.id}
         eventTitle={data.title}
         savedSessionCount={data.sessionCount}
+        locked={data.lockedAt !== null}
         students={students}
         onSaved={handleSaved}
       />

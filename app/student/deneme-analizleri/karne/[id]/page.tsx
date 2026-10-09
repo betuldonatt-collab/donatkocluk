@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import type { KarneTopicRow, NetSummary } from "@/lib/karne";
+import { fetchStudentEventAttendance } from "@/lib/student-event-attendance";
 import { KarneDetailClient } from "./karne-detail-client";
 
 async function fetchReportCard(studentId: string, id: string) {
@@ -23,6 +24,9 @@ export default async function KarneDetailPage(props: PageProps<"/student/deneme-
   const { id } = await props.params;
   const view = await getViewContext("student");
   const cycle = view ? await fetchReportCard(view.effectiveUserId, id) : null;
+  // Event attendance (Yoklama) of this period, read live -- the same section the parent and the coach see.
+  const eventAttendance =
+    view && cycle ? await fetchStudentEventAttendance(await createClient(), view.effectiveUserId, cycle.range_start, cycle.range_end) : [];
 
   if (!cycle) {
     return (
@@ -48,6 +52,7 @@ export default async function KarneDetailPage(props: PageProps<"/student/deneme-
       coachNotes={cycle.coach_notes}
       stats={cycle.stats as NetSummary}
       topicRows={cycle.topic_mistakes as KarneTopicRow[]}
+      eventAttendance={eventAttendance}
     />
   );
 }

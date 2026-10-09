@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { parseSessionCount, rsvpLabel, SESSION_COUNT_MAX, type AttendanceStatus, type RsvpResponse } from "@/lib/event-attendance";
-import { saveEventAttendance } from "../actions";
+import { lockEventAttendance, saveEventAttendance } from "../actions";
 
 // One student of the roll call: who they are, what they said in the RSVP, and the marks already saved (session number -> status).
 export type RollCallStudent = {
@@ -32,6 +32,8 @@ function initialDraft(students: RollCallStudent[], sessionCount: number | null):
   return draft;
 }
 
+type Saved = (sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>, lockedAt?: string) => void;
+
 // Step 1 asks "how many sessions does this event have?", step 2 is the Geldi / Gelmedi checklist -- one cell per student per session.
 // Nothing is written until "Kaydet": the whole roll call goes in one request (saveEventAttendance).
 export function AttendanceDialog({
@@ -40,6 +42,7 @@ export function AttendanceDialog({
   eventId,
   eventTitle,
   savedSessionCount,
+  locked,
   students,
   onSaved,
 }: {
@@ -48,8 +51,10 @@ export function AttendanceDialog({
   eventId: string;
   eventTitle: string;
   savedSessionCount: number | null;
+  // This coach has locked the roll call: everything is read-only.
+  locked: boolean;
   students: RollCallStudent[];
-  onSaved: (sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>) => void;
+  onSaved: Saved;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -59,9 +64,10 @@ export function AttendanceDialog({
           eventId={eventId}
           eventTitle={eventTitle}
           savedSessionCount={savedSessionCount}
+          locked={locked}
           students={students}
-          onSaved={(count, marks) => {
-            onSaved(count, marks);
+          onSaved={(count, marks, lockedAt) => {
+            onSaved(count, marks, lockedAt);
             onOpenChange(false);
           }}
         />
@@ -74,16 +80,19 @@ export function RollCall({
   eventId,
   eventTitle,
   savedSessionCount,
+  locked = false,
   students,
   onSaved,
 }: {
   eventId: string;
   eventTitle: string;
   savedSessionCount: number | null;
+  locked?: boolean;
   students: RollCallStudent[];
-  onSaved: (sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>) => void;
+  onSaved: Saved;
 }) {
   const [step, setStep] = useState<"count" | "roll">(savedSessionCount === null ? "count" : "roll");
+  const [confirmLock, setConfirmLock] = useState(false);
   const [sessionCount, setSessionCount] = useState<number>(savedSessionCount ?? 1);
   const [countInput, setCountInput] = useState(String(savedSessionCount ?? 1));
   const [countError, setCountError] = useState<string | null>(null);
@@ -108,6 +117,7 @@ export function RollCall({
   }
 
   function toggle(studentId: string, n: number, status: AttendanceStatus) {
+    if (locked) return;
     setDraft((prev) => {
       const next = { ...prev };
       if (next[keyOf(studentId, n)] === status) delete next[keyOf(studentId, n)];
@@ -117,6 +127,7 @@ export function RollCall({
   }
 
   function markAll(n: number, status: AttendanceStatus) {
+    if (locked) return;
     setDraft((prev) => {
       const next = { ...prev };
       for (const s of students) next[keyOf(s.studentId, n)] = status;
@@ -124,7 +135,9 @@ export function RollCall({
     });
   }
 
-  function save() {
+  // Saves the roll call; with `lockAfter` it is locked right after it was saved (the unsaved changes are part of what gets locked).
+  function save(lockAfter: boolean) {
+    if (locked) return;
     setError(null);
     const marks = students.flatMap((s) => sessions.map((n) => ({ studentId: s.studentId, sessionNumber: n, status: draft[keyOf(s.studentId, n)] ?? null })));
     startTransition(async () => {
@@ -132,7 +145,18 @@ export function RollCall({
         const result = await saveEventAttendance(eventId, sessionCount, marks);
         if (!result.success) {
           setError(result.error);
+          setConfirmLock(false);
           return;
+        }
+        let lockedAt: string | undefined;
+        if (lockAfter) {
+          const lockResult = await lockEventAttendance(eventId);
+          if (!lockResult.success) {
+            setError(`Yoklama kaydedildi ama kilitlenemedi: ${lockResult.error}`);
+            setConfirmLock(false);
+            return;
+          }
+          lockedAt = lockResult.lockedAt;
         }
         const byStudent: Record<string, Record<number, AttendanceStatus>> = {};
         for (const s of students) {
@@ -142,10 +166,11 @@ export function RollCall({
             if (status) byStudent[s.studentId][n] = status;
           }
         }
-        toast.success("Yoklama kaydedildi.");
-        onSaved(result.sessionCount, byStudent);
+        toast.success(lockAfter ? "Yoklama kaydedildi ve kilitlendi." : "Yoklama kaydedildi.");
+        onSaved(result.sessionCount, byStudent, lockedAt);
       } catch {
         setError("Yoklama kaydedilemedi, bağlantını kontrol edip tekrar dene.");
+        setConfirmLock(false);
       }
     });
   }
@@ -157,7 +182,9 @@ export function RollCall({
         <DialogDescription>
           {step === "count"
             ? "Önce etkinliğin kaç oturumdan oluştuğunu belirt."
-            : `${sessionCount} oturum · her öğrenci için her oturumda Geldi ya da Gelmedi işaretle.`}
+            : locked
+              ? `${sessionCount} oturum · yoklama kilitli, salt okunur.`
+              : `${sessionCount} oturum · her öğrenci için her oturumda Geldi ya da Gelmedi işaretle.`}
         </DialogDescription>
       </DialogHeader>
 
@@ -192,6 +219,12 @@ export function RollCall({
         </div>
       ) : (
         <div className="flex min-h-0 flex-col gap-3">
+          {locked && (
+            <div role="status" className="bg-muted flex items-start gap-2 rounded-md px-3 py-2 text-sm">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              <span>Bu etkinliğin yoklaması kilitlendi. Kayıtlar artık değiştirilemez.</span>
+            </div>
+          )}
           <div className="border-border thin-scrollbar max-h-[55dvh] overflow-auto rounded-md border">
             <table className="w-full text-sm">
               <thead className="bg-muted/60 sticky top-0 z-10">
@@ -202,6 +235,7 @@ export function RollCall({
                       <div>{n}. Oturum</div>
                       <button
                         type="button"
+                        disabled={locked}
                         onClick={() => markAll(n, "attended")}
                         className="text-muted-foreground hover:text-emerald-600 text-[10px] font-normal underline"
                       >
@@ -233,6 +267,7 @@ export function RollCall({
                             <button
                               type="button"
                               onClick={() => toggle(s.studentId, n, "attended")}
+                              disabled={locked}
                               aria-pressed={status === "attended"}
                               aria-label={`${s.studentName} — ${n}. oturum: Geldi`}
                               title="Geldi"
@@ -248,6 +283,7 @@ export function RollCall({
                             <button
                               type="button"
                               onClick={() => toggle(s.studentId, n, "not_attended")}
+                              disabled={locked}
                               aria-pressed={status === "not_attended"}
                               aria-label={`${s.studentName} — ${n}. oturum: Gelmedi`}
                               title="Gelmedi"
@@ -271,19 +307,43 @@ export function RollCall({
           </div>
 
           {error && <p className="text-destructive text-xs">{error}</p>}
+          {confirmLock && !locked && (
+            <div role="alertdialog" className="space-y-2 rounded-md border border-amber-400 bg-amber-500/10 p-3">
+              <p className="text-sm font-semibold">Yoklamayı kilitlemek istediğine emin misin?</p>
+              <p className="text-muted-foreground text-xs">
+                Kilitlediğinde bu etkinliğin yoklaması hiçbir koç tarafından bir daha değiştirilemez. Kaydedilmemiş değişikliklerin de kaydedilip
+                kilitlenir. Bu işlem geri alınamaz.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setConfirmLock(false)}>
+                  Vazgeç
+                </Button>
+                <Button type="button" size="sm" disabled={pending} onClick={() => save(true)}>
+                  {pending && <Loader2 className="size-4 animate-spin" />}
+                  Evet, kaydet ve kilitle
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-muted-foreground text-xs">
               {markedCount} / {students.length * sessionCount} işaretlendi
             </p>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" disabled={pending} onClick={() => setStep("count")}>
-                Oturum sayısını değiştir
-              </Button>
-              <Button type="button" disabled={pending} onClick={save}>
-                {pending && <Loader2 className="size-4 animate-spin" />}
-                Kaydet
-              </Button>
-            </div>
+            {!locked && (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={pending} onClick={() => setStep("count")}>
+                  Oturum sayısını değiştir
+                </Button>
+                <Button type="button" variant="outline" disabled={pending || confirmLock} onClick={() => setConfirmLock(true)}>
+                  <Lock className="size-4" />
+                  Kilitle
+                </Button>
+                <Button type="button" disabled={pending} onClick={() => save(false)}>
+                  {pending && <Loader2 className="size-4 animate-spin" />}
+                  Kaydet
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
