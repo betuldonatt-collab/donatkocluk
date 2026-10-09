@@ -220,3 +220,13 @@ describe("the same Etkinlik Katılımı section on every report card view", () =
     expect(renderToStaticMarkup(<ParentKarneDetail {...detailProps} />)).not.toContain("Etkinlik Katılımı");
   });
 });
+
+describe("the Kilitle confirmation text", () => {
+  it("asks exactly: Bunu bir daha değiştiremeyeceksin, emin misin?", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("../app/coach/events/_components/attendance-dialog.tsx", import.meta.url), "utf8");
+    expect(src).toContain("Bunu bir daha değiştiremeyeceksin, emin misin?");
+    expect(src).not.toContain("geri alınamaz");
+    expect(src).toContain("Evet, kaydet ve kilitle");
+  });
+});

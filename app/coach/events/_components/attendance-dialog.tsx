@@ -309,10 +309,9 @@ export function RollCall({
           {error && <p className="text-destructive text-xs">{error}</p>}
           {confirmLock && !locked && (
             <div role="alertdialog" className="space-y-2 rounded-md border border-amber-400 bg-amber-500/10 p-3">
-              <p className="text-sm font-semibold">Yoklamayı kilitlemek istediğine emin misin?</p>
+              <p className="text-sm font-semibold">Bunu bir daha değiştiremeyeceksin, emin misin?</p>
               <p className="text-muted-foreground text-xs">
-                Kilitlediğinde bu etkinliğin yoklaması hiçbir koç tarafından bir daha değiştirilemez. Kaydedilmemiş değişikliklerin de kaydedilip
-                kilitlenir. Bu işlem geri alınamaz.
+                Kaydedilmemiş değişikliklerin de kaydedilip kilitlenir.
               </p>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setConfirmLock(false)}>
