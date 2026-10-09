@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveStudentId } from "@/lib/parent-context";
 import type { KarneTopicRow, NetSummary } from "@/lib/karne";
+import { fetchParentEventAttendance } from "@/lib/parent-event-attendance";
 import { KarneDetailClient } from "./karne-detail-client";
 
 async function fetchReportCard(studentId: string, id: string) {
@@ -25,6 +26,9 @@ export default async function ParentKarneDetailPage(props: PageProps<"/parent/ka
   const { id } = await props.params;
   const studentId = await getActiveStudentId();
   const cycle = studentId ? await fetchReportCard(studentId, id) : null;
+  // Event attendance (Yoklama) of this period: read live, so a correction by the coach shows here too.
+  const eventAttendance =
+    studentId && cycle ? await fetchParentEventAttendance(await createClient(), studentId, cycle.range_start, cycle.range_end) : [];
 
   if (!cycle) {
     return (
@@ -48,6 +52,7 @@ export default async function ParentKarneDetailPage(props: PageProps<"/parent/ka
         coachNotes={cycle.coach_notes}
         stats={cycle.stats as NetSummary}
         topicRows={cycle.topic_mistakes as KarneTopicRow[]}
+        eventAttendance={eventAttendance}
       />
     </div>
   );

@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { AYT_COURSES_BY_TRACK, TRACK_LABELS, TYT_COURSES, type Course, type Track } from "@/lib/curriculum";
 import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
 import { karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
+import type { ParentEventAttendance } from "@/lib/event-attendance";
+import { EventAttendanceCard } from "./event-attendance-card";
 
 function formatDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
@@ -194,6 +196,7 @@ export function KarneDetailClient({
   coachNotes,
   stats,
   topicRows,
+  eventAttendance = [],
 }: {
   cycleNumber: number;
   rangeStart: string;
@@ -202,6 +205,8 @@ export function KarneDetailClient({
   coachNotes: string | null;
   stats: NetSummary;
   topicRows: KarneTopicRow[];
+  // The period's event attendance (Yoklama), session by session; empty = the section is not shown.
+  eventAttendance?: ParentEventAttendance[];
 }) {
   const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
   const [track, setTrack] = useState<Track>("sayisal");
@@ -251,6 +256,8 @@ export function KarneDetailClient({
           <p className="text-foreground text-sm whitespace-pre-wrap">{coachNotes}</p>
         </section>
       )}
+
+      <EventAttendanceCard events={eventAttendance} />
 
       <section className="space-y-4 print:break-inside-avoid">
         <h3 className="text-foreground text-sm font-semibold">Net Gelişimi</h3>

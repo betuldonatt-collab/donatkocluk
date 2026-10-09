@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, X } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import { ClipboardCheck } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { clearAnnouncementAttendance, upsertAnnouncementAttendance } from "../actions";
+import type { AttendanceStatus, RsvpResponse } from "@/lib/event-attendance";
+import { AttendanceDialog } from "./attendance-dialog";
 
-export type AttendanceStatus = "attended" | "not_attended";
+export type { AttendanceStatus };
 
 export type EventStudentRow = {
   studentId: string;
   studentName: string;
   declineReason: string | null;
-  actualAttendance: AttendanceStatus | null;
+  // The marks saved so far: session number -> status (a session with no entry is not marked yet).
+  marks: Record<number, AttendanceStatus>;
 };
 
 export type EventData = {
@@ -22,6 +24,8 @@ export type EventData = {
   title: string;
   eventDate: string | null;
   eventTime: string | null;
+  // How many sessions the event has, once a coach has said so (null = not asked yet).
+  sessionCount: number | null;
   attending: EventStudentRow[];
   notAttending: EventStudentRow[];
   pending: EventStudentRow[];
@@ -31,93 +35,34 @@ function formatEventDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-// Katıldı/Katılmadı toggle -- clicking the already-active state clears it
-// back to "not yet marked" (see clearAnnouncementAttendance's own comment).
-function AttendanceToggle({
-  announcementId,
-  row,
-  onChanged,
-}: {
-  announcementId: string;
-  row: EventStudentRow;
-  onChanged: (studentId: string, status: AttendanceStatus | null) => void;
-}) {
-  const [pending, startTransition] = useTransition();
-
-  function setStatus(next: AttendanceStatus) {
-    const nextValue = row.actualAttendance === next ? null : next;
-    const prevValue = row.actualAttendance;
-    onChanged(row.studentId, nextValue);
-    startTransition(async () => {
-      // Both actions always resolve to a plain { success, error? } object --
-      // they never throw -- so failure is a normal value to check, not an
-      // exception to catch. The try/catch here is only a last-resort net for
-      // a genuine transport failure (e.g. the request never reaching the
-      // server at all), which the actions themselves have no way to return.
-      try {
-        const result = nextValue === null
-          ? await clearAnnouncementAttendance(announcementId, row.studentId)
-          : await upsertAnnouncementAttendance(announcementId, row.studentId, nextValue);
-        if (!result.success) {
-          onChanged(row.studentId, prevValue);
-          toast.error(result.error);
-        }
-      } catch {
-        onChanged(row.studentId, prevValue);
-        toast.error("Yoklama kaydedilemedi, bağlantını kontrol edip tekrar dene.");
-      }
-    });
-  }
-
+// One small dot per session: green = Geldi, red = Gelmedi, grey = not marked.
+export function SessionDots({ marks, sessionCount }: { marks: Record<number, AttendanceStatus>; sessionCount: number }) {
   return (
-    <div className="flex shrink-0 items-center gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => setStatus("attended")}
-        aria-label="Katıldı"
-        title="Katıldı"
-        className={cn(
-          "flex size-6 items-center justify-center rounded-full border transition-colors disabled:opacity-50",
-          row.actualAttendance === "attended"
-            ? "border-emerald-500 bg-emerald-500/15 text-emerald-600"
-            : "border-border text-muted-foreground hover:border-emerald-500 hover:text-emerald-600",
-        )}
-      >
-        <Check className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => setStatus("not_attended")}
-        aria-label="Katılmadı"
-        title="Katılmadı"
-        className={cn(
-          "flex size-6 items-center justify-center rounded-full border transition-colors disabled:opacity-50",
-          row.actualAttendance === "not_attended"
-            ? "border-rose-500 bg-rose-500/15 text-rose-600"
-            : "border-border text-muted-foreground hover:border-rose-500 hover:text-rose-600",
-        )}
-      >
-        <X className="size-3.5" />
-      </button>
+    <div className="flex shrink-0 items-center gap-1" aria-label="Oturum yoklamaları">
+      {Array.from({ length: sessionCount }, (_, i) => i + 1).map((n) => {
+        const status = marks[n];
+        return (
+          <span
+            key={n}
+            title={`${n}. oturum: ${status === "attended" ? "Geldi" : status === "not_attended" ? "Gelmedi" : "işaretlenmedi"}`}
+            className={cn(
+              "flex size-5 items-center justify-center rounded-full border text-[10px] font-semibold",
+              status === "attended"
+                ? "border-emerald-500 bg-emerald-500/15 text-emerald-700"
+                : status === "not_attended"
+                  ? "border-rose-500 bg-rose-500/15 text-rose-700"
+                  : "border-border text-muted-foreground",
+            )}
+          >
+            {n}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function EventColumn({
-  heading,
-  rows,
-  announcementId,
-  onChanged,
-  showDeclineReason,
-}: {
-  heading: string;
-  rows: EventStudentRow[];
-  announcementId: string;
-  onChanged: (studentId: string, status: AttendanceStatus | null) => void;
-  showDeclineReason: boolean;
-}) {
+function EventColumn({ heading, rows, sessionCount, showDeclineReason }: { heading: string; rows: EventStudentRow[]; sessionCount: number | null; showDeclineReason: boolean }) {
   return (
     <div className="min-w-0">
       <p className="text-muted-foreground mb-1.5 text-xs font-semibold tracking-wide uppercase">
@@ -131,11 +76,9 @@ function EventColumn({
             <div key={row.studentId} className="hover:bg-accent/40 flex items-center justify-between gap-2 rounded-md px-2 py-1.5">
               <div className="min-w-0">
                 <p className="text-foreground truncate text-sm">{row.studentName}</p>
-                {showDeclineReason && row.declineReason && (
-                  <p className="text-muted-foreground truncate text-xs">{row.declineReason}</p>
-                )}
+                {showDeclineReason && row.declineReason && <p className="text-muted-foreground truncate text-xs">{row.declineReason}</p>}
               </div>
-              <AttendanceToggle announcementId={announcementId} row={row} onChanged={onChanged} />
+              {sessionCount !== null && <SessionDots marks={row.marks} sessionCount={sessionCount} />}
             </div>
           ))}
         </div>
@@ -144,40 +87,61 @@ function EventColumn({
   );
 }
 
-// One card per active, RSVP-required announcement -- the three-column
-// Katılacaklar/Katılmayacaklar/Cevap Bekleyenler breakdown, each name paired
-// with a Katıldı/Katılmadı toggle so the coach can record attendance right
-// where they're already looking at who said they would (or wouldn't) come.
+// One card per active, RSVP-required announcement -- the three-column Katılacaklar/Katılmayacaklar/Cevap Bekleyenler breakdown
+// across the coach's roster, and the "Yoklama Al" button: it asks how many sessions the event has, then opens the Geldi / Gelmedi
+// checklist (attendance-dialog.tsx). Each name shows one dot per session once a roll call exists.
 export function EventAttendanceSection({ event }: { event: EventData }) {
-  const [rows, setRows] = useState(event);
+  const [data, setData] = useState(event);
+  const [open, setOpen] = useState(false);
 
-  function handleChanged(studentId: string, status: AttendanceStatus | null) {
-    setRows((prev) => ({
-      ...prev,
-      attending: prev.attending.map((r) => (r.studentId === studentId ? { ...r, actualAttendance: status } : r)),
-      notAttending: prev.notAttending.map((r) => (r.studentId === studentId ? { ...r, actualAttendance: status } : r)),
-      pending: prev.pending.map((r) => (r.studentId === studentId ? { ...r, actualAttendance: status } : r)),
-    }));
+  const students = [
+    ...data.attending.map((r) => ({ row: r, rsvp: "attending" as RsvpResponse | null })),
+    ...data.notAttending.map((r) => ({ row: r, rsvp: "not_attending" as RsvpResponse | null })),
+    ...data.pending.map((r) => ({ row: r, rsvp: null as RsvpResponse | null })),
+  ].map(({ row, rsvp }) => ({ studentId: row.studentId, studentName: row.studentName, rsvp, marks: row.marks }));
+
+  function handleSaved(sessionCount: number, marksByStudent: Record<string, Record<number, AttendanceStatus>>) {
+    const apply = (rows: EventStudentRow[]) => rows.map((r) => ({ ...r, marks: marksByStudent[r.studentId] ?? r.marks }));
+    setData((prev) => ({ ...prev, sessionCount, attending: apply(prev.attending), notAttending: apply(prev.notAttending), pending: apply(prev.pending) }));
   }
+
+  const hasStudents = students.length > 0;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{rows.title}</CardTitle>
-        {rows.eventDate && (
-          <p className="text-muted-foreground text-xs">
-            {formatEventDate(rows.eventDate)}
-            {rows.eventTime && ` — ${rows.eventTime.slice(0, 5)}`}
-          </p>
-        )}
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div className="space-y-1">
+          <CardTitle className="text-base">{data.title}</CardTitle>
+          {data.eventDate && (
+            <p className="text-muted-foreground text-xs">
+              {formatEventDate(data.eventDate)}
+              {data.eventTime && ` — ${data.eventTime.slice(0, 5)}`}
+              {data.sessionCount !== null && ` · ${data.sessionCount} oturum`}
+            </p>
+          )}
+        </div>
+        <Button type="button" size="sm" variant="outline" disabled={!hasStudents} onClick={() => setOpen(true)}>
+          <ClipboardCheck className="size-4" />
+          {data.sessionCount === null ? "Yoklama Al" : "Yoklamayı Düzenle"}
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <EventColumn heading="Katılacaklar" rows={rows.attending} announcementId={rows.id} onChanged={handleChanged} showDeclineReason={false} />
-          <EventColumn heading="Katılmayacaklar" rows={rows.notAttending} announcementId={rows.id} onChanged={handleChanged} showDeclineReason />
-          <EventColumn heading="Cevap Bekleyenler" rows={rows.pending} announcementId={rows.id} onChanged={handleChanged} showDeclineReason={false} />
+          <EventColumn heading="Katılacaklar" rows={data.attending} sessionCount={data.sessionCount} showDeclineReason={false} />
+          <EventColumn heading="Katılmayacaklar" rows={data.notAttending} sessionCount={data.sessionCount} showDeclineReason />
+          <EventColumn heading="Cevap Bekleyenler" rows={data.pending} sessionCount={data.sessionCount} showDeclineReason={false} />
         </div>
       </CardContent>
+
+      <AttendanceDialog
+        open={open}
+        onOpenChange={setOpen}
+        eventId={data.id}
+        eventTitle={data.title}
+        savedSessionCount={data.sessionCount}
+        students={students}
+        onSaved={handleSaved}
+      />
     </Card>
   );
 }

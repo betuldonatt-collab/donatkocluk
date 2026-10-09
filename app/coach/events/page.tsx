@@ -19,7 +19,7 @@ async function fetchEventsData(coachId: string): Promise<EventData[]> {
   if (announcements.length === 0) return [];
   const announcementIds = announcements.map((a) => a.id);
 
-  const [{ data: profiles }, { data: rsvpRows }, { data: attendanceRows }] = await Promise.all([
+  const [{ data: profiles }, { data: rsvpRows }, { data: attendanceRows }, { data: configRows }] = await Promise.all([
     supabase.from("profiles").select("id, full_name").in("id", studentIds),
     supabase
       .from("announcement_rsvps")
@@ -28,14 +28,22 @@ async function fetchEventsData(coachId: string): Promise<EventData[]> {
       .in("announcement_id", announcementIds),
     supabase
       .from("announcement_attendance")
-      .select("student_id, announcement_id, status")
+      .select("student_id, announcement_id, session_number, status")
       .in("student_id", studentIds)
       .in("announcement_id", announcementIds),
+    // How many sessions each event has (set by the coach's "Yoklama Al", shared by every coach).
+    supabase.from("announcement_attendance_config").select("announcement_id, session_count").in("announcement_id", announcementIds),
   ]);
 
   const roster = (profiles ?? []) as RosterStudent[];
   const rosterById = new Map(roster.map((s) => [s.id, s]));
-  const attendanceByPair = new Map((attendanceRows ?? []).map((r) => [`${r.student_id}::${r.announcement_id}`, r.status as AttendanceStatus]));
+  // (student, announcement) -> { session number -> status }
+  const marksByPair = new Map<string, Record<number, AttendanceStatus>>();
+  for (const r of attendanceRows ?? []) {
+    const key = `${r.student_id}::${r.announcement_id}`;
+    marksByPair.set(key, { ...(marksByPair.get(key) ?? {}), [r.session_number as number]: r.status as AttendanceStatus });
+  }
+  const sessionCountByAnnouncement = new Map((configRows ?? []).map((c) => [c.announcement_id as string, c.session_count as number]));
 
   return announcements.map((a): EventData => {
     const rowsForAnnouncement = (rsvpRows ?? []).filter((r) => r.announcement_id === a.id);
@@ -47,7 +55,7 @@ async function fetchEventsData(coachId: string): Promise<EventData[]> {
         studentId,
         studentName: rosterById.get(studentId)?.full_name ?? "İsimsiz Öğrenci",
         declineReason: rsvpByStudent.get(studentId)?.decline_reason ?? null,
-        actualAttendance: attendanceByPair.get(`${studentId}::${a.id}`) ?? null,
+        marks: marksByPair.get(`${studentId}::${a.id}`) ?? {},
       };
     }
 
@@ -56,6 +64,7 @@ async function fetchEventsData(coachId: string): Promise<EventData[]> {
       title: a.title,
       eventDate: a.event_date,
       eventTime: a.event_time,
+      sessionCount: sessionCountByAnnouncement.get(a.id) ?? null,
       attending: rowsForAnnouncement.filter((r) => r.response === "attending").map((r) => toRow(r.student_id)),
       notAttending: rowsForAnnouncement.filter((r) => r.response === "not_attending").map((r) => toRow(r.student_id)),
       pending: roster.filter((s) => !respondedIds.has(s.id)).map((s) => toRow(s.id)),
