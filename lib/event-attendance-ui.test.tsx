@@ -94,23 +94,30 @@ describe("the parent's report card: Etkinlik Katılımı", () => {
     expect(html).toContain("2 oturumdan 1 tanesine katıldı");
   });
 
-  it("CRITICAL: said 'Katılacağım' but was absent -> the explicit warning", () => {
+  it("said 'Katılacağım' but attended nothing -> one calm, factual note (no alarm, no red)", () => {
     const html = renderToStaticMarkup(<EventAttendanceCard events={build("attending", ["not_attended", "not_attended"])} />);
-    expect(html).toContain("Katılacağını belirtti ancak katılmadı.");
-    expect(html).toContain('role="alert"');
+    expect(html).toContain("Katılım bildirilmişti; bu etkinliğe katılım sağlamadı.");
+    expect(html).not.toContain('role="alert"');
+    // the note itself is neutral (the per-session X marks keep their own colour; the card border no longer turns red)
+    const note = html.match(/<p class="[^"]*" data-slot="attendance-note">/)?.[0] ?? "";
+    expect(note).toContain("bg-muted");
+    expect(note).not.toMatch(/rose|red|amber/);
+    expect(html).not.toContain("border-rose-400");
+    // never reads like a system error
+    expect(html).not.toContain("kaydı yok");
   });
 
   it("no warning when they never said they would come, said no, or actually attended", () => {
     for (const events of [build(null, ["not_attended"]), build("not_attending", ["not_attended"]), build("attending", ["attended", "attended"])]) {
       const html = renderToStaticMarkup(<EventAttendanceCard events={events} />);
-      expect(html).not.toContain("Katılacağını belirtti ancak");
+      expect(html).not.toContain("Katılım bildirilmişti");
       expect(html).not.toContain('role="alert"');
     }
   });
 
-  it("a partial absence gets the milder note, not the red alert", () => {
+  it("a partial absence gets the same calm note, naming how many sessions", () => {
     const html = renderToStaticMarkup(<EventAttendanceCard events={build("attending", ["attended", "not_attended", "not_attended"])} />);
-    expect(html).toContain("Katılacağını belirtti ancak 2 oturuma katılmadı.");
+    expect(html).toContain("Katılım bildirilmişti; 2 oturuma katılım sağlamadı.");
     expect(html).not.toContain('role="alert"');
   });
 

@@ -47,6 +47,13 @@ export function summarizeStudentEvent(
   };
 }
 
+// The note under an event on a report card, or null when there is nothing to say. Calm and factual; not a warning.
+export function attendanceNote(summary: Pick<StudentEventSummary, "noShow" | "partialAbsence" | "absent">): string | null {
+  if (summary.noShow) return "Katılım bildirilmişti; bu etkinliğe katılım sağlamadı.";
+  if (summary.partialAbsence) return `Katılım bildirilmişti; ${summary.absent} oturuma katılım sağlamadı.`;
+  return null;
+}
+
 export function sessionStatusLabel(status: AttendanceStatus | null): string {
   return status === "attended" ? "Katıldı" : status === "not_attended" ? "Katılmadı" : "Yoklama alınmadı";
 }
