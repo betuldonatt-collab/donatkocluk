@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/x", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
-import { capCourseRows, KarneDocument, MAX_COURSE_ROWS, MAX_EVENTS, MAX_EXAMS_PER_GROUP } from "@/components/karne-document";
+import { KarneDocument } from "@/components/karne-document";
 import { KarnePeriodPicker } from "@/components/karne-period-picker";
 import { buildParentEventAttendance } from "./event-attendance";
 import { computeKarneSummary, type KarneSummaryTask } from "./karne-summary";
@@ -124,6 +124,10 @@ describe("the Karne document", () => {
     expect(one).not.toContain("Etkinlik Katılımı</h3>");
   });
 
+  it("the momentum chart is titled with 'yüzdesi'", () => {
+    expect(html).toContain("İvme — haftalık program tamamlama yüzdesi");
+  });
+
   it("shows the questions BY COURSE: Toplam, ✓, ✗, ○ for each course -- and nothing at topic level", () => {
     expect(html).toContain("Ders bazında çözülen soru");
     expect(html).toMatch(/TYT Matematik<\/td><td[^>]*>20<\/td><td[^>]*>15<\/td><td[^>]*>3<\/td><td[^>]*>2<\/td>/);
@@ -158,17 +162,7 @@ describe("the document stays an executive summary (1-2 pages)", () => {
     expect(imports).not.toContainEqual(expect.stringMatching(/curriculum|gelisim|topic/));
   });
 
-  it("the course table folds the long tail into one row so it always adds up and stays short", () => {
-    const rows = Array.from({ length: 12 }, (_, i) => ({ key: `c${i}`, label: `Ders ${i}`, total: 100 - i, correct: 60 - i, wrong: 30, empty: 10 - 0 }));
-    const capped = capCourseRows(rows);
-    expect(capped).toHaveLength(MAX_COURSE_ROWS);
-    const last = capped[capped.length - 1];
-    expect(last.label).toBe(`Diğer dersler (${12 - (MAX_COURSE_ROWS - 1)})`);
-    expect(capped.reduce((n, r) => n + r.total, 0)).toBe(rows.reduce((n, r) => n + r.total, 0));
-    expect(capCourseRows(rows.slice(0, 3))).toHaveLength(3);
-  });
-
-  it("long exam and event lists are cut, and the cut is stated", () => {
+  it("nothing is truncated: every course, every exam and every event of the period is shown", () => {
     const manyExams: KarneSummaryTask[] = Array.from({ length: 9 }, (_, i) =>
       task({
         task_date: `2026-10-${String(1 + i * 3).padStart(2, "0")}`,
@@ -185,12 +179,26 @@ describe("the document stays an executive summary (1-2 pages)", () => {
       rangeStart: RANGE.start,
       rangeEnd: RANGE.end,
     });
-    const big = computeKarneSummary({ rangeStart: RANGE.start, rangeEnd: RANGE.end, today: "2026-10-29", now: "2026-10-29T08:00:00Z", tasks: manyExams, events: manyEvents });
+    const manyCourses: KarneSummaryTask[] = Array.from({ length: 14 }, (_, i) =>
+      task({ task_date: "2026-10-02", course_id: `tyt-ders-${i}`, correct_count: 10 + i, wrong_count: 2, empty_count: 1 }),
+    );
+    const big = computeKarneSummary({
+      rangeStart: RANGE.start,
+      rangeEnd: RANGE.end,
+      today: "2026-10-29",
+      now: "2026-10-29T08:00:00Z",
+      tasks: [...manyExams, ...manyCourses],
+      events: manyEvents,
+    });
+    // 14 courses + the Genel Deneme row
+    expect(big.questions.byCourse).toHaveLength(15);
     const out = renderToStaticMarkup(<KarneDocument summary={big} studentName="A" />);
-    expect(out.match(/TYT Genel Deneme \d/g)!.length).toBeLessThanOrEqual(MAX_EXAMS_PER_GROUP);
-    expect(out).toContain(`Son ${MAX_EXAMS_PER_GROUP} deneme gösteriliyor`);
-    expect(out.match(/Etkinlik \d/g)!.length).toBeLessThanOrEqual(MAX_EVENTS);
-    expect(out).toContain(`+ ${7 - MAX_EVENTS} etkinlik daha`);
+    // all 9 exams, all 7 events, all 14 courses
+    expect(out.match(/TYT Genel Deneme \d/g)).toHaveLength(9);
+    expect(out.match(/Etkinlik \d/g)).toHaveLength(7);
+    expect((out.match(/Tyt ders \d+|TYT ders \d+/gi) ?? []).length).toBe(14);
+    // no folding / cut-off wording anywhere
+    expect(out).not.toMatch(/Diğer dersler|deneme gösteriliyor|etkinlik daha/);
   });
 });
 

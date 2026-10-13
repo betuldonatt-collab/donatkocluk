@@ -24,11 +24,8 @@ import {
 // coach's note; page 2 = the exam overview and the event attendance -- and when the period has neither, the document is one page.
 // Nothing relies on colour alone: every change carries ▲ / ▼ / = and a number, and the current period's line is thick as well as dark.
 
-// The document is capped so it can never run past two A4 pages, whatever the period holds: the longest lists are cut to what fits and
-// say how many more there were. (Everything is still in the data; this is only what the page shows.)
-export const MAX_COURSE_ROWS = 7;
-export const MAX_EXAMS_PER_GROUP = 4;
-export const MAX_EVENTS = 4;
+// Nothing in the document is truncated: a period shows every course, every exam and every event it has. A long period simply runs onto
+// further pages -- the long tables are allowed to break between rows (the header row repeats on each page).
 
 const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 });
 const fmt = (n: number) => nf.format(n);
@@ -164,7 +161,7 @@ function BranchBars({ branches }: { branches: KarneBranchAverage[] }) {
 function ExamGroup({ group }: { group: KarneExamGroup }) {
   const change = deltaOf(group.averageNet, group.previousAverageNet);
   return (
-    <section className="border-border bg-card space-y-3 rounded-lg border p-4 print:space-y-2 print:p-3 print:break-inside-avoid" aria-label={group.label}>
+    <section className="border-border bg-card space-y-3 rounded-lg border p-4 print:space-y-2 print:p-3" aria-label={group.label}>
       <h4 className="text-foreground text-sm font-semibold">{group.label}</h4>
       <StickyXScroll>
         <table className="w-full text-sm">
@@ -177,8 +174,8 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
             </tr>
           </thead>
           <tbody>
-            {group.items.slice(-MAX_EXAMS_PER_GROUP).map((item) => (
-              <tr key={`${item.date}-${item.title}`} className="border-border border-b last:border-0">
+            {group.items.map((item) => (
+              <tr key={`${item.date}-${item.title}`} className="border-border border-b last:border-0 print:break-inside-avoid">
                 <td className="text-muted-foreground py-1.5 pr-3 whitespace-nowrap print:py-0.5">{formatDay(item.date)}</td>
                 <td className="text-foreground py-1.5 pr-3 print:py-0.5">{item.title}</td>
                 <td className="text-foreground py-1.5 pr-3 text-right font-semibold tabular-nums print:py-0.5">{fmt(item.net)}</td>
@@ -199,9 +196,6 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
           </tbody>
         </table>
       </StickyXScroll>
-      {group.items.length > MAX_EXAMS_PER_GROUP && (
-        <p className="text-muted-foreground text-[11px]">Son {MAX_EXAMS_PER_GROUP} deneme gösteriliyor; ortalama ve en yüksek net {group.items.length} denemenin tamamından hesaplandı.</p>
-      )}
       <p className="text-foreground text-xs">
         Dönem ortalaması: <strong>{fmt(group.averageNet)}</strong> net · En yüksek: <strong>{fmt(group.bestNet)}</strong>
         {group.previousAverageNet !== null && (
@@ -219,23 +213,11 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
 
 // ---- course-level question breakdown --------------------------------------------------------------------------------------------------
 
-// Largest courses first, the rest folded into one "Diğer dersler" row so the table stays short and still adds up to the total.
-export function capCourseRows(rows: KarneCourseQuestions[], max: number = MAX_COURSE_ROWS): KarneCourseQuestions[] {
-  if (rows.length <= max) return rows;
-  const head = rows.slice(0, max - 1);
-  const rest = rows.slice(max - 1);
-  const folded = rest.reduce(
-    (acc, r) => ({ ...acc, total: acc.total + r.total, correct: acc.correct + r.correct, wrong: acc.wrong + r.wrong, empty: acc.empty + r.empty }),
-    { key: "diger-dersler", label: `Diğer dersler (${rest.length})`, total: 0, correct: 0, wrong: 0, empty: 0 } as KarneCourseQuestions,
-  );
-  return [...head, folded];
-}
-
+// Every course that has questions in the period, largest first.
 function CourseQuestions({ rows }: { rows: KarneCourseQuestions[] }) {
   if (rows.length === 0) return null;
-  const shown = capCourseRows(rows);
   return (
-    <section className="border-border bg-card rounded-lg border p-3 print:p-2 print:break-inside-avoid" aria-label="Ders bazında çözülen soru">
+    <section className="border-border bg-card rounded-lg border p-3 print:p-2" aria-label="Ders bazında çözülen soru">
       <h3 className="text-foreground mb-1.5 text-sm font-semibold">Ders bazında çözülen soru</h3>
       <table className="w-full text-sm">
         <thead>
@@ -248,8 +230,8 @@ function CourseQuestions({ rows }: { rows: KarneCourseQuestions[] }) {
           </tr>
         </thead>
         <tbody>
-          {shown.map((r) => (
-            <tr key={r.key} className="border-border border-b last:border-0">
+          {rows.map((r) => (
+            <tr key={r.key} className="border-border border-b last:border-0 print:break-inside-avoid">
               <td className="text-foreground py-1 pr-2 print:py-0.5">{r.label}</td>
               <td className="text-foreground px-2 py-1 text-right font-semibold tabular-nums print:py-0.5">{fmt(r.total)}</td>
               <td className="px-2 py-1 text-right font-semibold text-emerald-700 tabular-nums print:py-0.5">{fmt(r.correct)}</td>
@@ -267,13 +249,11 @@ function CourseQuestions({ rows }: { rows: KarneCourseQuestions[] }) {
 
 function CompactEvents({ events }: { events: ParentEventAttendance[] }) {
   if (events.length === 0) return null;
-  const shown = events.slice(0, MAX_EVENTS);
-  const hidden = events.length - shown.length;
   return (
     <section className="space-y-2" aria-label="Etkinlik katılımı">
       <h3 className="text-foreground text-sm font-semibold print:break-after-avoid">Etkinlik Katılımı</h3>
       <ul className="space-y-2 print:space-y-1.5">
-        {shown.map((event) => {
+        {events.map((event) => {
           const note = attendanceNote(event.summary);
           return (
             <li key={event.announcementId} className="border-border bg-card space-y-1.5 rounded-lg border p-3 print:space-y-1 print:p-2 print:break-inside-avoid">
@@ -316,7 +296,6 @@ function CompactEvents({ events }: { events: ParentEventAttendance[] }) {
           );
         })}
       </ul>
-      {hidden > 0 && <p className="text-muted-foreground text-xs">+ {hidden} etkinlik daha</p>}
     </section>
   );
 }
@@ -426,7 +405,7 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
 
       <section className="border-border bg-card space-y-2 rounded-lg border p-4 print:space-y-1 print:p-3 print:break-inside-avoid" aria-label="İvme">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-foreground text-sm font-semibold">İvme — haftalık program tamamlama</h3>
+          <h3 className="text-foreground text-sm font-semibold">İvme — haftalık program tamamlama yüzdesi</h3>
           <p className="text-muted-foreground text-[11px]">
             <span className="bg-foreground mr-1 inline-block h-1 w-5 rounded align-middle" /> bu dönem
             <span className="bg-muted-foreground/60 mr-1 ml-3 inline-block h-0.5 w-5 rounded align-middle" /> önceki haftalar
