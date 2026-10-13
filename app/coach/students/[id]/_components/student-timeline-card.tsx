@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquareText, Plus, XCircle } from "lucide-react";
+import { ChevronRight, MessageSquareText, Plus, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -219,6 +219,11 @@ type TimelineItem =
   | { kind: "note"; date: string; note: DetailCoachNote }
   | { kind: "missed_session"; date: string; session: DetailSession };
 
+// The notes (and the missed-session reasons in the same stream) are for the coach and the parents, never for the student the coach
+// is sharing a screen with -- so the card is COLLAPSED every time the page loads. The state is deliberately plain useState: not
+// remembered anywhere (no browser storage, no cookie), so a refresh, a navigation or another student always starts closed. While
+// closed, none of the content is rendered at all (not merely hidden by CSS); the header shows how many records there are, and
+// "Not Ekle" stays usable (its dialog shows no existing note).
 export function StudentTimelineCard({
   studentId,
   notes,
@@ -231,6 +236,7 @@ export function StudentTimelineCard({
   initialHasMore: boolean;
 }) {
   const [items, setItems] = useState(notes);
+  const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -261,88 +267,108 @@ export function StudentTimelineCard({
     ...missedSessions.map((session): TimelineItem => ({ kind: "missed_session", date: session.scheduled_at, session })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
+  // A page of notes is loaded at a time: "12+ kayıt" while there are more to load.
+  const countLabel = `${timeline.length}${hasMore ? "+" : ""} kayıt`;
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-        <CardTitle className="text-base">Öğrenci Günlüğü / İletişim Akışı</CardTitle>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="student-timeline-content"
+          data-slot="timeline-toggle"
+          className="focus-visible:ring-ring/50 -m-1 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left outline-none focus-visible:ring-[3px]"
+        >
+          <ChevronRight className={cn("text-muted-foreground size-4 shrink-0 transition-transform", open && "rotate-90")} />
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="text-base leading-none font-semibold">Öğrenci Günlüğü / İletişim Akışı</span>
+            <span className="text-muted-foreground text-xs" data-slot="timeline-count">
+              {open ? "Notları Gizle" : "Notları Göster"} · {countLabel}
+            </span>
+          </span>
+        </button>
         <Button type="button" size="sm" onClick={() => setDialogOpen(true)}>
           <Plus className="size-4" />
           Not Ekle
         </Button>
       </CardHeader>
-      <CardContent>
-        {timeline.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Henüz kayıt eklenmedi.</p>
-        ) : (
-          <ol className="space-y-4">
-            {timeline.map((item) =>
-              item.kind === "note" ? (
-                <li key={`note-${item.note.id}`} className="border-border border-b pb-4 last:border-b-0 last:pb-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                        NOTE_TYPE_BADGE_CLASSES[item.note.type],
-                      )}
-                    >
-                      {NOTE_TYPE_LABELS[item.note.type]}
-                    </span>
-                    {item.note.parent_share_status !== "none" && (
+      {open && (
+        <CardContent id="student-timeline-content">
+          {timeline.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Henüz kayıt eklenmedi.</p>
+          ) : (
+            <ol className="space-y-4">
+              {timeline.map((item) =>
+                item.kind === "note" ? (
+                  <li key={`note-${item.note.id}`} className="border-border border-b pb-4 last:border-b-0 last:pb-0">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <span
                         className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                          SHARE_STATUS_BADGE_CLASSES[item.note.parent_share_status],
+                          NOTE_TYPE_BADGE_CLASSES[item.note.type],
                         )}
                       >
-                        {SHARE_STATUS_LABELS[item.note.parent_share_status]}
+                        {NOTE_TYPE_LABELS[item.note.type]}
                       </span>
-                    )}
-                    <span className="text-muted-foreground text-xs">{formatDate(item.note.created_at)}</span>
-                  </div>
-                  {item.note.guardian_descriptor && (
-                    <p className="text-muted-foreground mb-1 text-xs">Görüşülen: {item.note.guardian_descriptor}</p>
-                  )}
-                  <p className="text-foreground text-sm whitespace-pre-wrap">
-                    {item.note.content || "Not bırakılmadı."}
-                  </p>
-                  {item.note.parent_share_status === "revision_requested" && (
-                    <ReviseNoteForm note={item.note} onResubmitted={handleResubmitted} />
-                  )}
-                </li>
-              ) : (
-                <li key={`session-${item.session.id}`} className="border-border border-b pb-4 last:border-b-0 last:pb-0">
-                  <p className="text-muted-foreground mb-1 text-xs">{formatDate(item.session.scheduled_at)}</p>
-                  <div className="flex items-start gap-1.5">
-                    <XCircle className="mt-0.5 size-3.5 shrink-0 text-rose-600" />
-                    <p className="text-foreground text-sm">
-                      Gerçekleşmedi —{" "}
-                      {item.session.missed_reason ? MISSED_REASON_LABELS[item.session.missed_reason] : "—"}
-                      {item.session.missed_reason_note && (
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <MessageSquareText className="size-3 shrink-0" />
-                          {item.session.missed_reason_note}
+                      {item.note.parent_share_status !== "none" && (
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                            SHARE_STATUS_BADGE_CLASSES[item.note.parent_share_status],
+                          )}
+                        >
+                          {SHARE_STATUS_LABELS[item.note.parent_share_status]}
                         </span>
                       )}
+                      <span className="text-muted-foreground text-xs">{formatDate(item.note.created_at)}</span>
+                    </div>
+                    {item.note.guardian_descriptor && (
+                      <p className="text-muted-foreground mb-1 text-xs">Görüşülen: {item.note.guardian_descriptor}</p>
+                    )}
+                    <p className="text-foreground text-sm whitespace-pre-wrap">
+                      {item.note.content || "Not bırakılmadı."}
                     </p>
-                  </div>
-                </li>
-              ),
-            )}
-          </ol>
-        )}
-        {hasMore && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4 w-full"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-          >
-            {loadingMore ? "Yükleniyor..." : "Daha Fazla Yükle"}
-          </Button>
-        )}
-      </CardContent>
+                    {item.note.parent_share_status === "revision_requested" && (
+                      <ReviseNoteForm note={item.note} onResubmitted={handleResubmitted} />
+                    )}
+                  </li>
+                ) : (
+                  <li key={`session-${item.session.id}`} className="border-border border-b pb-4 last:border-b-0 last:pb-0">
+                    <p className="text-muted-foreground mb-1 text-xs">{formatDate(item.session.scheduled_at)}</p>
+                    <div className="flex items-start gap-1.5">
+                      <XCircle className="mt-0.5 size-3.5 shrink-0 text-rose-600" />
+                      <p className="text-foreground text-sm">
+                        Gerçekleşmedi —{" "}
+                        {item.session.missed_reason ? MISSED_REASON_LABELS[item.session.missed_reason] : "—"}
+                        {item.session.missed_reason_note && (
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <MessageSquareText className="size-3 shrink-0" />
+                            {item.session.missed_reason_note}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                ),
+              )}
+            </ol>
+          )}
+          {hasMore && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4 w-full"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Yükleniyor..." : "Daha Fazla Yükle"}
+            </Button>
+          )}
+        </CardContent>
+      )}
 
       <AddNoteDialog studentId={studentId} open={dialogOpen} onOpenChange={setDialogOpen} onSaved={handleSaved} />
     </Card>
