@@ -7,10 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { Track } from "@/lib/curriculum";
 import { CourseTabs } from "@/components/course-tabs";
 import {
-  AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
-  AYT_COURSES_BY_TRACK,
-  TYT_BRANCH_EXAM_MACRO_COURSES,
-  TYT_COURSES,
+  branchExamCourses,
   isLgsCourseId,
   type Course,
 } from "@/lib/curriculum";
@@ -76,8 +73,8 @@ export function BransAnalysisClient({
   // follow -- never replacing or nesting them, a coach/student can pick
   // either "Fizik" or "TYT Fen" as fully independent, side-by-side options.
   // (LGS has no macro subjects -- its branş denemeleri are per-course.)
-  const tytBranchCourses = [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES];
-  const aytBranchCoursesFor = (t: Track) => [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[t], ...AYT_COURSES_BY_TRACK[t]];
+  const tytBranchCourses = branchExamCourses("tyt");
+  const aytBranchCoursesFor = (t: Track) => branchExamCourses("ayt", t);
 
   const mistakesByExam = useMemo(() => {
     const map: Record<string, Set<string>> = {};

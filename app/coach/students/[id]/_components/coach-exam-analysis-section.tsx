@@ -8,11 +8,10 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import {
-  AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
+  branchExamCourses,
   AYT_COURSES_BY_TRACK,
   LGS_COURSES,
   TRACK_LABELS,
-  TYT_BRANCH_EXAM_MACRO_COURSES,
   TYT_COURSES,
   type Track,
 } from "@/lib/curriculum";
@@ -149,8 +148,8 @@ export function CoachExamAnalysisSection({
     : isLgs
     ? LGS_COURSES
     : mainTrack === "tyt"
-      ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
-      : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytSubTrack], ...AYT_COURSES_BY_TRACK[aytSubTrack]];
+      ? branchExamCourses("tyt")
+      : branchExamCourses("ayt", aytSubTrack);
   // 11th grade: a TYT-structured exam analysed against the merged 9th+10th courses.
   const isMaarif11 = maarifGrade === 11 && !isLgs;
   const genelGroups = isMaarif11

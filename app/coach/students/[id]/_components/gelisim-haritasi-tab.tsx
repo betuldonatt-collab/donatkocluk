@@ -7,10 +7,7 @@ import { CourseTabs } from "@/components/course-tabs";
 import { formatChartRangeLabel, isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { cn } from "@/lib/utils";
 import {
-  AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
-  AYT_COURSES_BY_TRACK,
-  TYT_BRANCH_EXAM_MACRO_COURSES,
-  TYT_COURSES,
+  branchExamCourses,
   type Track,
 } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
@@ -82,8 +79,8 @@ export function GelisimHaritasiTab({
   // ("sliced") ones here too, so a mistake logged under a combined "TYT
   // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
   // "Biyoloji"'s own chips.
-  const tytCourses = [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES];
-  const aytCoursesFor = (t: Track) => [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[t], ...AYT_COURSES_BY_TRACK[t]];
+  const tytCourses = branchExamCourses("tyt");
+  const aytCoursesFor = (t: Track) => branchExamCourses("ayt", t);
 
   const rows: GelisimHaritasiRow[] = useMemo(() => {
     const examsInRange = [...generalExams, ...branchExams].filter((e) => isDateInChartRange(e.task_date, chartRange));

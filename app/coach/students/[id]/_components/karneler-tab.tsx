@@ -13,10 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { CourseTabs } from "@/components/course-tabs";
 import { dateToISO, isoToDate, isValidISODateOnly } from "@/lib/chart-range";
 import {
-  AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK,
+  branchExamCourses,
   AYT_COURSES_BY_TRACK,
   TRACK_LABELS,
-  TYT_BRANCH_EXAM_MACRO_COURSES,
   TYT_COURSES,
   type Course,
   type Track,
@@ -499,8 +498,8 @@ export function ReportCardReview({
   // ("sliced") ones here too, so a mistake logged under a combined "TYT
   // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
   // "Biyoloji"'s own chips.
-  const tytCourses = [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES];
-  const aytCourses = [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[track], ...AYT_COURSES_BY_TRACK[track]];
+  const tytCourses = branchExamCourses("tyt");
+  const aytCourses = branchExamCourses("ayt", track);
 
   // Warning Mode (product decision): a cycle shorter than CYCLE_DAYS used
   // to hard-block approval. Short cycles are now legitimate (intensive

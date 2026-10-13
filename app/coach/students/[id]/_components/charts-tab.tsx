@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
-import { AYT_COURSES_BY_TRACK, LGS_COURSES, TRACK_LABELS, TYT_COURSES, findCourseById, type Track } from "@/lib/curriculum";
+import { branchExamCourses, LGS_COURSES, TRACK_LABELS, findCourseById, type Track } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
@@ -101,6 +101,7 @@ export function ChartsTab({
   examType = "YKS",
   lgsRoutines = [],
   chartRange,
+  initialExamMode = "genel",
 }: {
   studentId: string;
   // Every topic the student marked, per exam -- the popup behind a click on an exam lists them.
@@ -118,6 +119,8 @@ export function ChartsTab({
   // Owned by DetailTabs now (shared with Analiz/Gelişim Haritası, and
   // survives switching tabs) -- this tab used to own this state itself.
   chartRange: ChartRange;
+  // Which exam kind the tab opens on (Genel Deneme by default).
+  initialExamMode?: ExamMode;
 }) {
   const isLgs = examType === "LGS";
   const maarifGrade = useMaarifGrade();
@@ -162,7 +165,7 @@ export function ChartsTab({
   // Paragraf (3:1 net + duration) and Kitap Okuma (pages per day) come from the daily LGS routines for an LGS
   // student and for a 7th grader (the LGS structure); every other cohort has Paragraf and Problem.
   const lgsRoutineCards = isLgs || maarifGrade === 7;
-  const [examMode, setExamMode] = useState<ExamMode>("genel");
+  const [examMode, setExamMode] = useState<ExamMode>(initialExamMode);
 
   // A Maarif 9./10. Sınıf student (migration 0096/0099) never has TYT/AYT
   // exams at all -- their Genel Deneme is always the m9/m10 track, so this
@@ -184,20 +187,21 @@ export function ChartsTab({
   // the list entirely.
   const [mainTrack, setMainTrack] = useState<MainTrack>(defaultMainTrack);
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState<string>(gradeCourses?.[0]?.id ?? (isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id));
+  const [branchCourseId, setBranchCourseId] = useState<string>(gradeCourses?.[0]?.id ?? (isLgs ? LGS_COURSES[0].id : branchExamCourses("tyt")[0].id));
 
   function handleMainTrackChange(next: MainTrack) {
     setMainTrack(next);
-    setBranchCourseId(next === "tyt" ? TYT_COURSES[0].id : AYT_COURSES_BY_TRACK.sayisal[0].id);
+    setBranchCourseId(branchExamCourses(next === "tyt" ? "tyt" : "ayt", "sayisal")[0].id);
     setAytSubTrack("sayisal");
   }
 
   function handleAytSubTrackChange(next: Track) {
     setAytSubTrack(next);
-    setBranchCourseId(AYT_COURSES_BY_TRACK[next][0].id);
+    setBranchCourseId(branchExamCourses("ayt", next)[0].id);
   }
 
-  const branchCourses = gradeCourses ?? (isLgs ? LGS_COURSES : mainTrack === "tyt" ? TYT_COURSES : AYT_COURSES_BY_TRACK[aytSubTrack]);
+  // The combined branch-exam courses (TYT Fen, TYT Sosyal, ...) lead the list -- see branchExamCourses.
+  const branchCourses = gradeCourses ?? (isLgs ? LGS_COURSES : branchExamCourses(mainTrack === "tyt" ? "tyt" : "ayt", aytSubTrack));
 
   // One point per DAY, not per row: a day can hold several entries for the
   // same date now -- the student's own manual entries plus a Paragraf/Problem

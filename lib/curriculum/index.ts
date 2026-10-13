@@ -191,6 +191,16 @@ export const BRANCH_EXAM_MACRO_COURSES: Course[] = uniqueById([
   ...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK.sozel,
 ]);
 
+// THE list of courses a Branş Denemesi can be about, for one exam field: the combined ("macro", "whole fruit") courses -- TYT Sosyal /
+// TYT Matematik / TYT Fen, AYT Matematik / AYT Fen / AYT Sos 1 / AYT Sos 2 -- first, then the single-subject ("sliced") ones.
+// Every Branş Denemesi picker, chart and analysis in both panels builds its list through this function: a picker assembled from
+// TYT_COURSES / AYT_COURSES_BY_TRACK alone silently hides every exam saved under a combined course (the Grafikler bug of 2026-10).
+export function branchExamCourses(field: "tyt" | "ayt", aytTrack: Track = "sayisal"): Course[] {
+  return field === "tyt"
+    ? [...TYT_BRANCH_EXAM_MACRO_COURSES, ...TYT_COURSES]
+    : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytTrack], ...AYT_COURSES_BY_TRACK[aytTrack]];
+}
+
 // profiles.academic_track ("yks_sayisal" ...) as an AYT track; null for anything else (LGS, Maarif, YDT, unset).
 export function aytTrackOf(academicTrack: string | null | undefined): Track | null {
   return academicTrack === "yks_sayisal" ? "sayisal" : academicTrack === "yks_ea" ? "ea" : academicTrack === "yks_sozel" ? "sozel" : null;
