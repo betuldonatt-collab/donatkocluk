@@ -128,6 +128,30 @@ export function comparableGeneralExams<T extends { id: string; title: string; ta
     .sort((a, b) => b.task_date.localeCompare(a.task_date) || a.id.localeCompare(b.id));
 }
 
+// The exams that belong in one side-by-side comparison of a Branş Denemesi: every Branş Denemesi of the SAME course ("TYT Fen" with
+// "TYT Fen", "Fizik" with "Fizik" -- the combined and the single-subject courses are different courses) whose date passes `inRange`,
+// newest first, ties by id. The clicked exam is always part of it, even if a caller's range would not include it.
+export function comparableBranchExams<T extends { id: string; task_type: string; course_id: string | null; task_date: string }>(
+  all: T[],
+  focus: T,
+  inRange: (dateIso: string) => boolean,
+): T[] {
+  const picked = all.filter((e) => e.task_type === "branch_exam" && e.course_id === focus.course_id && (e.id === focus.id || inRange(e.task_date)));
+  if (!picked.some((e) => e.id === focus.id)) picked.push(focus);
+  return picked.slice().sort((a, b) => b.task_date.localeCompare(a.task_date) || a.id.localeCompare(b.id));
+}
+
+// In how many of the shown exams a topic row was marked (a row rolls up its member topics: any member marked counts once per exam).
+// Read as "N / M exams": the chronic weaknesses are the rows with a high N.
+export function rowRecurrence(row: { memberTopicIds: string[] }, examIds: string[], markedByExam: Map<string, Set<string>>): number {
+  let n = 0;
+  for (const id of examIds) {
+    const marked = markedByExam.get(id);
+    if (marked && row.memberTopicIds.some((t) => marked.has(t))) n++;
+  }
+  return n;
+}
+
 // "TYT Genel Deneme - 3D Yayınları" -> "3D Yayınları" (the publisher is the title's " - " suffix); "—" when there is none.
 export function examPublisher(title: string): string {
   const match = title.match(/-\s*([^-]+)$/);

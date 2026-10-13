@@ -11,8 +11,10 @@ import {
   isLgsCourseId,
   type Course,
 } from "@/lib/curriculum";
+import { formatChartRangeLabel, isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import type { ExamType } from "@/lib/exam-type";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
+import { ChartRangePicker } from "../../_components/charts/chart-range-picker";
 import { DualMetricChart } from "../../_components/charts/dual-metric-chart";
 import { getMoreBransExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -37,6 +39,9 @@ export function BransAnalysisClient({
   const [mistakes, setMistakes] = useState(initialMistakes);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
+  // The same date filter the coach has in Grafikler / Analiz: "Son 30 Gün" until the student picks a calendar range. Everything on the
+  // page (each course's chart and its topic table) is limited to the exams inside it.
+  const [range, setRange] = useState<ChartRange>(LAST_30_DAYS_RANGE);
 
   async function handleLoadMore() {
     setLoadingMore(true);
@@ -85,8 +90,15 @@ export function BransAnalysisClient({
     return map;
   }, [mistakes]);
 
+  const examsInRange = useMemo(() => exams.filter((e) => isDateInChartRange(e.task_date, range)), [exams, range]);
+  const outsideRange = exams.length - examsInRange.length;
+  // Exams are loaded newest first, a page at a time: when the range reaches further back than what is loaded, say so.
+  const oldestLoaded = exams.reduce<string | null>((min, e) => (min === null || e.task_date < min ? e.task_date : min), null);
+  const rangeStart = range.type === "custom" ? range.startDate : null;
+  const mayHaveOlder = hasMore && rangeStart !== null && oldestLoaded !== null && rangeStart < oldestLoaded;
+
   function examsForCourse(course: Course): StudentTask[] {
-    return exams
+    return examsInRange
       .filter((e) => e.course_id === course.id)
       .sort((a, b) => a.task_date.localeCompare(b.task_date));
   }
@@ -128,6 +140,19 @@ export function BransAnalysisClient({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted-foreground text-sm" data-slot="range-summary">
+          {formatChartRangeLabel(range)} · {examsInRange.length} branş denemesi
+          {outsideRange > 0 && ` (aralığın dışında ${outsideRange} deneme daha var)`}
+        </p>
+        <ChartRangePicker value={range} onChange={setRange} />
+      </div>
+      {mayHaveOlder && (
+        <p className="rounded-md bg-amber-500/15 px-3 py-2 text-xs text-amber-700" data-slot="older-hint">
+          Seçtiğin aralık yüklenen denemelerden daha eskiyi kapsıyor. Eski denemeleri görmek için aşağıdaki &quot;Daha Fazla Yükle&quot; düğmesine bas.
+        </p>
+      )}
+
       <CourseTabs
         examType={examType}
         tytCourses={tytBranchCourses}

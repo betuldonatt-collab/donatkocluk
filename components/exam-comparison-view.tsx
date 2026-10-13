@@ -1,14 +1,22 @@
 "use client";
 
 import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, X } from "lucide-react";
 
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, isFlatRows, withGroupHeadings } from "@/lib/curriculum/rows";
-import { examPublisher, examTrackOf, generalExamTabs, markedRowCount, subjectScoreSummary } from "@/lib/exam-detail";
+import {
+  examPublisher,
+  examTrackOf,
+  generalExamTabs,
+  markedRowCount,
+  rowRecurrence,
+  subjectScoreSummary,
+  type ScoreSummary,
+} from "@/lib/exam-detail";
 import { cn } from "@/lib/utils";
 import type { ExamDetailExam } from "@/components/exam-detail-view";
 
@@ -24,19 +32,27 @@ function formatShortDate(dateStr: string) {
 
 function ExamColumnHead({
   exam,
-  scoreKey,
+  summary,
   focused,
   onEdit,
+  duration,
+  stickyTop = false,
 }: {
   exam: ExamDetailExam;
-  scoreKey: string;
+  summary: ScoreSummary | null;
   focused: boolean;
   onEdit?: (exam: ExamDetailExam) => void;
+  // Branş Denemesi: the exam's own Süre (minutes) shown under the score.
+  duration?: number | null;
+  // The header row stays visible while the topics scroll (the branch comparison's bounded table).
+  stickyTop?: boolean;
 }) {
-  const summary = subjectScoreSummary(exam.subject_scores, scoreKey, examTrackOf(exam.title));
   return (
-    <TableHead data-focused={focused || undefined} className={cn("min-w-28 border-l p-0 text-center align-top", focused && "bg-primary/10")}>
-      <div className="flex w-full flex-col items-center gap-1 px-2 py-2">
+    <TableHead
+      data-focused={focused || undefined}
+      className={cn("min-w-28 border-l p-0 text-center align-top", stickyTop && "bg-background sticky top-0 z-30", !stickyTop && focused && "bg-primary/10")}
+    >
+      <div className={cn("flex w-full flex-col items-center gap-1 px-2 py-2", stickyTop && focused && "bg-primary/10")}>
         <span className="text-foreground max-w-28 truncate text-xs font-semibold" title={exam.title}>
           {examPublisher(exam.title)}
         </span>
@@ -49,6 +65,9 @@ function ExamColumnHead({
           </span>
         ) : (
           <span className="text-muted-foreground text-[10px] font-normal">sonuç yok</span>
+        )}
+        {duration !== null && duration !== undefined && duration > 0 && (
+          <span className="text-muted-foreground text-[10px] font-normal tabular-nums">Süre {duration} dk</span>
         )}
         {exam.analysis_pending && <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">Analiz Bekliyor</span>}
         {onEdit && (
@@ -96,7 +115,13 @@ function CourseComparisonTable({
               {!flat && <TableHead className="bg-background sticky left-0 z-20 w-12 align-bottom">Ünite</TableHead>}
               <TableHead className={cn("bg-background sticky z-20 min-w-48 border-r align-bottom", flat ? "left-0" : "left-12")}>Konu</TableHead>
               {exams.map((exam) => (
-                <ExamColumnHead key={exam.id} exam={exam} scoreKey={scoreKey} focused={exam.id === focusExamId} onEdit={onEdit} />
+                <ExamColumnHead
+                  key={exam.id}
+                  exam={exam}
+                  summary={subjectScoreSummary(exam.subject_scores, scoreKey, examTrackOf(exam.title))}
+                  focused={exam.id === focusExamId}
+                  onEdit={onEdit}
+                />
               ))}
             </TableRow>
           </TableHeader>
@@ -149,6 +174,158 @@ function CourseComparisonTable({
           </TableBody>
         </Table>
       </StickyXScroll>
+    </section>
+  );
+}
+
+// ---- Branş Denemesi: one course, every exam of it in the range ----------------------------------------------------------------------------
+
+// Topics as rows, the course's exams as columns (newest on the left), a plain X wherever the topic was marked in that exam, and a
+// "Tekrar" column counting in how many of the shown exams each topic was marked -- the chronic weaknesses stand out. The table is
+// height-bounded with a sticky header row (and sticky Ünite / Konu / Tekrar columns), so a long topic list never loses its exam
+// headings; it scrolls both ways inside its own frame and opens with the clicked exam's column in view.
+export function BranchExamComparisonView({
+  course,
+  exams,
+  focusExamId,
+  markedByExam,
+  netOf,
+  onEdit,
+}: {
+  course: Course | null;
+  // Every Branş Denemesi of the course in the range, newest first (comparableBranchExams).
+  exams: ExamDetailExam[];
+  focusExamId: string;
+  markedByExam: Map<string, Set<string>>;
+  // The cohort's net rule (LGS / 7th grade 3:1, otherwise 4:1).
+  netOf: (correct: number, wrong: number) => number;
+  onEdit?: (exam: ExamDetailExam) => void;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const empty = new Set<string>();
+
+  // open with the clicked exam's column in view, however far back it is
+  useEffect(() => {
+    const column = frameRef.current?.querySelector<HTMLElement>("[data-focused]");
+    column?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [focusExamId, exams.length]);
+
+  if (!course) return <p className="text-muted-foreground text-sm">Bu ders için konu tablosu bulunamadı.</p>;
+  if (exams.length === 0) return <p className="text-muted-foreground text-sm">Karşılaştırılacak deneme yok.</p>;
+
+  const rows = flattenSelectionRows(course);
+  const flat = isFlatRows(rows);
+  const pendingCount = exams.filter((e) => e.analysis_pending).length;
+  const examIds = exams.map((e) => e.id);
+  const summaryOf = (e: ExamDetailExam): ScoreSummary | null =>
+    e.correct_count === null && e.wrong_count === null && e.empty_count === null
+      ? null
+      : {
+          correct: e.correct_count ?? 0,
+          wrong: e.wrong_count ?? 0,
+          empty: e.empty_count ?? 0,
+          net: netOf(e.correct_count ?? 0, e.wrong_count ?? 0),
+        };
+  const konuLeft = flat ? "left-0" : "left-12";
+  const tekrarLeft = flat ? "left-48" : "left-[15rem]";
+
+  return (
+    <section className="space-y-3" aria-label={`${course.name} branş denemeleri karşılaştırması`}>
+      <p className="text-muted-foreground text-xs">
+        {exams.length === 1
+          ? "Bu aralıkta bu branştan tek deneme var."
+          : `${exams.length} deneme, en yeniden eskiye soldan sağa.`}{" "}
+        Vurgulu sütun tıkladığın deneme; X = o denemede işaretlenen konu; Tekrar = konunun gösterilen denemelerin kaçında işaretlendiği.
+        {pendingCount > 0 && ` ${pendingCount} denemenin konu analizi henüz girilmemiş.`}
+      </p>
+
+      <div ref={frameRef} className="max-h-[60dvh] overflow-auto rounded-md border" data-slot="branch-comparison-frame">
+        <table data-slot="table" className="w-full caption-bottom text-sm">
+          <TableHeader>
+            <TableRow>
+              {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 align-bottom">Ünite</TableHead>}
+              <TableHead className={cn("bg-background sticky top-0 z-40 w-48 max-w-48 min-w-48 border-r align-bottom", konuLeft)}>Konu</TableHead>
+              <TableHead
+                className={cn("bg-background sticky top-0 z-40 w-16 min-w-16 border-r text-center align-bottom", tekrarLeft)}
+                title="Konunun, gösterilen denemelerin kaçında işaretlendiği"
+              >
+                Tekrar
+              </TableHead>
+              {exams.map((exam) => (
+                <ExamColumnHead
+                  key={exam.id}
+                  exam={exam}
+                  summary={summaryOf(exam)}
+                  duration={exam.duration_minutes}
+                  focused={exam.id === focusExamId}
+                  onEdit={onEdit}
+                  stickyTop
+                />
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {withGroupHeadings(rows).map((item) => {
+              const unitLabel = item.kind === "heading" ? item.unitLabel : item.row.unitLabel;
+              const unitCell = !flat && item.unitRowSpan !== null && (
+                <TableCell
+                  rowSpan={item.unitRowSpan}
+                  className={cn("bg-card sticky left-0 z-10 border-r p-0 text-center align-middle", item.unitRowSpan === 1 && "text-muted-foreground")}
+                >
+                  {unitLabel === "-" ? (
+                    "-"
+                  ) : (
+                    <div className="flex h-full items-center justify-center py-2">
+                      <span className="[writing-mode:vertical-rl] rotate-180 font-medium">{unitLabel}</span>
+                    </div>
+                  )}
+                </TableCell>
+              );
+              if (item.kind === "heading") {
+                return (
+                  <TableRow key={item.key}>
+                    {unitCell}
+                    <TableCell colSpan={2 + exams.length} className="bg-muted/60 text-xs font-semibold whitespace-normal">
+                      {item.label}
+                    </TableCell>
+                  </TableRow>
+                );
+              }
+              const row = item.row;
+              const repeated = rowRecurrence(row, examIds, markedByExam);
+              return (
+                <TableRow key={row.id}>
+                  {unitCell}
+                  <TableCell className={cn("bg-card sticky z-10 w-48 max-w-48 min-w-48 border-r font-medium whitespace-normal", konuLeft)}>
+                    {row.label}
+                    <ReadOnlySubtopics names={row.readOnlyNames} />
+                  </TableCell>
+                  <TableCell
+                    data-slot="recurrence"
+                    data-count={repeated}
+                    className={cn(
+                      "sticky z-10 w-16 min-w-16 border-r text-center text-xs tabular-nums",
+                      tekrarLeft,
+                      repeated >= 2 ? "bg-rose-50 font-semibold text-rose-700 dark:bg-rose-950" : "bg-card",
+                      repeated === 0 && "text-muted-foreground",
+                    )}
+                  >
+                    {repeated === 0 ? "—" : `${repeated}/${exams.length}`}
+                  </TableCell>
+                  {exams.map((exam) => {
+                    const missed = row.memberTopicIds.some((id) => (markedByExam.get(exam.id) ?? empty).has(id));
+                    return (
+                      <TableCell key={exam.id} className={cn("border-l text-center", exam.id === focusExamId && "bg-primary/5")}>
+                        {missed && <X className="mx-auto size-4 text-rose-500" aria-label="İşaretli" />}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </table>
+      </div>
     </section>
   );
 }

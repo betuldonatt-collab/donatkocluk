@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { isDateInChartRange, type ChartRange } from "@/lib/chart-range";
+import { formatChartRangeLabel, isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
 import { branchExamCourses, LGS_COURSES, TRACK_LABELS, findCourseById, type Track } from "@/lib/curriculum";
@@ -518,6 +518,9 @@ export function ChartsTab({
         <ExamDetailDialog
           exam={detailExam}
           allGeneralExams={generalExams}
+          allBranchExams={branchExams}
+          isInRange={(date) => isDateInChartRange(date, chartRange)}
+          rangeLabel={formatChartRangeLabel(chartRange)}
           markedByExam={markedTopicsByExam}
           netOf={netOf}
           onClose={() => setDetailExamId(null)}
