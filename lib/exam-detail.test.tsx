@@ -243,6 +243,37 @@ describe("Genel Deneme side by side", () => {
     expect(xs(row(first[1].label))).toBe(0);
   });
 
+  it("Tekrar counts in how many of the shown exams a topic was marked, and tints the repeated ones", () => {
+    const t0 = mathId(0);
+    const t3 = mathId(3);
+    const out = html({ tab: "matematik", marked: { a: [t0], b: [t0, t3], c: [t0] } });
+    expect(out).toContain(">Tekrar</th>");
+    const counts = [...out.matchAll(/data-count="(\d+)"/g)].map((m) => Number(m[1]));
+    expect(counts.slice(0, 4)).toEqual([3, 0, 0, 1]);
+    expect(out).toContain("3/3");
+    expect(out).toContain("1/3");
+    expect(out).toMatch(/text-rose-700[^"]*" data-count="3"/);
+    expect(out).not.toMatch(/text-rose-700[^"]*" data-count="1"/);
+    expect(out).toContain("Tekrar = konunun gösterilen denemelerin kaçında işaretlendiği");
+  });
+
+  it("the exam headings and the Ünite / Konu / Tekrar columns stay in place inside a height-bounded frame, in every course table", () => {
+    const out = html({ tab: "matematik" });
+    expect((out.match(/data-slot="general-comparison-frame"/g) ?? []).length).toBe(2); // Matematik + Geometri
+    expect(out).toContain("max-h-[60dvh]");
+    expect(out).toMatch(/<th[^>]*sticky top-0[^>]*>Konu<\/th>/);
+    expect(out).toMatch(/<th[^>]*sticky top-0[^>]*>Tekrar<\/th>/);
+    // each exam's header sticks too: 3 exams x 2 course tables
+    expect((out.match(/sticky top-0 z-30/g) ?? []).length).toBe(3 * 2);
+  });
+
+  it("with a single exam there is nothing to recur: no Tekrar column or hint, the X marks still show", () => {
+    const one = html({ tab: "matematik", exams: [b], focus: "b", marked: { b: [mathId(0)] } });
+    expect(one).not.toContain("Tekrar");
+    expect(one).not.toContain("data-count");
+    expect((one.match(/aria-label="İşaretli"/g) ?? []).length).toBe(1);
+  });
+
   it("each subject tab shows its own courses across all exams", () => {
     expect(html({ tab: "fen" })).toContain('aria-label="Fizik konuları"');
     expect(html({ tab: "fen" })).toContain('aria-label="Biyoloji konuları"');
