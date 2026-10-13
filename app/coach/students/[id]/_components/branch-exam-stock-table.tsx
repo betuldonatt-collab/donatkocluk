@@ -5,6 +5,7 @@ import { friendlyError } from "@/lib/friendly-error";
 import { Archive, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -193,7 +194,7 @@ export function BranchExamStockTable({
         {addButton}
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <StickyXScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -270,7 +271,7 @@ export function BranchExamStockTable({
             ))}
           </TableBody>
         </Table>
-        </div>
+        </StickyXScroll>
       </CardContent>
 
       {dialogs}

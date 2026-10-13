@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Clock, Lock, Pencil, Plus, SquareArrowOutUpR
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { courseDisplayName, findCourseById, findTopicById } from "@/lib/curriculum";
 import { subjectBackgroundClass, taskStatusBorderClass } from "@/lib/subject-colors";
 import { weekDates } from "@/lib/date";
@@ -131,7 +132,7 @@ export function ProgramTab({
           Öğrencinin her hafta aynı kalan sabit programı (okul, spor gibi) -- haftalık planlayıcıda otomatik olarak,
           salt okunur şekilde gösterilir.
         </p>
-        <div className="overflow-x-auto pb-2">
+        <StickyXScroll scrollerClassName="pb-2">
           <div className="grid min-w-[980px] grid-cols-7 gap-2">
             {DAY_LABELS.map((dayLabel, dayOfWeek) => {
               const dayFixedTasks = fixedTasks.filter((t) => t.day_of_week === dayOfWeek);
@@ -185,7 +186,7 @@ export function ProgramTab({
               );
             })}
           </div>
-        </div>
+        </StickyXScroll>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -235,7 +236,7 @@ export function ProgramTab({
         </Button>
       </div>
 
-      <div className="overflow-x-auto pb-2">
+      <StickyXScroll scrollerClassName="pb-2">
         <div className="grid min-w-[980px] grid-cols-7 gap-2">
           {weekDays.map((day) => {
             const dayTasks = tasks.filter((t) => t.task_date === day.date);
@@ -279,7 +280,7 @@ export function ProgramTab({
             );
           })}
         </div>
-      </div>
+      </StickyXScroll>
 
       {fixedTaskDialog && (
         <FixedTaskDialog

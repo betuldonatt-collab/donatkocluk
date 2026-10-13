@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { isRoutineCourseId } from "@/lib/curriculum";
 import { sumTaskCounts } from "@/lib/scoring";
 import { updateScheduleRoutineRowHeights, updateScheduleTaskRowHeights } from "@/lib/schedule-row-heights";
@@ -914,7 +915,7 @@ export function ScheduleBoard({
           setOverDay(null);
         }}
       >
-        <div className="overflow-x-auto pb-2">
+        <StickyXScroll scrollerClassName="pb-2">
           <div className="grid min-w-[1260px] grid-cols-7 items-start gap-3">
             {weekDays.map((day) => {
               const bucket = dayBuckets.get(day.date)!;
@@ -957,7 +958,7 @@ export function ScheduleBoard({
               );
             })}
           </div>
-        </div>
+        </StickyXScroll>
 
         <WeeklyDybTotal tasks={tasks} />
 

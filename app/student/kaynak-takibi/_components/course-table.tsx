@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
 import {
   MAARIF_KONU_STICKY_LEFT_CLASS,
@@ -163,7 +164,7 @@ export function CourseTable({
       </CardHeader>
       <CardContent>
         {collapsedPipeline && <PipelineSummaryBar course={course} map={collapsedPipeline.map} config={collapsedPipeline.config} />}
-        <div className="overflow-x-auto">
+        <StickyXScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -377,7 +378,7 @@ export function CourseTable({
             </TableRow>
           </TableBody>
         </Table>
-        </div>
+        </StickyXScroll>
 
         {resources.length === 0 && (
           <p className="text-muted-foreground mt-3 text-sm">

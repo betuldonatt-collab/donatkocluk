@@ -137,7 +137,13 @@
        scroll container instead, never the page. */
   }
   body {
-    @apply bg-background text-foreground overflow-x-hidden;
+    @apply bg-background text-foreground;
+    /* clip, NOT hidden: overflow-x: hidden on body also makes body a scroll container (its overflow-y computes to auto), and
+       position: sticky then resolves against body's own box instead of the viewport -- every page-level sticky element (the sticky
+       horizontal scrollbar of wide tables, components/ui/sticky-x-scroll.tsx) would sit at its natural position. clip keeps the
+       same "nothing scrolls sideways" guarantee without creating a scroll container; html's overflow-x: hidden above still covers
+       the (old) browsers that do not know clip. */
+    overflow-x: clip;
     /* iPhone notch/Dynamic Island and home-indicator clearance -- a
        no-op zero value everywhere else, since env(safe-area-inset-*)
        only resolves to something non-zero when viewport-fit=cover is

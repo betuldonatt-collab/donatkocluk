@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { PipelineCells, PipelineFillerCell, PipelineStepHeads, PipelineSummaryBar } from "@/components/topic-pipeline";
 import {
   MAARIF_KONU_STICKY_LEFT_CLASS,
@@ -177,7 +178,7 @@ export function EditableCourseTable({
       </CardHeader>
       <CardContent>
         {collapsedPipeline && <PipelineSummaryBar course={course} map={collapsedPipeline.map} config={collapsedPipeline.config} />}
-        <div className="overflow-x-auto">
+        <StickyXScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -423,7 +424,7 @@ export function EditableCourseTable({
               </TableRow>
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
 
         {resources.length === 0 && (
           <p className="text-muted-foreground mt-3 text-sm">
