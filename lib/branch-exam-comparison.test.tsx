@@ -171,6 +171,32 @@ describe("wiring", () => {
     expect(charts).toContain("allBranchExams={branchExams}");
     expect(charts).toContain("isInRange={(date) => isDateInChartRange(date, chartRange)}");
   });
+
+  // The sticky Ünite / Konu / Tekrar columns stick to the table's OWN scroll frame. DialogContent is a grid, whose items default to
+  // min-width:auto -- so without these, a wide table stretched the whole popup, the frame never scrolled, and the columns went away
+  // with the popup. (Measured in a real browser: popup 257px, frame 1884px, no overflow in the frame.)
+  it("the popup keeps a wide table inside its own scrolling frame (grid track + view roots can shrink)", () => {
+    const dialog = read("../app/coach/students/[id]/_components/exam-detail-dialog.tsx");
+    expect(dialog).toContain('max-w-6xl grid-cols-[minmax(0,1fr)]');
+    const view = read("../components/exam-comparison-view.tsx");
+    expect(view).toContain('<section className="min-w-0 max-w-full space-y-3"');
+    expect(view).toContain('<div className="min-w-0 max-w-full space-y-4">');
+  });
+
+  it("the Ünite header is exactly 3rem wide in every topic x exam table, so Konu (left-12) and Tekrar (left-[15rem]) never overlap it", () => {
+    for (const file of [
+      "../components/exam-comparison-view.tsx",
+      "../app/coach/students/[id]/_components/coach-exam-topic-table.tsx",
+      "../app/student/deneme-analizleri/_components/exam-topic-table.tsx",
+    ]) {
+      const src = read(file);
+      const heads = src.match(/sticky top-0 left-0 z-40 w-12 min-w-12 px-0 text-center align-bottom/g) ?? [];
+      expect(heads.length, file).toBeGreaterThan(0);
+      expect(src, file).not.toMatch(/w-12 min-w-12 align-bottom/);
+      // the matching offsets
+      expect(src, file).toContain('"left-[15rem]"');
+    }
+  });
 });
 
 // ---- the student's Branş page: a date range ---------------------------------------------------------------------------------------------

@@ -28,6 +28,10 @@ import type { ExamDetailExam } from "@/components/exam-detail-view";
 // Every table here (Genel and Branş) is the same object as the student's and the coach's Analiz tables: a height-bounded frame with
 // a sticky header row, sticky Ünite / Konu / Tekrar columns, and "Tekrar" = in how many of the shown exams a topic was marked
 // (shown from two exams up).
+//
+// The roots carry min-w-0 / max-w-full ON PURPOSE: inside a grid (the dialog's DialogContent is one) an item's automatic minimum width is
+// its content's, so a wide table would stretch the whole popup instead of scrolling inside its own frame -- and the sticky columns,
+// which stick to the frame, would then scroll away with the popup.
 
 function formatShortDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "2-digit", timeZone: "UTC" });
@@ -119,7 +123,7 @@ function CourseComparisonTable({
         <table data-slot="table" className="w-full caption-bottom text-sm">
           <TableHeader>
             <TableRow>
-              {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 align-bottom">Ünite</TableHead>}
+              {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 px-0 text-center align-bottom">Ünite</TableHead>}
               <TableHead className={cn("bg-background sticky top-0 z-40 w-48 max-w-48 min-w-48 border-r align-bottom", konuLeft)}>Konu</TableHead>
               {showTekrar && (
                 <TableHead
@@ -261,7 +265,7 @@ export function BranchExamComparisonView({
   const tekrarLeft = flat ? "left-48" : "left-[15rem]";
 
   return (
-    <section className="space-y-3" aria-label={`${course.name} branş denemeleri karşılaştırması`}>
+    <section className="min-w-0 max-w-full space-y-3" aria-label={`${course.name} branş denemeleri karşılaştırması`}>
       <p className="text-muted-foreground text-xs">
         {exams.length === 1
           ? "Bu aralıkta bu branştan tek deneme var."
@@ -274,7 +278,7 @@ export function BranchExamComparisonView({
         <table data-slot="table" className="w-full caption-bottom text-sm">
           <TableHeader>
             <TableRow>
-              {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 align-bottom">Ünite</TableHead>}
+              {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 px-0 text-center align-bottom">Ünite</TableHead>}
               <TableHead className={cn("bg-background sticky top-0 z-40 w-48 max-w-48 min-w-48 border-r align-bottom", konuLeft)}>Konu</TableHead>
               <TableHead
                 className={cn("bg-background sticky top-0 z-40 w-16 min-w-16 border-r text-center align-bottom", tekrarLeft)}
@@ -386,7 +390,7 @@ export function ExamComparisonView({
   const pendingCount = exams.filter((e) => e.analysis_pending).length;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 max-w-full space-y-4">
       <div role="tablist" aria-label="Dersler" className="bg-secondary flex flex-wrap rounded-lg p-1">
         {tabs.map((tab) => {
           const selected = tab.key === active.key;

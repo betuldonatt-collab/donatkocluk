@@ -70,7 +70,7 @@ export function ExamTopicTable({
           <table data-slot="table" className="w-full caption-bottom text-sm">
             <TableHeader>
               <TableRow>
-                {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 align-bottom">Ünite</TableHead>}
+                {!flat && <TableHead className="bg-background sticky top-0 left-0 z-40 w-12 min-w-12 px-0 text-center align-bottom">Ünite</TableHead>}
                 <TableHead className={cn("bg-background sticky top-0 z-40 w-48 max-w-48 min-w-48 border-r align-bottom", konuLeft)}>Konu</TableHead>
                 {showTekrar && (
                   <TableHead

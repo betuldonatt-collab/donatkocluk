@@ -50,7 +50,7 @@ export function ExamDetailDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-w-6xl grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
           <DialogTitle>
             {isGeneral ? `${trackLabel} Genel Deneme Karşılaştırması` : `${branchCourse?.name ?? exam.title} Branş Denemesi Karşılaştırması`}
