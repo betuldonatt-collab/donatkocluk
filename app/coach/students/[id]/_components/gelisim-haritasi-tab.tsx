@@ -11,7 +11,6 @@ import type { ExamType } from "@/lib/exam-type";
 import {
   computeGelisimHaritasi,
   HEAT_TIER_STYLES,
-  WINDOW_SIZE,
   heatTier,
   type GelisimHaritasiRow,
   type TrialSource,
@@ -37,7 +36,7 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
             <div key={row.topicId} className={cn("space-y-1 rounded-lg border px-3 py-2", HEAT_TIER_STYLES[tier].tile)}>
               <p className="truncate text-sm font-medium">{row.topicName}</p>
               <p className="text-xs tabular-nums opacity-80">
-                {row.count}/{row.windowSize} son deneme
+                {row.count}/{row.windowSize} deneme
               </p>
             </div>
           );
@@ -47,11 +46,9 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
   );
 }
 
-// Windowed sibling of Konu Performans Haritası (analytics-tab.tsx) -- last
-// WINDOW_SIZE trials per course, rendered as a color tile grid instead of
-// a drill-down list. Same TYT/AYT -> course-chips navigation shell,
-// duplicated per this repo's panel-UI convention (the computation itself
-// is shared, see lib/gelisim-haritasi.ts).
+// Date-ranged sibling of Konu Performans Haritası (analytics-tab.tsx) -- EVERY trial of a course inside the coach's date range
+// (no cap on how many), rendered as a color tile grid instead of a drill-down list. Same TYT/AYT -> course-chips navigation
+// shell, duplicated per this repo's panel-UI convention (the computation itself is shared, see lib/gelisim-haritasi.ts).
 //
 // One merged map per subject (Fizik, Kimya, ...): its trials are the Genel Denemeler of the track, the combined Branş
 // exams it is part of ("TYT Fen") and its own single Branş exams -- which is why there are no combined chips here. The
@@ -59,12 +56,11 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
 //
 // Recomputed here client-side (not passed pre-aggregated from the
 // server) so it can react live to the shared date filter (DetailTabs):
-// branchExams/generalExams/examMistakes are this student's full,
-// unfiltered history already, filtered to `chartRange` first and then
-// windowed to each course's last WINDOW_SIZE trials WITHIN that range --
-// the two windows compose naturally (fewer than WINDOW_SIZE trials in a
-// short range just means a smaller denominator, shown via each row's own
-// windowSize).
+// branchExams/generalExams/examMistakes are this student's full history,
+// filtered to `chartRange` -- the date range is the only window (a short range
+// just means fewer trials, shown via each row's own windowSize). A student's own
+// self-created exam that the coach has not approved yet stays out, as in every
+// other analytics rollup.
 export function GelisimHaritasiTab({
   branchExams,
   generalExams,
@@ -83,7 +79,9 @@ export function GelisimHaritasiTab({
   const [source, setSource] = useState<TrialSource>("all");
 
   const rows: GelisimHaritasiRow[] = useMemo(() => {
-    const examsInRange = [...generalExams, ...branchExams].filter((e) => isDateInChartRange(e.task_date, chartRange));
+    const examsInRange = [...generalExams, ...branchExams].filter(
+      (e) => (e.is_coach_assigned || e.is_approved_by_coach) && isDateInChartRange(e.task_date, chartRange),
+    );
     return computeGelisimHaritasi(curriculumCourseIds, examsInRange, examMistakes, { source });
   }, [generalExams, branchExams, examMistakes, curriculumCourseIds, chartRange, source]);
 
@@ -92,7 +90,7 @@ export function GelisimHaritasiTab({
       <CardHeader>
         <CardTitle className="text-base">Gelişim Haritası</CardTitle>
         <p className="text-muted-foreground text-sm">
-          {formatChartRangeLabel(chartRange)} içindeki son {WINDOW_SIZE} denemedeki hata sıklığı.
+          {formatChartRangeLabel(chartRange)} içindeki tüm denemelerdeki hata sıklığı.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -1,21 +1,18 @@
-// "Aylık Karne" (monthly report card) topic-mistake aggregation -- a
-// date-range-bounded sibling of lib/gelisim-haritasi.ts's computeGelisimHaritasi.
-// That one windows each course to its most recent N trials regardless of
-// when they happened; a Karne instead needs everything that happened
-// within one specific calendar month, so the count-based `.slice(0, N)`
-// step is replaced with a task_date range filter. Same courseId::topicId
-// counting convention and the same TYT_SUBJECT_GROUPS general-exam
-// membership rule as gelisim-haritasi.ts, kept identical on purpose so a
-// topic's color means the same thing in both features.
-import { findCourseById, TRACK_LABELS, type Track } from "./curriculum";
+// "Aylık Karne" (monthly report card) topic-mistake aggregation -- the
+// unified topic computation of lib/gelisim-haritasi.ts (computeGelisimHaritasi)
+// restricted to the exams of one cycle's date range: one merged map per
+// subject (Genel Denemeler of the track + combined Branş exams + single Branş
+// exams, pending-analysis exams left out, AYT track-aware), so a topic's color
+// means exactly the same here as in the Gelişim Haritası and the Konu
+// Performans Haritası. Only the row shape of the stored snapshot is kept.
+import { TRACK_LABELS, type Track } from "./curriculum";
+import { computeGelisimHaritasi, type TrialExam } from "./gelisim-haritasi";
 import { canonicalCourseId, canonicalTopicId } from "./curriculum/legacy-course-ids";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   inferAytTrackFromScores,
   LGS_EXAM_SUBJECTS,
-  LGS_SUBJECT_GROUPS,
   MAARIF7_EXAM_SUBJECTS,
-  MAARIF7_SUBJECT_GROUPS,
   TYT_SUBJECT_GROUPS,
   coursesForMaarifTytGroup,
   type AytSubjectGroupKey,
@@ -53,20 +50,13 @@ export function karneTopicRowsForCourse(rows: KarneTopicRow[], courseId: string)
   return [...merged.values()].sort((a, b) => b.count - a.count);
 }
 
-export type KarneExam = { id: string; task_date: string; task_type: string; course_id: string | null };
+// title / subject_scores / analysis_pending are what the unified topic computation reads (which courses a Genel Deneme covers, and
+// whether its analysis is still pending); every one of them is optional.
+export type KarneExam = TrialExam;
 export type KarneMistakeRow = { task_id: string; course_id: string; topic_id: string };
 
-// LGS's subjects join the set for the same reason as in
-// lib/gelisim-haritasi.ts: callers only ever pass their own student's
-// cohort course ids, so cohorts can't bleed into each other.
-const GENERAL_EXAM_COURSE_IDS = new Set([
-  ...TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
-  ...LGS_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
-  ...MAARIF7_SUBJECT_GROUPS.flatMap((g) => g.courseIds),
-  // An 11th grader's Genel Deneme is analysed against the merged Maarif TYT courses.
-  ...TYT_SUBJECT_GROUPS.flatMap((g) => coursesForMaarifTytGroup(g.key).map((c) => c.id)),
-]);
-
+// The cycle's topic rows: every exam of [rangeStart, rangeEnd] (both inclusive), no cap on how many. `windowSize` is the number of
+// trials the course had in the cycle.
 export function computeAylikKarne(
   courseIds: string[],
   exams: KarneExam[],
@@ -74,44 +64,15 @@ export function computeAylikKarne(
   rangeStart: string,
   rangeEnd: string,
 ): KarneTopicRow[] {
-  const mistakesByTask = new Map<string, Set<string>>();
-  for (const m of mistakeRows) {
-    const set = mistakesByTask.get(m.task_id) ?? new Set<string>();
-    set.add(`${m.course_id}::${m.topic_id}`);
-    mistakesByTask.set(m.task_id, set);
-  }
-
-  const rows: KarneTopicRow[] = [];
-  for (const courseId of courseIds) {
-    const course = findCourseById(courseId);
-    if (!course) continue;
-
-    const relevant = exams.filter(
-      (e) =>
-        e.task_date >= rangeStart &&
-        e.task_date <= rangeEnd &&
-        ((e.task_type === "branch_exam" && e.course_id === courseId) ||
-          (e.task_type === "general_exam" && GENERAL_EXAM_COURSE_IDS.has(courseId))),
-    );
-    const windowSize = relevant.length;
-
-    for (const unit of course.units) {
-      for (const topic of unit.topics) {
-        const key = `${courseId}::${topic.id}`;
-        const count = relevant.filter((e) => mistakesByTask.get(e.id)?.has(key)).length;
-        rows.push({
-          courseId,
-          courseName: course.name,
-          topicId: topic.id,
-          // LGS Alt Konu leaves carry their Konu (see gelisim-haritasi.ts).
-          topicName: unit.konu ? `${unit.konu} › ${topic.name}` : topic.name,
-          count,
-          windowSize,
-        });
-      }
-    }
-  }
-  return rows;
+  const inRange = exams.filter((e) => e.task_date >= rangeStart && e.task_date <= rangeEnd);
+  return computeGelisimHaritasi(courseIds, inRange, mistakeRows).map((r) => ({
+    courseId: r.courseId,
+    courseName: r.courseName,
+    topicId: r.topicId,
+    topicName: r.topicName,
+    count: r.count,
+    windowSize: r.windowSize,
+  }));
 }
 
 // --- Karne v2: cycle math + net summary (shared by the coach's generate

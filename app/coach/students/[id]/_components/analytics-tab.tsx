@@ -4,7 +4,7 @@ import type { ExamType } from "@/lib/exam-type";
 import type { DetailTask } from "../types";
 import { CoachExamAnalysisSection } from "./coach-exam-analysis-section";
 import type { CourseResourceData } from "./kaynak-takibi-tab";
-import { TopicPerformanceMap, type TopicPerformanceRow } from "./topic-performance-map";
+import { TopicPerformanceMap, type TopicQuestionTotals } from "./topic-performance-map";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
@@ -17,7 +17,8 @@ function rangeKey(range: ChartRange): string {
 
 export function AnalyticsTab({
   studentId,
-  topicPerformance,
+  topicQuestionTotals,
+  curriculumCourseIds,
   branchExams,
   generalExams,
   examMistakes,
@@ -27,13 +28,13 @@ export function AnalyticsTab({
   chartRange,
 }: {
   studentId: string;
-  // Deliberately NOT filtered by chartRange -- Konu Performans Haritası is
-  // an all-time sample-size map (see topic-performance-map.tsx's own
-  // fetch, page.tsx), and a 30-day (or shorter) window would make an
-  // already-thin per-topic sample size even thinner, or silently drop a
-  // whole course/track a coach hasn't tested recently. Same reasoning
-  // Kaynak Takibi's lifetime totals are excluded from this filter for.
-  topicPerformance: TopicPerformanceRow[];
+  // Konu Performans Haritası is deliberately NOT filtered by chartRange -- it is an all-time sample-size map, and a 30-day (or
+  // shorter) window would make an already-thin per-topic sample size even thinner, or silently drop a whole course/track a
+  // coach hasn't tested recently. Same reasoning Kaynak Takibi's lifetime totals are excluded from this filter for. It is
+  // computed in the browser from the full exam history below (so the Tümü / Genel / Branş switch can narrow it); the
+  // question-level totals are the one thing the server precomputes.
+  topicQuestionTotals: TopicQuestionTotals;
+  curriculumCourseIds: string[];
   branchExams: DetailTask[];
   generalExams: DetailTask[];
   examMistakes: MistakeRow[];
@@ -55,7 +56,14 @@ export function AnalyticsTab({
           <p className="text-muted-foreground text-sm">Tüm zamanlar -- bu harita tarih filtresinden etkilenmez.</p>
         </CardHeader>
         <CardContent>
-          <TopicPerformanceMap rows={topicPerformance} examType={examType} />
+          <TopicPerformanceMap
+            branchExams={branchExams}
+            generalExams={generalExams}
+            examMistakes={examMistakes}
+            curriculumCourseIds={curriculumCourseIds}
+            questionTotals={topicQuestionTotals}
+            examType={examType}
+          />
         </CardContent>
       </Card>
 

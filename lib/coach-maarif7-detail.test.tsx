@@ -103,7 +103,7 @@ describe("the coach's detail page tabs", () => {
       <MaarifGradeProvider value={grade}>
         <DetailTabs
           studentId="s1"
-          topicPerformance={[]}
+          topicQuestionTotals={{}}
           curriculumCourseIds={[]}
           paragrafEntries={[]}
           generalExams={[]}

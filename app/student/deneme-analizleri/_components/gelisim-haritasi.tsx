@@ -1,19 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { CourseTabs } from "@/components/course-tabs";
 import { TrialBreakdownLine, TrialSourceSwitch } from "@/components/trial-source-switch";
+import { formatChartRangeLabel, isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import { cn } from "@/lib/utils";
 import type { ExamType } from "@/lib/exam-type";
-import { HEAT_TIER_STYLES, WINDOW_SIZE, heatTier, type GelisimHaritasiRow, type TrialSource } from "@/lib/gelisim-haritasi";
+import {
+  HEAT_TIER_STYLES,
+  computeGelisimHaritasi,
+  heatTier,
+  type GelisimHaritasiRow,
+  type TopicMistakeRow,
+  type TrialExam,
+  type TrialSource,
+} from "@/lib/gelisim-haritasi";
+import { ChartRangePicker } from "../../_components/charts/chart-range-picker";
 
 // Spelled out in full sentences rather than the old "1/8 son deneme"
-// shorthand. The window mixes every kind of exam about the course (Genel
-// Deneme, combined Branş, single Branş -- see lib/gelisim-haritasi.ts), and a
-// bare "son 8 deneme" reads to a student as "the last 8 full mock exams", which
-// isn't what windowSize actually counts; with the Genel / Branş switch the
-// sentence names the kind that is shown.
+// shorthand. The map covers every exam about the course inside the chosen
+// range (Genel Deneme, combined Branş, single Branş -- see
+// lib/gelisim-haritasi.ts); with the Genel / Branş switch the sentence names
+// the kind that is shown.
 const SOURCE_PHRASE: Record<TrialSource, string> = {
   all: "branş/genel denemede",
   general: "genel denemede",
@@ -26,22 +35,23 @@ function formatTopicPerformanceText(row: GelisimHaritasiRow, source: TrialSource
 
   if (windowSize === 0) {
     return source === "all"
-      ? "Bu konudan henüz branş veya genel deneme kaydın yok."
+      ? "Bu aralıkta bu konudan branş veya genel deneme kaydın yok."
       : source === "general"
-        ? "Bu konudan henüz genel deneme kaydın yok."
-        : "Bu konudan henüz branş denemesi kaydın yok.";
+        ? "Bu aralıkta bu konudan genel deneme kaydın yok."
+        : "Bu aralıkta bu konudan branş denemesi kaydın yok.";
   }
 
+  const span = `Bu aralıktaki ${windowSize} ${where}`;
   if (wrongCount === 0 && blankCount === 0) {
-    return `Son ${windowSize} ${where} bu konudan hiç hata yapmamışsın.`;
+    return `${span} bu konudan hiç hata yapmamışsın.`;
   }
   if (blankCount === 0) {
-    return `Son ${windowSize} ${where} bu konudan ${wrongCount} yanlış yapmışsın.`;
+    return `${span} bu konudan ${wrongCount} yanlış yapmışsın.`;
   }
   if (wrongCount === 0) {
-    return `Son ${windowSize} ${where} bu konuyu ${blankCount} kez boş bırakmışsın.`;
+    return `${span} bu konuyu ${blankCount} kez boş bırakmışsın.`;
   }
-  return `Son ${windowSize} ${where} bu konudan ${wrongCount} yanlış yapmış, ${blankCount} kez boş bırakmışsın.`;
+  return `${span} bu konudan ${wrongCount} yanlış yapmış, ${blankCount} kez boş bırakmışsın.`;
 }
 
 function TopicGrid({ courseId, rows, source }: { courseId: string; rows: GelisimHaritasiRow[]; source: TrialSource }) {
@@ -76,32 +86,48 @@ function TopicGrid({ courseId, rows, source }: { courseId: string; rows: Gelisim
 // own DenemeAnalizleriLayout already provides the section header.
 //
 // One merged map per subject: the chips are the atomic subjects (Fizik, Kimya, ...); a combined "TYT Fen" exam's marks are
-// already folded onto them by the computation, so there are no combined chips here. The server hands over the three source
-// variants (Tümü / Genel / Branş) and this only picks one.
+// already folded onto them by the computation, so there are no combined chips here. The map covers EVERY exam inside the date
+// range the student picked (no cap on how many; "Son 30 Gün" until they pick a calendar range, like the Branş page), and the
+// Tümü / Genel / Branş switch narrows it to one kind of exam.
 export function GelisimHaritasi({
-  rowsBySource,
+  exams,
+  mistakes,
+  courseIds,
   examType,
 }: {
-  rowsBySource: Record<TrialSource, GelisimHaritasiRow[]>;
+  exams: TrialExam[];
+  mistakes: TopicMistakeRow[];
+  courseIds: string[];
   examType: ExamType;
 }) {
   const [source, setSource] = useState<TrialSource>("all");
-  const rows = rowsBySource[source];
+  const [range, setRange] = useState<ChartRange>(LAST_30_DAYS_RANGE);
+
+  const examsInRange = useMemo(() => exams.filter((e) => isDateInChartRange(e.task_date, range)), [exams, range]);
+  const rows = useMemo(
+    () => computeGelisimHaritasi(courseIds, examsInRange, mistakes, { source }),
+    [courseIds, examsInRange, mistakes, source],
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">Son {WINDOW_SIZE} denemedeki hata sıklığı.</p>
-        <TrialSourceSwitch value={source} onChange={setSource} />
+        <p className="text-muted-foreground text-sm" data-slot="range-summary">
+          {formatChartRangeLabel(range)} içindeki denemelerdeki hata sıklığı.
+        </p>
+        <ChartRangePicker value={range} onChange={setRange} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        {(["hot", "warm", "cool"] as const).map((t) => (
-          <span key={t} className="flex items-center gap-1.5">
-            <span className={cn("size-2 rounded-full border", HEAT_TIER_STYLES[t].tile)} />
-            <span className="text-muted-foreground">{HEAT_TIER_STYLES[t].label}</span>
-          </span>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          {(["hot", "warm", "cool"] as const).map((t) => (
+            <span key={t} className="flex items-center gap-1.5">
+              <span className={cn("size-2 rounded-full border", HEAT_TIER_STYLES[t].tile)} />
+              <span className="text-muted-foreground">{HEAT_TIER_STYLES[t].label}</span>
+            </span>
+          ))}
+        </div>
+        <TrialSourceSwitch value={source} onChange={setSource} />
       </div>
 
       <CourseTabs examType={examType} render={(course) => <TopicGrid courseId={course.id} rows={rows} source={source} />} />

@@ -69,7 +69,7 @@ describe("11th grade: what the Gelişim Haritası covers", () => {
 describe("11th grade: the Gelişim Haritası is visible", () => {
   const props = {
     studentId: "s1",
-    topicPerformance: [],
+    topicQuestionTotals: {},
     curriculumCourseIds: [] as string[],
     paragrafEntries: [],
     generalExams: [],

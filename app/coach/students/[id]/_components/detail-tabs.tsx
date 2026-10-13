@@ -19,7 +19,7 @@ import { ProgramTab } from "./program-tab";
 import { SchoolExamsTab } from "./school-exams-tab";
 import { SessionsTab } from "./sessions-tab";
 import type { SchoolExamsData } from "@/lib/school-exams-data";
-import type { TopicPerformanceRow } from "./topic-performance-map";
+import type { TopicQuestionTotals } from "./topic-performance-map";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
 
@@ -40,7 +40,7 @@ const NO_HIDDEN_TABS = new Set<string>();
 
 export function DetailTabs({
   studentId,
-  topicPerformance,
+  topicQuestionTotals,
   curriculumCourseIds,
   paragrafEntries,
   generalExams,
@@ -64,11 +64,10 @@ export function DetailTabs({
   schoolExams = null,
 }: {
   studentId: string;
-  topicPerformance: TopicPerformanceRow[];
-  // Every curriculum course for this student's cohort -- Gelişim
-  // Haritası re-aggregates itself client-side against the live date
-  // filter (see GelisimHaritasiTab), so it needs this same course list
-  // the server-side computation used to take.
+  // Lifetime question totals per course::topic for the Konu Performans Haritası (the exam side of that map is computed in the browser).
+  topicQuestionTotals: TopicQuestionTotals;
+  // Every curriculum course for this student's cohort -- Gelişim Haritası re-aggregates itself client-side against the live
+  // date filter (see GelisimHaritasiTab) and so does Konu Performans Haritası (all-time), so both need this course list.
   curriculumCourseIds: string[];
   paragrafEntries: ParagrafProblemEntry[];
   generalExams: DetailTask[];
@@ -131,7 +130,8 @@ export function DetailTabs({
       <TabsContent value="analiz" className="pt-4">
         <AnalyticsTab
           studentId={studentId}
-          topicPerformance={topicPerformance}
+          topicQuestionTotals={topicQuestionTotals}
+          curriculumCourseIds={curriculumCourseIds}
           branchExams={branchExams}
           generalExams={generalExams}
           examMistakes={examMistakes}

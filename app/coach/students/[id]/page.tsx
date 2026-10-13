@@ -12,7 +12,6 @@ import { createClient } from "@/lib/supabase/server";
 import { KARMA_TOPIC_ID, aytTrackOf, courseDisplayName, findCourseById, isLgsCourseId } from "@/lib/curriculum";
 import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
 import { lgsNodeIdForTopicId } from "@/lib/curriculum/lgs-selection";
-import { computeGelisimHaritasi } from "@/lib/gelisim-haritasi";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
@@ -33,8 +32,7 @@ import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
 import { resolveCycles, tasksInCycle, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
-import type { TopicPerformanceRow } from "./_components/topic-performance-map";
-import type { WeakTopicRow } from "./weak-topic-map";
+import type { TopicQuestionTotals } from "./_components/topic-performance-map";
 import type {
   CompletionStats,
   DetailCoachNote,
@@ -483,29 +481,9 @@ async function fetchStudentDetail(studentId: string) {
       : Promise.resolve({ data: [] as { course_id: string; topic_id: string; total_questions: number; correct_answers: number; incorrect_answers: number }[] }),
   ]);
 
-  // Full-spectrum performance map: every topic in every curriculum course (not just ones the student has actually been
-  // examined on yet), so the coach can browse any course's chip and see a clean topic list -- a 0-mistake topic is real
-  // "good news" signal, not just an absence of data.
-  // It is the SAME merged computation as the Gelişim Haritası (lib/gelisim-haritasi.ts) over the whole history instead of a
-  // window: a course's trials are every exam about it -- Genel Denemeler of its track, combined Branş exams it is part of
-  // and its own single Branş exams -- each counted once, with pending-analysis exams left out. Sample size = how many.
-  // (Gelişim Haritası itself reruns client-side in gelisim-haritasi-tab.tsx against the coach's live date-range filter.)
-  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = computeGelisimHaritasi(
-    curriculumCourseIds,
-    allExams,
-    mistakeRows ?? [],
-    { limit: Infinity },
-  )
-    .map((r) => ({
-      courseId: r.courseId,
-      courseName: r.courseName,
-      topicId: r.topicId,
-      topicName: r.topicName,
-      count: r.count,
-      examTitles: r.examTitles,
-      sampleSize: r.windowSize,
-    }))
-    .sort((a, b) => b.count - a.count);
+  // Konu Performans Haritası (all-time; every topic of every curriculum course, a 0-mistake topic being real "good news") is
+  // computed in the browser from the exam history this page already ships (topic-performance-map.tsx, same computation as the
+  // Gelişim Haritası, so it can offer the Tümü / Genel / Branş switch). The server only precomputes its question-level totals below.
 
   // Topic-based question aggregation (distinct from the mistake-count
   // tiers above): total/correct/incorrect QUESTIONS solved per topic,
@@ -557,15 +535,7 @@ async function fetchStudentDetail(studentId: string) {
     bumpQuestionTotals(row.course_id, row.topic_id, row.total_questions, row.correct_answers ?? 0, row.incorrect_answers ?? 0);
   }
 
-  const topicPerformanceWithQuestions: TopicPerformanceRow[] = topicPerformance.map((row) => {
-    const q = topicQuestionTotals.get(`${row.courseId}::${row.topicId}`);
-    return {
-      ...row,
-      questionTotal: q?.total ?? 0,
-      questionCorrect: q?.correct ?? 0,
-      questionIncorrect: q?.incorrect ?? 0,
-    };
-  });
+  const topicQuestionTotalsRecord: TopicQuestionTotals = Object.fromEntries(topicQuestionTotals);
 
   return {
     profile: profile as StudentProfile,
@@ -575,7 +545,7 @@ async function fetchStudentDetail(studentId: string) {
     subjectCompletion: computeSubjectCompletion(tasks, today, currentCycle),
     progressFrom: currentCycle.start,
     progressTo: currentCycle.end,
-    topicPerformance: topicPerformanceWithQuestions,
+    topicQuestionTotals: topicQuestionTotalsRecord,
     curriculumCourseIds,
     sessions,
     notes,
@@ -669,7 +639,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
 
                 <DetailTabs
                   studentId={id}
-                  topicPerformance={detail.topicPerformance}
+                  topicQuestionTotals={detail.topicQuestionTotals}
                   curriculumCourseIds={detail.curriculumCourseIds}
                   paragrafEntries={detail.paragrafEntries}
                   generalExams={detail.generalExams}

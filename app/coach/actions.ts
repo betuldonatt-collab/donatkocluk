@@ -3247,7 +3247,7 @@ export async function generateCycleReportCard(studentId: string, customRange?: {
   // coach-assigned tasks are always pre-approved.
   const { data: examRows, error: examError } = await supabase
     .from("student_tasks")
-    .select("id, task_date, task_type, course_id, title, subject_scores, correct_count, wrong_count, empty_count")
+    .select("id, task_date, task_type, course_id, title, subject_scores, correct_count, wrong_count, empty_count, analysis_pending")
     .eq("student_id", studentIdV)
     .in("task_type", ["branch_exam", "general_exam", "question_bank", "resource_review", "topic_study"])
     .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true")

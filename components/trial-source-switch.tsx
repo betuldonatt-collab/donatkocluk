@@ -3,6 +3,8 @@
 import { cn } from "@/lib/utils";
 import type { GelisimHaritasiRow, TrialSource } from "@/lib/gelisim-haritasi";
 
+type BreakdownRow = Pick<GelisimHaritasiRow, "windowSize" | "breakdown">;
+
 // The Tümü / Genel / Branş switch of the Gelişim Haritası (both panels): which exams a course's map is built from. Tümü is the
 // one merged view and the default; the other two narrow the SAME map to one kind of exam.
 const OPTIONS: { value: TrialSource; label: string }[] = [
@@ -33,8 +35,9 @@ export function TrialSourceSwitch({ value, onChange }: { value: TrialSource; onC
   );
 }
 
-// "Son 8 deneme: 3 Genel Deneme, 3 TYT Fizik Branş, 2 TYT Fen Branş" -- what the course's window is made of (same for every row of the course).
-export function TrialBreakdownLine({ rows }: { rows: GelisimHaritasiRow[] }) {
+// "Bu aralıkta 8 deneme: 3 Genel Deneme, 3 TYT Fizik Branş, 2 TYT Fen Branş" -- what the course's map is made of (same for every
+// row of the course). `lead` says which exams were looked at ("Bu aralıkta", "Tüm zamanlarda").
+export function TrialBreakdownLine({ rows, lead = "Bu aralıkta" }: { rows: BreakdownRow[]; lead?: string }) {
   const first = rows[0];
   if (!first) return null;
   if (first.windowSize === 0) {
@@ -42,7 +45,7 @@ export function TrialBreakdownLine({ rows }: { rows: GelisimHaritasiRow[] }) {
   }
   return (
     <p className="text-muted-foreground text-xs" data-slot="trial-breakdown">
-      Son {first.windowSize} deneme: {first.breakdown.map((b) => `${b.count} ${b.label}`).join(", ")}.
+      {lead} {first.windowSize} deneme: {first.breakdown.map((b) => `${b.count} ${b.label}`).join(", ")}.
     </p>
   );
 }

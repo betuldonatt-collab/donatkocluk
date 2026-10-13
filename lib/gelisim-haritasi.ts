@@ -5,8 +5,9 @@
 // client, no auth) -- shared across panels rather than duplicated, unlike
 // the UI components that render it, since a drifted copy here would mean
 // the coach and student literally see different colors for the same data.
-// The all-time map is the same computation with an unbounded window
-// (options.limit = Infinity), so the two can never disagree on what a trial is.
+// There is no cap on the number of exams: a map covers EVERY exam the caller hands it, so the caller's date range (or its
+// absence, for the all-time map) is the only window -- and the maps, the Aylık Karne and the all-time map can never disagree
+// on what a trial is.
 import {
   courseDisplayName,
   findCourseById,
@@ -47,9 +48,6 @@ export type HeatTier = "hot" | "warm" | "cool";
 
 // Which exams a map looks at: everything the course appears in, only Genel Denemeler, or only Branş Denemeleri (single and combined).
 export type TrialSource = "all" | "general" | "branch";
-
-// Middle of the requested "last 5-10 trials" range.
-export const WINDOW_SIZE = 8;
 
 export const HEAT_TIER_STYLES: Record<HeatTier, { tile: string; label: string }> = {
   hot: { tile: "border-rose-500/40 bg-rose-500/15 text-rose-700", label: "Kanayan Yara" },
@@ -101,8 +99,6 @@ export type TopicMistakeRow = { task_id: string; course_id: string; topic_id: st
 export type TrialOptions = {
   // Default "all".
   source?: TrialSource;
-  // How many of the newest exams of a course the window holds. Default WINDOW_SIZE; Infinity = the whole history (all-time map).
-  limit?: number;
 };
 
 // The atomic courses one exam is ABOUT -- the courses whose topic map it is a trial of:
@@ -131,8 +127,9 @@ function examCoverage(e: TrialExam, markedCourseIds: Set<string>): Set<string> |
   return covered;
 }
 
-// Windows each course to its most recent `limit` relevant trials, then counts how many of those trials tagged a mistake for
-// each of that course's topics. ONE merged view per course: a course's trials are every exam about it, whatever kind --
+// Collects, per course, EVERY relevant trial among `exams` (the caller bounds them -- by date range, or not at all), then
+// counts how many of those trials tagged a mistake for each of that course's topics. ONE merged view per course: a course's
+// trials are every exam about it, whatever kind --
 // Genel Denemeler of its track, combined Branş exams it is part of ("TYT Fen" for Fizik), and its own single Branş exams.
 // A combined exam's marks are stored under the macro course id (same topic ids), so they are folded back onto the atomic
 // course here, at read time -- nothing stored changes. Exams whose topic analysis is still pending are left out entirely (they
@@ -146,7 +143,6 @@ export function computeGelisimHaritasi(
   options: TrialOptions = {},
 ): GelisimHaritasiRow[] {
   const source = options.source ?? "all";
-  const limit = options.limit ?? WINDOW_SIZE;
 
   // A topic can carry BOTH a Yanlış and a Boş mark in the same exam (one row
   // per status, see lib/topic-mistakes.ts), so each key holds a set of statuses.
@@ -193,7 +189,7 @@ export function computeGelisimHaritasi(
     const course = findCourseById(courseId);
     if (!course) continue;
 
-    const relevant = newestFirst.filter((e) => covers(e, courseId)).slice(0, limit);
+    const relevant = newestFirst.filter((e) => covers(e, courseId));
     const windowSize = relevant.length;
     const tally = new Map<string, number>();
     for (const e of relevant) {
@@ -257,18 +253,4 @@ export function computeGelisimHaritasi(
     }
   }
   return rows;
-}
-
-// The three source variants of one data set, for a view with a Tümü / Genel / Branş switch.
-export function computeGelisimHaritasiBySource(
-  courseIds: string[],
-  exams: TrialExam[],
-  mistakeRows: TopicMistakeRow[],
-  options: Omit<TrialOptions, "source"> = {},
-): Record<TrialSource, GelisimHaritasiRow[]> {
-  return {
-    all: computeGelisimHaritasi(courseIds, exams, mistakeRows, { ...options, source: "all" }),
-    general: computeGelisimHaritasi(courseIds, exams, mistakeRows, { ...options, source: "general" }),
-    branch: computeGelisimHaritasi(courseIds, exams, mistakeRows, { ...options, source: "branch" }),
-  };
 }
