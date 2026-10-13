@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useState } from "react";
 import { X } from "lucide-react";
 
@@ -76,7 +77,7 @@ function ExamMarksTable({ course, markedTopicIds }: { course: Course; markedTopi
         <h4 className="text-sm font-semibold">{course.name}</h4>
         <span className="text-muted-foreground text-xs tabular-nums">{marked} konu işaretli</span>
       </div>
-      <div className="overflow-x-auto rounded-md border">
+      <StickyXScroll scrollerClassName="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -127,7 +128,7 @@ function ExamMarksTable({ course, markedTopicIds }: { course: Course; markedTopi
             })}
           </TableBody>
         </Table>
-      </div>
+      </StickyXScroll>
     </section>
   );
 }

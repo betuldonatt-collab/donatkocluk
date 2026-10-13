@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useRef, useState } from "react";
 import { Lock, LockOpen, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
@@ -152,7 +153,7 @@ function CourseCard({
   }
 
   return (
-    <section className={cn("overflow-hidden rounded-lg border-2 shadow-xs", color.border, color.body)} aria-label={card.name}>
+    <section className={cn("overflow-clip rounded-lg border-2 shadow-xs", color.border, color.body)} aria-label={card.name}>
       <header className={cn("px-3 py-2", color.header)}>
         <h2 className="truncate text-center text-sm font-bold tracking-wide uppercase" title={card.name}>
           {card.name}
@@ -176,7 +177,7 @@ function CourseCard({
         <p className="bg-background/60 px-3 py-1.5 text-center text-xs">Öğrencinin bu dersi silme talebini reddettin.</p>
       )}
 
-      <div className="overflow-x-auto">
+      <StickyXScroll>
         <table className="w-full table-fixed text-center text-xs">
           <thead>
             <tr>
@@ -235,7 +236,7 @@ function CourseCard({
             </tr>
           </tbody>
         </table>
-      </div>
+      </StickyXScroll>
 
       <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
         <DialogContent>

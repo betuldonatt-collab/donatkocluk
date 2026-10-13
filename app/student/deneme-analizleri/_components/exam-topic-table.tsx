@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +57,7 @@ export function ExamTopicTable({
         <CardTitle className="text-base">{course.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <StickyXScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -141,7 +142,7 @@ export function ExamTopicTable({
               })}
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
 
         {exams.length === 0 && (
           <p className="text-muted-foreground mt-3 text-sm">

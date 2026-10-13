@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { NotebookPen } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
@@ -48,14 +49,14 @@ export function ParentSchoolExams({ data }: { data: SchoolExamsData }) {
 function CourseCard({ card }: { card: SchoolCard }) {
   const color = schoolColor(card.color, card.index);
   return (
-    <section className={cn("overflow-hidden rounded-lg border-2 shadow-xs", color.border, color.body)} aria-label={card.name}>
+    <section className={cn("overflow-clip rounded-lg border-2 shadow-xs", color.border, color.body)} aria-label={card.name}>
       <header className={cn("px-3 py-2", color.header)}>
         <h2 className="truncate text-center text-sm font-bold tracking-wide uppercase" title={card.name}>
           {card.name}
         </h2>
       </header>
 
-      <div className="overflow-x-auto">
+      <StickyXScroll>
         <table className="w-full table-fixed text-center text-xs">
           <thead>
             <tr>
@@ -98,7 +99,7 @@ function CourseCard({ card }: { card: SchoolCard }) {
             </tr>
           </tbody>
         </table>
-      </div>
+      </StickyXScroll>
     </section>
   );
 }

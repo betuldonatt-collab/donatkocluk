@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useMemo, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -466,7 +467,7 @@ export function ChartsTab({
               Bu tarih aralığında kayıtlı genel deneme yok.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <StickyXScroll>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -504,7 +505,7 @@ export function ChartsTab({
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </StickyXScroll>
           )}
         </CardContent>
       </Card>

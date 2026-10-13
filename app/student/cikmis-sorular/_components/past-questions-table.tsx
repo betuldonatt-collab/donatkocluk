@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -245,7 +246,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
         <CardTitle className="text-base">{course.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <StickyXScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -320,7 +321,7 @@ export function PastQuestionsTable({ course }: { course: Course }) {
             ))}
           </TableBody>
         </Table>
-        </div>
+        </StickyXScroll>
       </CardContent>
     </Card>
   );

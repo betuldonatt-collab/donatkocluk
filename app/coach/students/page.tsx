@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import Link from "next/link";
 import { BookOpen, Users } from "lucide-react";
 
@@ -144,7 +145,7 @@ export default async function CoachStudentsPage() {
           description="Yeni bir öğrenci atandığında burada listelenecek. Atamalar yönetici tarafından yapılır."
         />
       ) : (
-        <div className="border-border overflow-x-auto rounded-lg border">
+        <StickyXScroll scrollerClassName="border-border rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -198,7 +199,7 @@ export default async function CoachStudentsPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
       )}
     </div>
   );

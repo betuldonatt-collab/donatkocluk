@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
@@ -610,7 +611,7 @@ export function TaskBoard({
         </>
       ) : (
         <>
-        <div className="overflow-x-auto pb-2">
+        <StickyXScroll scrollerClassName="pb-2">
           {/* items-start (not the grid default of stretch) -- each day
               column should only be as tall as its own content, so a
               light day doesn't get stretched to match a packed one.
@@ -774,7 +775,7 @@ export function TaskBoard({
               });
             })()}
           </div>
-        </div>
+        </StickyXScroll>
 
         <WeeklyDybTotal tasks={tasks.filter((t) => weekDays.some((d) => d.date === t.task_date))} />
         </>

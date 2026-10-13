@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { ClipboardList } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export function LgsExamHistory({ exams }: { exams: LgsHistoryExam[] }) {
             description="Bir LGS Genel Deneme görevinin sonuçları girildiğinde burada netleri ve yaklaşık puanıyla görünür."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <StickyXScroll>
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="text-muted-foreground border-b text-left text-xs">
@@ -81,7 +82,7 @@ export function LgsExamHistory({ exams }: { exams: LgsHistoryExam[] }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </StickyXScroll>
         )}
       </CardContent>
     </Card>

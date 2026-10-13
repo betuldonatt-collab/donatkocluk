@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { Plus, Trash2 } from "lucide-react";
@@ -256,7 +257,7 @@ export function StopwatchRosterTable({
               {roster.length === 0 ? "Henüz atanmış öğrencin yok." : "Bu grupta öğrenci yok."}
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <StickyXScroll>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-border text-muted-foreground border-b text-left text-xs font-semibold tracking-wide uppercase">
@@ -355,7 +356,7 @@ export function StopwatchRosterTable({
                   })}
                 </tbody>
               </table>
-            </div>
+            </StickyXScroll>
           )}
         </CardContent>
       </Card>

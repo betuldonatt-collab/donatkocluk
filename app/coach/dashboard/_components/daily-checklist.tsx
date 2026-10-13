@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import {
@@ -180,7 +181,7 @@ export function DailyChecklist({
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <div className="touch-pan-x touch-pan-y overflow-x-auto overscroll-x-contain pb-2">
+      <StickyXScroll scrollerClassName="touch-pan-x touch-pan-y overscroll-x-contain pb-2">
         <div className="grid min-w-[980px] grid-cols-7 gap-2">
           {weekDays.map((day) => (
             <DayColumn
@@ -195,7 +196,7 @@ export function DailyChecklist({
             />
           ))}
         </div>
-      </div>
+      </StickyXScroll>
 
       <AddTaskDialog
         open={!!addOpenFor}

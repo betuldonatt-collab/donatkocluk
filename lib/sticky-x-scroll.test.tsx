@@ -48,3 +48,29 @@ describe("the page itself must not be a scroll container", () => {
     expect(body).not.toMatch(/@apply[^;]*overflow-x-hidden/);
   });
 });
+
+describe("no wide region keeps a native, bottom-of-element horizontal scrollbar", () => {
+  // Every plain <div className="... overflow-x-auto ..."> wrapper in the app was converted to <StickyXScroll> (2026-10-13). This guard
+  // fails when a new one is added, so a new wide table is not silently the one with the far-away scrollbar. components/ui is the
+  // library layer (Table's own container, the tab list) and is exempt.
+  it("app/ and components/ have none left", async () => {
+    const { readdirSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (name === "node_modules" || name === ".next" || full.split("\\").join("/").includes("components/ui")) continue;
+        if (statSync(full).isDirectory()) walk(full);
+        else if (/\.tsx$/.test(name) && !/\.test\./.test(name)) {
+          const src = readFileSync(full, "utf8");
+          if (/<div className="[^"]*\boverflow-x-auto\b[^"]*"/.test(src)) offenders.push(full.replace(root, ""));
+        }
+      }
+    };
+    walk(join(root, "app"));
+    walk(join(root, "components"));
+    expect(offenders).toEqual([]);
+  });
+});

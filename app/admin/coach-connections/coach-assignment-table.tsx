@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useState } from "react";
 
 import {
@@ -139,7 +140,7 @@ export function CoachAssignmentTable({
     "border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-10 md:h-9 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50";
 
   return (
-    <div className="border-border overflow-x-auto rounded-lg border">
+    <StickyXScroll scrollerClassName="border-border rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -260,6 +261,6 @@ export function CoachAssignmentTable({
           })}
         </TableBody>
       </Table>
-    </div>
+    </StickyXScroll>
   );
 }

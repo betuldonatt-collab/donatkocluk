@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { Users } from "lucide-react";
 
 import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
@@ -159,7 +160,7 @@ export default async function StudentDirectoryPage({
           description="Kayıt isteği onaylandığında öğrenciler burada, havuzda görünecek."
         />
       ) : (
-        <div className="border-border mt-6 overflow-x-auto rounded-lg border">
+        <StickyXScroll scrollerClassName="border-border mt-6 rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -239,7 +240,7 @@ export default async function StudentDirectoryPage({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
       )}
 
       <PaginationControls currentPage={page} totalPages={totalPages} basePath="/admin/students" />

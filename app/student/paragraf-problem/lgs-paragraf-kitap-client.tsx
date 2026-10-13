@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useEffect, useMemo, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { useRouter } from "next/navigation";
@@ -350,7 +351,7 @@ export function LgsParagrafKitapClient({
               {paragrafHistory.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <StickyXScroll>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -373,7 +374,7 @@ export function LgsParagrafKitapClient({
                     ))}
                   </TableBody>
                 </Table>
-                </div>
+                </StickyXScroll>
               )}
             </CardContent>
           </Card>
@@ -386,7 +387,7 @@ export function LgsParagrafKitapClient({
               {kitapHistory.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Henüz veri girilmedi.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <StickyXScroll>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -416,7 +417,7 @@ export function LgsParagrafKitapClient({
                     ))}
                   </TableBody>
                 </Table>
-                </div>
+                </StickyXScroll>
               )}
             </CardContent>
           </Card>

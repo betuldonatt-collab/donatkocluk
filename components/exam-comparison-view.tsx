@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { useState } from "react";
 import { Pencil, X } from "lucide-react";
 
@@ -88,7 +89,7 @@ function CourseComparisonTable({
   return (
     <section aria-label={`${course.name} konuları`}>
       <h4 className="mb-2 text-sm font-semibold">{course.name}</h4>
-      <div className="overflow-x-auto rounded-md border">
+      <StickyXScroll scrollerClassName="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -147,7 +148,7 @@ function CourseComparisonTable({
             })}
           </TableBody>
         </Table>
-      </div>
+      </StickyXScroll>
     </section>
   );
 }

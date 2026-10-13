@@ -1,3 +1,4 @@
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { Users } from "lucide-react";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,7 +16,7 @@ export function PastStudentsTable({ students }: { students: PastStudent[] }) {
           Henüz ayrılan bir öğrencin yok.
         </p>
       ) : (
-        <div className="border-border overflow-x-auto rounded-lg border">
+        <StickyXScroll scrollerClassName="border-border rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -38,7 +39,7 @@ export function PastStudentsTable({ students }: { students: PastStudent[] }) {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
       )}
     </div>
   );

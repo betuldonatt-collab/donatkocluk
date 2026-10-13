@@ -1,5 +1,6 @@
 "use client";
 
+import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export function CoachExamTopicTable({
         <CardTitle className="text-base">{course.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <StickyXScroll>
           <Table>
             <TableHeader>
               <TableRow>
@@ -160,7 +161,7 @@ export function CoachExamTopicTable({
               })}
             </TableBody>
           </Table>
-        </div>
+        </StickyXScroll>
 
         {exams.length === 0 && (
           <p className="text-muted-foreground mt-3 text-sm">
