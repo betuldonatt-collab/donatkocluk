@@ -84,9 +84,13 @@ describe("Kaynak Taraması is a Soru Çözümü in everything but its name", () 
     expect(values.indexOf("resource_review")).toBe(values.indexOf("question_bank") + 1);
   });
 
-  it("is weighted for completion like a Soru Çözümü (question count, else duration, else the default)", () => {
-    for (const t of [{ total_count: 40 }, { duration_minutes: 45 }, {}]) {
-      expect(taskWeight({ ...t, task_type: "resource_review", course_id: "tyt-matematik" })).toBe(taskWeight({ ...t, task_type: "question_bank", course_id: "tyt-matematik" }));
+  it("is weighted for completion at exactly 1.5x the equivalent Soru Çözümü (question count, else duration, else the default)", () => {
+    for (const course of ["tyt-matematik", "tyt-fizik", "tyt-turkce", "paragraf", null]) {
+      for (const t of [{ total_count: 40 }, { duration_minutes: 45 }, {}]) {
+        const review = taskWeight({ ...t, task_type: "resource_review", course_id: course });
+        const solve = taskWeight({ ...t, task_type: "question_bank", course_id: course });
+        expect(review, `${course} ${JSON.stringify(t)}`).toBe(Math.round(solve * 1.5));
+      }
     }
   });
 });

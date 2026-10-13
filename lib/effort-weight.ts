@@ -1,4 +1,5 @@
 import type { CompletionCounts, CycleWindow } from "./completion";
+import { RESOURCE_REVIEW_TASK_TYPE } from "./task-types";
 
 // Effort-based task weighting behind every progress bar.
 //
@@ -16,6 +17,12 @@ import type { CompletionCounts, CycleWindow } from "./completion";
 //                                       kimya, fen and anything with no
 //                                       subject 5 units/min. Duration is the
 //                                       coach's, else 30 min.
+//   Kaynak taraması (resource_review) . weighs exactly 1.5x the Soru Çözümü
+//                                       it would be with the same course and
+//                                       the same amount (question count,
+//                                       else duration, else the default) --
+//                                       a pure factor on top of the subject
+//                                       coefficient, never instead of it.
 //   Branş denemesi .................... questions x coefficient + a small
 //                                       format bonus
 //   Genel deneme ...................... fixed milestone (large)
@@ -28,6 +35,8 @@ export const UNITS_PER_MINUTE = 5;
 export const VERBAL_UNITS_PER_MINUTE = 15;
 export const DEFAULT_DURATION_MINUTES = 30;
 export const DEFAULT_TASK_UNITS = DEFAULT_DURATION_MINUTES * UNITS_PER_MINUTE; // 150
+// Going back over missed / blank questions asks more of the student than solving fresh ones (2026-10-13, user decision).
+export const RESOURCE_REVIEW_WEIGHT_MULTIPLIER = 1.5;
 export const BRANCH_EXAM_FORMAT_BONUS = 20;
 export const DEFAULT_BRANCH_EXAM_QUESTIONS = 20;
 export const GENERAL_EXAM_UNITS_YKS = 1200;
@@ -91,10 +100,14 @@ export function taskWeight(t: Partial<Omit<WeightableTask, "task_date" | "status
       // question_bank, extra_custom and the routine tasks (paragraf,
       // problem, yeni nesil...): question count when there is one, else
       // a duration if the coach/student gave one, else the default.
-      if (t.course_id === "kitap-okuma") return Math.round(minutesUnits(t.duration_minutes, t.course_id));
-      if (positive(t.total_count)) return Math.round(t.total_count * UNITS_PER_QUESTION * coef);
-      if (positive(t.duration_minutes)) return Math.round(t.duration_minutes * unitsPerMinute(t.course_id));
-      return DEFAULT_TASK_UNITS;
+      //
+      // A Kaynak Taraması takes the very same path and its result is scaled by RESOURCE_REVIEW_WEIGHT_MULTIPLIER (applied before the
+      // rounding), so it is 1.5x the equivalent Soru Çözümü in all three cases.
+      const multiplier = t.task_type === RESOURCE_REVIEW_TASK_TYPE ? RESOURCE_REVIEW_WEIGHT_MULTIPLIER : 1;
+      if (t.course_id === "kitap-okuma") return Math.round(minutesUnits(t.duration_minutes, t.course_id) * multiplier);
+      if (positive(t.total_count)) return Math.round(t.total_count * UNITS_PER_QUESTION * coef * multiplier);
+      if (positive(t.duration_minutes)) return Math.round(t.duration_minutes * unitsPerMinute(t.course_id) * multiplier);
+      return Math.round(DEFAULT_TASK_UNITS * multiplier);
     }
   }
 }
