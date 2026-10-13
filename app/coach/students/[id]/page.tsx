@@ -749,6 +749,7 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   today={detail.today}
                   initialWeekStats={detail.weekStats}
                   karneCycles={detail.karneCycles}
+                  studentName={detail.profile.full_name ?? null}
                   eventAttendance={detail.eventAttendance}
                   defaultKarneRange={detail.defaultKarneRange}
                   allTimeTrackedMinutes={detail.allTimeTrackedMinutes}

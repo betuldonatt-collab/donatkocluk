@@ -53,6 +53,7 @@ export function DetailTabs({
   today,
   initialWeekStats,
   karneCycles,
+  studentName = null,
   eventAttendance = [],
   defaultKarneRange,
   allTimeTrackedMinutes,
@@ -80,6 +81,7 @@ export function DetailTabs({
   today: string;
   initialWeekStats: DayStat[];
   karneCycles: CoachReportCardRow[];
+  studentName?: string | null;
   // The student's event attendance over their whole history (each report card filters its own period).
   eventAttendance?: ParentEventAttendance[];
   defaultKarneRange: { rangeStart: string; rangeEnd: string } | null;
@@ -189,6 +191,8 @@ export function DetailTabs({
         <KarnelerTab
           studentId={studentId}
           cycles={karneCycles}
+          studentName={studentName}
+          today={today}
           eventAttendance={eventAttendance}
           defaultRange={defaultKarneRange}
           allTimeTrackedMinutes={allTimeTrackedMinutes}

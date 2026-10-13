@@ -190,8 +190,8 @@ describe("the exam overview: high level only", () => {
   it("main-branch averages only (no topics), and only the branches the exams actually have", () => {
     const tyt = summary.exams.groups[0];
     expect(tyt.branches).toEqual([
-      { key: "turkce", label: expect.any(String), averageNet: computeNet(30, 5) },
-      { key: "matematik", label: expect.any(String), averageNet: computeNet(20, 10) },
+      { key: "turkce", label: expect.any(String), averageNet: computeNet(30, 5), questions: 40 },
+      { key: "matematik", label: expect.any(String), averageNet: computeNet(20, 10), questions: 40 },
     ]);
   });
 
@@ -237,7 +237,7 @@ describe("the exam overview: high level only", () => {
     expect(s.exams.groups).toHaveLength(1);
     expect(s.exams.groups[0].key).toBe("lgs");
     expect(s.exams.groups[0].items[0].net).toBe(computeLgsNet(15, 6));
-    expect(s.exams.groups[0].branches).toEqual([{ key: "lgs_matematik", label: expect.any(String), averageNet: computeLgsNet(15, 6) }]);
+    expect(s.exams.groups[0].branches).toEqual([{ key: "lgs_matematik", label: expect.any(String), averageNet: computeLgsNet(15, 6), questions: 20 }]);
   });
 
   it("an 11th grader's TYT-structured exam carries its own name", () => {

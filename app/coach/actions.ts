@@ -29,6 +29,7 @@ import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
 import { fetchAllPages } from "@/lib/paged-select";
+import { fetchKarneSummary } from "@/lib/karne-summary-data";
 import { resolveCycles, type ProgressLock } from "@/lib/completion";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
@@ -3390,13 +3391,24 @@ export async function approveReportCard(reportCardId: string, coachNotes: string
 
   const { data: existing, error: fetchError } = await supabase
     .from("student_report_cards")
-    .select("student_id, status")
+    .select("student_id, status, range_start, range_end")
     .eq("id", inputV.reportCardId)
     .single();
   if (fetchError) throw dbError(fetchError);
   await requireCoachAccess(supabase, user.id, existing.student_id);
 
   if (existing.status === "approved") throw new Error("Bu karne zaten onaylanmış.");
+
+  // The unified Karne (lib/karne-summary.ts) as it is at this moment: this frozen snapshot is what the PARENT sees, forever (migration
+  // 0136 refuses to change it afterwards). A failure here must not block the approval itself -- without a snapshot the parent's page
+  // simply computes the same figures from the current records.
+  let executiveSummary: Awaited<ReturnType<typeof fetchKarneSummary>> | null = null;
+  try {
+    executiveSummary = await fetchKarneSummary(supabase, existing.student_id, existing.range_start, existing.range_end);
+  } catch (e) {
+    console.error("[approveReportCard] summary snapshot failed:", e);
+    Sentry.captureException(e);
+  }
 
   const { data, error } = await supabase
     .from("student_report_cards")
@@ -3405,6 +3417,7 @@ export async function approveReportCard(reportCardId: string, coachNotes: string
       coach_notes: inputV.coachNotes || null,
       approved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      ...(executiveSummary ? { executive_summary: executiveSummary } : {}),
     })
     .eq("id", inputV.reportCardId)
     .select("*")

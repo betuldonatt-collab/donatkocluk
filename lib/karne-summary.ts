@@ -50,7 +50,8 @@ export type KarneExamItem = {
   deltaVsPrevious: number | null;
 };
 
-export type KarneBranchAverage = { key: string; label: string; averageNet: number };
+// `questions` is the branch's real question count in that exam, so a bar can show the net against what was possible.
+export type KarneBranchAverage = { key: string; label: string; averageNet: number; questions: number };
 
 export type KarneExamGroup = {
   key: ExamGroupKey;
@@ -260,12 +261,12 @@ function averageNet(rows: ExamRow[]): number | null {
   return netFnFor(rows[0].groupKey)(sum.correct / rows.length, sum.wrong / rows.length);
 }
 
-function branchDefinitions(key: ExamGroupKey): { key: string; label: string }[] {
-  if (key === "tyt") return TYT_SUBJECT_GROUPS.map((g) => ({ key: g.key, label: g.label }));
-  if (key === "lgs") return LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label }));
-  if (key === "m7") return MAARIF7_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label }));
+function branchDefinitions(key: ExamGroupKey): { key: string; label: string; questions: number }[] {
+  if (key === "tyt") return TYT_SUBJECT_GROUPS.map((g) => ({ key: g.key, label: g.label, questions: g.questions }));
+  if (key === "lgs") return LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, questions: s.questions }));
+  if (key === "m7") return MAARIF7_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, questions: s.questions }));
   const track = key.slice(4) as Track;
-  return AYT_SUBJECT_GROUPS_BY_TRACK[track].map((g) => ({ key: g.key, label: g.label }));
+  return AYT_SUBJECT_GROUPS_BY_TRACK[track].map((g) => ({ key: g.key, label: g.label, questions: g.questions }));
 }
 
 function branchAverages(rows: ExamRow[], key: ExamGroupKey): KarneBranchAverage[] {
@@ -276,7 +277,7 @@ function branchAverages(rows: ExamRow[], key: ExamGroupKey): KarneBranchAverage[
     if (having.length === 0) continue;
     const c = having.reduce((s, r) => s + (r.scores[def.key].correct ?? 0), 0) / having.length;
     const w = having.reduce((s, r) => s + (r.scores[def.key].wrong ?? 0), 0) / having.length;
-    result.push({ key: def.key, label: def.label, averageNet: netFn(c, w) });
+    result.push({ key: def.key, label: def.label, averageNet: netFn(c, w), questions: def.questions });
   }
   return result;
 }

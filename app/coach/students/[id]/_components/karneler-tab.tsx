@@ -25,6 +25,7 @@ import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
 import { CYCLE_DAYS, inclusiveDaySpan, karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
 import { eventsInRange, type ParentEventAttendance } from "@/lib/event-attendance";
 import { EventAttendanceCard } from "@/components/event-attendance-card";
+import { KarneLiveSection } from "./karne-live-section";
 import { cn } from "@/lib/utils";
 import { approveReportCard, deleteReportCard, generateCycleReportCard, type CoachReportCardRow } from "../../../actions";
 import { LineChart } from "./charts/line-chart";
@@ -51,6 +52,8 @@ export function KarnelerTab({
   studentId,
   cycles: initialCycles,
   eventAttendance = [],
+  studentName = null,
+  today,
   defaultRange,
   allTimeTrackedMinutes,
 }: {
@@ -58,6 +61,9 @@ export function KarnelerTab({
   cycles: CoachReportCardRow[];
   // The student's event attendance over their whole history; every report card shows the events of its own period.
   eventAttendance?: ParentEventAttendance[];
+  // For the unified Karne preview at the top of the tab (omitted: the preview is not shown).
+  studentName?: string | null;
+  today?: string;
   defaultRange: KarneRange | null;
   // All-time sum of tracked_duration_seconds across every task this
   // student has ever had, regardless of cycle -- a genuinely different
@@ -127,6 +133,8 @@ export function KarnelerTab({
       <p className="text-muted-foreground text-sm">
         Öğrenciye onayladıktan sonra görünen karneler -- her dönem için tarih aralığını sen belirlersin.
       </p>
+
+      {today && <KarneLiveSection studentId={studentId} studentName={studentName} today={today} cycles={cycles} />}
 
       {/* Cross-cycle progress -- combines "how is the exam net changing"
           (from every approved cycle's already-fetched stats, no extra

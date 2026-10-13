@@ -1,23 +1,83 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import { KarneListClient, type KarneListItem } from "./karne-client";
+import { KarneDocument } from "@/components/karne-document";
+import { KarnePeriodPicker, type PeriodOption } from "@/components/karne-period-picker";
+import { PrintButton } from "@/components/print-button";
+import { fetchKarneSummary } from "@/lib/karne-summary-data";
+import { formatPeriod, parsePeriod, presetPeriods, type KarnePeriod } from "@/lib/karne-periods";
 
-async function fetchKarneList(studentId: string): Promise<KarneListItem[]> {
-  const supabase = await createClient();
-  // RLS already restricts this to approved rows for the student role; the
-  // admin-preview role additionally sees drafts, matching how impersonation
-  // works everywhere else in this app.
-  const { data } = await supabase
-    .from("student_report_cards")
-    .select("id, cycle_number, range_start, range_end, approved_at, stats")
-    .eq("student_id", studentId)
-    .order("cycle_number", { ascending: false });
-  return (data ?? []) as KarneListItem[];
-}
+// "Karnelerim": the unified Karne. The student picks any period (presets, one of their approved report cards, or a custom range) and
+// sees the live numbers for it; when the chosen period IS an approved report card, the coach's note and the "Koç onaylı" badge
+// appear. The detailed analytics live in their own pages (Deneme Analizleri, Gelişim Haritası, ...) -- this is a standalone summary.
 
-export default async function KarnePage() {
+type CycleRow = {
+  id: string;
+  cycle_number: number;
+  range_start: string;
+  range_end: string;
+  status: "draft" | "approved";
+  approved_at: string | null;
+  coach_notes: string | null;
+};
+
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+export default async function KarnePage(props: PageProps<"/student/deneme-analizleri/karne">) {
+  const sp = await props.searchParams;
   const view = await getViewContext("student");
-  const cycles = view ? await fetchKarneList(view.effectiveUserId) : [];
+  if (!view) return <p className="text-muted-foreground text-sm">Karne görüntülenemedi.</p>;
 
-  return <KarneListClient cycles={cycles} />;
+  const supabase = await createClient();
+  const studentId = view.effectiveUserId;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [{ data: cycleRows }, { data: profile }] = await Promise.all([
+    // RLS restricts the student role to approved rows; the admin preview additionally sees drafts, which are filtered out below.
+    supabase
+      .from("student_report_cards")
+      .select("id, cycle_number, range_start, range_end, status, approved_at, coach_notes")
+      .eq("student_id", studentId)
+      .order("cycle_number", { ascending: false }),
+    supabase.from("profiles").select("full_name, sinif_sube, exam_type").eq("id", studentId).maybeSingle(),
+  ]);
+  const cycles = ((cycleRows ?? []) as CycleRow[]).filter((c) => c.status === "approved");
+
+  const presets = presetPeriods(today);
+  const fallback: KarnePeriod = cycles[0] ? { from: cycles[0].range_start, to: cycles[0].range_end } : presets[0].period;
+  const period = parsePeriod(first(sp.from), first(sp.to), today) ?? fallback;
+
+  const options: PeriodOption[] = [
+    ...cycles.slice(0, 6).map((c) => ({
+      key: c.id,
+      label: `${c.cycle_number}. Dönem`,
+      hint: formatPeriod(c.range_start, c.range_end),
+      period: { from: c.range_start, to: c.range_end },
+    })),
+    ...presets.map((p) => ({ key: p.key, label: p.label, period: p.period })),
+  ];
+
+  const summary = await fetchKarneSummary(supabase, studentId, period.from, period.to, { today });
+  const matched = cycles.find((c) => c.range_start === period.from && c.range_end === period.to) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
+        <div>
+          <h2 className="text-foreground text-lg font-semibold">Karnelerim</h2>
+          <p className="text-muted-foreground text-sm">İstediğin dönemin karnesini görüntüle, yazdır veya PDF olarak kaydet.</p>
+        </div>
+        <PrintButton />
+      </div>
+
+      <KarnePeriodPicker period={period} options={options} today={today} basePath="/student/deneme-analizleri/karne" />
+
+      <KarneDocument
+        summary={summary}
+        studentName={profile?.full_name ?? null}
+        classLabel={profile?.sinif_sube ?? profile?.exam_type ?? null}
+        coachNote={matched?.coach_notes ?? null}
+        approval={matched ? { approvedAt: matched.approved_at, cycleNumber: matched.cycle_number } : null}
+      />
+    </div>
+  );
 }
