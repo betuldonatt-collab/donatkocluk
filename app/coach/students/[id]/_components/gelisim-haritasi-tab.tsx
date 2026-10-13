@@ -1,15 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CourseTabs } from "@/components/course-tabs";
+import { TrialBreakdownLine, TrialSourceSwitch } from "@/components/trial-source-switch";
 import { formatChartRangeLabel, isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { cn } from "@/lib/utils";
-import {
-  branchExamCourses,
-  type Track,
-} from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import {
   computeGelisimHaritasi,
@@ -17,6 +14,7 @@ import {
   WINDOW_SIZE,
   heatTier,
   type GelisimHaritasiRow,
+  type TrialSource,
 } from "@/lib/gelisim-haritasi";
 import type { DetailTask } from "../types";
 
@@ -30,18 +28,21 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-      {courseRows.map((row) => {
-        const tier = heatTier(row.count, row.windowSize);
-        return (
-          <div key={row.topicId} className={cn("space-y-1 rounded-lg border px-3 py-2", HEAT_TIER_STYLES[tier].tile)}>
-            <p className="truncate text-sm font-medium">{row.topicName}</p>
-            <p className="text-xs tabular-nums opacity-80">
-              {row.count}/{row.windowSize} son deneme
-            </p>
-          </div>
-        );
-      })}
+    <div className="space-y-3">
+      <TrialBreakdownLine rows={courseRows} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+        {courseRows.map((row) => {
+          const tier = heatTier(row.count, row.windowSize);
+          return (
+            <div key={row.topicId} className={cn("space-y-1 rounded-lg border px-3 py-2", HEAT_TIER_STYLES[tier].tile)}>
+              <p className="truncate text-sm font-medium">{row.topicName}</p>
+              <p className="text-xs tabular-nums opacity-80">
+                {row.count}/{row.windowSize} son deneme
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -51,6 +52,10 @@ function TopicGrid({ courseId, rows }: { courseId: string; rows: GelisimHaritasi
 // a drill-down list. Same TYT/AYT -> course-chips navigation shell,
 // duplicated per this repo's panel-UI convention (the computation itself
 // is shared, see lib/gelisim-haritasi.ts).
+//
+// One merged map per subject (Fizik, Kimya, ...): its trials are the Genel Denemeler of the track, the combined Branş
+// exams it is part of ("TYT Fen") and its own single Branş exams -- which is why there are no combined chips here. The
+// Tümü / Genel / Branş switch narrows the same map to one kind of exam; Tümü is the default overview.
 //
 // Recomputed here client-side (not passed pre-aggregated from the
 // server) so it can react live to the shared date filter (DetailTabs):
@@ -75,17 +80,12 @@ export function GelisimHaritasiTab({
   chartRange: ChartRange;
   examType?: ExamType;
 }) {
-  // Macro ("whole fruit") branch-exam subjects sit alongside the atomic
-  // ("sliced") ones here too, so a mistake logged under a combined "TYT
-  // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
-  // "Biyoloji"'s own chips.
-  const tytCourses = branchExamCourses("tyt");
-  const aytCoursesFor = (t: Track) => branchExamCourses("ayt", t);
+  const [source, setSource] = useState<TrialSource>("all");
 
   const rows: GelisimHaritasiRow[] = useMemo(() => {
     const examsInRange = [...generalExams, ...branchExams].filter((e) => isDateInChartRange(e.task_date, chartRange));
-    return computeGelisimHaritasi(curriculumCourseIds, examsInRange, examMistakes);
-  }, [generalExams, branchExams, examMistakes, curriculumCourseIds, chartRange]);
+    return computeGelisimHaritasi(curriculumCourseIds, examsInRange, examMistakes, { source });
+  }, [generalExams, branchExams, examMistakes, curriculumCourseIds, chartRange, source]);
 
   return (
     <Card>
@@ -96,21 +96,19 @@ export function GelisimHaritasiTab({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          {(["hot", "warm", "cool"] as const).map((t) => (
-            <span key={t} className="flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-full border", HEAT_TIER_STYLES[t].tile)} />
-              <span className="text-muted-foreground">{HEAT_TIER_STYLES[t].label}</span>
-            </span>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            {(["hot", "warm", "cool"] as const).map((t) => (
+              <span key={t} className="flex items-center gap-1.5">
+                <span className={cn("size-2 rounded-full border", HEAT_TIER_STYLES[t].tile)} />
+                <span className="text-muted-foreground">{HEAT_TIER_STYLES[t].label}</span>
+              </span>
+            ))}
+          </div>
+          <TrialSourceSwitch value={source} onChange={setSource} />
         </div>
 
-        <CourseTabs
-          examType={examType}
-          tytCourses={tytCourses}
-          aytCoursesFor={aytCoursesFor}
-          render={(course) => <TopicGrid courseId={course.id} rows={rows} />}
-        />
+        <CourseTabs examType={examType} render={(course) => <TopicGrid courseId={course.id} rows={rows} />} />
       </CardContent>
     </Card>
   );

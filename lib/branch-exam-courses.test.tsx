@@ -143,13 +143,24 @@ describe("guard: no picker is assembled by hand any more", () => {
     for (const file of [
       "app/coach/students/[id]/_components/charts-tab.tsx",
       "app/coach/students/[id]/_components/coach-exam-analysis-section.tsx",
-      "app/coach/students/[id]/_components/gelisim-haritasi-tab.tsx",
-      "app/coach/students/[id]/_components/topic-performance-map.tsx",
       "app/coach/students/[id]/_components/karneler-tab.tsx",
       "app/student/deneme-analizleri/brans/brans-analysis-client.tsx",
-      "app/student/deneme-analizleri/_components/gelisim-haritasi.tsx",
     ]) {
       expect(readFileSync(join(root, file), "utf8"), file).toContain("branchExamCourses(");
+    }
+  });
+
+  // The topic maps are the opposite case: one merged map per ATOMIC subject (a combined exam's marks are folded onto
+  // Fizik / Kimya / Biyoloji by lib/gelisim-haritasi.ts), so they must NOT offer the combined chips.
+  it("the topic maps (Gelişim Haritası x2, Konu Performans Haritası) list the atomic subjects only", () => {
+    for (const file of [
+      "app/coach/students/[id]/_components/gelisim-haritasi-tab.tsx",
+      "app/coach/students/[id]/_components/topic-performance-map.tsx",
+      "app/student/deneme-analizleri/_components/gelisim-haritasi.tsx",
+    ]) {
+      const src = readFileSync(join(root, file), "utf8");
+      expect(src, file).not.toContain("branchExamCourses(");
+      expect(src, file).not.toMatch(/tytCourses=|aytCoursesFor=/);
     }
   });
 });

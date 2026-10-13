@@ -2,10 +2,6 @@
 
 import { CourseTabs } from "@/components/course-tabs";
 import { cn } from "@/lib/utils";
-import {
-  branchExamCourses,
-  type Track,
-} from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import type { WeakTopicRow } from "../weak-topic-map";
 
@@ -78,13 +74,9 @@ function TopicList({ courseId, rows }: { courseId: string; rows: TopicPerformanc
 // pattern so the coach only ever looks at one course's full topic list at a
 // time.
 export function TopicPerformanceMap({ rows, examType = "YKS" }: { rows: TopicPerformanceRow[]; examType?: ExamType }) {
-  // Macro ("whole fruit") branch-exam subjects sit alongside the atomic
-  // ("sliced") ones here too, so a mistake logged under a combined "TYT
-  // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
-  // "Biyoloji"'s own chips.
-  const tytCourses = branchExamCourses("tyt");
-  const aytCoursesFor = (t: Track) => branchExamCourses("ayt", t);
-
+  // One chip per atomic subject: a mistake logged under a combined "TYT Fen" exam is folded onto Fizik / Kimya / Biyoloji by the
+  // computation (lib/gelisim-haritasi.ts), together with that subject's Genel Deneme and single Branş exams -- so there are no
+  // combined chips and every number here is the subject's whole history in one place.
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -96,12 +88,7 @@ export function TopicPerformanceMap({ rows, examType = "YKS" }: { rows: TopicPer
         ))}
       </div>
 
-      <CourseTabs
-        examType={examType}
-        tytCourses={tytCourses}
-        aytCoursesFor={aytCoursesFor}
-        render={(course) => <TopicList courseId={course.id} rows={rows} />}
-      />
+      <CourseTabs examType={examType} render={(course) => <TopicList courseId={course.id} rows={rows} />} />
     </div>
   );
 }

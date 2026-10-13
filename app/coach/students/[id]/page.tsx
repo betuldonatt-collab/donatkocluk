@@ -10,9 +10,9 @@ import { ArrowLeft } from "lucide-react";
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
 import { KARMA_TOPIC_ID, aytTrackOf, courseDisplayName, findCourseById, isLgsCourseId } from "@/lib/curriculum";
-import { curriculumCourseIdsFor, generalExamCourseIdsForTitle } from "@/lib/curriculum/cohort";
-import { lgsNodeIdForTopicId, lgsSelectionNodes } from "@/lib/curriculum/lgs-selection";
-import { courseHasBuckets, maarifSelectionNodes } from "@/lib/curriculum/maarif-selection";
+import { curriculumCourseIdsFor } from "@/lib/curriculum/cohort";
+import { lgsNodeIdForTopicId } from "@/lib/curriculum/lgs-selection";
+import { computeGelisimHaritasi } from "@/lib/gelisim-haritasi";
 import { groupPipelineRows, pipelineConfigFor, pipelineSelectColumns, type PipelineRow } from "@/lib/topic-pipeline";
 import { weekDates } from "@/lib/date";
 import { nextCycleRange } from "@/lib/karne";
@@ -483,97 +483,29 @@ async function fetchStudentDetail(studentId: string) {
       : Promise.resolve({ data: [] as { course_id: string; topic_id: string; total_questions: number; correct_answers: number; incorrect_answers: number }[] }),
   ]);
 
-  const examTitleById = new Map(allExams.map((e) => [e.id, e.title]));
-  const counts = new Map<string, { courseId: string; topicId: string; count: number; examTitles: string[] }>();
-  // A topic marked both Yanlış and Boş in one exam is two rows (migration
-  // 0116) but one mistake for that exam -- counted once.
-  const countedExamTopics = new Set<string>();
-  for (const m of mistakeRows ?? []) {
-    const key = `${m.course_id}::${m.topic_id}`;
-    const examTopicKey = `${m.task_id}::${key}`;
-    if (countedExamTopics.has(examTopicKey)) continue;
-    countedExamTopics.add(examTopicKey);
-    const examTitle = examTitleById.get(m.task_id) ?? "";
-    const existing = counts.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.examTitles.push(examTitle);
-    } else {
-      counts.set(key, { courseId: m.course_id, topicId: m.topic_id, count: 1, examTitles: [examTitle] });
-    }
-  }
-
-  // Each course's own exam count (not a single global sample size) is
-  // used as its topics' denominator, since a course tested in 2 exams
-  // shouldn't be judged against how many exams exist for every other
-  // course.
-  const courseExamCounts = new Map<string, number>();
-  for (const e of allExams) {
-    if (e.task_type === "branch_exam" && e.course_id) {
-      courseExamCounts.set(e.course_id, (courseExamCounts.get(e.course_id) ?? 0) + 1);
-    }
-    if (e.task_type === "general_exam") {
-      // An LGS general exam covers every LGS course; a YKS one the TYT groups.
-      // A general exam counts toward the courses of ITS cohort (LGS / 7th / 9th / 10th grade / TYT).
-      const generalCourseIds = generalExamCourseIdsForTitle(e.title);
-      for (const cid of generalCourseIds) {
-        courseExamCounts.set(cid, (courseExamCounts.get(cid) ?? 0) + 1);
-      }
-    }
-  }
-
-  // Gelişim Haritası (the windowed sibling of the all-time map below) is
-  // no longer computed here -- it now reruns client-side in
-  // gelisim-haritasi-tab.tsx against the coach's live date-range filter
-  // (DetailTabs), using the same allExams/mistakeRows this file already
-  // sends down for other tabs (via generalExams/branchExams/examMistakes,
-  // built further below) plus curriculumCourseIds, returned as-is.
-
-  // Full-spectrum performance map: every topic in every curriculum course
-  // (not just ones the student has actually been examined on yet), so the
-  // coach can browse any course's chip and see a clean topic list -- a
-  // 0-mistake topic is real "good news" signal, not just an absence of
-  // data.
-  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = curriculumCourseIds.flatMap((courseId) => {
-    const course = findCourseById(courseId);
-    if (!course) return [];
-    const sampleSize = courseExamCounts.get(courseId) ?? 0;
-    // An LGS course reports at its selection-node granularity (see
-    // lib/curriculum/lgs-selection.ts) -- one row per Konu/Ünite/etc.
-    // instead of one per raw Alt Konu/topic, summing every member's
-    // mistake count so a mistake tagged on any of them (old data from
-    // before this rollup, or new data tagged directly against the node's
-    // own representative id) still counts toward the same row. Every
-    // non-LGS course keeps its existing one-row-per-topic behavior.
-    const nodes = isLgsCourseId(courseId)
-      ? lgsSelectionNodes(course)
-      : courseHasBuckets(course)
-        ? maarifSelectionNodes(course)
-        : course.units.flatMap((u) =>
-          u.topics.map((t) => ({
-            id: t.id,
-            // LGS's Konu level is part of the name so same-named Alt Konu rows
-            // under different Konu (e.g. "Örnekler") stay distinguishable --
-            // moot here (no non-LGS course has a konu level) but kept for
-            // parity with the LGS branch's own naming.
-            label: u.konu ? `${u.konu} › ${t.name}` : t.name,
-            memberTopicIds: [t.id],
-          })),
-        );
-    return nodes.map((node) => {
-      const count = node.memberTopicIds.reduce((n, id) => n + (counts.get(`${courseId}::${id}`)?.count ?? 0), 0);
-      const examTitles = node.memberTopicIds.flatMap((id) => counts.get(`${courseId}::${id}`)?.examTitles ?? []);
-      return {
-        courseId,
-        courseName: course.name,
-        topicId: node.id,
-        topicName: node.label,
-        count,
-        examTitles,
-        sampleSize,
-      };
-    });
-  }).sort((a, b) => b.count - a.count);
+  // Full-spectrum performance map: every topic in every curriculum course (not just ones the student has actually been
+  // examined on yet), so the coach can browse any course's chip and see a clean topic list -- a 0-mistake topic is real
+  // "good news" signal, not just an absence of data.
+  // It is the SAME merged computation as the Gelişim Haritası (lib/gelisim-haritasi.ts) over the whole history instead of a
+  // window: a course's trials are every exam about it -- Genel Denemeler of its track, combined Branş exams it is part of
+  // and its own single Branş exams -- each counted once, with pending-analysis exams left out. Sample size = how many.
+  // (Gelişim Haritası itself reruns client-side in gelisim-haritasi-tab.tsx against the coach's live date-range filter.)
+  const topicPerformance: (WeakTopicRow & { sampleSize: number })[] = computeGelisimHaritasi(
+    curriculumCourseIds,
+    allExams,
+    mistakeRows ?? [],
+    { limit: Infinity },
+  )
+    .map((r) => ({
+      courseId: r.courseId,
+      courseName: r.courseName,
+      topicId: r.topicId,
+      topicName: r.topicName,
+      count: r.count,
+      examTitles: r.examTitles,
+      sampleSize: r.windowSize,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   // Topic-based question aggregation (distinct from the mistake-count
   // tiers above): total/correct/incorrect QUESTIONS solved per topic,

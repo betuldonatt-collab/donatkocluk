@@ -131,7 +131,16 @@ export function isRoutineCourseId(courseId: string | null | undefined): boolean 
 // TYT Türkçe has no macro entry -- it's already a single atomic subject
 // with nothing to combine, so the existing tyt-turkce course IS the
 // "whole" option.
+// Which atomic course each of a macro course's topics belongs to (topic ids are course-prefixed and unique, so this is exact).
+// The topic maps read it to fold a combined exam's marks back onto the atomic subjects they are about.
+const MACRO_SOURCE_COURSE_IDS = new Map<string, string[]>();
+const MACRO_TOPIC_OWNER = new Map<string, Map<string, string>>();
+
 function macroCourse(id: string, name: string, sourceCourses: Course[]): Course {
+  const owner = new Map<string, string>();
+  for (const c of sourceCourses) for (const u of c.units) for (const t of u.topics) owner.set(t.id, c.id);
+  MACRO_SOURCE_COURSE_IDS.set(id, sourceCourses.map((c) => c.id));
+  MACRO_TOPIC_OWNER.set(id, owner);
   return {
     id,
     name,
@@ -254,6 +263,17 @@ export function yksCourseOptions(input: { atomic: Course[]; macros: Course[]; ay
 
 export function isBranchExamMacroCourseId(courseId: string | null | undefined): boolean {
   return BRANCH_EXAM_MACRO_COURSES.some((c) => c.id === courseId);
+}
+
+// The atomic courses a combined ("macro") branch-exam course is made of: "tyt-fen-macro" -> Fizik, Kimya, Biyoloji. [] for anything else.
+export function macroSourceCourseIds(courseId: string | null | undefined): string[] {
+  return (courseId && MACRO_SOURCE_COURSE_IDS.get(courseId)) || [];
+}
+
+// The atomic course a mark made on a macro exam belongs to: ("tyt-fen-macro", "tyt-fizik-u0-t0") -> "tyt-fizik". Null when the
+// course is not a macro or the topic is not one of its own.
+export function macroTopicCourseId(macroCourseId: string, topicId: string): string | null {
+  return MACRO_TOPIC_OWNER.get(macroCourseId)?.get(topicId) ?? null;
 }
 
 const ALL_COURSES: Course[] = uniqueById([
