@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/x", useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 
-import { KarneDocument } from "@/components/karne-document";
+import { capCourseRows, KarneDocument, MAX_COURSE_ROWS, MAX_EVENTS, MAX_EXAMS_PER_GROUP } from "@/components/karne-document";
 import { KarnePeriodPicker } from "@/components/karne-period-picker";
 import { buildParentEventAttendance } from "./event-attendance";
 import { computeKarneSummary, type KarneSummaryTask } from "./karne-summary";
@@ -116,13 +116,19 @@ describe("the Karne document", () => {
     expect(html).not.toContain("/karne/");
   });
 
-  it("is marked for A4 printing and page 2 starts only when there is something for it", () => {
+  it("is marked for A4 printing; the exam and event sections exist only when the period has exams / events", () => {
     expect(html).toContain("karne-doc");
-    expect(html).toContain("print:break-before-page");
     const quiet = computeKarneSummary({ rangeStart: RANGE.start, rangeEnd: RANGE.end, today: "2026-10-29", now: "2026-10-29T08:00:00Z", tasks: [tasks[0]], events: [] });
     const one = renderToStaticMarkup(<KarneDocument summary={quiet} studentName="A" />);
-    expect(one).not.toContain("print:break-before-page");
     expect(one).not.toContain("Deneme Özeti");
+    expect(one).not.toContain("Etkinlik Katılımı</h3>");
+  });
+
+  it("shows the questions BY COURSE: Toplam, ✓, ✗, ○ for each course -- and nothing at topic level", () => {
+    expect(html).toContain("Ders bazında çözülen soru");
+    expect(html).toMatch(/TYT Matematik<\/td><td[^>]*>20<\/td><td[^>]*>15<\/td><td[^>]*>3<\/td><td[^>]*>2<\/td>/);
+    expect(html).toContain("Genel Deneme");
+    expect(html).not.toMatch(/Konu|Ünite|topic/i);
   });
 
   it("states where the numbers come from: live, or frozen at approval for the parent", () => {
@@ -138,6 +144,53 @@ describe("the Karne document", () => {
     expect(out).toContain("Bu dönemde yoklaması alınan etkinlik yok");
     expect(out).toContain("Bu dönem için görev verisi yok.");
     expect(out).toContain("0 dk");
+  });
+});
+
+describe("the document stays an executive summary (1-2 pages)", () => {
+  it("contains no detailed-analysis components or data (topic heat map, topic lists, per-topic mistakes)", () => {
+    const src = readFileSync(new URL("../components/karne-document.tsx", import.meta.url), "utf8");
+    for (const forbidden of ["TopicGrid", "KarneTopicRow", "topic_mistakes", "topicRows", "CourseTabs", "gelisim-haritasi", "heatTier", "HEAT_TIER"]) {
+      expect(src, forbidden).not.toContain(forbidden);
+    }
+    // it only knows the summary, the event card pieces and layout primitives
+    const imports = src.match(/from "[^"]+"/g) ?? [];
+    expect(imports).not.toContainEqual(expect.stringMatching(/curriculum|gelisim|topic/));
+  });
+
+  it("the course table folds the long tail into one row so it always adds up and stays short", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({ key: `c${i}`, label: `Ders ${i}`, total: 100 - i, correct: 60 - i, wrong: 30, empty: 10 - 0 }));
+    const capped = capCourseRows(rows);
+    expect(capped).toHaveLength(MAX_COURSE_ROWS);
+    const last = capped[capped.length - 1];
+    expect(last.label).toBe(`Diğer dersler (${12 - (MAX_COURSE_ROWS - 1)})`);
+    expect(capped.reduce((n, r) => n + r.total, 0)).toBe(rows.reduce((n, r) => n + r.total, 0));
+    expect(capCourseRows(rows.slice(0, 3))).toHaveLength(3);
+  });
+
+  it("long exam and event lists are cut, and the cut is stated", () => {
+    const manyExams: KarneSummaryTask[] = Array.from({ length: 9 }, (_, i) =>
+      task({
+        task_date: `2026-10-${String(1 + i * 3).padStart(2, "0")}`,
+        task_type: "general_exam",
+        title: `TYT Genel Deneme ${i + 1}`,
+        subject_scores: { turkce: { correct: 20 + i, wrong: 5, empty: 5 } },
+      }),
+    );
+    const manyEvents = buildParentEventAttendance({
+      announcements: Array.from({ length: 7 }, (_, i) => ({ id: `e${i}`, title: `Etkinlik ${i}`, event_date: `2026-10-${String(2 + i).padStart(2, "0")}` })),
+      configs: [],
+      attendance: Array.from({ length: 7 }, (_, i) => ({ announcement_id: `e${i}`, session_number: 1, status: "attended" as const, marked_at: "2026-10-05T10:00:00Z" })),
+      rsvps: [],
+      rangeStart: RANGE.start,
+      rangeEnd: RANGE.end,
+    });
+    const big = computeKarneSummary({ rangeStart: RANGE.start, rangeEnd: RANGE.end, today: "2026-10-29", now: "2026-10-29T08:00:00Z", tasks: manyExams, events: manyEvents });
+    const out = renderToStaticMarkup(<KarneDocument summary={big} studentName="A" />);
+    expect(out.match(/TYT Genel Deneme \d/g)!.length).toBeLessThanOrEqual(MAX_EXAMS_PER_GROUP);
+    expect(out).toContain(`Son ${MAX_EXAMS_PER_GROUP} deneme gösteriliyor`);
+    expect(out.match(/Etkinlik \d/g)!.length).toBeLessThanOrEqual(MAX_EVENTS);
+    expect(out).toContain(`+ ${7 - MAX_EVENTS} etkinlik daha`);
   });
 });
 
@@ -193,6 +246,11 @@ describe("print setup", () => {
     expect(css).toMatch(/@page karne \{[^}]*size: A4 portrait/);
     expect(css).toMatch(/\.karne-doc \{[^}]*page: karne;[^}]*--background: #ffffff;[^}]*--foreground: #18181b/);
     expect(css).toContain("print-color-adjust: exact");
+  });
+
+  it("prints ONLY the document: everything on the page that is not the Karne (or around it) is removed from the sheet", () => {
+    // the coach's page also holds the header, other tabs and the whole report-card list; window.print() used to print all of it (7 pages)
+    expect(css).toMatch(/body:has\(\.karne-doc\) \*:not\(:has\(\.karne-doc\)\):not\(\.karne-doc\):not\(\.karne-doc \*\) \{\s*display: none !important;/);
   });
 });
 

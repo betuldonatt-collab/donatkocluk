@@ -99,7 +99,7 @@ describe("the showcase numbers", () => {
 
   it("questions solved: Doğru / Yanlış / Boş of finished tasks, exams from their subject scores (nothing counted twice)", () => {
     // 20 + 10 + TYT exam 80 + AYT exam 54 = 164
-    expect(summary.questions).toEqual({ total: 164, correct: 15 + 6 + 50 + 28, wrong: 3 + 2 + 15 + 11, empty: 2 + 2 + 15 + 15, previousTotal: 30 + 40 });
+    expect(summary.questions).toMatchObject({ total: 164, correct: 15 + 6 + 50 + 28, wrong: 3 + 2 + 15 + 11, empty: 2 + 2 + 15 + 15, previousTotal: 30 + 40 });
   });
 
   it("an unfinished task does not count as solved", () => {
@@ -146,6 +146,60 @@ describe("the showcase numbers", () => {
     expect(summary.attendance.events).toHaveLength(2);
     const none = computeKarneSummary({ rangeStart: RANGE.start, rangeEnd: RANGE.end, today: TODAY, now: NOW, tasks: [], events: [] });
     expect(none.attendance).toEqual({ attendedSessions: 0, recordedSessions: 0, ratePct: null, events: [] });
+  });
+});
+
+describe("questions by course (Ders bazında) -- courses only, never topics", () => {
+  it("one row per course with Toplam / Doğru / Yanlış / Boş, largest first, and the rows add up to the grand total", () => {
+    const rows = summary.questions.byCourse;
+    expect(rows.map((r) => [r.label, r.total, r.correct, r.wrong, r.empty])).toEqual([
+      ["Genel Deneme", 134, 78, 26, 30],
+      ["TYT Matematik", 20, 15, 3, 2],
+      ["TYT Fizik", 10, 6, 2, 2],
+    ]);
+    expect(rows.reduce((n, r) => n + r.total, 0)).toBe(summary.questions.total);
+    expect(rows.reduce((n, r) => n + r.correct, 0)).toBe(summary.questions.correct);
+    expect(rows.reduce((n, r) => n + r.wrong, 0)).toBe(summary.questions.wrong);
+    expect(rows.reduce((n, r) => n + r.empty, 0)).toBe(summary.questions.empty);
+  });
+
+  it("a row is exactly a course: no topic information anywhere in it", () => {
+    for (const row of summary.questions.byCourse) expect(Object.keys(row).sort()).toEqual(["correct", "empty", "key", "label", "total", "wrong"]);
+    expect(JSON.stringify(summary.questions)).not.toMatch(/topic|konu/i);
+  });
+
+  it("practice on the same course in several tasks is one row; routine courses get readable names; no course is 'Diğer'", () => {
+    const s = computeKarneSummary({
+      rangeStart: RANGE.start,
+      rangeEnd: RANGE.end,
+      today: TODAY,
+      now: NOW,
+      tasks: [
+        task({ task_date: "2026-10-02", course_id: "tyt-matematik", topic_id: "tyt-matematik-u0-t0", correct_count: 5, wrong_count: 1, empty_count: 0 } as never),
+        task({ task_date: "2026-10-03", course_id: "tyt-matematik", topic_id: "tyt-matematik-u1-t0", correct_count: 7, wrong_count: 2, empty_count: 1 } as never),
+        task({ task_date: "2026-10-04", course_id: "paragraf", correct_count: 9, wrong_count: 1, empty_count: 0 }),
+        task({ task_date: "2026-10-05", course_id: null, correct_count: 2, wrong_count: 0, empty_count: 0 }),
+        task({ task_date: "2026-10-06", course_id: "tyt-turkce", status: "pending", correct_count: 9, wrong_count: 9, empty_count: 9 }),
+      ],
+      events: [],
+    });
+    expect(s.questions.byCourse.map((r) => [r.label, r.total])).toEqual([
+      ["TYT Matematik", 16],
+      ["Paragraf", 10],
+      ["Diğer", 2],
+    ]);
+  });
+
+  it("an old (legacy) AYT course id is counted under the unified course", () => {
+    const s = computeKarneSummary({
+      rangeStart: RANGE.start,
+      rangeEnd: RANGE.end,
+      today: TODAY,
+      now: NOW,
+      tasks: [task({ task_date: "2026-10-02", course_id: "ayt-matematik-sayisal", correct_count: 4, wrong_count: 0, empty_count: 0 })],
+      events: [],
+    });
+    expect(s.questions.byCourse.map((r) => [r.key, r.label])).toEqual([["ayt-matematik", "AYT Matematik"]]);
   });
 });
 
@@ -263,7 +317,7 @@ describe("empty input and shape", () => {
   it("an empty period is all zeros / nulls, never NaN, and still has its 12 trend weeks", () => {
     const s = computeKarneSummary({ rangeStart: RANGE.start, rangeEnd: RANGE.end, today: TODAY, now: NOW, tasks: [], events: [] });
     expect(s.completion).toEqual({ pct: null, previousPct: null });
-    expect(s.questions).toEqual({ total: 0, correct: 0, wrong: 0, empty: 0, previousTotal: 0 });
+    expect(s.questions).toEqual({ total: 0, correct: 0, wrong: 0, empty: 0, previousTotal: 0, byCourse: [] });
     expect(s.studyTime).toEqual({ minutes: 0, previousMinutes: 0 });
     expect(s.consistency.activeDays).toBe(0);
     expect(s.trend.weeks).toHaveLength(12);

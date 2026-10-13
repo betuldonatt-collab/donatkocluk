@@ -265,6 +265,8 @@
   }
   .karne-doc {
     page: karne;
+    /* a little under 100% so even a crowded period (many courses, exams and events) stays inside two A4 pages */
+    zoom: 0.92;
     color-scheme: light;
     --background: #ffffff;
     --foreground: #18181b;
@@ -275,6 +277,13 @@
     --border: #d4d4d8;
     --primary: #1e293b;
     --primary-foreground: #ffffff;
+  }
+  /* PRINT ONLY THE KARNE. The document sits inside a page that has plenty more (the coach's student page: the header, the other tabs'
+     content, the whole cycle list with its detailed review cards...) and window.print() prints all of it -- which is how a 1-2 page
+     summary came out as 7 pages. Everything that is neither the document, nor inside it, nor one of its ancestors is taken out of the
+     sheet. */
+  body:has(.karne-doc) *:not(:has(.karne-doc)):not(.karne-doc):not(.karne-doc *) {
+    display: none !important;
   }
   :has(> .karne-doc):not(.karne-doc),
   :has(.karne-doc):not(.karne-doc) {

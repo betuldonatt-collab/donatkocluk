@@ -1,13 +1,16 @@
-import { EventAttendanceCard } from "@/components/event-attendance-card";
+import { Check, Minus, X } from "lucide-react";
+
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { StickyXScroll } from "@/components/ui/sticky-x-scroll";
 import { cn } from "@/lib/utils";
 import { formatPeriod, monthLabel } from "@/lib/karne-periods";
+import { attendanceNote, rsvpLabel, sessionStatusLabel, type ParentEventAttendance } from "@/lib/event-attendance";
 import {
   deltaOf,
   formatStudyTime,
   studyTimeSentence,
   type KarneBranchAverage,
+  type KarneCourseQuestions,
   type KarneExamGroup,
   type KarneSummary,
   type KarneTrendWeek,
@@ -20,6 +23,12 @@ import {
 // Print: A4 portrait (see globals.css .karne-doc). Page 1 = header, the showcase tiles, the study time, the momentum chart and the
 // coach's note; page 2 = the exam overview and the event attendance -- and when the period has neither, the document is one page.
 // Nothing relies on colour alone: every change carries ▲ / ▼ / = and a number, and the current period's line is thick as well as dark.
+
+// The document is capped so it can never run past two A4 pages, whatever the period holds: the longest lists are cut to what fits and
+// say how many more there were. (Everything is still in the data; this is only what the page shows.)
+export const MAX_COURSE_ROWS = 7;
+export const MAX_EXAMS_PER_GROUP = 4;
+export const MAX_EVENTS = 4;
 
 const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 });
 const fmt = (n: number) => nf.format(n);
@@ -44,7 +53,7 @@ function Delta({ delta, unit = "", format }: { delta: number | null; unit?: stri
 
 function Tile({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("border-border bg-card flex flex-col gap-1 rounded-lg border p-3 print:break-inside-avoid", className)}>
+    <div className={cn("border-border bg-card flex flex-col gap-1 rounded-lg border p-3 print:gap-0.5 print:p-2 print:break-inside-avoid", className)}>
       <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">{label}</p>
       {children}
     </div>
@@ -82,7 +91,7 @@ export function KarneTrendChart({ weeks }: { weeks: KarneTrendWeek[] }) {
   }
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Haftalık program tamamlama yüzdesi" className="text-foreground h-auto w-full">
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Haftalık program tamamlama yüzdesi" className="text-foreground h-auto w-full print:h-[150px]">
       {[0, 50, 100].map((g) => (
         <g key={g}>
           <line x1={PAD.left} x2={W - PAD.right} y1={y(g)} y2={y(g)} className="stroke-border" strokeWidth={1} strokeDasharray={g === 0 ? undefined : "3 4"} />
@@ -133,7 +142,7 @@ export function KarneTrendChart({ weeks }: { weeks: KarneTrendWeek[] }) {
 function BranchBars({ branches }: { branches: KarneBranchAverage[] }) {
   if (branches.length === 0) return null;
   return (
-    <ul className="space-y-1.5" aria-label="Ana branş ortalamaları">
+    <ul className="space-y-1.5 print:space-y-1" aria-label="Ana branş ortalamaları">
       {branches.map((b) => {
         const pct = b.questions > 0 ? Math.max(0, Math.min(100, (b.averageNet / b.questions) * 100)) : 0;
         return (
@@ -155,7 +164,7 @@ function BranchBars({ branches }: { branches: KarneBranchAverage[] }) {
 function ExamGroup({ group }: { group: KarneExamGroup }) {
   const change = deltaOf(group.averageNet, group.previousAverageNet);
   return (
-    <section className="border-border bg-card space-y-3 rounded-lg border p-4 print:break-inside-avoid" aria-label={group.label}>
+    <section className="border-border bg-card space-y-3 rounded-lg border p-4 print:space-y-2 print:p-3 print:break-inside-avoid" aria-label={group.label}>
       <h4 className="text-foreground text-sm font-semibold">{group.label}</h4>
       <StickyXScroll>
         <table className="w-full text-sm">
@@ -168,12 +177,12 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
             </tr>
           </thead>
           <tbody>
-            {group.items.map((item) => (
+            {group.items.slice(-MAX_EXAMS_PER_GROUP).map((item) => (
               <tr key={`${item.date}-${item.title}`} className="border-border border-b last:border-0">
-                <td className="text-muted-foreground py-1.5 pr-3 whitespace-nowrap">{formatDay(item.date)}</td>
-                <td className="text-foreground py-1.5 pr-3">{item.title}</td>
-                <td className="text-foreground py-1.5 pr-3 text-right font-semibold tabular-nums">{fmt(item.net)}</td>
-                <td className="py-1.5 text-right tabular-nums">
+                <td className="text-muted-foreground py-1.5 pr-3 whitespace-nowrap print:py-0.5">{formatDay(item.date)}</td>
+                <td className="text-foreground py-1.5 pr-3 print:py-0.5">{item.title}</td>
+                <td className="text-foreground py-1.5 pr-3 text-right font-semibold tabular-nums print:py-0.5">{fmt(item.net)}</td>
+                <td className="py-1.5 text-right tabular-nums print:py-0.5">
                   {item.deltaVsPrevious === null ? (
                     <span className="text-muted-foreground text-xs">—</span>
                   ) : item.deltaVsPrevious === 0 ? (
@@ -190,6 +199,9 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
           </tbody>
         </table>
       </StickyXScroll>
+      {group.items.length > MAX_EXAMS_PER_GROUP && (
+        <p className="text-muted-foreground text-[11px]">Son {MAX_EXAMS_PER_GROUP} deneme gösteriliyor; ortalama ve en yüksek net {group.items.length} denemenin tamamından hesaplandı.</p>
+      )}
       <p className="text-foreground text-xs">
         Dönem ortalaması: <strong>{fmt(group.averageNet)}</strong> net · En yüksek: <strong>{fmt(group.bestNet)}</strong>
         {group.previousAverageNet !== null && (
@@ -201,6 +213,110 @@ function ExamGroup({ group }: { group: KarneExamGroup }) {
         )}
       </p>
       <BranchBars branches={group.branches} />
+    </section>
+  );
+}
+
+// ---- course-level question breakdown --------------------------------------------------------------------------------------------------
+
+// Largest courses first, the rest folded into one "Diğer dersler" row so the table stays short and still adds up to the total.
+export function capCourseRows(rows: KarneCourseQuestions[], max: number = MAX_COURSE_ROWS): KarneCourseQuestions[] {
+  if (rows.length <= max) return rows;
+  const head = rows.slice(0, max - 1);
+  const rest = rows.slice(max - 1);
+  const folded = rest.reduce(
+    (acc, r) => ({ ...acc, total: acc.total + r.total, correct: acc.correct + r.correct, wrong: acc.wrong + r.wrong, empty: acc.empty + r.empty }),
+    { key: "diger-dersler", label: `Diğer dersler (${rest.length})`, total: 0, correct: 0, wrong: 0, empty: 0 } as KarneCourseQuestions,
+  );
+  return [...head, folded];
+}
+
+function CourseQuestions({ rows }: { rows: KarneCourseQuestions[] }) {
+  if (rows.length === 0) return null;
+  const shown = capCourseRows(rows);
+  return (
+    <section className="border-border bg-card rounded-lg border p-3 print:p-2 print:break-inside-avoid" aria-label="Ders bazında çözülen soru">
+      <h3 className="text-foreground mb-1.5 text-sm font-semibold">Ders bazında çözülen soru</h3>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-muted-foreground border-border border-b text-[11px] tracking-wide uppercase">
+            <th className="py-1 pr-2 text-left font-semibold">Ders</th>
+            <th className="px-2 py-1 text-right font-semibold">Toplam</th>
+            <th className="px-2 py-1 text-right font-semibold" aria-label="Doğru">✓</th>
+            <th className="px-2 py-1 text-right font-semibold" aria-label="Yanlış">✗</th>
+            <th className="py-1 pl-2 text-right font-semibold" aria-label="Boş">○</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r) => (
+            <tr key={r.key} className="border-border border-b last:border-0">
+              <td className="text-foreground py-1 pr-2 print:py-0.5">{r.label}</td>
+              <td className="text-foreground px-2 py-1 text-right font-semibold tabular-nums print:py-0.5">{fmt(r.total)}</td>
+              <td className="px-2 py-1 text-right font-semibold text-emerald-700 tabular-nums print:py-0.5">{fmt(r.correct)}</td>
+              <td className="px-2 py-1 text-right font-semibold text-rose-700 tabular-nums print:py-0.5">{fmt(r.wrong)}</td>
+              <td className="text-muted-foreground py-1 pl-2 text-right font-semibold tabular-nums print:py-0.5">{fmt(r.empty)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+// ---- event attendance, compact ---------------------------------------------------------------------------------------------------------
+
+function CompactEvents({ events }: { events: ParentEventAttendance[] }) {
+  if (events.length === 0) return null;
+  const shown = events.slice(0, MAX_EVENTS);
+  const hidden = events.length - shown.length;
+  return (
+    <section className="space-y-2" aria-label="Etkinlik katılımı">
+      <h3 className="text-foreground text-sm font-semibold print:break-after-avoid">Etkinlik Katılımı</h3>
+      <ul className="space-y-2 print:space-y-1.5">
+        {shown.map((event) => {
+          const note = attendanceNote(event.summary);
+          return (
+            <li key={event.announcementId} className="border-border bg-card space-y-1.5 rounded-lg border p-3 print:space-y-1 print:p-2 print:break-inside-avoid">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <p className="text-foreground text-sm font-semibold">
+                  {event.title} <span className="text-muted-foreground font-normal">· Etkinlik Tarihi: {formatDay(event.date)}</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Öğrencinin yanıtı: <span className="text-foreground font-medium">{rsvpLabel(event.rsvp)}</span>
+                </p>
+              </div>
+              <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                {event.summary.sessions.map((s) => (
+                  <li key={s.sessionNumber} className="flex items-center gap-1.5 text-xs">
+                    <span
+                      className={cn(
+                        "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                        s.status === "attended"
+                          ? "border-emerald-500 bg-emerald-500/15 text-emerald-700"
+                          : s.status === "not_attended"
+                            ? "border-rose-500 bg-rose-500/15 text-rose-700"
+                            : "border-border text-muted-foreground",
+                      )}
+                      aria-hidden="true"
+                    >
+                      {s.status === "attended" ? <Check className="size-2.5" /> : s.status === "not_attended" ? <X className="size-2.5" /> : <Minus className="size-2.5" />}
+                    </span>
+                    <span className="text-foreground">
+                      {s.sessionNumber}. Oturum: <span className="font-medium">{sessionStatusLabel(s.status)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {note && (
+                <p className="bg-muted text-foreground rounded-md px-2.5 py-1.5 text-xs" data-slot="attendance-note">
+                  {note}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {hidden > 0 && <p className="text-muted-foreground text-xs">+ {hidden} etkinlik daha</p>}
     </section>
   );
 }
@@ -226,7 +342,7 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
   const studyDelta = deltaOf(studyTime.minutes, studyTime.previousMinutes);
 
   return (
-    <article className="karne-doc bg-background text-foreground mx-auto w-full max-w-[210mm] space-y-4 print:max-w-none print:space-y-3" aria-label="Karne">
+    <article className="karne-doc bg-background text-foreground mx-auto w-full max-w-[210mm] space-y-4 print:max-w-none print:space-y-2" aria-label="Karne">
       {/* ---- page 1 ---- */}
       <header className="border-border flex flex-wrap items-center justify-between gap-3 border-b pb-3 print:break-inside-avoid">
         <div className="flex items-center gap-3">
@@ -251,13 +367,13 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
       <section aria-label="Özet" className="space-y-3">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:grid-cols-4">
           <Tile label="Program tamamlama">
-            <p className="text-foreground text-3xl leading-none font-bold tabular-nums">{completion.pct === null ? "—" : `%${completion.pct}`}</p>
+            <p className="text-foreground text-3xl leading-none font-bold tabular-nums print:text-2xl">{completion.pct === null ? "—" : `%${completion.pct}`}</p>
             <Delta delta={deltaOf(completion.pct, completion.previousPct)} />
             {completion.previousPct !== null && <p className="text-muted-foreground text-[11px]">Önceki dönem: %{completion.previousPct}</p>}
           </Tile>
 
           <Tile label="Çözülen soru">
-            <p className="text-foreground text-3xl leading-none font-bold tabular-nums">{fmt(questions.total)}</p>
+            <p className="text-foreground text-3xl leading-none font-bold tabular-nums print:text-2xl">{fmt(questions.total)}</p>
             <p className="text-xs tabular-nums">
               <span className="font-semibold text-emerald-700">✓ {fmt(questions.correct)}</span>{" "}
               <span className="font-semibold text-rose-700">✗ {fmt(questions.wrong)}</span>{" "}
@@ -269,7 +385,7 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
           <Tile label="Etkinlik katılımı">
             {attendance.recordedSessions > 0 ? (
               <>
-                <p className="text-foreground text-3xl leading-none font-bold tabular-nums">
+                <p className="text-foreground text-3xl leading-none font-bold tabular-nums print:text-2xl">
                   {attendance.attendedSessions} <span className="text-muted-foreground text-lg font-semibold">/ {attendance.recordedSessions}</span>
                 </p>
                 <p className="text-foreground text-xs font-semibold">oturuma katıldı{attendance.ratePct !== null ? ` · %${attendance.ratePct}` : ""}</p>
@@ -283,7 +399,7 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
           </Tile>
 
           <Tile label="Tutarlılık">
-            <p className="text-foreground text-3xl leading-none font-bold tabular-nums">
+            <p className="text-foreground text-3xl leading-none font-bold tabular-nums print:text-2xl">
               {consistency.activeDays} <span className="text-muted-foreground text-lg font-semibold">/ {consistency.totalDays}</span>
             </p>
             <p className="text-foreground text-xs font-semibold">gün çalıştı</p>
@@ -292,10 +408,10 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
         </div>
 
         {/* study time: its own prominent block, stated explicitly as tracked (kronometre) time */}
-        <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 p-4 print:break-inside-avoid">
+        <div className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 p-4 print:p-3 print:break-inside-avoid">
           <div>
             <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">Toplam çalışma süresi · kronometre</p>
-            <p className="text-foreground text-4xl leading-tight font-bold tabular-nums">{formatStudyTime(studyTime.minutes)}</p>
+            <p className="text-foreground text-4xl leading-tight font-bold tabular-nums print:text-3xl">{formatStudyTime(studyTime.minutes)}</p>
             <p className="text-foreground text-sm">{studyTimeSentence(studyTime.minutes)}</p>
             <p className="text-muted-foreground text-[11px]">Sitede görevlerde kronometre ile tutulan süredir; hedeflenen süre değildir.</p>
           </div>
@@ -306,7 +422,9 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
         </div>
       </section>
 
-      <section className="border-border bg-card space-y-2 rounded-lg border p-4 print:break-inside-avoid" aria-label="İvme">
+      <CourseQuestions rows={questions.byCourse} />
+
+      <section className="border-border bg-card space-y-2 rounded-lg border p-4 print:space-y-1 print:p-3 print:break-inside-avoid" aria-label="İvme">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-foreground text-sm font-semibold">İvme — haftalık program tamamlama</h3>
           <p className="text-muted-foreground text-[11px]">
@@ -318,24 +436,24 @@ export function KarneDocument({ summary, studentName, classLabel, coachNote, app
       </section>
 
       {coachNote && (
-        <section className="border-border bg-card space-y-1 rounded-lg border p-4 print:break-inside-avoid" aria-label="Koçun notu">
+        <section className="border-border bg-card space-y-1 rounded-lg border p-4 print:p-3 print:break-inside-avoid" aria-label="Koçun notu">
           <h3 className="text-foreground text-sm font-semibold">Koçun Notu</h3>
-          <p className="text-foreground text-sm whitespace-pre-wrap">{coachNote}</p>
+          <p className="text-foreground text-sm whitespace-pre-wrap print:text-xs print:leading-snug">{coachNote}</p>
         </section>
       )}
 
       {/* ---- page 2 (only when the period has exams or events) ---- */}
       {hasPageTwo && (
-        <div className="space-y-4 print:break-before-page print:space-y-3">
+        <div className="space-y-4 print:space-y-3">
           {exams.groups.length > 0 && (
             <section className="space-y-3" aria-label="Deneme özeti">
-              <h3 className="text-foreground text-sm font-semibold">Deneme Özeti</h3>
+              <h3 className="text-foreground text-sm font-semibold print:break-after-avoid">Deneme Özeti</h3>
               {exams.groups.map((g) => (
                 <ExamGroup key={g.key} group={g} />
               ))}
             </section>
           )}
-          <EventAttendanceCard events={attendance.events} />
+          <CompactEvents events={attendance.events} />
         </div>
       )}
 

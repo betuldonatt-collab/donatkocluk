@@ -13,7 +13,8 @@
 
 import { completionPercent } from "./completion";
 import { mondayOf } from "./date";
-import { TRACK_LABELS, type Track } from "./curriculum";
+import { courseDisplayName, findCourseById, TRACK_LABELS, type Track } from "./curriculum";
+import { canonicalCourseId } from "./curriculum/legacy-course-ids";
 import {
   AYT_SUBJECT_GROUPS_BY_TRACK,
   inferAytTrackFromScores,
@@ -51,6 +52,10 @@ export type KarneExamItem = {
 };
 
 // `questions` is the branch's real question count in that exam, so a bar can show the net against what was possible.
+// One row of "Ders bazında çözülen soru": a COURSE (Ders) -- never a topic. Genel Deneme questions are their own row (an exam is scored
+// per subject group, not per course) and tasks without a course are "Diğer", so the rows always add up to the grand total.
+export type KarneCourseQuestions = { key: string; label: string; total: number; correct: number; wrong: number; empty: number };
+
 export type KarneBranchAverage = { key: string; label: string; averageNet: number; questions: number };
 
 export type KarneExamGroup = {
@@ -84,6 +89,8 @@ export type KarneSummary = {
     wrong: number;
     empty: number;
     previousTotal: number;
+    // Course by course, largest first (see KarneCourseQuestions).
+    byCourse: KarneCourseQuestions[];
   };
   // Time tracked with the kronometre on tasks in the site -- shown as its own prominent block.
   studyTime: { minutes: number; previousMinutes: number };
@@ -154,24 +161,66 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // A finished (or half-finished) task's D/Y/B. Same rule as the topic stats (done / half_done); a Genel Deneme carries its
 // numbers in subject_scores, everything else in the task's own columns, so nothing is counted twice.
-function questionCounts(tasks: KarneSummaryTask[]): { correct: number; wrong: number; empty: number } {
+export const GENERAL_EXAM_ROW_KEY = "genel-deneme";
+export const OTHER_ROW_KEY = "diger";
+
+// Routine "courses" that are not in the curriculum (their ids come from the daily-routine task types).
+const ROUTINE_COURSE_LABELS: Record<string, string> = {
+  paragraf: "Paragraf",
+  problem: "Problem",
+  "kitap-okuma": "Kitap Okuma",
+  "yeni-nesil-mat-dozu": "Yeni Nesil Mat Dozu",
+};
+
+function courseLabel(courseId: string): string {
+  const canonical = canonicalCourseId(courseId);
+  const course = findCourseById(canonical);
+  if (course) return courseDisplayName(canonical, course.name);
+  if (ROUTINE_COURSE_LABELS[canonical]) return ROUTINE_COURSE_LABELS[canonical];
+  // an unknown id: readable, never raw ("tyt-xyz" -> "Tyt xyz" is still better than a slug)
+  const words = canonical.replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Diğer";
+}
+
+function questionBreakdown(tasks: KarneSummaryTask[]): { correct: number; wrong: number; empty: number; byCourse: KarneCourseQuestions[] } {
   let correct = 0;
   let wrong = 0;
   let empty = 0;
+  const rows = new Map<string, KarneCourseQuestions>();
+  const add = (key: string, label: string, c: number, w: number, e: number) => {
+    correct += c;
+    wrong += w;
+    empty += e;
+    const row = rows.get(key) ?? { key, label, total: 0, correct: 0, wrong: 0, empty: 0 };
+    row.correct += c;
+    row.wrong += w;
+    row.empty += e;
+    row.total += c + w + e;
+    rows.set(key, row);
+  };
   for (const t of tasks) {
     if (t.status !== "done" && t.status !== "half_done") continue;
     if (t.task_type === "general_exam" && t.subject_scores) {
-      for (const s of Object.values(t.subject_scores)) {
-        correct += s.correct ?? 0;
-        wrong += s.wrong ?? 0;
-        empty += s.empty ?? 0;
-      }
+      for (const s of Object.values(t.subject_scores)) add(GENERAL_EXAM_ROW_KEY, "Genel Deneme", s.correct ?? 0, s.wrong ?? 0, s.empty ?? 0);
       continue;
     }
-    correct += t.correct_count ?? 0;
-    wrong += t.wrong_count ?? 0;
-    empty += t.empty_count ?? 0;
+    const c = t.correct_count ?? 0;
+    const w = t.wrong_count ?? 0;
+    const e = t.empty_count ?? 0;
+    if (c + w + e === 0) continue;
+    if (t.course_id) {
+      const id = canonicalCourseId(t.course_id);
+      add(id, courseLabel(id), c, w, e);
+    } else {
+      add(OTHER_ROW_KEY, "Diğer", c, w, e);
+    }
   }
+  const byCourse = [...rows.values()].filter((r) => r.total > 0).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, "tr"));
+  return { correct, wrong, empty, byCourse };
+}
+
+function questionCounts(tasks: KarneSummaryTask[]): { correct: number; wrong: number; empty: number } {
+  const { correct, wrong, empty } = questionBreakdown(tasks);
   return { correct, wrong, empty };
 }
 
@@ -337,7 +386,7 @@ export function computeKarneSummary(input: KarneSummaryInput): KarneSummary {
   const counts = weightedCycleCounts(tasks, { start: rangeStart, end: rangeEnd });
   const previousCounts = weightedCycleCounts(tasks, { start: previous.start, end: previous.end });
 
-  const q = questionCounts(current);
+  const q = questionBreakdown(current);
   const pq = questionCounts(before);
 
   const days = activeDays(tasks, rangeStart, rangeEnd, today);
@@ -362,6 +411,7 @@ export function computeKarneSummary(input: KarneSummaryInput): KarneSummary {
       wrong: q.wrong,
       empty: q.empty,
       previousTotal: pq.correct + pq.wrong + pq.empty,
+      byCourse: q.byCourse,
     },
     studyTime: { minutes: trackedMinutes(current), previousMinutes: trackedMinutes(before) },
     consistency: { activeDays: days.active, totalDays: days.total, previousActiveDays: prevDays.active, previousTotalDays: prevDays.total },
