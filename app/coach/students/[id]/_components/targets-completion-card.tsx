@@ -119,14 +119,18 @@ export function TargetsCompletionCard({
               and "Genel" is already what each row's own all-time COLUMN is
               called (vs. that same row's "Haftalık" column) -- reusing it
               here too would read as "Genel: Haftalık %80 · Genel %65". */}
-          <DualCompletionBar label="Toplam" weekly={completion.weekly.overall} allTime={completion.allTime.overall} />
-          {/* TYT/AYT split is a YKS notion; for LGS these would be two
-              permanently empty bars. */}
-          {profile.exam_type !== "LGS" && (
+          {/* TYT/AYT is a YKS notion: Maarif 9 / 10 / 11, the 7th grade and LGS get bars of their own cohort instead (lib/program-completion-bars.ts);
+              a 9th grader's single "9. Sınıf" bar covers everything, so it has no separate Toplam. */}
+          {(completion.layout.kind === "standard" || completion.layout.showOverall) && (
+            <DualCompletionBar label="Toplam" weekly={completion.weekly.overall} allTime={completion.allTime.overall} />
+          )}
+          {completion.layout.kind === "standard" ? (
             <>
               <DualCompletionBar label="TYT" weekly={completion.weekly.tyt} allTime={completion.allTime.tyt} />
               <DualCompletionBar label="AYT" weekly={completion.weekly.ayt} allTime={completion.allTime.ayt} />
             </>
+          ) : (
+            completion.groups.map((g) => <DualCompletionBar key={g.key} label={g.label} weekly={g.weekly} allTime={g.allTime} />)
           )}
         </section>
 

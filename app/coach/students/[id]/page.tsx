@@ -32,6 +32,7 @@ import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
 import { resolveCycles, tasksInCycle, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
+import { completionLayoutFor, groupStats, type CompletionLayout } from "@/lib/program-completion-bars";
 import type { TopicQuestionTotals } from "./_components/topic-performance-map";
 import type {
   CompletionStats,
@@ -111,10 +112,20 @@ function bucketCompletionStats(tasks: CompletionRow[]): CompletionStats {
   return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
-function computeDualCompletionStats(allTasks: CompletionRow[], today: string, currentCycle: CycleWindow): DualCompletionStats {
+function computeDualCompletionStats(
+  allTasks: CompletionRow[],
+  today: string,
+  currentCycle: CycleWindow,
+  layout: CompletionLayout,
+): DualCompletionStats {
+  const weeklyTasks = tasksInCycle(allTasks, currentCycle);
+  const allTimeTasks = allTasks.filter((t) => t.task_date <= today);
   return {
-    weekly: bucketCompletionStats(tasksInCycle(allTasks, currentCycle)),
-    allTime: bucketCompletionStats(allTasks.filter((t) => t.task_date <= today)),
+    weekly: bucketCompletionStats(weeklyTasks),
+    allTime: bucketCompletionStats(allTimeTasks),
+    // A Maarif / 7th grade / LGS student gets bars of its own cohort instead of TYT + AYT (lib/program-completion-bars.ts).
+    layout: layout.kind === "groups" ? { kind: "groups", showOverall: layout.showOverall } : { kind: "standard" },
+    groups: groupStats(layout, weeklyTasks, allTimeTasks),
   };
 }
 
@@ -541,7 +552,7 @@ async function fetchStudentDetail(studentId: string) {
     profile: profile as StudentProfile,
     maarifGrade,
     schoolExams,
-    completion: computeDualCompletionStats(tasks, today, currentCycle),
+    completion: computeDualCompletionStats(tasks, today, currentCycle, completionLayoutFor({ examType, maarifGrade })),
     subjectCompletion: computeSubjectCompletion(tasks, today, currentCycle),
     progressFrom: currentCycle.start,
     progressTo: currentCycle.end,

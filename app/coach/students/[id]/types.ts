@@ -117,6 +117,10 @@ export type CompletionStats = {
 export type DualCompletionStats = {
   weekly: CompletionStats;
   allTime: CompletionStats;
+  // Which bars the card shows (lib/program-completion-bars.ts): "standard" = Toplam + TYT + AYT as always; "groups" = the cohort's own
+  // bars below (Maarif 9 / 10 / 11, the 7th grade, LGS), with or without the Toplam bar.
+  layout: { kind: "standard" } | { kind: "groups"; showOverall: boolean };
+  groups: { key: string; label: string; weekly: number | null; allTime: number | null }[];
 };
 
 export type CompletionBucket = { pct: number | null; done: number; total: number };
