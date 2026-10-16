@@ -12,13 +12,8 @@ import { MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_KAYNAK_COURSES } from "./maarif10";
 import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
-import {
-  MAARIF9_EXAM_SUBJECTS,
-  MAARIF10_EXAM_SUBJECTS,
-  MAARIF7_EXAM_SUBJECTS,
-  TYT_SUBJECT_GROUPS,
-  coursesForMaarifTytGroup,
-} from "./subject-groups";
+import { inferAytTrackFromScores } from "./subject-groups";
+import { generalExamCourseIds, parseGeneralExamTrack } from "../general-exam-track";
 
 // Each id once: the AYT subjects shared by two fields are one course now.
 export const YKS_CURRICULUM_COURSE_IDS: string[] = [
@@ -59,15 +54,11 @@ export function curriculumCourseIdsFor(examType: ExamType, maarifGrade: number |
   return examType === "LGS" ? LGS_CURRICULUM_COURSE_IDS : YKS_CURRICULUM_COURSE_IDS;
 }
 
-// The courses ONE general exam counts toward, read from its title (a general exam has no course_id): the
-// denominator of each course's topic map. An LGS exam covers the LGS courses, a 7th/9th/10th-grade one that
-// grade's courses, anything else the TYT groups.
-export function generalExamCourseIdsForTitle(title: string): string[] {
-  if (/^LGS\b/i.test(title)) return LGS_CURRICULUM_COURSE_IDS;
-  if (/^7\.\s*SINIF\b/i.test(title)) return MAARIF7_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
-  if (/^9\.\s*SINIF\b/i.test(title)) return MAARIF9_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
-  if (/^10\.\s*SINIF\b/i.test(title)) return MAARIF10_EXAM_SUBJECTS.flatMap((s) => s.courseIds);
-  // An 11th grader's exam is TYT-structured but analysed against the merged Maarif TYT courses.
-  if (/^11\.\s*SINIF\b/i.test(title)) return TYT_SUBJECT_GROUPS.flatMap((g) => coursesForMaarifTytGroup(g.key).map((c) => c.id));
-  return TYT_SUBJECT_GROUPS.flatMap((g) => g.courseIds);
+// The courses ONE general exam counts toward, read from its title (a general exam has no course_id) -- the track comes from
+// lib/general-exam-track.ts: an LGS exam covers the LGS courses, a 7th / 9th / 10th-grade one that grade's, Maarif TYT the merged
+// Maarif TYT courses, the 11th grade's own exam its Genel Deneme courses, AYT the courses of its field, anything else the TYT ones.
+export function generalExamCourseIdsForTitle(title: string, subjectScores?: Record<string, unknown> | null): string[] {
+  const track = parseGeneralExamTrack(title, subjectScores);
+  if (track === "lgs") return LGS_CURRICULUM_COURSE_IDS;
+  return generalExamCourseIds(track, track === "ayt" ? (inferAytTrackFromScores(subjectScores) ?? "sayisal") : null);
 }

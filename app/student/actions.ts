@@ -10,7 +10,8 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { computeAutoTaskStatus, countsAreConsistent, mergeDualTaskStatus, type DualPartStatus } from "@/lib/count-fields";
 import { needsCoachApproval } from "@/lib/focus-approval";
 import { decideOpenAction } from "@/lib/focus-open-decision";
-import { fetchMaarifGrade, type GeneralExamTrack } from "@/lib/maarif-grade";
+import { fetchMaarifGrade } from "@/lib/maarif-grade";
+import { GENERAL_EXAM_TRACKS, buildGeneralExamTitle, type GeneralExamTrack } from "@/lib/general-exam-track";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { isSoruCozumuLike } from "@/lib/task-types";
 import {
@@ -1170,7 +1171,7 @@ const createRichCustomTaskSchema = z
     // mı?". Ignored for every other task type (each already has its own
     // always-pending or always-full-results shape).
     isCompleted: z.boolean().nullable().optional(),
-    generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
+    generalExamTrack: z.enum(GENERAL_EXAM_TRACKS).nullable().optional(),
     generalExamPublisher: z.string().trim().max(200).nullable().optional(),
     branchExamPublisher: z.string().trim().max(200).nullable().optional(),
     freeTitle: z.string().trim().max(200).nullable().optional(),
@@ -1224,16 +1225,7 @@ function buildRichTaskTitle(v: z.infer<typeof createRichCustomTaskSchema>): stri
   if (v.taskType === "reading") return v.bookTitle?.trim() || "Kitap Okuma";
 
   if (v.taskType === "general_exam") {
-    const prefix =
-      v.generalExamTrack === "ayt" ? "AYT"
-      : v.generalExamTrack === "lgs" ? "LGS"
-      : v.generalExamTrack === "m7" ? "7. SINIF"
-      : v.generalExamTrack === "m9" ? "9. SINIF"
-      : v.generalExamTrack === "m10" ? "10. SINIF"
-      : v.generalExamTrack === "m11" ? "11. SINIF"
-      : "TYT";
-    const pub = v.generalExamPublisher?.trim();
-    return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
+    return buildGeneralExamTitle(v.generalExamTrack, v.generalExamPublisher);
   }
 
   const course = findCourseById(v.courseId);

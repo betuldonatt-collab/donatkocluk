@@ -14,7 +14,8 @@ import {
   isBranchExamMacroCourseId,
   isLgsCourseId,
   macroSourceCourseIds,
-  macroTopicCourseId,
+  topicMapCourseId,
+  topicMapTarget,
 } from "./curriculum";
 import { generalExamTabs, type SubjectScores } from "./exam-detail";
 import { lgsSelectionNodes } from "./curriculum/lgs-selection";
@@ -119,8 +120,11 @@ function examCoverage(e: TrialExam, markedCourseIds: Set<string>): Set<string> |
   const hasScores = !!scores && Object.values(scores).some((v) => !!v);
   const covered = new Set<string>();
   for (const tab of generalExamTabs({ title: e.title, subject_scores: scores })) {
-    if (hasScores && !scores?.[tab.scoreKey]) continue;
-    for (const c of tab.courses) covered.add(c.id);
+    // With per-subject scores, only a section the student actually sat counts (a field-dependent exam -- the 11th grade's own,
+    // AYT -- leaves the other sections at 0 Doğru / 0 Yanlış, which says nothing about their topics).
+    const row = scores?.[tab.scoreKey];
+    if (hasScores && !(row && (row.correct ?? 0) + (row.wrong ?? 0) > 0)) continue;
+    for (const c of tab.courses) covered.add(topicMapCourseId(c.id));
   }
   // A course the student actually marked topics for in this exam is covered whatever the scores say.
   for (const id of markedCourseIds) covered.add(id);
@@ -149,10 +153,11 @@ export function computeGelisimHaritasi(
   const mistakesByTask = new Map<string, Map<string, Set<"wrong" | "blank">>>();
   const markedCoursesByTask = new Map<string, Set<string>>();
   for (const m of mistakeRows) {
-    // A mark on a combined exam belongs to the atomic course that owns the topic.
-    const courseId = macroTopicCourseId(m.course_id, m.topic_id) ?? m.course_id;
+    // A mark on a combined exam belongs to the atomic course that owns the topic; a mark on the 11th grade's own Genel Deneme
+    // (Tarih-1, Tarih-2 ...) to the 11th-grade Kaynak course and topic -- the maps are per SUBJECT (curriculum topicMapTarget).
+    const { courseId, topicId } = topicMapTarget(m.course_id, m.topic_id);
     const byKey = mistakesByTask.get(m.task_id) ?? new Map<string, Set<"wrong" | "blank">>();
-    const key = `${courseId}::${m.topic_id}`;
+    const key = `${courseId}::${topicId}`;
     const statuses = byKey.get(key) ?? new Set<"wrong" | "blank">();
     statuses.add(m.status ?? "wrong");
     byKey.set(key, statuses);

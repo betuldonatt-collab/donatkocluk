@@ -41,22 +41,45 @@ describe("expectedGeneralExamKeys", () => {
     expect(expectedGeneralExamKeys("AYT Genel Deneme", {})).toBeNull();
   });
 
-  it("11th grade (Maarif) has no subject data yet -- an empty list, not TYT's", () => {
-    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual([]);
+  it("Maarif TYT expects TYT's four groups; the 11th grade's own exam its four m11_ sections", () => {
+    expect(expectedGeneralExamKeys("Maarif TYT Genel Deneme - X", null)).toEqual(["turkce", "sosyal", "matematik", "fen"]);
+    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual(["m11_sosyal1", "m11_matematik", "m11_fen", "m11_sosyal2"]);
+  });
+
+  it("a legacy '11. SINIF' title whose scores are TYT-shaped is read as Maarif TYT", () => {
+    const tytShaped = { turkce: row, sosyal: row, matematik: row, fen: row };
+    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", tytShaped)).toEqual(["turkce", "sosyal", "matematik", "fen"]);
   });
 });
 
-describe("11th-grade (Maarif) general exam has no subject data yet", () => {
-  it("a non-empty submission is never flagged incomplete, since no specific subject is required yet", () => {
-    expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", { anything: row })).toBe(false);
+describe("11th-grade (Maarif) own general exam: four sections of 40 questions", () => {
+  const full = (c: number, w: number, e: number) => ({ correct: c, wrong: w, empty: e });
+  const complete = {
+    m11_sosyal1: full(20, 10, 10),
+    m11_matematik: full(0, 0, 40),
+    m11_fen: full(0, 0, 40),
+    m11_sosyal2: full(0, 0, 40),
+  };
+
+  it("needs all four sections (an unsolved one is entered as 0 / 0 / 40)", () => {
+    expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", complete)).toBe(false);
+    const missing = { ...complete } as Record<string, unknown>;
+    delete missing.m11_fen;
+    expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", missing as never)).toBe(true);
   });
 
-  it("still rejects a wholly empty submission (the same blanket rule every track uses)", () => {
+  it("still rejects a wholly empty submission", () => {
     expect(isGeneralExamScoresIncomplete("11. SINIF Genel Deneme", {})).toBe(true);
   });
 
-  it("never reports a question-count mismatch, since no fixed count exists yet", () => {
-    expect(findGeneralExamTotalMismatch("11. SINIF Genel Deneme", { matematik: row })).toBeNull();
+  it("holds each section to its 40 questions and names the section", () => {
+    expect(findGeneralExamTotalMismatch("11. SINIF Genel Deneme", complete)).toBeNull();
+    expect(findGeneralExamTotalMismatch("11. SINIF Genel Deneme", { ...complete, m11_sosyal2: full(10, 10, 10) })).toEqual({ label: "Sosyal Bilimler 2", questions: 40 });
+  });
+
+  it("Maarif TYT keeps TYT's section sizes (Fen 20, Türkçe 40)", () => {
+    expect(findGeneralExamTotalMismatch("Maarif TYT Genel Deneme", { fen: full(10, 5, 5) })).toBeNull();
+    expect(findGeneralExamTotalMismatch("Maarif TYT Genel Deneme", { fen: full(10, 5, 10) })).toEqual({ label: "Fen Bilimleri", questions: 20 });
   });
 });
 

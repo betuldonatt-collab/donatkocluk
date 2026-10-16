@@ -1,12 +1,5 @@
-import {
-  AYT_SUBJECT_GROUPS_BY_TRACK,
-  LGS_EXAM_SUBJECTS,
-  MAARIF7_EXAM_SUBJECTS,
-  MAARIF9_EXAM_SUBJECTS,
-  MAARIF10_EXAM_SUBJECTS,
-  TYT_SUBJECT_GROUPS,
-  inferAytTrackFromScores,
-} from "./curriculum/subject-groups";
+import { inferAytTrackFromScores } from "./curriculum/subject-groups";
+import { generalExamSections, parseGeneralExamTrack } from "./general-exam-track";
 
 // "Sonuç girişi" rules shared by every Genel Deneme / Branş Denemesi entry
 // form (student task modal, student Ek Çalışma dialog, coach Sonuçları Gir)
@@ -41,35 +34,23 @@ export function anyBlankScore(values: Filled[]): boolean {
 
 type SubjectScore = { correct?: Filled; wrong?: Filled; empty?: Filled };
 
-// A general exam's title is the only place its track lives (no course_id) --
-// same convention every panel parses.
-function examTrackFromTitle(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" | "m11" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^11\.\s*SINIF\b/i.test(title)) return "m11";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
+// A general exam's title is the only place its track lives (no course_id); lib/general-exam-track.ts parses it for every panel.
+// The sections an exam of that track is scored in (and their question counts) come from the same file.
+function sectionsOfExam(title: string, scores: Record<string, unknown> | null | undefined) {
+  const track = parseGeneralExamTrack(title, scores);
+  if (track === "ayt") {
+    const aytTrack = inferAytTrackFromScores(scores);
+    return aytTrack ? generalExamSections("ayt", aytTrack) : null;
+  }
+  return generalExamSections(track, null);
 }
 
 // The subject keys a general exam of this track must carry a full row for.
 // null = can't tell (an AYT exam whose alan hasn't been chosen / can't be
 // inferred from the scores), in which case only the rows that ARE present
-// are checked. "m11" has no exam-subject data yet (no 11th-grade Genel
-// Deneme curriculum exists) -- an empty list, same effect as null's
-// fallback (isGeneralExamScoresIncomplete never flags a missing subject
-// that was never required in the first place) without pretending TYT's
-// own subject list applies to an 11th grader's exam.
+// are checked. Maarif TYT needs TYT's four sections, the 11th grade's own exam its four sections of 40.
 export function expectedGeneralExamKeys(title: string, scores: Record<string, unknown> | null | undefined): string[] | null {
-  const track = examTrackFromTitle(title);
-  if (track === "lgs") return LGS_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m9") return MAARIF9_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m10") return MAARIF10_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m7") return MAARIF7_EXAM_SUBJECTS.map((s) => s.key);
-  if (track === "m11") return []; // no exam-subject data yet
-  if (track === "tyt") return TYT_SUBJECT_GROUPS.map((g) => g.key);
-  const aytTrack = inferAytTrackFromScores(scores);
-  return aytTrack ? AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => g.key) : null;
+  return sectionsOfExam(title, scores)?.map((s) => s.key) ?? null;
 }
 
 // True when a submitted per-subject Genel Deneme result is NOT complete: a
@@ -96,16 +77,7 @@ function questionsForGeneralExamKey(
   key: string,
   scores: Record<string, unknown> | null | undefined,
 ): number | null {
-  const track = examTrackFromTitle(title);
-  if (track === "lgs") return LGS_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m9") return MAARIF9_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m10") return MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m7") return MAARIF7_EXAM_SUBJECTS.find((s) => s.key === key)?.questions ?? null;
-  if (track === "m11") return null; // no fixed per-subject question counts yet
-  if (track === "tyt") return TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.questions ?? null;
-  const aytTrack = inferAytTrackFromScores(scores);
-  if (!aytTrack) return null;
-  return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].find((g) => g.key === key)?.questions ?? null;
+  return sectionsOfExam(title, scores)?.find((s) => s.key === key)?.questions ?? null;
 }
 
 // The client auto-derives Boş from Doğru/Yanlış (see task-modal.tsx /
@@ -128,19 +100,7 @@ export function findGeneralExamTotalMismatch(
     if (questions === null) continue;
     const sum = Number(s.correct) + Number(s.wrong) + Number(s.empty);
     if (sum !== questions) {
-      const track = examTrackFromTitle(title);
-      const label =
-        track === "lgs"
-          ? LGS_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
-          : track === "m7"
-            ? MAARIF7_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
-          : track === "m10"
-            ? MAARIF10_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
-            : track === "m9"
-            ? MAARIF9_EXAM_SUBJECTS.find((s2) => s2.key === key)?.label
-            : track === "tyt"
-            ? TYT_SUBJECT_GROUPS.find((g) => g.key === key)?.label
-            : AYT_SUBJECT_GROUPS_BY_TRACK[inferAytTrackFromScores(scores)!].find((g) => g.key === key)?.label;
+      const label = sectionsOfExam(title, scores)?.find((s2) => s2.key === key)?.label;
       return { label: label ?? key, questions };
     }
   }

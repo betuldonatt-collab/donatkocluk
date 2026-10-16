@@ -3,7 +3,7 @@ import { logPerf, startPerf } from "@/lib/perf-log";
 import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
 import { getAuthUser } from "@/lib/supabase/session";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { lgsNetChart, maarif7NetChart, netChartFor, parseGeneralExamTrack, type ParentGeneralExam } from "@/lib/parent-net-charts";
+import { lgsNetChart, maarif7NetChart, maarif11NetChart, netChartFor, parseGeneralExamTrack, type ParentGeneralExam } from "@/lib/parent-net-charts";
 import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
@@ -161,8 +161,10 @@ async function fetchDashboardData() {
   const weekStat = sumWeekStats((dailyStatsRows ?? []).map((r) => ({ total: r.total_count })));
 
   const exams = (examRows ?? []) as ParentGeneralExam[];
-  const tytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "tyt"));
-  const aytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title) === "ayt"));
+  const tytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title, e.subject_scores) === "tyt"));
+  const aytNetChartData = netChartFor(exams.filter((e) => parseGeneralExamTrack(e.title, e.subject_scores) === "ayt"));
+  // The 11th grade's own Genel Deneme (Maarif 11. Sınıf) has a chart of its own, shown once there is one.
+  const maarif11NetChartData = maarif11NetChart(exams);
   // Only exams with a complete, valid result set reach the chart (lib/parent-net-charts.ts).
   const lgsNetChartData = lgsNetChart(exams);
   // A 7th grader's parent gets the 7th grade's own chart (3:1) instead of the empty TYT/AYT ones.
@@ -195,6 +197,7 @@ async function fetchDashboardData() {
     aytNetChartData,
     lgsNetChartData,
     maarif7NetChartData,
+    maarif11NetChartData,
     isMaarif7: profile.is_maarif7 === true,
     examType: (profile.exam_type ?? "YKS") as "YKS" | "LGS",
     // LGS-style program view (Dün/Bugün/Yarın bars, Tam Program): LGS students and 7th graders.
@@ -233,6 +236,7 @@ export default async function ParentPage() {
     aytNetChartData,
     lgsNetChartData,
     maarif7NetChartData,
+    maarif11NetChartData,
     isMaarif7,
     examType,
     programView,
@@ -327,6 +331,17 @@ export default async function ParentPage() {
               <LineChart data={aytNetChartData} />
             </CardContent>
           </Card>
+          {maarif11NetChartData.length > 0 && (
+            <Card className="sm:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base">Maarif 11. Sınıf Genel Deneme</CardTitle>
+                <CardDescription>Tüm derslerin toplamı üzerinden net değişimi (160 soru)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LineChart data={maarif11NetChartData} />
+              </CardContent>
+            </Card>
+          )}
         </div>
         )}
 

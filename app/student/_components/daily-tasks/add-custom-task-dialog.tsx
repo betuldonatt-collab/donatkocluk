@@ -23,7 +23,13 @@ import { isSoruCozumuLike } from "@/lib/task-types";
 import { TopicGroupSelect } from "@/components/topic-group-select";
 import { mainTopicOptions, mainValueOf } from "@/lib/curriculum/topic-groups";
 import type { StudentTask } from "./types";
-import { MAARIF_GRADES, maarif11AssignableCourses, maarif11CourseOptions, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarif11AssignableCourses, maarif11CourseOptions, maarifCourseOptions, type MaarifGrade } from "@/lib/maarif-grade";
+import {
+  GENERAL_EXAM_TRACK_LABELS,
+  MAARIF_GENERAL_EXAM_TRACKS,
+  defaultMaarifGeneralExamTrack,
+  type GeneralExamTrack,
+} from "@/lib/general-exam-track";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
 
@@ -110,7 +116,7 @@ function initialFormState(examType: ExamType, maarifGrade: MaarifGrade | null = 
     emptyCount: "",
     durationMinutes: "",
     isCompleted: false,
-    generalExamTrack: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].track : examType === "LGS" ? "lgs" : "tyt",
+    generalExamTrack: maarifGrade !== null ? defaultMaarifGeneralExamTrack(maarifGrade) : examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     freeTitle: "",
     freeDescription: "",
@@ -196,7 +202,13 @@ export function AddCustomTaskDialog({
   const isMaarif9 = maarifGrade !== null;
   // An 11th grader may also pick the "Maarif TYT" courses (lib/maarif-grade.ts); every other grade only its own.
   const gradeCourses = maarifGrade === 11 ? maarif11AssignableCourses() : maarifGrade !== null ? MAARIF_GRADES[maarifGrade].courses : [];
-  const singleGeneralExamFormat = isLgs || isMaarif9;
+  // LGS and the 7th grade have one Genel Deneme format; a 9th / 10th / 11th grader chooses between the four Maarif exams (Maarif TYT,
+  // 11., 10., 9. Sınıf), everyone else between TYT and AYT.
+  const maarifChoosesExam = maarifGrade === 9 || maarifGrade === 10 || maarifGrade === 11;
+  const singleGeneralExamFormat = isLgs || (isMaarif9 && !maarifChoosesExam);
+  const generalExamTrackOptions: { value: GeneralExamTrack; label: string }[] = maarifChoosesExam
+    ? MAARIF_GENERAL_EXAM_TRACKS.map((t) => ({ value: t, label: GENERAL_EXAM_TRACK_LABELS[t] }))
+    : [...GENERAL_EXAM_TRACK_OPTIONS];
   const [value, setValue] = useState<FormState>(() => initialFormState(examType, maarifGrade));
   const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
   const [saving, setSaving] = useState(false);
@@ -557,8 +569,8 @@ export function AddCustomTaskDialog({
                 {!singleGeneralExamFormat && (
                 <div className="space-y-1.5">
                   <Label>Sınav Türü</Label>
-                  <div className="flex gap-1.5">
-                    {GENERAL_EXAM_TRACK_OPTIONS.map((opt) => (
+                  <div className={maarifChoosesExam ? "grid grid-cols-2 gap-1.5" : "flex gap-1.5"}>
+                    {generalExamTrackOptions.map((opt) => (
                       <button
                         key={opt.value}
                         type="button"

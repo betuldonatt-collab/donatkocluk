@@ -5,39 +5,23 @@
 // a Genel Deneme) and its subject_scores keys -- so the popup needs no student context and shows an exam the same way
 // whoever opens it.
 import type { Course } from "./curriculum";
-import {
-  AYT_SUBJECT_GROUPS_BY_TRACK,
-  LGS_EXAM_SUBJECTS,
-  TYT_SUBJECT_GROUPS,
-  type SubjectGroupKey,
-  coursesForAytGroup,
-  coursesForGroup,
-  coursesForLgsExamSubject,
-  coursesForMaarifTytGroup,
-  inferAytTrackFromScores,
-} from "./curriculum/subject-groups";
-import { MAARIF_GRADES, isMaarif11GeneralExamTitle } from "./maarif-grade";
+import { coursesForExamSection, generalExamSections, parseGeneralExamTrack, usesLgsNet, type GeneralExamTrack } from "./general-exam-track";
+import { inferAytTrackFromScores } from "./curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "./scoring";
 
 export type SubjectScores = Record<string, { correct: number | null; wrong: number | null; empty: number | null } | undefined>;
 
-export type ExamTrack = "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" | "m11";
+export type ExamTrack = GeneralExamTrack;
 
 // General-exam tasks have no course_id -- the track lives only in the title text ("TYT Genel Deneme - ...",
-// "9. SINIF Genel Deneme - ...", "LGS ...").
-export function examTrackOf(title: string): ExamTrack {
-  const t = title.toUpperCase();
-  if (/^7\.\s*SINIF\b/.test(t)) return "m7";
-  if (/^9\.\s*SINIF\b/.test(t)) return "m9";
-  if (/^10\.\s*SINIF\b/.test(t)) return "m10";
-  if (isMaarif11GeneralExamTitle(title)) return "m11";
-  if (t.startsWith("LGS")) return "lgs";
-  return t.startsWith("AYT") ? "ayt" : "tyt";
+// "Maarif TYT Genel Deneme - ...", "9. SINIF Genel Deneme - ...", "LGS ..."); see lib/general-exam-track.ts.
+export function examTrackOf(title: string, subjectScores?: Record<string, unknown> | null): ExamTrack {
+  return parseGeneralExamTrack(title, subjectScores);
 }
 
 // LGS and the 7th grade lose a right answer per 3 wrong; every other exam per 4.
 export function netFunctionFor(track: ExamTrack): (correct: number, wrong: number) => number {
-  return track === "lgs" || track === "m7" ? computeLgsNet : computeNet;
+  return usesLgsNet(track) ? computeLgsNet : computeNet;
 }
 
 export type ExamSubjectTab = {
@@ -50,37 +34,15 @@ export type ExamSubjectTab = {
 };
 
 export function generalExamTabs(exam: { title: string; subject_scores: SubjectScores | null }): ExamSubjectTab[] {
-  const track = examTrackOf(exam.title);
-  switch (track) {
-    case "m11":
-      // A TYT-structured exam whose topics are the 9th and 10th grade curricula.
-      return TYT_SUBJECT_GROUPS.map((g) => ({ key: g.key, label: g.label, scoreKey: g.key, courses: coursesForMaarifTytGroup(g.key) }));
-    case "m7":
-    case "m9":
-    case "m10": {
-      const cfg = MAARIF_GRADES[track === "m7" ? 7 : track === "m9" ? 9 : 10];
-      return cfg.examSubjects.map((s) => ({ key: s.key, label: s.label, scoreKey: s.key, courses: cfg.coursesForExamSubject(s.key) }));
-    }
-    case "lgs":
-      return LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, scoreKey: s.key, courses: coursesForLgsExamSubject(s.key) }));
-    case "ayt": {
-      // AYT keeps its track (Sayısal / EA / Sözel) only in which score keys are present.
-      const aytTrack = inferAytTrackFromScores(exam.subject_scores) ?? "sayisal";
-      return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack].map((g) => ({
-        key: g.key,
-        label: g.label,
-        scoreKey: g.key,
-        courses: coursesForAytGroup(aytTrack, g.key),
-      }));
-    }
-    default:
-      return TYT_SUBJECT_GROUPS.map((g) => ({
-        key: g.key,
-        label: g.label,
-        scoreKey: g.key,
-        courses: coursesForGroup(g.key as SubjectGroupKey),
-      }));
-  }
+  const track = examTrackOf(exam.title, exam.subject_scores);
+  // AYT keeps its field (Sayısal / EA / Sözel) only in which score keys are present.
+  const aytTrack = track === "ayt" ? (inferAytTrackFromScores(exam.subject_scores) ?? "sayisal") : null;
+  return generalExamSections(track, aytTrack).map((s) => ({
+    key: s.key,
+    label: s.label,
+    scoreKey: s.key,
+    courses: coursesForExamSection(track, aytTrack, s.key),
+  }));
 }
 
 export type ScoreSummary = { correct: number; wrong: number; empty: number; net: number };
@@ -120,10 +82,10 @@ export function comparableGeneralExams<T extends { id: string; title: string; ta
   all: T[],
   focus: T,
 ): T[] {
-  const track = examTrackOf(focus.title);
+  const track = examTrackOf(focus.title, focus.subject_scores);
   const aytTrack = (e: T) => inferAytTrackFromScores(e.subject_scores) ?? "sayisal";
   return all
-    .filter((e) => e.task_type === "general_exam" && examTrackOf(e.title) === track && (track !== "ayt" || aytTrack(e) === aytTrack(focus)))
+    .filter((e) => e.task_type === "general_exam" && examTrackOf(e.title, e.subject_scores) === track && (track !== "ayt" || aytTrack(e) === aytTrack(focus)))
     .slice()
     .sort((a, b) => b.task_date.localeCompare(a.task_date) || a.id.localeCompare(b.id));
 }

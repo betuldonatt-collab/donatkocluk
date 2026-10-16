@@ -294,17 +294,28 @@ describe("the exam overview: high level only", () => {
     expect(s.exams.groups[0].branches).toEqual([{ key: "lgs_matematik", label: expect.any(String), averageNet: computeLgsNet(15, 6), questions: 20 }]);
   });
 
-  it("an 11th grader's TYT-structured exam carries its own name", () => {
+  it("an 11th grader's TYT-structured exam carries its own name: Maarif TYT (also for a legacy '11. SINIF' title with TYT-shaped scores)", () => {
+    const legacy = computeKarneSummary({
+      rangeStart: RANGE.start,
+      rangeEnd: RANGE.end,
+      today: TODAY,
+      now: NOW,
+      tasks: [task({ task_date: "2026-10-12", task_type: "general_exam", title: "11. SINIF Genel Deneme - X", subject_scores: { turkce: { correct: 10, wrong: 2, empty: 0 } } })],
+      events: [],
+      maarifGrade: 11,
+    });
+    expect(legacy.exams.groups[0].label).toBe("Maarif TYT Genel Deneme");
     const s = computeKarneSummary({
       rangeStart: RANGE.start,
       rangeEnd: RANGE.end,
       today: TODAY,
       now: NOW,
-      tasks: [task({ task_date: "2026-10-12", task_type: "general_exam", title: "TYT Genel Deneme 1", subject_scores: { turkce: { correct: 10, wrong: 2, empty: 0 } } })],
+      tasks: [task({ task_date: "2026-10-12", task_type: "general_exam", title: "Maarif TYT Genel Deneme - X", subject_scores: { turkce: { correct: 10, wrong: 2, empty: 0 } } })],
       events: [],
       maarifGrade: 11,
     });
-    expect(s.exams.groups[0].label).toBe("11. Sınıf Genel Deneme");
+    expect(s.exams.groups[0].label).toBe("Maarif TYT Genel Deneme");
+    expect(s.exams.groups[0].key).toBe("mtyt");
   });
 
   it("no exam in the period: no groups (the document says so instead of showing zeros)", () => {

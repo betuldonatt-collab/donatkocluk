@@ -16,7 +16,7 @@ import lgsJson from "./lgs.json";
 
 import { MAARIF9_GENEL_DENEME_COURSES, MAARIF9_KAYNAK_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES, MAARIF10_KAYNAK_COURSES } from "./maarif10";
-import { MAARIF11_KAYNAK_COURSES } from "./maarif11";
+import { MAARIF11_GENEL_DENEME_COURSES, MAARIF11_KAYNAK_COURSES, maarif11GdOrigin, maarif11GdSourceCourseId } from "./maarif11";
 import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { lgsSelectionNodes } from "./lgs-selection";
@@ -270,6 +270,22 @@ export function macroSourceCourseIds(courseId: string | null | undefined): strin
   return (courseId && MACRO_SOURCE_COURSE_IDS.get(courseId)) || [];
 }
 
+// The (course, topic) a stored mark counts for in the PER-SUBJECT topic maps (Gelişim Haritası, Konu Performans Haritası, Aylık Karne):
+//  - a mark on a combined ("macro") Branş exam folds onto the atomic course that owns the topic (same topic id);
+//  - a mark on the 11th grade's own Genel Deneme ("maarif11-gd-tarih-2" ...) folds onto the 11th-grade Kaynak course and topic
+//    ("maarif11-tarih"), so Tarih-1 and Tarih-2 marks of one exam are one subject's marks there;
+//  - anything else is its own target.
+export function topicMapTarget(courseId: string, topicId: string): { courseId: string; topicId: string } {
+  const macro = macroTopicCourseId(courseId, topicId);
+  if (macro) return { courseId: macro, topicId };
+  return maarif11GdOrigin(courseId, topicId) ?? { courseId, topicId };
+}
+
+// The course an exam that covers `courseId` is a trial of in the per-subject maps (the same folding, for coverage).
+export function topicMapCourseId(courseId: string): string {
+  return maarif11GdSourceCourseId(courseId) ?? courseId;
+}
+
 // The atomic course a mark made on a macro exam belongs to: ("tyt-fen-macro", "tyt-fizik-u0-t0") -> "tyt-fizik". Null when the
 // course is not a macro or the topic is not one of its own.
 export function macroTopicCourseId(macroCourseId: string, topicId: string): string | null {
@@ -299,6 +315,7 @@ function findMaarif9Course(courseId: string): Course | null {
     MAARIF10_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
     MAARIF11_KAYNAK_COURSES.find((c) => c.id === courseId) ??
+    MAARIF11_GENEL_DENEME_COURSES.find((c) => c.id === courseId) ??
     MAARIF7_KAYNAK_COURSES.find((c) => c.id === courseId) ??
     MAARIF_TYT_MERGED_COURSES.find((c) => c.id === courseId) ??
     null

@@ -4,7 +4,7 @@ import { findCourseById } from "./curriculum";
 import { MAARIF10_EXAM_QUESTION_TOTAL, MAARIF10_EXAM_SUBJECTS, coursesForMaarif10ExamSubject } from "./curriculum/subject-groups";
 import { expectedGeneralExamKeys, findGeneralExamTotalMismatch, isGeneralExamScoresIncomplete } from "./exam-results-validation";
 import { taskWeight } from "./effort-weight";
-import { MAARIF_GRADES, gradeFromFlags, gradeOfTrack, isMaarif11GeneralExamTitle, stripGradePrefix } from "./maarif-grade";
+import { MAARIF_GRADES, gradeFromFlags, gradeOfTrack, stripGradePrefix } from "./maarif-grade";
 import { subjectBackgroundClass } from "./subject-colors";
 import { validatePipelineStep } from "./topic-pipeline";
 
@@ -57,13 +57,14 @@ describe("grade separation (9th vs 10th)", () => {
     expect(stripGradePrefix("10. Sınıf Din Kültürü ve Ahlak Bilgisi")).toBe("Din Kültürü ve Ahlak Bilgisi");
   });
 
-  it("11th grade has its own Kaynak Takibi courses but no Genel Deneme subjects, and resolves safely for both", () => {
+  it("11th grade has its own Kaynak Takibi courses and its own Genel Deneme (four sections of 40), and resolves safely for both", () => {
     expect(MAARIF_GRADES[11].courses.length).toBeGreaterThan(0);
     for (const c of MAARIF_GRADES[11].courses) expect(c.id.startsWith("maarif11-")).toBe(true);
-    expect(MAARIF_GRADES[11].examSubjects).toEqual([]);
+    expect(MAARIF_GRADES[11].examSubjects.map((s) => s.key)).toEqual(["m11_sosyal1", "m11_matematik", "m11_fen", "m11_sosyal2"]);
     expect(MAARIF_GRADES[11].isCourseId("maarif11-matematik")).toBe(true);
     expect(MAARIF_GRADES[11].isCourseId("maarif9-matematik")).toBe(false);
     expect(MAARIF_GRADES[11].coursesForExamSubject("anything")).toEqual([]);
+    expect(MAARIF_GRADES[11].coursesForExamSubject("m11_fen").map((c) => c.id)).toEqual(["maarif11-gd-fizik", "maarif11-gd-kimya", "maarif11-gd-biyoloji"]);
   });
 
   it("findCourseById resolves both grades' stored courses", () => {
@@ -137,12 +138,3 @@ describe("10th-grade colours and effort weights reuse the existing rules", () =>
   });
 });
 
-describe("isMaarif11GeneralExamTitle", () => {
-  it("recognises an 11th grader Genel Deneme, and only that", () => {
-    expect(isMaarif11GeneralExamTitle("11. SINIF Genel Deneme - 3D Yayınları")).toBe(true);
-    expect(isMaarif11GeneralExamTitle("11.SINIF Genel Deneme")).toBe(true);
-    expect(isMaarif11GeneralExamTitle("10. SINIF Genel Deneme - 3D Yayınları")).toBe(false);
-    expect(isMaarif11GeneralExamTitle("TYT Genel Deneme - 3D Yayınları")).toBe(false);
-    expect(isMaarif11GeneralExamTitle("AYT Genel Deneme")).toBe(false);
-  });
-});

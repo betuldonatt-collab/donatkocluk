@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react";
 
 import { BranchExamComparisonView, ExamComparisonView } from "@/components/exam-comparison-view";
 import { comparableBranchExams, comparableGeneralExams, examTrackOf } from "@/lib/exam-detail";
+import { GENERAL_EXAM_TRACK_LABELS } from "@/lib/general-exam-track";
 import { findCourseById } from "@/lib/curriculum";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,7 +47,7 @@ export function ExamDetailDialog({
   const isGeneral = exam.task_type === "general_exam";
   const compared = isGeneral ? comparableGeneralExams(allGeneralExams, exam) : comparableBranchExams(allBranchExams, exam, isInRange);
   const branchCourse = isGeneral ? null : findCourseById(exam.course_id);
-  const trackLabel = { tyt: "TYT", ayt: "AYT", lgs: "LGS", m7: "7. Sınıf", m9: "9. Sınıf", m10: "10. Sınıf", m11: "11. Sınıf" }[examTrackOf(exam.title)];
+  const trackLabel = GENERAL_EXAM_TRACK_LABELS[examTrackOf(exam.title, exam.subject_scores)];
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

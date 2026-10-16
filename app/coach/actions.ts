@@ -45,7 +45,8 @@ import {
   type KarneTopicRow,
   type NetSummary,
 } from "@/lib/karne";
-import { fetchMaarifGrade, fetchMaarifGradesByIds, type GeneralExamTrack } from "@/lib/maarif-grade";
+import { fetchMaarifGrade, fetchMaarifGradesByIds } from "@/lib/maarif-grade";
+import { GENERAL_EXAM_TRACKS, buildGeneralExamTitle, parseGeneralExamTrack, type GeneralExamTrack } from "@/lib/general-exam-track";
 import {
   pipelineConfigFor,
   pipelineStepSchema,
@@ -91,22 +92,8 @@ function buildTaskTitle(courseId: string | null | undefined, topicId: string | n
   return topic ? `${name} — ${topic.name}` : name;
 }
 
-// "Genel Deneme" has no course/topic at all -- per the coach's request,
-// the TYT/AYT track and publisher live only in the title text (no new
-// columns), e.g. "TYT Genel Deneme - 3D Yayınları".
-function buildGeneralExamTitle(track: GeneralExamTrack | null | undefined, publisher: string | null | undefined): string {
-  // "m9"/"m10"/"m11" = Nth grade (Maarif) Genel Deneme; parsed back by
-  // /^N\.\s*SINIF\b/ everywhere. "m11" has no exam-subject data yet
-  // (MAARIF_GRADES[11].examSubjects is still empty) so this title can be
-  // built but the form behind it has nothing to validate against until
-  // that curriculum content exists -- building a correct, non-misleading
-  // title now is still worth it on its own (never silently mislabel an
-  // 11th grader's exam as "TYT").
-  const prefix =
-    track === "ayt" ? "AYT" : track === "lgs" ? "LGS" : track === "m7" ? "7. SINIF" : track === "m9" ? "9. SINIF" : track === "m10" ? "10. SINIF" : track === "m11" ? "11. SINIF" : "TYT";
-  const pub = publisher?.trim();
-  return pub ? `${prefix} Genel Deneme - ${pub}` : `${prefix} Genel Deneme`;
-}
+// "Genel Deneme" has no course/topic at all -- per the coach's request, the track and publisher live only in the title text (no new
+// columns), e.g. "TYT Genel Deneme - 3D Yayınları" / "Maarif TYT Genel Deneme - X". Built and parsed in lib/general-exam-track.ts.
 
 // Same "no new column, publisher lives in the title text" convention as
 // buildGeneralExamTitle, applied on top of the normal course+topic title --
@@ -1362,7 +1349,7 @@ const assignTaskInputSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
+  generalExamTrack: z.enum(GENERAL_EXAM_TRACKS).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -1589,7 +1576,7 @@ const updateAssignedTaskSchema = z.object({
   totalCount: z.number().int().min(0).max(10000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).nullable().optional(),
   videoLinks: z.array(videoLinkSchema).optional(),
-  generalExamTrack: z.enum(["tyt", "ayt", "lgs", "m7", "m9", "m10", "m11"]).nullable().optional(),
+  generalExamTrack: z.enum(GENERAL_EXAM_TRACKS).nullable().optional(),
   generalExamPublisher: z.string().trim().max(200).nullable().optional(),
   branchExamPublisher: z.string().trim().max(200).nullable().optional(),
   bookTitle: z.string().trim().max(300).nullable().optional(),
@@ -3109,7 +3096,7 @@ export async function saveCoachTrialResults(
     }
     // Which six subjects the rows must cover: the 7th grade's Genel Deneme ("7. SINIF Genel Deneme ...") has its
     // own keys (m7_*), every other per-subject exam is the LGS one.
-    const isMaarif7Exam = /^7\.\s*SINIF\b/i.test(String(existing.title ?? ""));
+    const isMaarif7Exam = parseGeneralExamTrack(String(existing.title ?? "")) === "m7";
     const normalized = isMaarif7Exam ? normalizeLgsScores(inputV.subjectScores, MAARIF7_EXAM_SUBJECTS) : normalizeLgsScores(inputV.subjectScores);
     if (!normalized.ok) return { ok: false, error: normalized.error };
     lgs = normalized;

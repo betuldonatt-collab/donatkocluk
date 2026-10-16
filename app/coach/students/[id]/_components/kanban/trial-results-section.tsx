@@ -11,25 +11,10 @@ import { Label } from "@/components/ui/label";
 import { LgsExamScoreGrid, emptyLgsInputs, lgsInputsIncomplete, lgsOverCapSubject } from "@/components/lgs-exam-score-grid";
 import { autoCalcMissingField, countsAreConsistent } from "@/lib/count-fields";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
-import { isMaarif11GeneralExamTitle } from "@/lib/maarif-grade";
+import { coursesForExamSection, generalExamSections, parseGeneralExamTrack } from "@/lib/general-exam-track";
 import { cn } from "@/lib/utils";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
-import {
-  AYT_SUBJECT_GROUPS_BY_TRACK,
-  LGS_SUBJECT_GROUPS,
-  TYT_SUBJECT_GROUPS,
-  MAARIF7_EXAM_SUBJECTS,
-  MAARIF9_EXAM_SUBJECTS,
-  MAARIF10_EXAM_SUBJECTS,
-  coursesForMaarif10ExamSubject,
-  coursesForMaarif7ExamSubject,
-  coursesForMaarif9ExamSubject,
-  coursesForAytGroup,
-  coursesForGroup,
-  coursesForMaarifTytGroup,
-  coursesForLgsGroup,
-  inferAytTrackFromScores,
-} from "@/lib/curriculum/subject-groups";
+import { LGS_SUBJECT_GROUPS, coursesForLgsGroup, inferAytTrackFromScores } from "@/lib/curriculum/subject-groups";
 import { getTaskTopicMistakesForCoach, saveCoachTrialResults } from "../../../../actions";
 import type { DetailTask } from "../../types";
 import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selector";
@@ -50,44 +35,6 @@ import { TopicMistakeSelector, type TopicMistake } from "./topic-mistake-selecto
 // reaching the coach as raw framework output.
 function friendlySaveError(e: unknown): string {
   return friendlyError(e, "Kaydedilemedi ya da sonuç belirsiz kaldı. Listeye dönüp bu denemenin hâlâ \"Analiz Bekliyor\" durumunda olup olmadığını kontrol et, gerekirse tekrar dene.");
-}
-
-// Mirrors task-modal.tsx's own parseGeneralExamTitle track-recovery
-// (duplicated, not imported -- that lives under app/student).
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
-}
-
-function subjectGroupsFor(examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10", aytTrack: Track | null) {
-  if (examTrack === "lgs") return LGS_SUBJECT_GROUPS;
-  if (examTrack === "m7") return MAARIF7_EXAM_SUBJECTS;
-  if (examTrack === "m9") return MAARIF9_EXAM_SUBJECTS;
-  if (examTrack === "m10") return MAARIF10_EXAM_SUBJECTS;
-  if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
-  if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
-  return [];
-}
-
-// `maarif11`: an 11th grader's Genel Deneme -- scored as TYT, but analysed
-// against the merged 9th+10th "Maarif TYT" courses (see subject-groups.ts).
-function coursesForActiveGroup(
-  examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10",
-  aytTrack: Track | null,
-  key: string,
-  maarif11 = false,
-): Course[] {
-  if (examTrack === "tyt" && maarif11) return coursesForMaarifTytGroup(key);
-  if (examTrack === "lgs") return coursesForLgsGroup(key);
-  if (examTrack === "m7") return coursesForMaarif7ExamSubject(key);
-  if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
-  if (examTrack === "m10") return coursesForMaarif10ExamSubject(key);
-  if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
-  if (aytTrack) return coursesForAytGroup(aytTrack, key);
-  return [];
 }
 
 // The browser's own `min={0}` on a number input only blocks the spinner
@@ -154,7 +101,7 @@ export function TrialResultsSection({
   // Set once a save was refused for a blank Doğru/Yanlış/Boş box.
   const [showMissingScores, setShowMissingScores] = useState(false);
 
-  const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
+  const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title, task.subject_scores) : "tyt";
   // The LGS and the 7th-grade Genel Deneme get the same per-subject Sözel/Sayısal form as the student's
   // (LgsExamScoreGrid, its "lgs" / "maarif7" variants); every other exam keeps the one overall D/Y/B entry.
   const isGridGeneral = task.task_type === "general_exam" && (examTrack === "lgs" || examTrack === "m7");
@@ -183,12 +130,13 @@ export function TrialResultsSection({
   }, [studentId, task.id]);
 
   const branchCourse = task.task_type === "branch_exam" ? findCourseById(task.course_id) : null;
-  const activeGroups = task.task_type === "general_exam" ? subjectGroupsFor(examTrack, aytTrack) : [];
+  // The sections and their courses come from lib/general-exam-track.ts for every track (the LGS exam keeps its two real sessions here).
+  const activeGroups = task.task_type === "general_exam" ? (examTrack === "lgs" ? LGS_SUBJECT_GROUPS : generalExamSections(examTrack, aytTrack)) : [];
 
   const analysisGroups: { label: string; courses: Course[] }[] =
     task.task_type === "general_exam"
       ? activeGroups
-          .map((g) => ({ label: g.label, courses: coursesForActiveGroup(examTrack, aytTrack, g.key, isMaarif11GeneralExamTitle(task.title)) }))
+          .map((g) => ({ label: g.label, courses: examTrack === "lgs" ? coursesForLgsGroup(g.key) : coursesForExamSection(examTrack, aytTrack, g.key) }))
           .filter((g) => g.courses.length > 0)
       : branchCourse
         ? [{ label: branchCourse.name, courses: [branchCourse] }]

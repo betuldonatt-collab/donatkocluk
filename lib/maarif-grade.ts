@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { courseDisplayName, type Course } from "./curriculum";
 import { MAARIF_TYT_MERGED_COURSES } from "./curriculum/maarif-tyt";
+import type { GeneralExamTrack } from "./general-exam-track";
 import { MAARIF7_KAYNAK_COURSES, isMaarif7CourseId } from "./curriculum/maarif7";
 import { MAARIF9_KAYNAK_COURSES, isMaarif9CourseId } from "./curriculum/maarif9";
 import { MAARIF10_KAYNAK_COURSES, isMaarif10CourseId } from "./curriculum/maarif10";
@@ -11,9 +12,11 @@ import {
   MAARIF7_SUBJECT_GROUPS,
   MAARIF9_EXAM_SUBJECTS,
   MAARIF10_EXAM_SUBJECTS,
+  MAARIF11_EXAM_SUBJECTS,
   coursesForMaarif7ExamSubject,
   coursesForMaarif9ExamSubject,
   coursesForMaarif10ExamSubject,
+  coursesForMaarif11ExamSubject,
 } from "./curriculum/subject-groups";
 
 // Maarif ("Türkiye Yüzyılı") grades a student can be flagged with:
@@ -26,7 +29,8 @@ export type MaarifGrade = 7 | 9 | 10 | 11;
 
 export type MaarifExamSubject = { key: string; label: string; section: string; courseIds: string[]; questions: number };
 
-export type GeneralExamTrack = "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" | "m11";
+// The track type lives in lib/general-exam-track.ts (re-exported here for the callers that always imported it from this file).
+export type { GeneralExamTrack };
 
 type GradeConfig = {
   label: string; // "9. Sınıf"
@@ -75,37 +79,23 @@ export const MAARIF_GRADES: Record<MaarifGrade, GradeConfig> = {
     isCourseId: isMaarif10CourseId,
     coursesForExamSubject: coursesForMaarif10ExamSubject,
   },
-  // No Kaynak Takibi / Genel Deneme curriculum data exists for 11th grade's
-  // OWN courses yet (lib/curriculum/maarif11.ts's MAARIF11_KAYNAK_COURSES is
-  // still an empty placeholder, same Course[] shape as 9th/10th grade's own
-  // so real data can drop in later with no changes elsewhere) -- an 11th
-  // grader's Kaynak Takibi instead leads with the "Maarif TYT" tab (9th+10th
-  // grade merged, lib/curriculum/maarif-tyt.ts), with this grade's own
-  // courses as a second "11. Sınıf" tab once they exist. Every consumer of
-  // MAARIF_GRADES[grade] (course-tabs.tsx, the general-exam pickers, ...)
-  // already has to handle an empty course list gracefully regardless, so an
-  // 11th grader's own tab shows "nothing here yet" instead of crashing.
+  // An 11th grader's Kaynak Takibi leads with the "Maarif TYT" tab (9th+10th grade merged,
+  // lib/curriculum/maarif-tyt.ts) and has this grade's own courses as a second "11. Sınıf" tab. The grade's OWN Genel Deneme
+  // ("11. SINIF Genel Deneme", track m11) is four sections of 40 questions (MAARIF11_EXAM_SUBJECTS); the TYT-structured exam an
+  // 11th grader also sits is the separate "Maarif TYT Genel Deneme" (track mtyt, lib/general-exam-track.ts).
   11: {
     label: "11. Sınıf",
     track: "m11",
     titlePrefix: "11. SINIF",
     courses: MAARIF11_KAYNAK_COURSES,
-    examSubjects: [],
+    examSubjects: MAARIF11_EXAM_SUBJECTS,
     isCourseId: isMaarif11CourseId,
-    coursesForExamSubject: () => [],
+    coursesForExamSubject: coursesForMaarif11ExamSubject,
   },
 };
 
 export function gradeOfTrack(track: GeneralExamTrack): MaarifGrade | null {
   return track === "m7" ? 7 : track === "m9" ? 9 : track === "m10" ? 10 : track === "m11" ? 11 : null;
-}
-
-// True for an 11th grader's Genel Deneme ("11. SINIF Genel Deneme - ..."). Its
-// scoring stays TYT's (every other screen reads the title as a TYT exam), so
-// this is checked only where the ANALYSIS course list is chosen: it is
-// recorded and shown against the merged 9th+10th "Maarif TYT" courses.
-export function isMaarif11GeneralExamTitle(title: string): boolean {
-  return /^11\.\s*SINIF\b/i.test(title);
 }
 
 // "9. Sınıf Matematik" -> "Matematik" (picker/chip labels).

@@ -23,25 +23,8 @@ import { applyCountChange, computeAutoTaskStatus, mergeDualTaskStatus, type Dual
 import { LgsExamScoreGrid, emptyLgsInputs } from "@/components/lgs-exam-score-grid";
 import { EXAM_SCORES_REQUIRED, GENERAL_EXAM_SCORES_REQUIRED, isBlankScore } from "@/lib/exam-results-validation";
 import { findCourseById, TRACK_LABELS, type Course, type Track } from "@/lib/curriculum";
-import {
-  AYT_SUBJECT_GROUPS_BY_TRACK,
-  LGS_EXAM_SUBJECTS,
-  MAARIF7_EXAM_SUBJECTS,
-  MAARIF9_EXAM_SUBJECTS,
-  MAARIF10_EXAM_SUBJECTS,
-  coursesForMaarif10ExamSubject,
-  TYT_SUBJECT_GROUPS,
-  coursesForMaarif7ExamSubject,
-  coursesForMaarif9ExamSubject,
-  coursesForAytGroup,
-  coursesForGroup,
-  coursesForMaarifTytGroup,
-  coursesForLgsExamSubject,
-  emptyForGroup,
-  inferAytTrackFromScores,
-  overCapGroup,
-} from "@/lib/curriculum/subject-groups";
-import { isMaarif11GeneralExamTitle } from "@/lib/maarif-grade";
+import { AYT_SUBJECT_GROUPS_BY_TRACK, emptyForGroup, inferAytTrackFromScores, overCapGroup } from "@/lib/curriculum/subject-groups";
+import { coursesForExamSection, generalExamSections, parseGeneralExamTrack } from "@/lib/general-exam-track";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { isSoruCozumuLike } from "@/lib/task-types";
@@ -265,47 +248,6 @@ function toNumberOrNull(v: string) {
   return v.trim() === "" ? null : Number(v);
 }
 
-// General-exam tasks have no course_id -- the TYT/AYT track lives only in
-// the title text ("TYT Genel Deneme - ..." / "AYT Genel Deneme - ..."), the
-// same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
-}
-
-function subjectGroupsFor(
-  examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10",
-  aytTrack: Track | null,
-): { key: string; label: string; courseIds: string[]; section?: string; questions: number }[] {
-  if (examTrack === "lgs") return LGS_EXAM_SUBJECTS;
-  if (examTrack === "m7") return MAARIF7_EXAM_SUBJECTS;
-  if (examTrack === "m9") return MAARIF9_EXAM_SUBJECTS;
-  if (examTrack === "m10") return MAARIF10_EXAM_SUBJECTS;
-  if (examTrack === "tyt") return TYT_SUBJECT_GROUPS;
-  if (aytTrack) return AYT_SUBJECT_GROUPS_BY_TRACK[aytTrack];
-  return [];
-}
-
-// `maarif11`: an 11th grader's Genel Deneme -- scored as TYT, but analysed
-// against the merged 9th+10th "Maarif TYT" courses (see subject-groups.ts).
-function coursesForActiveGroup(
-  examTrack: "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10",
-  aytTrack: Track | null,
-  key: string,
-  maarif11 = false,
-): Course[] {
-  if (examTrack === "tyt" && maarif11) return coursesForMaarifTytGroup(key);
-  if (examTrack === "lgs") return coursesForLgsExamSubject(key);
-  if (examTrack === "m7") return coursesForMaarif7ExamSubject(key);
-  if (examTrack === "m9") return coursesForMaarif9ExamSubject(key);
-  if (examTrack === "m10") return coursesForMaarif10ExamSubject(key);
-  if (examTrack === "tyt") return coursesForGroup(key as (typeof TYT_SUBJECT_GROUPS)[number]["key"]);
-  if (aytTrack) return coursesForAytGroup(aytTrack, key);
-  return [];
-}
 
 function TaskModalBody({
   task,
@@ -382,10 +324,12 @@ function TaskModalBody({
   }
 
   const showSubjectScores = task.task_type === "general_exam";
-  const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title) : "tyt";
+  const examTrack = task.task_type === "general_exam" ? parseGeneralExamTrack(task.title, task.subject_scores) : "tyt";
 
   const [aytTrack, setAytTrack] = useState<Track | null>(() => inferAytTrackFromScores(task.subject_scores));
-  const activeGroups = showSubjectScores ? subjectGroupsFor(examTrack, aytTrack) : [];
+  // The sections of this track and the courses each is analysed against: lib/general-exam-track.ts (the title's track, Maarif TYT
+  // and the 11th grade's own exam included).
+  const activeGroups = showSubjectScores ? generalExamSections(examTrack, aytTrack) : [];
 
   const [subjectInputs, setSubjectInputs] = useState<Record<string, { correct: string; wrong: string; empty: string }>>(
     () =>
@@ -548,7 +492,7 @@ function TaskModalBody({
   const analysisGroups: { label: string; courses: Course[] }[] =
     task.task_type === "general_exam"
       ? activeGroups
-          .map((g) => ({ label: g.label, courses: coursesForActiveGroup(examTrack, aytTrack, g.key, isMaarif11GeneralExamTitle(task.title)) }))
+          .map((g) => ({ label: g.label, courses: coursesForExamSection(examTrack, aytTrack, g.key) }))
           .filter((g) => g.courses.length > 0)
       : branchCourse
         ? [{ label: branchCourse.name, courses: [branchCourse] }]

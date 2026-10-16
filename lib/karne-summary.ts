@@ -24,7 +24,8 @@ import {
 } from "./curriculum/subject-groups";
 import { weightedCycleCounts, type WeightableTask } from "./effort-weight";
 import type { ParentEventAttendance } from "./event-attendance";
-import { parseGeneralExamTrack } from "./karne";
+import { MAARIF11_EXAM_SUBJECTS } from "./curriculum/subject-groups";
+import { parseGeneralExamTrack } from "./general-exam-track";
 import { computeLgsNet, computeNet } from "./scoring";
 
 export const KARNE_SUMMARY_VERSION = 1;
@@ -41,7 +42,7 @@ export type KarneSummaryTask = WeightableTask & {
   subject_scores?: SubjectScores | null;
 };
 
-export type ExamGroupKey = "tyt" | `ayt:${Track}` | "lgs" | "m7";
+export type ExamGroupKey = "tyt" | "mtyt" | `ayt:${Track}` | "lgs" | "m7" | "m11";
 
 export type KarneExamItem = {
   date: string;
@@ -271,9 +272,11 @@ function examRows(tasks: KarneSummaryTask[]): ExamRow[] {
   for (const t of tasks) {
     if (t.task_type !== "general_exam" || !t.subject_scores || Object.keys(t.subject_scores).length === 0) continue;
     const title = t.title ?? "";
-    const track = parseGeneralExamTrack(title);
+    const track = parseGeneralExamTrack(title, t.subject_scores);
     let groupKey: ExamGroupKey;
     if (track === "tyt") groupKey = "tyt";
+    else if (track === "mtyt") groupKey = "mtyt";
+    else if (track === "m11") groupKey = "m11";
     else if (track === "ayt") {
       const aytTrack = inferAytTrackFromScores(t.subject_scores);
       if (!aytTrack) continue;
@@ -286,6 +289,7 @@ function examRows(tasks: KarneSummaryTask[]): ExamRow[] {
   return rows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title, "tr")));
 }
 
+// (Maarif TYT and the 11th grade's own exam net like TYT: 4 yanlış 1 doğruyu götürür.)
 const netFnFor = (key: ExamGroupKey) => (key === "lgs" || key === "m7" ? computeLgsNet : computeNet);
 
 function totalsOf(scores: SubjectScores): { correct: number; wrong: number } {
@@ -311,7 +315,8 @@ function averageNet(rows: ExamRow[]): number | null {
 }
 
 function branchDefinitions(key: ExamGroupKey): { key: string; label: string; questions: number }[] {
-  if (key === "tyt") return TYT_SUBJECT_GROUPS.map((g) => ({ key: g.key, label: g.label, questions: g.questions }));
+  if (key === "tyt" || key === "mtyt") return TYT_SUBJECT_GROUPS.map((g) => ({ key: g.key, label: g.label, questions: g.questions }));
+  if (key === "m11") return MAARIF11_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, questions: s.questions }));
   if (key === "lgs") return LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, questions: s.questions }));
   if (key === "m7") return MAARIF7_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label, questions: s.questions }));
   const track = key.slice(4) as Track;
@@ -331,21 +336,22 @@ function branchAverages(rows: ExamRow[], key: ExamGroupKey): KarneBranchAverage[
   return result;
 }
 
-function groupLabel(key: ExamGroupKey, maarifGrade: 7 | 11 | null | undefined): string {
-  if (key === "tyt") return maarifGrade === 11 ? "11. Sınıf Genel Deneme" : "TYT Genel Deneme";
+function groupLabel(key: ExamGroupKey): string {
+  if (key === "tyt") return "TYT Genel Deneme";
+  if (key === "mtyt") return "Maarif TYT Genel Deneme";
+  if (key === "m11") return "Maarif 11. Sınıf Genel Deneme";
   if (key === "lgs") return "LGS Genel Deneme";
   if (key === "m7") return "7. Sınıf Genel Deneme";
   return `AYT Genel Deneme (${TRACK_LABELS[key.slice(4) as Track]})`;
 }
 
-const GROUP_ORDER: ExamGroupKey[] = ["tyt", "ayt:sayisal", "ayt:ea", "ayt:sozel", "lgs", "m7"];
+const GROUP_ORDER: ExamGroupKey[] = ["tyt", "mtyt", "ayt:sayisal", "ayt:ea", "ayt:sozel", "m11", "lgs", "m7"];
 
 function buildExamGroups(
   history: ExamRow[],
   start: string,
   end: string,
   previous: { start: string; end: string },
-  maarifGrade: 7 | 11 | null | undefined,
 ): KarneExamGroup[] {
   const groups: KarneExamGroup[] = [];
   for (const key of GROUP_ORDER) {
@@ -362,7 +368,7 @@ function buildExamGroups(
     const nets = items.map((i) => i.net);
     groups.push({
       key,
-      label: groupLabel(key, maarifGrade),
+      label: groupLabel(key),
       items,
       averageNet: averageNet(current)!,
       bestNet: Math.max(...nets),
@@ -422,7 +428,7 @@ export function computeKarneSummary(input: KarneSummaryInput): KarneSummary {
       events,
     },
     trend: { weeks: weeklyTrend(tasks, rangeStart, rangeEnd, today, weeks) },
-    exams: { groups: buildExamGroups(examRows(tasks), rangeStart, rangeEnd, previous, input.maarifGrade) },
+    exams: { groups: buildExamGroups(examRows(tasks), rangeStart, rangeEnd, previous) },
   };
 }
 

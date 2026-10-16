@@ -6,6 +6,7 @@
 import { MAARIF7_KAYNAK_COURSES } from "./maarif7";
 import { MAARIF9_GENEL_DENEME_COURSES } from "./maarif9";
 import { MAARIF10_GENEL_DENEME_COURSES } from "./maarif10";
+import { MAARIF11_GENEL_DENEME_COURSES } from "./maarif11";
 import { MAARIF_TYT_MERGED_COURSES } from "./maarif-tyt";
 import { AYT_COURSES_BY_TRACK, LGS_COURSES, TYT_COURSES, type Course, type Track } from "./index";
 
@@ -103,8 +104,8 @@ export function overCapGroup<T extends { key: string; questions: number }>(
   });
 }
 
-// An 11th grader's Genel Deneme ("11. SINIF Genel Deneme") is scored exactly
-// like TYT -- the same four sections and question counts -- but its topics
+// A "Maarif TYT Genel Deneme" (the TYT-structured exam an 11th grader sits; before it had its own title it was called
+// "11. SINIF Genel Deneme") is scored exactly like TYT -- the same four sections and question counts -- but its topics
 // are the 9th AND 10th grade curricula, so the analysis is recorded against
 // the merged "Maarif TYT" courses (lib/curriculum/maarif-tyt.ts) rather than
 // the TYT courses. Which of them sit in which section:
@@ -288,4 +289,43 @@ export function coursesForMaarif10ExamSubject(key: string): Course[] {
   const subject = MAARIF10_EXAM_SUBJECTS.find((s) => s.key === key);
   if (!subject) return [];
   return subject.courseIds.map((id) => MAARIF10_GENEL_DENEME_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
+}
+
+// 11th-grade (Maarif) own Genel Deneme: four sections of 40 questions (160), scored per SECTION like AYT's, net 4:1. Keys are
+// `m11_`-prefixed. Which sections a student sits depends on the field (Eşit Ağırlık: Matematik + Sosyal-1; Sayısal: Matematik +
+// Fen; Sözel: Sosyal-1 + Sosyal-2), so only the sections with a score count for a student. The sub-counts are in each label:
+// Sosyal-1 = Edebiyat 24 + Coğrafya-1 6 + Tarih-1 10; Fen = Fizik 14 + Kimya 13 + Biyoloji 13; Sosyal-2 = Tarih-2 11 +
+// Coğrafya-2 11 + Felsefe grubu 12 (Felsefe, Sosyoloji, Psikoloji, Mantık 3 each) + Din Kültürü 6. `courseIds` point at
+// MAARIF11_GENEL_DENEME_COURSES (Tarih and Coğrafya appear in BOTH Sosyal sections, as separate courses).
+export const MAARIF11_EXAM_SUBJECTS: { key: string; label: string; section: string; courseIds: string[]; questions: number }[] = [
+  {
+    key: "m11_sosyal1",
+    label: "Türk Dili ve Edebiyatı - Sosyal Bilimler 1",
+    section: "Sosyal Bilimler 1",
+    courseIds: ["maarif11-gd-turk-dili-ve-edebiyati", "maarif11-gd-tarih-1", "maarif11-gd-cografya-1"],
+    questions: 40,
+  },
+  { key: "m11_matematik", label: "Matematik", section: "Matematik", courseIds: ["maarif11-gd-matematik"], questions: 40 },
+  {
+    key: "m11_fen",
+    label: "Fen Bilimleri",
+    section: "Fen Bilimleri",
+    courseIds: ["maarif11-gd-fizik", "maarif11-gd-kimya", "maarif11-gd-biyoloji"],
+    questions: 40,
+  },
+  {
+    key: "m11_sosyal2",
+    label: "Sosyal Bilimler 2",
+    section: "Sosyal Bilimler 2",
+    courseIds: ["maarif11-gd-tarih-2", "maarif11-gd-cografya-2", "maarif11-gd-felsefe"],
+    questions: 40,
+  },
+];
+
+export const MAARIF11_EXAM_QUESTION_TOTAL = MAARIF11_EXAM_SUBJECTS.reduce((sum, s) => sum + s.questions, 0); // 160
+
+export function coursesForMaarif11ExamSubject(key: string): Course[] {
+  const subject = MAARIF11_EXAM_SUBJECTS.find((s) => s.key === key);
+  if (!subject) return [];
+  return subject.courseIds.map((id) => MAARIF11_GENEL_DENEME_COURSES.find((c) => c.id === id)).filter((c): c is Course => !!c);
 }

@@ -456,7 +456,8 @@ describe("7th grade Genel Deneme: the LGS question distribution", () => {
 
   it("a 7th grader's exam is never judged by TYT's subject list", () => {
     expect(expectedGeneralExamKeys(TITLE, null)).not.toContain("turkce");
-    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual([]); // the other empty grade is unchanged
+    // the 11th grade's own exam has its own four section keys, never TYT's
+    expect(expectedGeneralExamKeys("11. SINIF Genel Deneme", null)).toEqual(["m11_sosyal1", "m11_matematik", "m11_fen", "m11_sosyal2"]);
   });
 });
 

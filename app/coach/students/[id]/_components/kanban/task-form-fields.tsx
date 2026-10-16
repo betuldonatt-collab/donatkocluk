@@ -24,7 +24,14 @@ import {
   type Track,
 } from "@/lib/curriculum";
 import { lgsCourseOptions } from "@/lib/curriculum/subject-groups";
-import { MAARIF_GRADES, maarif11CourseOptions, maarifCourseOptions, type GeneralExamTrack, type MaarifGrade } from "@/lib/maarif-grade";
+import { MAARIF_GRADES, maarif11CourseOptions, maarifCourseOptions, type MaarifGrade } from "@/lib/maarif-grade";
+import {
+  GENERAL_EXAM_TRACK_LABELS,
+  MAARIF_GENERAL_EXAM_TRACKS,
+  defaultMaarifGeneralExamTrack,
+  parseGeneralExamTitle,
+  type GeneralExamTrack,
+} from "@/lib/general-exam-track";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { useAytTrack } from "@/components/ayt-track-context";
 import { TopicGroupSelect } from "@/components/topic-group-select";
@@ -158,31 +165,15 @@ export function defaultTaskFormValue(examType: ExamType = "YKS", maarifGrade: Ma
     totalCount: "",
     durationMinutes: "",
     videoLinks: [],
-    generalExamTrack: maarifGrade !== null ? MAARIF_GRADES[maarifGrade].track : examType === "LGS" ? "lgs" : "tyt",
+    generalExamTrack: maarifGrade !== null ? defaultMaarifGeneralExamTrack(maarifGrade) : examType === "LGS" ? "lgs" : "tyt",
     generalExamPublisher: "",
     branchExamPublisher: "",
     bookTitle: "",
   };
 }
 
-// Reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
-// editing an existing general-exam task pre-fills the track/publisher
-// fields instead of showing them blank.
-function parseGeneralExamTitle(title: string): { track: GeneralExamTrack; publisher: string } {
-  const match = title.match(/^(TYT|AYT|LGS|7\.\s*SINIF|9\.\s*SINIF|10\.\s*SINIF|11\.\s*SINIF)\s+Genel Deneme(?:\s*-\s*(.*))?$/i);
-  const track = match?.[1].toLowerCase();
-  return {
-    track:
-      track === "ayt" ? "ayt"
-      : track === "lgs" ? "lgs"
-      : track?.startsWith("7") ? "m7"
-      : track?.startsWith("11") ? "m11"
-      : track?.startsWith("10") ? "m10"
-      : track?.startsWith("9") ? "m9"
-      : "tyt",
-    publisher: match?.[2]?.trim() ?? "",
-  };
-}
+// parseGeneralExamTitle (lib/general-exam-track.ts) reverses buildGeneralExamTitle's "TYT Genel Deneme - Yayınevi" shape so
+// editing an existing general-exam task pre-fills the track/publisher fields instead of showing them blank.
 
 // Reverses buildBranchExamTitle's " - Yayınevi" suffix (app/coach/actions.ts)
 // so editing an existing branch-exam task pre-fills the publisher field.
@@ -229,7 +220,7 @@ export function valueFromTask(task: DetailTask | null, courseResourceData?: Cour
     addToLibrary: true,
   }));
   const generalExam: { track: GeneralExamTrack; publisher: string } =
-    taskType === "general_exam" ? parseGeneralExamTitle(task.title) : { track: "tyt", publisher: "" };
+    taskType === "general_exam" ? parseGeneralExamTitle(task.title, task.subject_scores) : { track: "tyt", publisher: "" };
   const branchExamPublisher = taskType === "branch_exam" ? parseBranchExamPublisher(task.title) : "";
   // An older branch exam task saved before this field merged into Kaynak
   // (or one whose linked resource was later removed) has a publisher only
@@ -399,8 +390,13 @@ export function TaskFormFields({
   const isLgs = examType === "LGS";
   const maarifGrade = useMaarifGrade();
   const isMaarif9 = maarifGrade !== null;
-  // Like LGS, a 9th-grade Genel Deneme has exactly one format -- no TYT/AYT choice.
-  const singleGeneralExamFormat = isLgs || isMaarif9;
+  // LGS and the 7th grade have exactly one Genel Deneme format -- no choice. A 9th / 10th / 11th grader chooses between the four
+  // Maarif exams (Maarif TYT, 11., 10., 9. Sınıf); everyone else between TYT and AYT.
+  const maarifChoosesExam = maarifGrade === 9 || maarifGrade === 10 || maarifGrade === 11;
+  const singleGeneralExamFormat = isLgs || (isMaarif9 && !maarifChoosesExam);
+  const generalExamTrackOptions: { value: GeneralExamTrack; label: string }[] = maarifChoosesExam
+    ? MAARIF_GENERAL_EXAM_TRACKS.map((t) => ({ value: t, label: GENERAL_EXAM_TRACK_LABELS[t] }))
+    : [...GENERAL_EXAM_TRACK_OPTIONS];
   const course =
     ALL_COURSES.find((c) => c.id === value.courseId) ??
     findCourseById(value.courseId) ??
@@ -534,8 +530,8 @@ export function TaskFormFields({
           {!singleGeneralExamFormat && (
             <div className="space-y-1.5">
               <Label>Sınav Türü</Label>
-              <div className="flex gap-1.5">
-                {GENERAL_EXAM_TRACK_OPTIONS.map((opt) => (
+              <div className={maarifChoosesExam ? "grid grid-cols-2 gap-1.5" : "flex gap-1.5"}>
+                {generalExamTrackOptions.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"

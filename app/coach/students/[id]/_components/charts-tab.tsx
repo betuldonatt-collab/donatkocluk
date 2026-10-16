@@ -10,15 +10,14 @@ import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/parag
 import { cn } from "@/lib/utils";
 import { branchExamCourses, LGS_COURSES, TRACK_LABELS, findCourseById, type Track } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
+import { LGS_EXAM_SUBJECTS, inferAytTrackFromScores } from "@/lib/curriculum/subject-groups";
 import {
-  AYT_SUBJECT_GROUPS_BY_TRACK,
-  LGS_EXAM_SUBJECTS,
-  MAARIF7_EXAM_SUBJECTS,
-  MAARIF9_EXAM_SUBJECTS,
-  MAARIF10_EXAM_SUBJECTS,
-  TYT_SUBJECT_GROUPS,
-  inferAytTrackFromScores,
-} from "@/lib/curriculum/subject-groups";
+  GENERAL_EXAM_TRACK_LABELS,
+  MAARIF_GENERAL_EXAM_TRACKS,
+  generalExamSections,
+  parseGeneralExamTrack,
+  type GeneralExamTrack,
+} from "@/lib/general-exam-track";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { MAARIF_GRADES, maarif11AssignableCourses, maarif11CourseOptions, maarifCourseSections } from "@/lib/maarif-grade";
@@ -30,23 +29,10 @@ import { LineChart } from "./charts/line-chart";
 import { StackedBarChart, type StackedSeries } from "./charts/stacked-bar-chart";
 import type { DetailTask, LgsDailyRoutine, ParagrafProblemEntry } from "../types";
 
-// General-exam tasks have no course_id -- the TYT/AYT track lives only in
-// the title text, same convention buildGeneralExamTitle/parseGeneralExamTitle
-// use coach-side when creating the task.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  const t = title.toUpperCase();
-  if (/^7\.\s*SINIF\b/.test(t)) return "m7";
-  if (/^9\.\s*SINIF\b/.test(t)) return "m9";
-  if (/^10\.\s*SINIF\b/.test(t)) return "m10";
-  if (t.startsWith("LGS")) return "lgs";
-  return t.startsWith("AYT") ? "ayt" : "tyt";
-}
-
 type ExamMode = "genel" | "brans";
-// m9/m10: a Maarif 9./10. Sınıf student's own Genel Deneme track (migration
-// 0096/0099) -- disjoint from TYT/AYT, one student is ever only ever on one
-// of these four, never a mix.
-type MainTrack = "tyt" | "ayt" | "m7" | "m9" | "m10";
+// The Genel Deneme track the charts show (LGS has its own branch of this tab). A Maarif 9./10./11. Sınıf student switches between the
+// four Maarif tracks (Maarif TYT, 11., 10., 9. Sınıf); every other cohort is on one fixed track or TYT / AYT.
+type MainTrack = Exclude<GeneralExamTrack, "lgs">;
 
 const GENEL_COLORS = ["var(--primary)", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4"];
 
@@ -171,7 +157,9 @@ export function ChartsTab({
   // exams at all -- their Genel Deneme is always the m9/m10 track, so this
   // tab defaults straight to it instead of a TYT toggle that would only ever
   // show an empty chart. Not LGS/Maarif at all -> the ordinary tyt default.
-  const defaultMainTrack: MainTrack = maarifGrade === 7 ? "m7" : maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "tyt";
+  // An 11th grader opens on Maarif TYT (the exam it has always sat); 9th / 10th graders on their own grade's.
+  const defaultMainTrack: MainTrack =
+    maarifGrade === 7 ? "m7" : maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : maarifGrade === 11 ? "mtyt" : "tyt";
   // A Maarif student's Branş Denemesi picker lists that grade's own courses (the 7th grade's grouped
   // SÖZEL / SAYISAL), never the TYT/AYT ones. The 11th grade's lists its own "11. Sınıf" courses and the merged
   // "Maarif TYT" ones (what its Genel Deneme is analysed against) under two headings.
@@ -244,17 +232,9 @@ export function ChartsTab({
   // 9./10. Sınıf subject list) instead of one summed total, so the coach can
   // see exactly which section is driving the exam's overall net.
   // LGS's general exam is scored per subject (six of them, keyed lgs_*).
-  const genelGroups = isLgs
+  const genelGroups: { key: string; label: string }[] = isLgs
     ? LGS_EXAM_SUBJECTS.map((s) => ({ key: s.key, label: s.label }))
-    : mainTrack === "tyt"
-      ? TYT_SUBJECT_GROUPS
-      : mainTrack === "ayt"
-        ? AYT_SUBJECT_GROUPS_BY_TRACK[aytSubTrack]
-        : mainTrack === "m7"
-          ? MAARIF7_EXAM_SUBJECTS
-          : mainTrack === "m9"
-            ? MAARIF9_EXAM_SUBJECTS
-            : MAARIF10_EXAM_SUBJECTS;
+    : generalExamSections(mainTrack, aytSubTrack).map((s) => ({ key: s.key, label: s.label }));
   const genelSeries = seriesFor(genelGroups);
   const genelBreakdownData = generalExams
     .filter(
@@ -263,7 +243,7 @@ export function ChartsTab({
         e.subject_scores &&
         (isLgs
           ? parseGeneralExamTrack(e.title) === "lgs"
-          : parseGeneralExamTrack(e.title) === mainTrack &&
+          : parseGeneralExamTrack(e.title, e.subject_scores) === mainTrack &&
             (mainTrack !== "ayt" || inferAytTrackFromScores(e.subject_scores) === aytSubTrack)),
     )
     .slice()
@@ -392,6 +372,13 @@ export function ChartsTab({
                 ]}
                 value={mainTrack}
                 onChange={handleMainTrackChange}
+              />
+            )}
+            {(maarifGrade === 9 || maarifGrade === 10 || maarifGrade === 11) && (
+              <TrackToggle
+                options={MAARIF_GENERAL_EXAM_TRACKS.map((t) => ({ value: t as MainTrack, label: GENERAL_EXAM_TRACK_LABELS[t] }))}
+                value={mainTrack}
+                onChange={setMainTrack}
               />
             )}
             {!isLgs && mainTrack === "ayt" && (

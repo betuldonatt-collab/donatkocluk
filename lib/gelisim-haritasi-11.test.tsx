@@ -33,9 +33,10 @@ describe("11th grade: what the Gelişim Haritası covers", () => {
     expect(curriculumCourseIdsFor("LGS").every((id) => id.startsWith("lgs-"))).toBe(true);
   });
 
-  it("an 11th-grade Genel Deneme counts toward the Maarif TYT courses (the denominator of the topic maps)", () => {
-    const ids = generalExamCourseIdsForTitle("11. SINIF Genel Deneme - X");
+  it("a Maarif TYT Genel Deneme counts toward the Maarif TYT courses (the denominator of the topic maps); the 11th grade's own exam toward its Genel Deneme courses", () => {
+    const ids = generalExamCourseIdsForTitle("Maarif TYT Genel Deneme - X");
     expect(ids.sort()).toEqual(MAARIF_TYT_MERGED_COURSES.map((c) => c.id).sort());
+    expect(generalExamCourseIdsForTitle("11. SINIF Genel Deneme - X").every((id) => id.startsWith("maarif11-gd-"))).toBe(true);
     expect(generalExamCourseIdsForTitle("TYT Genel Deneme - X").every((id) => id.startsWith("tyt-"))).toBe(true);
   });
 

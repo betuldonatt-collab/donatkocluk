@@ -2,7 +2,15 @@
 
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { friendlyError } from "@/lib/friendly-error";
-import { isMaarif11GeneralExamTitle, maarifCourseSections, MAARIF_GRADES } from "@/lib/maarif-grade";
+import { maarifCourseSections, MAARIF_GRADES } from "@/lib/maarif-grade";
+import {
+  GENERAL_EXAM_TRACK_LABELS,
+  MAARIF_GENERAL_EXAM_TRACKS,
+  coursesForExamSection,
+  generalExamSections,
+  parseGeneralExamTrack,
+  type GeneralExamTrack,
+} from "@/lib/general-exam-track";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,7 +31,6 @@ import {
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
-  coursesForMaarifTytGroup,
   inferAytTrackFromScores,
 } from "@/lib/curriculum/subject-groups";
 import { deleteAssignedTask, getTaskTopicMistakesForCoach } from "../../../actions";
@@ -34,16 +41,6 @@ import type { CourseResourceData } from "./kaynak-takibi-tab";
 
 type ExamMode = "brans" | "genel";
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
-
-// Mirrors buildGeneralExamTitle/parseGeneralExamTitle's own convention --
-// duplicated per call site across this app, not imported.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
-}
 
 function TrackToggle<T extends string>({
   options,
@@ -113,6 +110,10 @@ export function CoachExamAnalysisSection({
 
   const [examMode, setExamMode] = useState<ExamMode>("brans");
   const [mainTrack, setMainTrack] = useState<"tyt" | "ayt">("tyt");
+  // A Maarif 9th / 10th / 11th grader picks which of the four Maarif Genel Denemeler to look at (Maarif TYT, 11., 10., 9. Sınıf),
+  // opening on its own grade's (the 11th grade on Maarif TYT, the exam it has always sat).
+  const maarifOwn = !isLgs && (maarifGrade === 9 || maarifGrade === 10 || maarifGrade === 11);
+  const [maarifTrack, setMaarifTrack] = useState<GeneralExamTrack>(maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "mtyt");
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
   // A grade with no Kaynak Takibi/Genel Deneme data yet (11th grade, for
   // now) has an empty courses/examSubjects list -- courses[0]/examSubjects[0]
@@ -122,7 +123,7 @@ export function CoachExamAnalysisSection({
     gradeCfg ? (gradeCfg.courses[0]?.id ?? "") : isLgs ? LGS_COURSES[0].id : TYT_COURSES[0].id,
   );
   const [genelGroupKey, setGenelGroupKey] = useState<string>(
-    maarifGrade === 11 && !isLgs ? TYT_SUBJECT_GROUPS[0].key : gradeCfg ? ((gradeCfg.sectionGroups ?? gradeCfg.examSubjects)[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
+    maarifOwn ? (generalExamSections(maarifGrade === 9 ? "m9" : maarifGrade === 10 ? "m10" : "mtyt", null)[0]?.key ?? "") : gradeCfg ? ((gradeCfg.sectionGroups ?? gradeCfg.examSubjects)[0]?.key ?? "") : isLgs ? LGS_SUBJECT_GROUPS[0].key : TYT_SUBJECT_GROUPS[0].key,
   );
 
   function handleMainTrackChange(next: "tyt" | "ayt") {
@@ -130,6 +131,11 @@ export function CoachExamAnalysisSection({
     setBranchCourseId(next === "tyt" ? TYT_COURSES[0].id : AYT_COURSES_BY_TRACK.sayisal[0].id);
     setAytSubTrack("sayisal");
     setGenelGroupKey(next === "tyt" ? TYT_SUBJECT_GROUPS[0].key : AYT_SUBJECT_GROUPS_BY_TRACK.sayisal[0].key);
+  }
+
+  function handleMaarifTrackChange(next: GeneralExamTrack) {
+    setMaarifTrack(next);
+    setGenelGroupKey(generalExamSections(next, null)[0]?.key ?? "");
   }
 
   function handleAytSubTrackChange(next: Track) {
@@ -150,10 +156,9 @@ export function CoachExamAnalysisSection({
     : mainTrack === "tyt"
       ? branchExamCourses("tyt")
       : branchExamCourses("ayt", aytSubTrack);
-  // 11th grade: a TYT-structured exam analysed against the merged 9th+10th courses.
-  const isMaarif11 = maarifGrade === 11 && !isLgs;
-  const genelGroups = isMaarif11
-    ? TYT_SUBJECT_GROUPS
+  // The Maarif Genel Denemeler (Maarif TYT, 11., 10., 9. Sınıf) go through the shared track definitions (lib/general-exam-track.ts).
+  const genelGroups = maarifOwn
+    ? generalExamSections(maarifTrack, null)
     : gradeCfg
     ? (gradeCfg.sectionGroups ?? gradeCfg.examSubjects)
     : isLgs
@@ -164,8 +169,8 @@ export function CoachExamAnalysisSection({
   const branchCourse = branchCourses.find((c) => c.id === branchCourseId) ?? branchCourses[0];
   // The 7th grade's courses are split SÖZEL / SAYISAL (like LGS's tabs): the picker shows the two groups.
   const gradeSections = maarifGrade !== null && maarifGrade !== 11 && !isLgs ? maarifCourseSections(maarifGrade) : null;
-  const genelCoursesInGroup = isMaarif11
-    ? coursesForMaarifTytGroup(genelGroupKey)
+  const genelCoursesInGroup = maarifOwn
+    ? coursesForExamSection(maarifTrack, null, genelGroupKey)
     : gradeCfg
     ? gradeCfg.coursesForExamSubject(genelGroupKey)
     : isLgs
@@ -190,8 +195,8 @@ export function CoachExamAnalysisSection({
     .filter(
       (e) =>
         e.task_type === "general_exam" &&
-        (isMaarif11
-          ? isMaarif11GeneralExamTitle(e.title)
+        (maarifOwn
+          ? parseGeneralExamTrack(e.title, e.subject_scores) === maarifTrack
           : gradeCfg
           ? parseGeneralExamTrack(e.title) === gradeCfg.track
           : isLgs
@@ -268,6 +273,13 @@ export function CoachExamAnalysisSection({
             ]}
             value={mainTrack}
             onChange={handleMainTrackChange}
+          />
+        )}
+        {maarifOwn && examMode === "genel" && (
+          <TrackToggle
+            options={MAARIF_GENERAL_EXAM_TRACKS.map((t) => ({ value: t, label: GENERAL_EXAM_TRACK_LABELS[t] }))}
+            value={maarifTrack}
+            onChange={handleMaarifTrackChange}
           />
         )}
         {!isFlat && mainTrack === "ayt" && (

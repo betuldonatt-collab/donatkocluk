@@ -9,8 +9,8 @@
 // Cisimler") because they carry the ordering; withCleanNames strips them
 // here so no screen shows them (see ./topic-name).
 //
-// There is no 11th-grade Genel Deneme data (MAARIF_GRADES[11].examSubjects
-// stays empty), only this Kaynak Takibi list.
+// The 11th grade's own Genel Deneme (MAARIF11_EXAM_SUBJECTS, subject-groups.ts) is analysed against the
+// MAARIF11_GENEL_DENEME_COURSES below -- the same topic lists, one course per subject AND per section.
 import type { Course } from "./index";
 import kaynakTakibiJson from "./maarif11.json";
 import { withCleanNames } from "./topic-name";
@@ -49,4 +49,67 @@ export function tracksForMaarif11Course(courseId: string): Maarif11Track[] {
 
 export function isMaarif11CourseId(courseId: string | null | undefined): boolean {
   return !!courseId && courseId.startsWith("maarif11-");
+}
+
+// ---- the 11th grade's own Genel Deneme: analysis courses ---------------------------------------------------------------------------------
+//
+// The exam has four sections of 40 questions (Sosyal-1, Matematik, Fen, Sosyal-2). Students of different fields sit different
+// sections, and the Tarih / Coğrafya questions of Sosyal-1 and Sosyal-2 are DIFFERENT questions -- so a student must be able
+// to mark mistakes under "Tarih-1" and "Tarih-2" independently. A mistake is stored as (course, topic), so each section
+// subject is a course of its own ("maarif11-gd-tarih-1", "maarif11-gd-tarih-2", ...) with topic ids of its own, built from the
+// 11th-grade Kaynak list (same names, no generated "(Genel)" masters; ids "<gd course>-u<unit>-t<topic>").
+// The topic maps (Gelişim Haritası, Konu Performans Haritası, Aylık Karne) are per SUBJECT: they fold these marks back onto the
+// Kaynak course and topic via maarif11GdOrigin (lib/curriculum/index.ts topicMapTarget does the folding).
+type GdSpec = { id: string; name: string; sourceId: string };
+const GD_SPECS: GdSpec[] = [
+  // Sosyal Bilimler 1
+  { id: "maarif11-gd-turk-dili-ve-edebiyati", name: "Türk Dili ve Edebiyatı", sourceId: "maarif11-turk-dili-ve-edebiyati" },
+  { id: "maarif11-gd-tarih-1", name: "Tarih-1", sourceId: "maarif11-tarih" },
+  { id: "maarif11-gd-cografya-1", name: "Coğrafya-1", sourceId: "maarif11-cografya" },
+  // Matematik
+  { id: "maarif11-gd-matematik", name: "Matematik", sourceId: "maarif11-matematik" },
+  // Fen Bilimleri
+  { id: "maarif11-gd-fizik", name: "Fizik", sourceId: "maarif11-fizik" },
+  { id: "maarif11-gd-kimya", name: "Kimya", sourceId: "maarif11-kimya" },
+  { id: "maarif11-gd-biyoloji", name: "Biyoloji", sourceId: "maarif11-biyoloji" },
+  // Sosyal Bilimler 2 (Din Kültürü, Psikoloji, Sosyoloji and Mantık have no 11th-grade topic list yet)
+  { id: "maarif11-gd-tarih-2", name: "Tarih-2", sourceId: "maarif11-tarih" },
+  { id: "maarif11-gd-cografya-2", name: "Coğrafya-2", sourceId: "maarif11-cografya" },
+  { id: "maarif11-gd-felsefe", name: "Felsefe", sourceId: "maarif11-felsefe" },
+];
+
+const GD_TOPIC_ORIGIN = new Map<string, { courseId: string; topicId: string }>();
+const GD_COURSE_ORIGIN = new Map<string, string>();
+
+const KAYNAK_WITHOUT_MASTERS: Maarif11Course[] = withCleanNames(kaynakTakibiJson as Maarif11Course[]);
+
+export const MAARIF11_GENEL_DENEME_COURSES: Course[] = GD_SPECS.map((spec) => {
+  const source = KAYNAK_WITHOUT_MASTERS.find((c) => c.id === spec.sourceId);
+  GD_COURSE_ORIGIN.set(spec.id, spec.sourceId);
+  return {
+    id: spec.id,
+    name: spec.name,
+    units: (source?.units ?? []).map((u, ui) => ({
+      unit: u.unit,
+      topics: u.topics.map((t, ti) => {
+        const id = `${spec.id}-u${ui}-t${ti}`;
+        GD_TOPIC_ORIGIN.set(id, { courseId: spec.sourceId, topicId: t.id });
+        return { id, name: t.name };
+      }),
+    })),
+  };
+});
+
+export function isMaarif11GenelDenemeCourseId(courseId: string | null | undefined): boolean {
+  return !!courseId && GD_COURSE_ORIGIN.has(courseId);
+}
+
+// The Kaynak course and topic an own-Genel-Deneme mark belongs to for the per-subject maps; null when the pair is not one of these.
+export function maarif11GdOrigin(courseId: string, topicId: string): { courseId: string; topicId: string } | null {
+  return GD_COURSE_ORIGIN.has(courseId) ? (GD_TOPIC_ORIGIN.get(topicId) ?? null) : null;
+}
+
+// The Kaynak course a Genel Deneme analysis course stands for (null for any other id).
+export function maarif11GdSourceCourseId(courseId: string): string | null {
+  return GD_COURSE_ORIGIN.get(courseId) ?? null;
 }

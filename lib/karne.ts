@@ -6,6 +6,7 @@
 // means exactly the same here as in the Gelişim Haritası and the Konu
 // Performans Haritası. Only the row shape of the stored snapshot is kept.
 import { TRACK_LABELS, type Track } from "./curriculum";
+import { parseGeneralExamTrack as parseExamTrack } from "./general-exam-track";
 import { computeGelisimHaritasi, type TrialExam } from "./gelisim-haritasi";
 import { canonicalCourseId, canonicalTopicId } from "./curriculum/legacy-course-ids";
 import {
@@ -157,14 +158,15 @@ export function computeTotalDurationMinutes(tasks: { tracked_duration_minutes: n
 type SubjectScores = Record<string, { correct?: number; wrong?: number; empty?: number }>;
 export type KarneGeneralExam = { task_date: string; title: string; subject_scores: SubjectScores | null };
 
-// General-exam tasks have no course_id -- the TYT/AYT track lives only in
-// the title text, same convention every panel already parses it with.
-export function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
+// General-exam tasks have no course_id -- the track lives only in the title text (lib/general-exam-track.ts). The report card's
+// legacy net rows treat a Maarif TYT exam as a TYT one (same four sections, same 4:1 net, as the 11th grader's "11. SINIF" exam always
+// was); the 11th grade's own exam ("m11") matches none of the rows below, so it never leaks into a TYT / AYT average.
+export function parseGeneralExamTrack(
+  title: string,
+  subjectScores?: Record<string, unknown> | null,
+): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" | "m11" {
+  const track = parseExamTrack(title, subjectScores);
+  return track === "mtyt" ? "tyt" : track;
 }
 
 // Average net across every general_exam in [rangeStart, rangeEnd] for one
@@ -174,7 +176,7 @@ export function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m
 // netChartFor in the analysis clients) so rounding never compounds. LGS
 // nets with its own 3:1 rule, YKS tracks with 4:1.
 function averageNetForTrack(exams: KarneGeneralExam[], track: "tyt" | "ayt" | "lgs" | "m7"): number | null {
-  const inTrack = exams.filter((e) => parseGeneralExamTrack(e.title) === track && e.subject_scores);
+  const inTrack = exams.filter((e) => parseGeneralExamTrack(e.title, e.subject_scores) === track && e.subject_scores);
   if (inTrack.length === 0) return null;
 
   const totals = inTrack.reduce(
@@ -282,7 +284,7 @@ export function computeTytScoreBreakdown(
 
   for (const e of exams) {
     if (e.task_date < rangeStart || e.task_date > rangeEnd || !e.subject_scores) continue;
-    if (parseGeneralExamTrack(e.title) !== "tyt") continue;
+    if (parseGeneralExamTrack(e.title, e.subject_scores) !== "tyt") continue;
     for (const group of TYT_SUBJECT_GROUPS) {
       const s = e.subject_scores[group.key];
       if (!s) continue;

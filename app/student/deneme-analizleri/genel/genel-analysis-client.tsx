@@ -15,13 +15,21 @@ import {
   coursesForAytGroup,
   coursesForGroup,
   coursesForLgsGroup,
-  coursesForMaarifTytGroup,
   inferAytTrackFromScores,
   type SubjectGroupKey,
 } from "@/lib/curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
-import { isMaarif11GeneralExamTitle, MAARIF_GRADES } from "@/lib/maarif-grade";
+import { MAARIF_GRADES } from "@/lib/maarif-grade";
+import {
+  GENERAL_EXAM_TRACK_LABELS,
+  MAARIF_GENERAL_EXAM_TRACKS,
+  coursesForExamSection,
+  defaultMaarifGeneralExamTrack,
+  generalExamSections,
+  parseGeneralExamTrack,
+  type GeneralExamTrack,
+} from "@/lib/general-exam-track";
 import { LineChart } from "../../_components/charts/line-chart";
 import { getMoreGenelExams, getTaskTopicMistakes } from "../../actions";
 import { EXAMS_PAGE_SIZE } from "../../constants";
@@ -30,16 +38,6 @@ import type { StudentTask } from "../../_components/daily-tasks/types";
 import { ExamTopicTable } from "../_components/exam-topic-table";
 
 type MistakeRow = { task_id: string; course_id: string; topic_id: string };
-
-// General-exam tasks have no course_id -- the TYT/AYT/LGS track lives only in
-// the title text, same convention the coach side uses to build/parse it.
-function parseGeneralExamTrack(title: string): "tyt" | "ayt" | "lgs" | "m7" | "m9" | "m10" {
-  if (/^7\.\s*SINIF\b/i.test(title)) return "m7";
-  if (/^9\.\s*SINIF\b/i.test(title)) return "m9";
-  if (/^10\.\s*SINIF\b/i.test(title)) return "m10";
-  if (/^LGS\b/i.test(title)) return "lgs";
-  return /^AYT\b/i.test(title) ? "ayt" : "tyt";
-}
 
 function netChartFor(exams: StudentTask[], netFn: (c: number, w: number) => number = computeNet) {
   // Overall net = sum of correct/wrong across all subjects, netted once
@@ -79,6 +77,11 @@ export function GenelAnalysisClient({
   const maarifGrade = useMaarifGrade();
   const gradeCfg = maarifGrade !== null ? MAARIF_GRADES[maarifGrade] : null;
   const [m9SubjectKey, setM9SubjectKey] = useState<string>("");
+  // A 9th / 10th / 11th grader looks at one of the four Maarif Genel Denemeler at a time (Maarif TYT, 11., 10., 9. Sınıf),
+  // opening on its own grade's (the 11th grade on Maarif TYT).
+  const maarifOwn = examType !== "LGS" && (maarifGrade === 9 || maarifGrade === 10 || maarifGrade === 11);
+  const [maarifTrack, setMaarifTrack] = useState<GeneralExamTrack>(maarifGrade !== null && maarifGrade !== 7 ? defaultMaarifGeneralExamTrack(maarifGrade) : "mtyt");
+  const [maarifSectionKey, setMaarifSectionKey] = useState<string>("");
 
   const [activeTask, setActiveTask] = useState<StudentTask | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -165,48 +168,73 @@ export function GenelAnalysisClient({
     </>
   );
 
-  // 11th grade: a TYT-structured Genel Deneme (Türkçe / Sosyal / Matematik /
-  // Fen, 4 yanlış 1 doğruyu götürür) whose topics are the 9th AND 10th grade
-  // curricula. Shown per subject like TYT, but each subject's table is the
-  // holistic bucket view (lib/curriculum/maarif-tyt-deneme-mapping.ts) with a
-  // count of missed topics, not the school's grade-and-unit lists.
-  if (maarifGrade === 11 && examType !== "LGS") {
-    const m11Exams = exams
-      .filter((e) => isMaarif11GeneralExamTitle(e.title))
+  // 9th / 10th / 11th grade: the four Maarif Genel Denemeler -- Maarif TYT (TYT's four sections, topics = the 9th AND 10th grade
+  // curricula in the holistic bucket view of lib/curriculum/maarif-tyt-deneme-mapping.ts), the 11th grade's own exam (four sections
+  // of 40, Tarih and Coğrafya once per Sosyal section), and the 9th / 10th grade's own exams. One track at a time; every net is
+  // 4 yanlış 1 doğruyu götürür.
+  if (maarifOwn) {
+    const sections = generalExamSections(maarifTrack, null);
+    const activeSection = sections.find((s) => s.key === maarifSectionKey) ?? sections[0];
+    const trackExams = exams
+      .filter((e) => parseGeneralExamTrack(e.title, e.subject_scores) === maarifTrack)
       .sort((a, b) => b.task_date.localeCompare(a.task_date));
-    const m11NetChartData = netChartFor(m11Exams);
-    const m11Courses = coursesForMaarifTytGroup(groupKey);
+    const trackNetChartData = netChartFor(trackExams);
+    const trackQuestionTotal = sections.reduce((sum, s) => sum + s.questions, 0);
+    const trackCourses = activeSection ? coursesForExamSection(maarifTrack, null, activeSection.key) : [];
     return (
       <div className="space-y-6">
+        <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1" role="tablist" aria-label="Genel deneme türü">
+          {MAARIF_GENERAL_EXAM_TRACKS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={maarifTrack === t}
+              onClick={() => {
+                setMaarifTrack(t);
+                setMaarifSectionKey("");
+              }}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+                maarifTrack === t ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {GENERAL_EXAM_TRACK_LABELS[t]}
+            </button>
+          ))}
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Genel Net Gelişimi</CardTitle>
-            <CardDescription>Tüm derslerin toplamı üzerinden 11. sınıf genel deneme (TYT formatı) net değişimi</CardDescription>
+            <CardDescription>
+              Tüm derslerin toplamı üzerinden {GENERAL_EXAM_TRACK_LABELS[maarifTrack]} genel deneme ({trackQuestionTotal} soru) net değişimi
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <LineChart data={m11NetChartData} />
+            <LineChart data={trackNetChartData} />
           </CardContent>
         </Card>
 
         <div className="bg-secondary inline-flex flex-wrap rounded-lg p-1">
-          {TYT_SUBJECT_GROUPS.map((g) => (
+          {sections.map((s) => (
             <button
-              key={g.key}
+              key={s.key}
               type="button"
-              onClick={() => setGroupKey(g.key)}
+              onClick={() => setMaarifSectionKey(s.key)}
               className={cn(
                 "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-                groupKey === g.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                activeSection?.key === s.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {g.label}
+              {s.label}
             </button>
           ))}
         </div>
 
         <div className="space-y-4">
-          {m11Courses.map((course) => (
-            <ExamTopicTable key={course.id} course={course} exams={m11Exams} mistakesByExam={mistakesByExam} onOpenExam={openExam} />
+          {trackCourses.map((course) => (
+            <ExamTopicTable key={course.id} course={course} exams={trackExams} mistakesByExam={mistakesByExam} onOpenExam={openExam} />
           ))}
         </div>
 
