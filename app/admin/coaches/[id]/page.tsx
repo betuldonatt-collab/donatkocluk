@@ -3,6 +3,9 @@ import { ArrowLeft, Lock, Star } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { weekDates } from "@/lib/date";
+import { completionPercent } from "@/lib/completion";
+import { weightedCounts, type WeightableTask } from "@/lib/effort-weight";
+import { fetchAllPages } from "@/lib/paged-select";
 import { COACH_REVIEWS_PAGE_SIZE } from "./constants";
 import { DeactivateToggle } from "../../_components/deactivate-toggle";
 import { ResetPasswordButton } from "../../_components/reset-password-button";
@@ -117,18 +120,27 @@ async function fetchCoachDetail(coachId: string) {
   // Completion rate across the current roster's coach-assigned tasks from
   // the last 12 months -- "how much of what this coach assigned actually
   // got done", bounded so it doesn't scan a growing all-time task history.
-  const { data: rosterTasks } =
+  // On the same effort-weighted math as every other percentage in the app (lib/effort-weight.ts: a task's full weight is the denominator,
+  // done earns all of it, half done solved / target of it), read page by page so a long history is never cut at the API's row limit.
+  const rosterTasks =
     rosterIds.length > 0
-      ? await supabase
-          .from("student_tasks")
-          .select("status")
-          .in("student_id", rosterIds)
-          .eq("is_coach_assigned", true)
-          .gte("task_date", isoDateMonthsAgo(TASK_COMPLETION_WINDOW_MONTHS))
-      : { data: [] };
-  const taskCompletionTotal = rosterTasks?.length ?? 0;
-  const taskCompletionDone = (rosterTasks ?? []).filter((t) => t.status === "done").length;
-  const taskCompletionPct = taskCompletionTotal > 0 ? Math.round((taskCompletionDone / taskCompletionTotal) * 100) : null;
+      ? (
+          await fetchAllPages<WeightableTask>((from, to, withCount) =>
+            supabase
+              .from("student_tasks")
+              .select(
+                "task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count",
+                withCount ? { count: "exact" } : undefined,
+              )
+              .in("student_id", rosterIds)
+              .eq("is_coach_assigned", true)
+              .gte("task_date", isoDateMonthsAgo(TASK_COMPLETION_WINDOW_MONTHS))
+              .order("id", { ascending: true })
+              .range(from, to) as unknown as PromiseLike<{ data: WeightableTask[] | null; error: unknown; count?: number | null }>,
+          )
+        ).data
+      : [];
+  const taskCompletionPct = completionPercent(weightedCounts(rosterTasks));
 
   const ratings = (ratedSessions ?? []).map((s) => s.student_rating!).filter((r): r is number => r !== null);
   const averageRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : null;

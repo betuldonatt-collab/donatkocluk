@@ -1,75 +1,117 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
-import { activityFromRpcRows, activityFromTaskRows, fetchStudentActivity, type ActivityWindow } from "./coach-dashboard-activity";
+import {
+  activeIdsFromRpcRows,
+  activeIdsFromTaskRows,
+  fetchStudentActivity,
+  prevWeekFromTaskRows,
+  type ActivityWindow,
+  type PrevWeekTaskRow,
+} from "./coach-dashboard-activity";
+import { completionPercent } from "./completion";
 
 const window: ActivityWindow = { recentSince: "2026-10-05T00:00:00.000Z", prevFrom: "2026-09-28", prevTo: "2026-10-04" };
 
-describe("the dashboard's activity numbers, from the database function", () => {
-  it("turns one row per student into the active set and last week's done/total", () => {
-    const { activeIds, prevWeek } = activityFromRpcRows([
+// A verbal-course question task of N questions weighs N x 10 effort units (lib/effort-weight.ts).
+const row = (student_id: string, status: string, over: Partial<PrevWeekTaskRow> = {}): PrevWeekTaskRow => ({
+  student_id,
+  task_date: "2026-10-01",
+  task_type: "question_bank",
+  course_id: "tyt-turkce",
+  title: "x",
+  status,
+  total_count: 10, // 100 units
+  ...over,
+});
+
+describe("who was active: from the database function, or (before migration 0134) from the rows", () => {
+  it("the function's rows give the set of recently active students", () => {
+    const ids = activeIdsFromRpcRows([
       { student_id: "a", recently_active: true, prev_total: 10, prev_done: 3 },
       { student_id: "b", recently_active: false, prev_total: 4, prev_done: 4 },
       { student_id: "c", recently_active: true, prev_total: 0, prev_done: 0 },
     ]);
-    expect([...activeIds].sort()).toEqual(["a", "c"]);
-    expect(prevWeek.get("a")).toEqual({ done: 3, total: 10 });
-    expect(prevWeek.get("b")).toEqual({ done: 4, total: 4 });
-    // a student with no task last week has no bucket (so no "low performance" entry), exactly as before
-    expect(prevWeek.has("c")).toBe(false);
+    expect([...ids].sort()).toEqual(["a", "c"]);
   });
 
-  it("gives the same answer as the row-based derivation it replaces", () => {
+  it("gives the same answer as the row-based derivation", () => {
     const recent = [
       { student_id: "a", updated_at: "2026-10-06T10:00:00.000Z", created_at: "2026-10-01T10:00:00.000Z" },
       // assigned and never opened: updated_at === created_at is not activity
       { student_id: "b", updated_at: "2026-10-06T10:00:00.000Z", created_at: "2026-10-06T10:00:00.000Z" },
     ];
-    const prev = [
-      { student_id: "a", status: "done" },
-      { student_id: "a", status: "pending" },
-      { student_id: "b", status: "not_done" },
-    ];
-    const fromRows = activityFromTaskRows(recent, prev);
-    const fromRpc = activityFromRpcRows([
+    const fromRpc = activeIdsFromRpcRows([
       { student_id: "a", recently_active: true, prev_total: 2, prev_done: 1 },
       { student_id: "b", recently_active: false, prev_total: 1, prev_done: 0 },
     ]);
-    expect([...fromRows.activeIds]).toEqual([...fromRpc.activeIds]);
-    expect([...fromRows.prevWeek]).toEqual([...fromRpc.prevWeek]);
+    expect([...activeIdsFromTaskRows(recent)]).toEqual([...fromRpc]);
+  });
+});
+
+describe("last week's completion: the effort-weighted math, not one unit per task", () => {
+  it("every task's full weight below, what it earned above (done 100%, half done solved / target, the rest nothing)", () => {
+    const prev = prevWeekFromTaskRows([
+      row("a", "done"), // 100 / 100
+      row("a", "half_done", { total_count: 40, correct_count: 20, wrong_count: 5 }), // 400 / 250
+      row("a", "not_done", { correct_count: 5 }), // 100 / 0
+      row("a", "pending"), // 100 / 0
+      row("b", "done", { total_count: 20 }), // 200 / 200
+    ]);
+    expect(prev.get("a")).toEqual({ done: 350, total: 700 });
+    expect(completionPercent(prev.get("a")!)).toBe(50);
+    expect(prev.get("b")).toEqual({ done: 200, total: 200 });
+    // one unit per task would have said 1 of 4 = 25%
+  });
+
+  it("a student with no task last week has no bucket (so no low-performance entry)", () => {
+    expect(prevWeekFromTaskRows([row("a", "done")]).has("c")).toBe(false);
+  });
+
+  it("a big task left undone outweighs a small one done", () => {
+    const prev = prevWeekFromTaskRows([row("a", "done", { total_count: 5 }), row("a", "pending", { total_count: 50 })]);
+    expect(completionPercent(prev.get("a")!)).toBe(9); // 50 of 550
   });
 });
 
 describe("fetchStudentActivity", () => {
-  it("asks the function once, with the window, and uses its answer (no row reads)", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: [{ student_id: "a", recently_active: true, prev_total: 2, prev_done: 1 }], error: null });
-    const from = vi.fn();
-    const result = await fetchStudentActivity({ rpc, from } as never, ["a", "b"], window);
-    expect(rpc).toHaveBeenCalledWith("coach_dashboard_activity", {
+  // A fake supabase: the function (rpc) and the task rows each answer on their own.
+  const fake = (rpcAnswer: unknown, rows: Record<string, unknown>[]) => {
+    const rpc = vi.fn().mockResolvedValue(rpcAnswer);
+    const from = vi.fn(() => {
+      const b: Record<string, unknown> = {};
+      for (const m of ["select", "in", "gte", "lte", "order", "range"]) b[m] = () => b;
+      b.then = (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null, count: rows.length });
+      return b;
+    });
+    return { rpc, from };
+  };
+
+  it("asks the function once for who is active and reads last week's rows once for the weighted completion", async () => {
+    const client = fake({ data: [{ student_id: "a", recently_active: true, prev_total: 2, prev_done: 1 }], error: null }, [
+      row("a", "done"),
+      row("a", "pending"),
+    ]);
+    const result = await fetchStudentActivity(client as never, ["a", "b"], window);
+    expect(client.rpc).toHaveBeenCalledWith("coach_dashboard_activity", {
       p_student_ids: ["a", "b"],
       p_recent_since: window.recentSince,
       p_prev_from: window.prevFrom,
       p_prev_to: window.prevTo,
     });
-    expect(from).not.toHaveBeenCalled();
+    expect(client.from).toHaveBeenCalledTimes(1); // last week's rows only; the recent-activity rows are not read
     expect(result.activeIds.has("a")).toBe(true);
+    expect(result.prevWeek.get("a")).toEqual({ done: 100, total: 200 });
   });
 
-  it("before the migration is run (function missing) it falls back to reading the rows, with the same result", async () => {
+  it("before the migration is run (function missing) it reads the recent rows too, with the same result", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const tables: Record<string, Record<string, unknown>[]> = {
-      student_tasks: [{ student_id: "a", updated_at: "2026-10-06T10:00:00Z", created_at: "2026-10-01T10:00:00Z", status: "done" }],
-    };
-    const from = () => {
-      const b: Record<string, unknown> = {};
-      for (const m of ["select", "in", "gte", "lte", "order", "range"]) b[m] = () => b;
-      b.then = (resolve: (v: unknown) => unknown) => resolve({ data: tables.student_tasks, error: null, count: 1 });
-      return b;
-    };
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "function public.coach_dashboard_activity does not exist" } });
-    const result = await fetchStudentActivity({ rpc, from } as never, ["a"], window);
+    const client = fake({ data: null, error: { message: "function public.coach_dashboard_activity does not exist" } }, [
+      { ...row("a", "done"), updated_at: "2026-10-06T10:00:00Z", created_at: "2026-10-01T10:00:00Z" },
+    ]);
+    const result = await fetchStudentActivity(client as never, ["a"], window);
     expect([...result.activeIds]).toEqual(["a"]);
-    expect(result.prevWeek.get("a")).toEqual({ done: 1, total: 1 });
+    expect(result.prevWeek.get("a")).toEqual({ done: 100, total: 100 });
   });
 
   it("with no students it asks nothing", async () => {
@@ -77,6 +119,27 @@ describe("fetchStudentActivity", () => {
     const result = await fetchStudentActivity({ rpc } as never, [], window);
     expect(rpc).not.toHaveBeenCalled();
     expect(result.activeIds.size).toBe(0);
+  });
+});
+
+describe("the other places that used to count tasks now use the weighted math", () => {
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
+
+  it("the coach dashboard's low-performance alert and the notification thresholds are effort-weighted", () => {
+    const dash = read("../app/coach/dashboard/page.tsx");
+    expect(dash).toContain("completionPercent(b)");
+    expect(dash).not.toContain("Math.round((b.done / b.total) * 100)");
+    const notifications = read("../app/coach/notifications/page.tsx");
+    expect(notifications).toContain("weightedCounts(tasks)");
+    expect(notifications).toContain("completionPercent(prevBucket)");
+    expect(notifications).toContain("curBucket.done >= curBucket.total");
+    expect(notifications).not.toMatch(/b\.total \+= 1/);
+  });
+
+  it("the admin's coach page computes the roster's task completion with it", () => {
+    const admin = read("../app/admin/coaches/[id]/page.tsx");
+    expect(admin).toContain("completionPercent(weightedCounts(rosterTasks))");
+    expect(admin).not.toContain("taskCompletionDone");
   });
 });
 

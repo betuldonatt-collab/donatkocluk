@@ -53,7 +53,7 @@ export type RosterStudent = {
 };
 
 export type InactiveAlert = { student: RosterStudent };
-export type LowPerformanceAlert = { student: RosterStudent; completionPct: number; doneCount: number; totalCount: number };
+export type LowPerformanceAlert = { student: RosterStudent; completionPct: number };
 export type MissingExamAlert = {
   student: RosterStudent;
   taskId: string;

@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
 import { weekDates } from "@/lib/date";
+import { completionPercent } from "@/lib/completion";
+import { weightedCounts, type WeightableTask } from "@/lib/effort-weight";
+import { fetchAllPages } from "@/lib/paged-select";
 import type { RosterStudent } from "../dashboard/types";
 import { NotificationsClient } from "./_components/notifications-client";
 import type { CoachNotification, NotificationType } from "./types";
@@ -33,14 +36,16 @@ function isoTimestampDaysAgo(days: number) {
   return d.toISOString();
 }
 
-function completionBucket(rows: { student_id: string; status: string }[]) {
+// Per student: the effort-weighted done / total of a week's tasks (lib/effort-weight.ts -- the one completion math of the whole app).
+type WeekTaskRow = WeightableTask & { student_id: string };
+const WEEK_TASK_COLUMNS =
+  "student_id, task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count";
+
+function completionBucket(rows: WeekTaskRow[]) {
+  const byStudent = new Map<string, WeekTaskRow[]>();
+  for (const r of rows) byStudent.set(r.student_id, [...(byStudent.get(r.student_id) ?? []), r]);
   const buckets = new Map<string, { done: number; total: number }>();
-  for (const r of rows) {
-    const b = buckets.get(r.student_id) ?? { done: 0, total: 0 };
-    b.total += 1;
-    if (r.status === "done") b.done += 1;
-    buckets.set(r.student_id, b);
-  }
+  for (const [studentId, tasks] of byStudent) buckets.set(studentId, weightedCounts(tasks));
   return buckets;
 }
 
@@ -66,6 +71,17 @@ async function syncThresholdNotifications(
   // hasRecent() below, none of the student_tasks queries depend on it or
   // on one another. One Promise.all instead of recentRows running alone
   // as its own round trip before the other three.
+  const weekRows = (from: string, to: string) =>
+    fetchAllPages<WeekTaskRow>((start, end, withCount) =>
+      supabase
+        .from("student_tasks")
+        .select(WEEK_TASK_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .in("student_id", studentIds)
+        .gte("task_date", from)
+        .lte("task_date", to)
+        .order("id", { ascending: true })
+        .range(start, end) as unknown as PromiseLike<{ data: WeekTaskRow[] | null; error: unknown; count?: number | null }>,
+    );
   const [{ data: recentRows }, { data: activityRows }, { data: prevWeekRows }, { data: currentWeekRows }] = await Promise.all([
     supabase
       .from("notifications")
@@ -78,18 +94,8 @@ async function syncThresholdNotifications(
       .select("student_id, updated_at, created_at")
       .in("student_id", studentIds)
       .gte("updated_at", isoTimestampDaysAgo(settings.inactivity_threshold_days)),
-    supabase
-      .from("student_tasks")
-      .select("student_id, status")
-      .in("student_id", studentIds)
-      .gte("task_date", prevWeekMonday)
-      .lte("task_date", prevWeekSunday),
-    supabase
-      .from("student_tasks")
-      .select("student_id, status")
-      .in("student_id", studentIds)
-      .gte("task_date", todayWeek[0])
-      .lte("task_date", todayWeek[6]),
+    weekRows(prevWeekMonday, prevWeekSunday),
+    weekRows(todayWeek[0], todayWeek[6]),
   ]);
 
   function hasRecent(studentId: string, type: NotificationType) {
@@ -106,8 +112,8 @@ async function syncThresholdNotifications(
       .filter((r) => new Date(r.updated_at).getTime() !== new Date(r.created_at).getTime())
       .map((r) => r.student_id),
   );
-  const prevWeekBuckets = completionBucket(prevWeekRows ?? []);
-  const currentWeekBuckets = completionBucket(currentWeekRows ?? []);
+  const prevWeekBuckets = completionBucket(prevWeekRows);
+  const currentWeekBuckets = completionBucket(currentWeekRows);
 
   const toInsert: {
     coach_id: string;
@@ -131,8 +137,8 @@ async function syncThresholdNotifications(
     }
 
     const prevBucket = prevWeekBuckets.get(student.id);
-    if (prevBucket && prevBucket.total > 0) {
-      const pct = Math.round((prevBucket.done / prevBucket.total) * 100);
+    const pct = prevBucket ? completionPercent(prevBucket) : null;
+    if (pct !== null) {
       if (pct < settings.critical_completion_threshold_pct && !hasRecent(student.id, "critical_completion_drop")) {
         toInsert.push({
           coach_id: coachId,
@@ -149,7 +155,8 @@ async function syncThresholdNotifications(
       if (
         curBucket &&
         curBucket.total > 0 &&
-        curBucket.done === curBucket.total &&
+        // every task done in full -- a half-done one earns only part of its weight, so this is never true while anything is open
+        curBucket.done >= curBucket.total &&
         !hasRecent(student.id, "success_completion")
       ) {
         toInsert.push({

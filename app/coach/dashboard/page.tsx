@@ -6,6 +6,7 @@ import { fetchMaarifGradesByIds } from "@/lib/maarif-grade";
 import { coachCohorts, NO_COHORTS, type CoachCohorts } from "@/lib/coach-cohorts";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { fetchStudentActivity, NO_ACTIVITY, type StudentActivity } from "@/lib/coach-dashboard-activity";
+import { completionPercent } from "@/lib/completion";
 import {
   getPendingFocusReviews,
   getPendingStudentTasks,
@@ -90,16 +91,15 @@ function buildCoachAlerts(
 ): CoachAlerts {
   const rosterById = new Map(roster.map((s) => [s.id, s]));
 
-  // "Active" = a task touched after its creation in the last 3 days, and last week's done/total per student -- both counted by the
-  // database (lib/coach-dashboard-activity.ts, migration 0134), live on every render.
+  // "Active" = a task touched after its creation in the last 3 days (counted by the database, migration 0134), and last week's completion per
+  // student on the same effort-weighted math as every other percentage (lib/coach-dashboard-activity.ts), live on every render.
   const { activeIds, prevWeek: prevWeekBuckets } = activity;
   const inactive = roster.filter((s) => !activeIds.has(s.id)).map((student) => ({ student }));
 
   const lowPerformance = roster.flatMap((student) => {
     const b = prevWeekBuckets.get(student.id);
-    if (!b || b.total === 0) return [];
-    const completionPct = Math.round((b.done / b.total) * 100);
-    return completionPct < 50 ? [{ student, completionPct, doneCount: b.done, totalCount: b.total }] : [];
+    const completionPct = b ? completionPercent(b) : null;
+    return completionPct !== null && completionPct < 50 ? [{ student, completionPct }] : [];
   });
 
   // The query already scopes this to analysis_pending = true (the same
