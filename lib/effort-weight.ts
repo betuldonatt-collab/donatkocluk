@@ -29,6 +29,14 @@ import { RESOURCE_REVIEW_TASK_TYPE } from "./task-types";
 //
 // Anything with no usable amount (older rows, blank counts) falls back to
 // DEFAULT_TASK_UNITS instead of 0 or NaN, so legacy records still count.
+//
+// PARTIAL CREDIT (2026-10-17, user decision) -- the one rule every percentage in the app shares (coach roster and student detail, parent,
+// student board, Karne): the DENOMINATOR is every task's full weight whatever its status (the effort that was expected);
+// the NUMERATOR is the share of that weight the status earned --
+//   done ........ 100% (the 5-question tolerance of computeAutoTaskStatus already makes 35/40 "done")
+//   half_done ... solved / target of its weight, where solved = Doğru + Yanlış + Boş and target = Toplam (total_count), capped at 100%:
+//                 target 40, solved 25 -> 62.5% of the task's weight. No usable target or nothing solved -> 0.
+//   not_done / pending ... 0
 
 export const UNITS_PER_QUESTION = 10;
 export const UNITS_PER_MINUTE = 5;
@@ -50,6 +58,12 @@ export type WeightableTask = {
   title?: string | null;
   total_count?: number | null;
   duration_minutes?: number | null;
+  // What a half_done task earns: the questions solved so far. Either the three counts (summed, like computeAutoTaskStatus does) or --
+  // for a row that is sent to a browser that should not get the Doğru / Yanlış / Boş split -- the ready-made sum.
+  correct_count?: number | null;
+  wrong_count?: number | null;
+  empty_count?: number | null;
+  solved_count?: number | null;
 };
 
 export function subjectCoefficient(courseId: string | null | undefined): 1 | 1.5 | 2 {
@@ -112,13 +126,35 @@ export function taskWeight(t: Partial<Omit<WeightableTask, "task_date" | "status
   }
 }
 
-function sum(tasks: WeightableTask[]): CompletionCounts {
+// Questions solved so far: Doğru + Yanlış + Boş, the same sum computeAutoTaskStatus judges "done" by.
+export function solvedCount(t: Pick<WeightableTask, "correct_count" | "wrong_count" | "empty_count" | "solved_count">): number {
+  if (typeof t.solved_count === "number" && Number.isFinite(t.solved_count)) return Math.max(0, t.solved_count);
+  return Math.max(0, (t.correct_count ?? 0) + (t.wrong_count ?? 0) + (t.empty_count ?? 0));
+}
+
+// The share (0..1) of a task's weight its status has earned: see PARTIAL CREDIT above.
+export function taskCreditFraction(t: Pick<WeightableTask, "status" | "total_count" | "correct_count" | "wrong_count" | "empty_count" | "solved_count">): number {
+  if (t.status === "done") return 1;
+  if (t.status !== "half_done") return 0;
+  if (!positive(t.total_count)) return 0;
+  const solved = solvedCount(t);
+  return solved > 0 ? Math.min(1, solved / t.total_count) : 0;
+}
+
+// The weight a task has earned so far (its full weight when done, a proportional part when half done, else 0).
+export function taskCredit(t: Partial<Omit<WeightableTask, "task_date">> & { status: string }): number {
+  const fraction = taskCreditFraction(t);
+  return fraction === 0 ? 0 : taskWeight(t) * fraction;
+}
+
+// Earned / total effort units of any set of tasks: the single sum behind every percentage (weightedCycleCounts / weightedDayCounts below,
+// the coach's per-track and per-course bars, the cohort bars of lib/program-completion-bars.ts).
+export function weightedCounts(tasks: WeightableTask[]): CompletionCounts {
   let done = 0;
   let total = 0;
   for (const t of tasks) {
-    const w = taskWeight(t);
-    total += w;
-    if (t.status === "done") done += w;
+    total += taskWeight(t);
+    done += taskCredit(t);
   }
   return { done, total };
 }
@@ -128,11 +164,11 @@ function sum(tasks: WeightableTask[]): CompletionCounts {
 // more "cap at today" special case, see that file's header comment for why).
 // done/total are effort units.
 export function weightedCycleCounts(tasks: WeightableTask[], window: CycleWindow): CompletionCounts {
-  return sum(tasks.filter((t) => t.task_date >= window.start && t.task_date <= window.end));
+  return weightedCounts(tasks.filter((t) => t.task_date >= window.start && t.task_date <= window.end));
 }
 
 export function weightedDayCounts(tasks: WeightableTask[], dateIso: string): CompletionCounts {
-  return sum(tasks.filter((t) => t.task_date === dateIso));
+  return weightedCounts(tasks.filter((t) => t.task_date === dateIso));
 }
 
 // How much finishing `task` moves its day's bar, as a whole percent

@@ -6,15 +6,19 @@ import type { DualCompletionStats } from "@/app/coach/students/[id]/types";
 import { completionLayoutFor, groupStats, percentForBar, type CompletionLayout, type CompletionTask } from "./program-completion-bars";
 
 // The overall Program Tamamlama bars: standard students keep Toplam + TYT + AYT; Maarif 9 / 10 / 11, the 7th grade and LGS get bars of their own.
+// Every figure is effort-weighted (lib/effort-weight.ts): a verbal-course question task of 10 questions weighs 100 units, a Genel Deneme 1200
+// (LGS 900), and a half-done task earns solved / target of its weight.
 
 const task = (course_id: string | null, status: string, over: Partial<CompletionTask> = {}): CompletionTask => ({
+  task_date: "2026-10-10",
   task_type: "question_bank",
   title: "x",
   course_id,
   status,
+  total_count: 10, // 100 units for a verbal course
   ...over,
 });
-const exam = (title: string, status: string): CompletionTask => task(null, status, { task_type: "general_exam", title });
+const exam = (title: string, status: string): CompletionTask => task(null, status, { task_type: "general_exam", title, total_count: null });
 
 const bars = (layout: CompletionLayout) => (layout.kind === "groups" ? layout.bars.map((b) => b.label) : null);
 
@@ -51,72 +55,79 @@ describe("what each bar counts", () => {
 
   it("11th grade: Maarif TYT = the merged courses + Maarif TYT / 9th / 10th grade Genel Denemeler; 11. Sınıf = its own courses + own Genel Deneme", () => {
     const tasks = [
-      task("maarif-tyt-matematik", "done"),
-      task("maarif-tyt-fizik", "pending"),
-      exam("Maarif TYT Genel Deneme - A", "done"),
-      exam("9. SINIF Genel Deneme - B", "done"),
-      exam("10. SINIF Genel Deneme - C", "pending"),
-      task("maarif11-fizik", "done"),
-      task("maarif11-kimya", "done"),
-      task("maarif11-tarih", "pending"),
-      exam("11. SINIF Genel Deneme - D", "done"),
+      task("maarif-tyt-tarih", "done"), // 100
+      task("maarif-tyt-cografya", "pending"), // 100
+      exam("Maarif TYT Genel Deneme - A", "done"), // 1200
+      exam("9. SINIF Genel Deneme - B", "done"), // 1200
+      exam("10. SINIF Genel Deneme - C", "pending"), // 1200
+      task("maarif11-tarih", "done"), // 100
+      task("maarif11-felsefe", "done"), // 100
+      task("maarif11-cografya", "pending"), // 100
+      exam("11. SINIF Genel Deneme - D", "done"), // 1200
       task("kitap-okuma", "done"), // fits no bar
-      task("tyt-matematik", "done"), // not a Maarif course
+      task("tyt-tarih", "done"), // not a Maarif course
     ];
-    expect(pct(m11, "mtyt", tasks)).toBe(Math.round((3 / 5) * 100)); // done: maarif-tyt-matematik, mtyt exam, 9. exam of 5
-    expect(pct(m11, "m11", tasks)).toBe(Math.round((3 / 4) * 100));
+    expect(pct(m11, "mtyt", tasks)).toBe(Math.round((2500 / 3800) * 100)); // 66
+    expect(pct(m11, "m11", tasks)).toBe(Math.round((1400 / 1500) * 100)); // 93
   });
 
   it("10th grade: 9. Sınıf and 10. Sınıf each count their own courses and Genel Denemeler", () => {
     const tasks = [
-      task("maarif9-matematik", "done"),
-      task("maarif9-fizik", "done"),
+      task("maarif9-tarih", "done"),
+      task("maarif9-cografya", "done"),
       exam("9. SINIF Genel Deneme", "pending"),
-      task("maarif10-matematik", "done"),
-      task("maarif10-kimya", "pending"),
+      task("maarif10-tarih", "done"),
+      task("maarif10-din-kulturu", "pending"),
       exam("10. SINIF Genel Deneme", "pending"),
     ];
-    expect(pct(m10, "m9", tasks)).toBe(67);
-    expect(pct(m10, "m10", tasks)).toBe(33);
+    expect(pct(m10, "m9", tasks)).toBe(Math.round((200 / 1400) * 100)); // 14
+    expect(pct(m10, "m10", tasks)).toBe(Math.round((100 / 1400) * 100)); // 7
   });
 
   it("9th grade: the single 9. Sınıf bar covers ALL of its tasks (the same figure Toplam would show)", () => {
     const m9 = completionLayoutFor({ examType: "YKS", maarifGrade: 9 });
-    const tasks = [task("maarif9-matematik", "done"), task(null, "pending", { task_type: "reading" }), task("paragraf", "done"), task("maarif9-fizik", "pending")];
+    const tasks = [task("maarif9-tarih", "done"), task(null, "pending", { task_type: "extra_custom" }), task("paragraf", "done"), task("maarif9-cografya", "pending")];
     expect(pct(m9, "m9", tasks)).toBe(50);
   });
 
   it("a bar with nothing due is '—' (null), never 0%", () => {
-    expect(pct(m11, "m11", [task("maarif-tyt-matematik", "done")])).toBeNull();
+    expect(pct(m11, "m11", [task("maarif-tyt-tarih", "done")])).toBeNull();
     expect(pct(m10, "m10", [])).toBeNull();
   });
 
-  it("LGS: Sözel and Sayısal take their subjects; the Genel Deneme and ... counts toward both; the routines go with their subject", () => {
+  it("LGS: Sözel and Sayısal take their subjects (weighted); the Genel Deneme counts toward both; the routines go with their subject", () => {
     const tasks = [
-      task("lgs-turkce", "done"),
-      task("lgs-ingilizce", "pending"),
-      task("paragraf", "done"),
-      task("ingilizce-quiz", "done"),
-      task("lgs-matematik", "done"),
-      task("lgs-fen-bilimleri", "pending"),
-      task("problem", "pending"),
-      task("yeni-nesil-mat-dozu", "done"),
-      exam("LGS Genel Deneme - X", "done"),
+      task("lgs-turkce", "done"), // 100
+      task("lgs-ingilizce", "pending"), // 100
+      task("paragraf", "done"), // 100
+      task("ingilizce-quiz", "done"), // 100
+      task("lgs-matematik", "done"), // 200
+      task("lgs-fen-bilimleri", "pending"), // 150
+      task("problem", "pending"), // 200
+      task("yeni-nesil-mat-dozu", "done"), // 200
+      exam("LGS Genel Deneme - X", "done"), // 900, both bars
       task("kitap-okuma", "pending"), // fits neither
     ];
-    // Sözel: turkce, ingilizce, paragraf, ingilizce-quiz, exam = 5, done 4
-    expect(pct(lgs, "sozel", tasks)).toBe(80);
-    // Sayısal: matematik, fen, problem, yeni nesil, exam = 5, done 3
-    expect(pct(lgs, "sayisal", tasks)).toBe(60);
+    expect(pct(lgs, "sozel", tasks)).toBe(Math.round((1200 / 1300) * 100)); // 92
+    expect(pct(lgs, "sayisal", tasks)).toBe(Math.round((1300 / 1650) * 100)); // 79
   });
 
   it("groupStats gives each bar its Dönem and Genel figure", () => {
-    const stats = groupStats(m11, [task("maarif11-fizik", "done")], [task("maarif11-fizik", "done"), task("maarif11-kimya", "pending")]);
+    const stats = groupStats(m11, [task("maarif11-tarih", "done")], [task("maarif11-tarih", "done"), task("maarif11-felsefe", "pending")]);
     expect(stats).toEqual([
       { key: "mtyt", label: "Maarif TYT", weekly: null, allTime: null },
       { key: "m11", label: "11. Sınıf", weekly: 100, allTime: 50 },
     ]);
     expect(groupStats({ kind: "standard" }, [], [])).toEqual([]);
+  });
+
+  it("a half-done task earns solved / target of its weight in a bar; a not-done or pending one nothing", () => {
+    const tasks = [
+      task("maarif11-tarih", "half_done", { total_count: 40, correct_count: 15, wrong_count: 8, empty_count: 2 }), // weight 400, earns 25/40 = 250
+      task("maarif11-felsefe", "done", { total_count: 40 }), // 400, all of it
+      task("maarif11-cografya", "not_done", { total_count: 20, correct_count: 10 }), // 200, nothing
+    ];
+    expect(pct(m11, "m11", tasks)).toBe(Math.round((650 / 1000) * 100)); // 65
   });
 });
 

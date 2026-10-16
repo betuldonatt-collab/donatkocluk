@@ -14,15 +14,18 @@
 // "maarifGrade 9 / 10 / 11" alone selects the Maarif layouts. A task joins a bar by its course, or -- a Genel Deneme having no
 // course -- by the track in its title (lib/general-exam-track.ts). A task that fits no bar (Kitap Okuma, a free study entry) is
 // in Toplam only, as it always was for TYT / AYT.
+import { completionPercent } from "./completion";
 import { YENI_NESIL_MAT_DOZU_ID } from "./curriculum";
+import { weightedCounts, type WeightableTask } from "./effort-weight";
 import { LGS_SUBJECT_GROUPS } from "./curriculum/subject-groups";
 import { parseGeneralExamTrack, type GeneralExamTrack } from "./general-exam-track";
 import type { ExamType } from "./exam-type";
 import type { MaarifGrade } from "./maarif-grade";
 
-export type CompletionTask = { task_type: string; title: string; course_id: string | null; status: string };
+// A task row as the bars read it: what taskWeight / taskCredit need (lib/effort-weight.ts) plus its course and title for the matching.
+export type CompletionTask = WeightableTask;
 
-export type CompletionBarDef = { key: string; label: string; matches: (task: Omit<CompletionTask, "status">) => boolean };
+export type CompletionBarDef = { key: string; label: string; matches: Matcher };
 
 export type CompletionLayout =
   // Toplam + TYT + AYT, as before (the page computes these).
@@ -32,14 +35,16 @@ export type CompletionLayout =
 
 export type CompletionGroupStat = { key: string; label: string; weekly: number | null; allTime: number | null };
 
-const courseStartsWith = (prefix: string) => (t: Omit<CompletionTask, "status">) => !!t.course_id?.startsWith(prefix);
+type Matcher = (t: Omit<CompletionTask, "status">) => boolean;
 
-const generalTrackIn = (tracks: GeneralExamTrack[]) => (t: Omit<CompletionTask, "status">) =>
-  t.task_type === "general_exam" && tracks.includes(parseGeneralExamTrack(t.title));
+const courseStartsWith = (prefix: string): Matcher => (t) => !!t.course_id?.startsWith(prefix);
+
+const generalTrackIn = (tracks: GeneralExamTrack[]): Matcher => (t) =>
+  t.task_type === "general_exam" && tracks.includes(parseGeneralExamTrack(t.title ?? ""));
 
 const anyOf =
-  (...fns: ((t: Omit<CompletionTask, "status">) => boolean)[]) =>
-  (t: Omit<CompletionTask, "status">) =>
+  (...fns: Matcher[]): Matcher =>
+  (t) =>
     fns.some((fn) => fn(t));
 
 const LGS_SOZEL_COURSES = new Set([...(LGS_SUBJECT_GROUPS.find((g) => g.key === "sozel")?.courseIds ?? []), "paragraf", "ingilizce-quiz"]);
@@ -77,16 +82,11 @@ export function completionLayoutFor(input: { examType: ExamType; maarifGrade: Ma
   }
 }
 
-// done / total of the tasks a bar counts, as a rounded percentage; null when it counts none (nothing due -> "—", never 0%).
+// The bar's percentage, on the same effort-weighted math as every other bar in the app (lib/effort-weight.ts): the weight of every task
+// the bar counts is the denominator, the weight each has earned (all of it when done, solved / target of it when half done) the
+// numerator. Null when the bar counts nothing (nothing due -> "—", never 0%).
 export function percentForBar(tasks: CompletionTask[], bar: CompletionBarDef): number | null {
-  let total = 0;
-  let done = 0;
-  for (const t of tasks) {
-    if (!bar.matches(t)) continue;
-    total += 1;
-    if (t.status === "done") done += 1;
-  }
-  return total > 0 ? Math.round((done / total) * 100) : null;
+  return completionPercent(weightedCounts(tasks.filter((t) => bar.matches(t))));
 }
 
 export function groupStats(layout: CompletionLayout, weeklyTasks: CompletionTask[], allTimeTasks: CompletionTask[]): CompletionGroupStat[] {

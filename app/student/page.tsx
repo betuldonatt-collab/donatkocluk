@@ -97,7 +97,7 @@ async function fetchHomeData(userId: string) {
     const { data: progressExtraRows } = await fetchAllPages((from, to, withCount) =>
       supabase
         .from("student_tasks")
-        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes", withCount ? { count: "exact" } : undefined)
+        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count", withCount ? { count: "exact" } : undefined)
         .eq("student_id", userId)
         .gte("task_date", progressTasksFrom)
         .lte("task_date", progressTasksTo)

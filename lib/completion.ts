@@ -24,6 +24,10 @@
 // off the same boundary -- STRICTLY BEFORE the lock day, so the lock day's
 // own tasks stay editable as part of the new cycle -- not an ISO week).
 
+// THE MATH. Every surface computes its percentage with lib/effort-weight.ts (weightedCycleCounts / weightedDayCounts / weightedCounts):
+// each task weighs its effort units (the denominator, whatever its status) and earns 100% of them when done, solved / target of them
+// when half_done, nothing when not_done or pending (see PARTIAL CREDIT there). The plain one-task-one-unit count below
+// (closedCycleCounts) is only the unweighted baseline kept for tests; no screen shows it any more.
 export type CompletionTask = { task_date: string; status: string };
 export type CompletionCounts = { done: number; total: number };
 

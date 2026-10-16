@@ -78,7 +78,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
     groupStudentsByCycleWindow(studentIds, (id) => currentCycleByStudent.get(id)!).map(async (group) => {
       const { data } = await supabase
         .from("student_tasks")
-        .select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes")
+        .select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count")
         .in("student_id", group.studentIds)
         .gte("task_date", group.start)
         .lte("task_date", group.end);
@@ -97,6 +97,10 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
       title: t.title,
       total_count: t.total_count,
       duration_minutes: t.duration_minutes,
+      // what a half-done task is credited for (lib/effort-weight.ts)
+      correct_count: t.correct_count,
+      wrong_count: t.wrong_count,
+      empty_count: t.empty_count,
     });
     tasksByStudent.set(t.student_id, list);
   }

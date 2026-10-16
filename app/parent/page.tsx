@@ -7,7 +7,7 @@ import { lgsNetChart, maarif7NetChart, maarif11NetChart, netChartFor, parseGener
 import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
-import { weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
+import { solvedCount, weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
 import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
 import { isLgsParentView } from "@/lib/parent-lgs";
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -115,9 +115,9 @@ async function fetchDashboardData() {
     // Security note: the rows below are sliced server-side. Only the slim
     // program fields ever cross into the client component (WeeklyProgramSheet);
     // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
-    // effort-weighted percentages.
+    // effort-weighted percentages (a half-done task is credited for what was solved).
     .from("student_tasks")
-    .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes")
+    .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes, correct_count, wrong_count, empty_count")
     .eq("student_id", studentId)
     .gte("task_date", tasksFrom)
     .lte("task_date", tasksTo)
@@ -142,7 +142,13 @@ async function fetchDashboardData() {
     order_index: t.order_index,
   }));
   // LGS parents only: yesterday..tomorrow rows for the Dün/Bugün/Yarın bars.
-  const dailyRowData = isLgsStudent ? inRange(addDays(today, -1), addDays(today, 1)) : [];
+  // These DO cross into a client component (the daily bars), so the Doğru / Yanlış / Boş split is folded into one "solved" number first.
+  const dailyRowData = isLgsStudent
+    ? inRange(addDays(today, -1), addDays(today, 1)).map(({ correct_count, wrong_count, empty_count, ...row }) => ({
+        ...row,
+        solved_count: solvedCount({ correct_count, wrong_count, empty_count }),
+      }))
+    : [];
 
   const programTasks = weekTaskRows as unknown as ProgramTask[];
   // All-time count of every outcome='completed' session, no date/cycle filter --

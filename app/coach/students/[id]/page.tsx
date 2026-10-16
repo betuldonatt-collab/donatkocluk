@@ -30,9 +30,10 @@ import { ProfileOverviewCard } from "./_components/profile-overview-card";
 import { LgsExamHistory } from "@/components/lgs-exam-history";
 import { buildLgsExamHistory } from "@/lib/lgs-exam";
 import { StudentTimelineCard } from "./_components/student-timeline-card";
-import { resolveCycles, tasksInCycle, type CycleWindow, type ProgressLock } from "@/lib/completion";
+import { completionPercent, resolveCycles, tasksInCycle, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import { completionLayoutFor, groupStats, type CompletionLayout } from "@/lib/program-completion-bars";
+import { weightedCounts } from "@/lib/effort-weight";
 import type { TopicQuestionTotals } from "./_components/topic-performance-map";
 import type {
   CompletionStats,
@@ -65,13 +66,18 @@ function getWeekDays(referenceIso: string) {
 
 // What the whole-history reads below carry per task: only the columns the completion percentages, the question totals
 // and the tracked-time sum use -- never the heavy ones (subject scores, photo paths, descriptions, video links).
-type CompletionRow = Pick<DetailTask, "task_date" | "status" | "task_type" | "title" | "course_id">;
+// (The completion rows also carry what the effort-weighted percentages need: the amount asked -- total_count / duration_minutes -- and
+// the questions solved so far, which a half-done task is credited for.)
+type CompletionRow = Pick<
+  DetailTask,
+  "task_date" | "status" | "task_type" | "title" | "course_id" | "total_count" | "duration_minutes" | "correct_count" | "wrong_count" | "empty_count"
+>;
 type HistoryTask = CompletionRow &
-  Pick<DetailTask, "id" | "topic_id" | "is_coach_assigned" | "is_approved_by_coach" | "total_count" | "correct_count" | "wrong_count" | "empty_count"> & {
+  Pick<DetailTask, "id" | "topic_id" | "is_coach_assigned" | "is_approved_by_coach"> & {
     tracked_duration_seconds: number | null;
   };
 const HISTORY_COLUMNS =
-  "id, task_date, task_type, title, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, total_count, correct_count, wrong_count, empty_count, tracked_duration_seconds";
+  "id, task_date, task_type, title, course_id, topic_id, status, is_coach_assigned, is_approved_by_coach, total_count, duration_minutes, correct_count, wrong_count, empty_count, tracked_duration_seconds";
 
 function classifyTrack(task: Pick<DetailTask, "task_type" | "title" | "course_id">): "tyt" | "ayt" | "other" {
   // Genel Deneme has no course_id -- its TYT/AYT track lives only in the
@@ -87,29 +93,17 @@ function classifyTrack(task: Pick<DetailTask, "task_type" | "title" | "course_id
   return "other";
 }
 
-// Program completion ("Haftalık") counts only what is due so far this week
-// (Monday..today, lib/completion.ts) -- tasks scheduled for tomorrow or
-// later are in neither the numerator nor the denominator. The "Genel"
-// (all-time) figure is the exact same bucketing, just over every task ever
-// assigned through today instead of only this week's -- see
-// computeDualCompletionStats below, which runs this over both slices.
+// Program completion counts the tasks of a window (the current cycle, or everything assigned through today for "Genel") on the SAME
+// effort-weighted math as every other percentage in the app (lib/effort-weight.ts): each task weighs its effort units -- the
+// denominator, whatever its status -- and earns all of them when done, solved / target of them when half done, none when not done or
+// pending. (It used to count one unit per task, which made this card disagree with the coach's roster, the parent and the student.)
 function bucketCompletionStats(tasks: CompletionRow[]): CompletionStats {
-  const buckets = {
-    overall: { done: 0, total: 0 },
-    tyt: { done: 0, total: 0 },
-    ayt: { done: 0, total: 0 },
+  const pct = (rows: CompletionRow[]) => completionPercent(weightedCounts(rows));
+  return {
+    overall: pct(tasks),
+    tyt: pct(tasks.filter((t) => classifyTrack(t) === "tyt")),
+    ayt: pct(tasks.filter((t) => classifyTrack(t) === "ayt")),
   };
-  for (const t of tasks) {
-    buckets.overall.total += 1;
-    if (t.status === "done") buckets.overall.done += 1;
-    const track = classifyTrack(t);
-    if (track === "tyt" || track === "ayt") {
-      buckets[track].total += 1;
-      if (t.status === "done") buckets[track].done += 1;
-    }
-  }
-  const pct = (b: { done: number; total: number }) => (b.total > 0 ? Math.round((b.done / b.total) * 100) : null);
-  return { overall: pct(buckets.overall), tyt: pct(buckets.tyt), ayt: pct(buckets.ayt) };
 }
 
 function computeDualCompletionStats(
@@ -129,17 +123,18 @@ function computeDualCompletionStats(
   };
 }
 
-// Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses
-// (paragraf/problem) aren't real curriculum subjects, so they're excluded
-// here even though they're valid course_ids elsewhere in the app.
+// Per-course breakdown (e.g. "TYT Matematik %72") -- routine pseudo-courses (paragraf/problem) aren't real curriculum subjects, so they're
+// excluded here even though they're valid course_ids elsewhere in the app. Effort-weighted like every bar: done / total are effort units.
 function bucketSubjectCompletion(tasks: CompletionRow[]): Map<string, { courseName: string; done: number; total: number }> {
-  const buckets = new Map<string, { courseName: string; done: number; total: number }>();
+  const byCourse = new Map<string, CompletionRow[]>();
   for (const t of tasks) {
     if (!t.course_id || t.course_id === "paragraf" || t.course_id === "problem") continue;
-    const bucket = buckets.get(t.course_id) ?? { courseName: courseLabelFor(t.course_id), done: 0, total: 0 };
-    bucket.total += 1;
-    if (t.status === "done") bucket.done += 1;
-    buckets.set(t.course_id, bucket);
+    byCourse.set(t.course_id, [...(byCourse.get(t.course_id) ?? []), t]);
+  }
+  const buckets = new Map<string, { courseName: string; done: number; total: number }>();
+  for (const [courseId, rows] of byCourse) {
+    const counts = weightedCounts(rows);
+    buckets.set(courseId, { courseName: courseLabelFor(courseId), done: counts.done, total: counts.total });
   }
   return buckets;
 }
@@ -158,7 +153,7 @@ function computeSubjectCompletion(allTasks: CompletionRow[], today: string, curr
   const allTime = bucketSubjectCompletion(allTasks.filter((t) => t.task_date <= today));
   const courseIds = new Set([...weekly.keys(), ...allTime.keys()]);
   const toBucket = (b: { done: number; total: number } | undefined) =>
-    b ? { pct: Math.round((b.done / b.total) * 100), done: b.done, total: b.total } : { pct: null, done: 0, total: 0 };
+    b ? { pct: completionPercent({ done: b.done, total: b.total }), done: Math.round(b.done), total: b.total } : { pct: null, done: 0, total: 0 };
 
   return [...courseIds]
     .map((courseId) => ({
