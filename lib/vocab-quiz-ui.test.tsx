@@ -5,7 +5,7 @@ vi.mock("@/app/student/ingilizce-quiz/actions", () => new Proxy({}, { get: (_t, 
 vi.mock("../app/student/ingilizce-quiz/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
 
 import { VocabQuizDashboard } from "@/app/student/ingilizce-quiz/vocab-quiz-dashboard";
-import { SessionResultText } from "@/app/student/ingilizce-quiz/vocab-quiz-session";
+import { AnswerFeedbackContent, SessionResultText } from "@/app/student/ingilizce-quiz/vocab-quiz-session";
 import { fillUnitStats } from "./lgs-vocab";
 import { masteryTierColor } from "./progress-colors";
 
@@ -60,5 +60,39 @@ describe("end-of-session text", () => {
 
   it("with no repeats it says every word was right on the first try", () => {
     expect(text(10, 10)).toBe("10 kelimenin hepsini ilk denemede doğru bildin.");
+  });
+});
+
+describe("the feedback of an answer that was accepted but not exact", () => {
+  const html = (result: "EXACT_MATCH" | "ACCEPTED_TYPO" | "INCORRECT", extra: { acceptedSpelling?: string | null } = {}) =>
+    renderToStaticMarkup(
+      <AnswerFeedbackContent
+        feedback={{ result, correctAnswer: "istemek / dilemek", wasSkipped: false, countAfter: 1, ...extra }}
+        isSaving={false}
+        submitError={null}
+        onAcknowledge={() => {}}
+      />,
+    );
+
+  it("grants the point and states the exact spelling: 'Doğru kabul edildi, ancak tam yazılışı: ...'", () => {
+    const out = html("ACCEPTED_TYPO", { acceptedSpelling: "istemek" });
+    expect(out).toContain("Kabul Edildi!");
+    expect(out.replace(/<[^>]+>/g, "")).toContain("Doğru kabul edildi, ancak tam yazılışı: istemek");
+    // only the matched word, not the whole slash-separated entry
+    expect(out).not.toContain("dilemek");
+    expect(out).toContain("Anladım"); // the student has to read it
+  });
+
+  it("falls back to the stored answer when no spelling was passed", () => {
+    expect(html("ACCEPTED_TYPO").replace(/<[^>]+>/g, "")).toContain("tam yazılışı: istemek / dilemek");
+  });
+
+  it("an exact answer shows no spelling note; a wrong one still says 'Doğru cevap'", () => {
+    const exact = html("EXACT_MATCH").replace(/<[^>]+>/g, "");
+    expect(exact).not.toContain("tam yazılışı");
+    expect(exact).not.toContain("Doğru cevap");
+    const wrong = html("INCORRECT").replace(/<[^>]+>/g, "");
+    expect(wrong).toContain("Doğru cevap: istemek / dilemek");
+    expect(wrong).not.toContain("tam yazılışı");
   });
 });

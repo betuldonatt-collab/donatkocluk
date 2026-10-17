@@ -4,6 +4,7 @@ import {
   applyCorrectToUnitStat,
   buildUnitStats,
   checkVocabAnswer,
+  checkVocabAnswerDetailed,
   fillUnitStats,
   levenshteinDistance,
   masteryLevel,
@@ -11,6 +12,7 @@ import {
   requeueAfterMiss,
   selectQuizBatch,
   shuffled,
+  stripTurkishEnding,
   summarizeSession,
   unitStarted,
   vocabUnitTitle,
@@ -75,8 +77,17 @@ describe("checkVocabAnswer", () => {
     expect(checkVocabAnswer("aprtmnt", "apartment", "tr_to_en")).toBe("INCORRECT");
   });
 
-  it("never forgives a typo on the Turkish (en_to_tr) side, even over 4 letters", () => {
+  it("a Turkish answer is forgiven one letter off too (over 4 letters), like an English one", () => {
+    expect(checkVocabAnswer("büyüleyci", "büyüleyici", "en_to_tr")).toBe("ACCEPTED_TYPO"); // one letter missing
+    expect(checkVocabAnswer("büyüleyicii", "büyüleyici", "en_to_tr")).toBe("ACCEPTED_TYPO"); // one extra
+    expect(checkVocabAnswer("büyüleyicı", "büyüleyici", "en_to_tr")).toBe("ACCEPTED_TYPO"); // one wrong (ı for i)
+    expect(checkVocabAnswer("büyüleyc", "büyüleyici", "en_to_tr")).toBe("INCORRECT"); // two off
+  });
+
+  it("a short Turkish word (4 letters or fewer) still has to be exact: one different letter is usually a different word", () => {
     expect(checkVocabAnswer("elmaa", "elma", "en_to_tr")).toBe("INCORRECT");
+    expect(checkVocabAnswer("kalm", "kalem", "en_to_tr")).toBe("ACCEPTED_TYPO"); // 5 letters
+    expect(checkVocabAnswer("göl", "gül", "en_to_tr")).toBe("INCORRECT");
   });
 
   it("lowercases an English answer with the English locale, not Turkish (a mobile keyboard's auto-capitalized 'I' must stay 'i', not become dotless 'ı')", () => {
@@ -108,6 +119,68 @@ describe("checkVocabAnswer", () => {
 
   it("ignores hyphens even when the student types one the answer doesn't have", () => {
     expect(checkVocabAnswer("well-known", "wellknown", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+});
+
+describe("Turkish endings: -mak / -mek / -ma / -me are ignored on both sides", () => {
+  it("strips one ending, and only while at least 3 letters remain", () => {
+    expect(stripTurkishEnding("istemek")).toBe("iste");
+    expect(stripTurkishEnding("isteme")).toBe("iste");
+    expect(stripTurkishEnding("okumak")).toBe("oku");
+    expect(stripTurkishEnding("okuma")).toBe("oku");
+    expect(stripTurkishEnding("yazmak")).toBe("yaz");
+    // "elma" (apple) must not shrink to "el" (hand); "yemek" / "içmek" keep their short stems for the same reason
+    expect(stripTurkishEnding("elma")).toBe("elma");
+    expect(stripTurkishEnding("yemek")).toBe("yemek");
+    expect(stripTurkishEnding("içmek")).toBe("içmek");
+    // one pass only
+    expect(stripTurkishEnding("anlamama")).toBe("anlama");
+  });
+
+  it("'isteme' and 'istemek' are the same answer, either way round -- accepted, not exact", () => {
+    expect(checkVocabAnswer("isteme", "istemek", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswer("istemek", "isteme", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswer("istemek", "istemek", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("okuma", "okumak", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswer("İSTEME", "istemek", "en_to_tr")).toBe("ACCEPTED_TYPO");
+  });
+
+  it("an ending plus a typo is still forgiven (one letter off the stem), two letters off is not", () => {
+    expect(checkVocabAnswer("anlama", "anlamak", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswer("hatırlam", "hatırlamak", "en_to_tr")).toBe("ACCEPTED_TYPO"); // 'hatırla' + 'm' off the stem by one
+    expect(checkVocabAnswer("hatrlama", "hatırlamak", "en_to_tr")).toBe("ACCEPTED_TYPO"); // a missing letter in the stem
+    expect(checkVocabAnswer("htrlama", "hatırlamak", "en_to_tr")).toBe("INCORRECT");
+  });
+
+  it("a short word that merely ends in -ma / -me is not confused with another word", () => {
+    expect(checkVocabAnswer("el", "elma", "en_to_tr")).toBe("INCORRECT");
+    expect(checkVocabAnswer("elma", "el", "en_to_tr")).toBe("INCORRECT");
+  });
+
+  it("a 4-letter infinitive: the verbal noun is one letter off and still accepted", () => {
+    expect(checkVocabAnswer("yeme", "yemek", "en_to_tr")).toBe("ACCEPTED_TYPO");
+  });
+
+  it("English answers do not lose any ending (the endings are a Turkish thing)", () => {
+    expect(checkVocabAnswer("walking", "walk", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("welcom", "welcome", "tr_to_en")).toBe("ACCEPTED_TYPO"); // one letter, nothing to do with -me
+  });
+});
+
+describe("checkVocabAnswerDetailed: what to show the student when the answer was close, not exact", () => {
+  it("gives the exact spelling of the accepted word -- the matching variant of a slash-separated entry", () => {
+    expect(checkVocabAnswerDetailed("aparment", "apartment", "tr_to_en")).toEqual({ result: "ACCEPTED_TYPO", accepted: "apartment" });
+    expect(checkVocabAnswerDetailed("atractive", "attractive/charming", "tr_to_en")).toEqual({ result: "ACCEPTED_TYPO", accepted: "attractive" });
+    expect(checkVocabAnswerDetailed("isteme", "istemek / dilemek", "en_to_tr")).toEqual({ result: "ACCEPTED_TYPO", accepted: "istemek" });
+  });
+
+  it("an exact answer and a wrong one carry nothing to show", () => {
+    expect(checkVocabAnswerDetailed("apartment", "apartment", "tr_to_en")).toEqual({ result: "EXACT_MATCH", accepted: null });
+    expect(checkVocabAnswerDetailed("house", "apartment", "tr_to_en")).toEqual({ result: "INCORRECT", accepted: null });
+  });
+
+  it("an exact variant beats a close one", () => {
+    expect(checkVocabAnswerDetailed("istemek", "isteme/istemek", "en_to_tr").result).toBe("EXACT_MATCH");
   });
 });
 

@@ -109,15 +109,14 @@ export function levenshteinDistance(a: string, b: string): number {
   return d[rows - 1][cols - 1];
 }
 
+// EXACT_MATCH: the answer is the word, letter for letter (case, hyphens and "&" / "and" aside). ACCEPTED_TYPO: the answer is accepted and
+// earns the point, but it was not the exact spelling -- one letter missing, extra or wrong, or (Turkish) the same word with another
+// verb-noun ending ("isteme" for "istemek"); the quiz then shows the exact spelling. INCORRECT: anything else.
 export type AnswerResult = "EXACT_MATCH" | "ACCEPTED_TYPO" | "INCORRECT";
 
-// Which language the STUDENT is typing this question's answer in -- not
-// which language is shown as the prompt. "tr_to_en": the prompt is
-// Turkish, the student types the English word (typo-tolerant, per the
-// coach's request). "en_to_tr": the prompt is English, the student types
-// the Turkish meaning (exact match only -- forgiving Turkish spelling
-// wasn't asked for, and could mask an actual wrong answer more easily
-// than it would for a foreign-language answer).
+// Which language the STUDENT is typing this question's answer in -- not which language is shown as the prompt. "tr_to_en": the prompt is
+// Turkish, the student types the English word. "en_to_tr": the prompt is English, the student types the Turkish meaning. Both are checked
+// with the same tolerance (suffix endings for Turkish, one-letter typos for both); only the Turkish side ignores the endings.
 export type QuizDirection = "en_to_tr" | "tr_to_en";
 
 // Case-insensitive per side, using the RIGHT locale for whichever
@@ -154,25 +153,58 @@ function acceptedVariants(correctAnswer: string): string[] {
     .filter((v) => v.length > 0);
 }
 
-// EXACT_MATCH beats a typo check outright, and is checked against every
-// accepted variant (see acceptedVariants above), not just the raw
-// slash-joined string. ACCEPTED_TYPO only ever applies typing English
-// (tr_to_en) and only for a variant over 4 letters, at edit distance <= 1 --
-// short words have too little room for a 1-character difference to still
-// clearly mean the same word. Deliberately NOT extended to en_to_tr: Turkish
-// is the student's native language, so a 1-edit "typo" there is more likely
-// to actually be a different, wrong word than it would be for a foreign
-// word the student is still learning to spell.
-export function checkVocabAnswer(userAnswer: string, correctAnswer: string, direction: QuizDirection): AnswerResult {
-  const a = normalizeForDirection(userAnswer, direction);
-  const variants = acceptedVariants(correctAnswer).map((v) => normalizeForDirection(v, direction));
-  if (variants.length === 0) return "INCORRECT";
+// Turkish infinitive (-mak / -mek) and verbal-noun (-ma / -me) endings are ignored: "isteme", "istemek" and "iste" all stand for the same
+// verb, so a student who types one for another still knows the word. Applied to BOTH the correct answer and the student's input before they
+// are compared. Only one ending is taken off, and only when at least 3 letters remain -- "elma" (apple) must never shrink to "el" (hand), so a
+// short word that merely ends in -ma / -me keeps it.
+const TURKISH_ENDINGS = [/(mak|mek)$/, /(ma|me)$/];
+const MIN_STEM_LENGTH = 3;
 
-  if (variants.includes(a)) return "EXACT_MATCH";
-  if (direction === "tr_to_en" && variants.some((v) => v.length > 4 && levenshteinDistance(a, v) <= 1)) {
-    return "ACCEPTED_TYPO";
+export function stripTurkishEnding(normalized: string): string {
+  for (const ending of TURKISH_ENDINGS) {
+    const stem = normalized.replace(ending, "");
+    if (stem !== normalized && stem.length >= MIN_STEM_LENGTH) return stem;
   }
-  return "INCORRECT";
+  return normalized;
+}
+
+// One letter missing, extra or wrong is forgiven -- but only for a word of more than 4 letters: in a short word one different letter is
+// usually a different word ("over" / "oven", "cat" / "cap", "el" / "ol"), and forgiving it would teach the wrong thing.
+const TYPO_MIN_LENGTH = 5;
+
+export type AnswerCheck = {
+  result: AnswerResult;
+  // The exact spelling of the accepted answer (the matching variant of a slash-separated entry, as stored), for ACCEPTED_TYPO; else null.
+  accepted: string | null;
+};
+
+// EXACT_MATCH beats everything and is checked against every accepted variant (see acceptedVariants above), not just the raw slash-joined
+// string. Otherwise a variant accepts the answer (ACCEPTED_TYPO) when, in either language, the answer is one letter away from it
+// (Levenshtein distance 1, for a variant over 4 letters), or, typing Turkish, when the two are the same once the -mak / -mek / -ma / -me
+// endings are ignored on both sides -- or one letter away from each other after that.
+export function checkVocabAnswerDetailed(userAnswer: string, correctAnswer: string, direction: QuizDirection): AnswerCheck {
+  const turkish = direction === "en_to_tr";
+  const a = normalizeForDirection(userAnswer, direction);
+  const variants = acceptedVariants(correctAnswer).map((raw) => {
+    const v = normalizeForDirection(raw, direction);
+    return { raw, v, stem: turkish ? stripTurkishEnding(v) : v };
+  });
+  if (variants.length === 0) return { result: "INCORRECT", accepted: null };
+
+  if (variants.some((x) => x.v === a)) return { result: "EXACT_MATCH", accepted: null };
+
+  const aStem = turkish ? stripTurkishEnding(a) : a;
+  for (const x of variants) {
+    const sameWithoutEnding = turkish && aStem === x.stem;
+    const oneLetterOff = x.v.length >= TYPO_MIN_LENGTH && levenshteinDistance(a, x.v) <= 1;
+    const oneLetterOffWithoutEnding = turkish && x.stem.length >= TYPO_MIN_LENGTH && levenshteinDistance(aStem, x.stem) <= 1;
+    if (sameWithoutEnding || oneLetterOff || oneLetterOffWithoutEnding) return { result: "ACCEPTED_TYPO", accepted: x.raw };
+  }
+  return { result: "INCORRECT", accepted: null };
+}
+
+export function checkVocabAnswer(userAnswer: string, correctAnswer: string, direction: QuizDirection): AnswerResult {
+  return checkVocabAnswerDetailed(userAnswer, correctAnswer, direction).result;
 }
 
 // --- Phase 2: quiz batch selection -----------------------------------------

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  checkVocabAnswer,
+  checkVocabAnswerDetailed,
   masteryLevel,
   requeueAfterMiss,
   summarizeSession,
@@ -31,7 +31,8 @@ const AUTO_ADVANCE_MS = 900;
 // countAfter is this word's own correct_count once this answer is accounted for -- set OPTIMISTICALLY the instant the answer is
 // given (recordAnswer mirrors nextWordProgress), then reconciled with the server's authoritative value once the background save
 // resolves, same spirit as this component's other optimistic state (activeTask.current below).
-type Feedback = { result: AnswerResult; correctAnswer: string; wasSkipped: boolean; countAfter: number };
+// acceptedSpelling: for ACCEPTED_TYPO, the exact spelling of the word that was accepted (the student's answer was close, not exact).
+type Feedback = { result: AnswerResult; correctAnswer: string; wasSkipped: boolean; countAfter: number; acceptedSpelling?: string | null };
 
 // The per-word mastery indicator: three dots, lit up to the word's level -- 1 correct answer = one dot in the light shade,
 // 2 = two dots in the medium shade, 3 or more = all three in the deepest (max mastery). The shade follows the LEVEL, so the
@@ -100,7 +101,7 @@ const FEEDBACK_CONTENT: Record<
   },
 };
 
-function AnswerFeedbackContent({
+export function AnswerFeedbackContent({
   feedback,
   isSaving,
   submitError,
@@ -121,7 +122,13 @@ function AnswerFeedbackContent({
       <WordProgressDots count={feedback.countAfter} className="justify-center" />
       <div className="space-y-1.5">
         <p className={cn("text-xl font-bold", content.titleClass)}>{content.title(feedback.wasSkipped)}</p>
-        {needsAcknowledgement && (
+        {feedback.result === "ACCEPTED_TYPO" && (
+          // The point is granted, but the student still sees how the word is really spelled.
+          <p className="text-foreground text-sm" data-slot="accepted-spelling">
+            Doğru kabul edildi, ancak tam yazılışı: <span className="font-semibold">{feedback.acceptedSpelling ?? feedback.correctAnswer}</span>
+          </p>
+        )}
+        {needsAcknowledgement && feedback.result !== "ACCEPTED_TYPO" && (
           <p className="text-foreground text-sm">
             Doğru cevap: <span className="font-semibold">{feedback.correctAnswer}</span>
           </p>
@@ -268,13 +275,13 @@ export function VocabQuizSession({
   // background save (startSaveTransition) even starts. The save itself
   // runs as a transition so it never blocks the window from swapping to
   // the feedback content or the student from clicking through.
-  function recordAnswer(result: AnswerResult, correctAnswer: string, wasSkipped: boolean) {
+  function recordAnswer(result: AnswerResult, correctAnswer: string, wasSkipped: boolean, acceptedSpelling: string | null = null) {
     if (!current) return;
     const isCorrect = result !== "INCORRECT";
     const previousCount = current.correctCount;
     // Optimistic count, mirroring nextWordProgress -- a correct answer adds one, a miss changes nothing -- so the dots already
     // show the right level the instant the answer is given, reconciled below with the server's figure once the save resolves.
-    setFeedback({ result, correctAnswer, wasSkipped, countAfter: previousCount + (isCorrect ? 1 : 0) });
+    setFeedback({ result, correctAnswer, wasSkipped, countAfter: previousCount + (isCorrect ? 1 : 0), acceptedSpelling });
     setResults((prev) => [...prev, result]);
     setSubmitError(null);
     // A miss (or Pas Geç), whatever the word had earned before, brings it back later in this same session.
@@ -316,7 +323,8 @@ export function VocabQuizSession({
     e.preventDefault();
     if (!current || feedback) return;
     const { correctAnswer } = promptFor(current);
-    recordAnswer(checkVocabAnswer(answer, correctAnswer, current.direction), correctAnswer, false);
+    const check = checkVocabAnswerDetailed(answer, correctAnswer, current.direction);
+    recordAnswer(check.result, correctAnswer, false, check.accepted);
   }
 
   // Pas Geç: mathematically an incorrect answer (queues the word again for this session, never takes back a correct answer it
