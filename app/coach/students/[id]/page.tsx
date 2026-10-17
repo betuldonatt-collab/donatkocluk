@@ -5,7 +5,7 @@ import { bridgeProblemRoutine } from "@/lib/curriculum/problemler";
 import { AytTrackProvider } from "@/components/ayt-track-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Images } from "lucide-react";
 
 import { sessionBalance } from "@/lib/session-balance";
 import { createClient } from "@/lib/supabase/server";
@@ -679,6 +679,14 @@ export default async function CoachStudentDetailPage(props: PageProps<"/coach/st
                   sessions={detail.sessions}
                   initialHasMore={detail.notesHasMore}
                 />
+                {/* Fotoğraf Havuzu: every Kanıt Fotoğrafı of this student, sortable into the coach's folders (own page). */}
+                <Link
+                  href={`/coach/students/${id}/photos`}
+                  className="bg-card hover:bg-muted mt-4 flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium shadow-xs transition-colors"
+                >
+                  <Images className="size-4" />
+                  Fotoğraf Havuzu
+                </Link>
               </div>
             </div>
           </>
