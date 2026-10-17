@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { fetchAllPages } from "@/lib/paged-select";
 import { weightedCounts, type WeightableTask } from "@/lib/effort-weight";
+import { studyStatusSelect } from "@/lib/task-study-status";
 
 // What the coach dashboard's two activity alerts need, per student:
 //  - was the student active in the last days (any task touched after it was created). Counted in the database by
@@ -54,6 +55,7 @@ export const PREV_WEEK_COLUMNS =
 export async function fetchStudentActivity(supabase: SupabaseClient, studentIds: string[], window: ActivityWindow): Promise<StudentActivity> {
   if (studentIds.length === 0) return NO_ACTIVITY;
 
+  const studyCol = await studyStatusSelect(supabase);
   const [rpc, prev] = await Promise.all([
     supabase.rpc("coach_dashboard_activity", {
       p_student_ids: studentIds,
@@ -64,7 +66,7 @@ export async function fetchStudentActivity(supabase: SupabaseClient, studentIds:
     fetchAllPages<PrevWeekTaskRow>((from, to, withCount) =>
       supabase
         .from("student_tasks")
-        .select(PREV_WEEK_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .select(PREV_WEEK_COLUMNS + studyCol, withCount ? { count: "exact" } : undefined)
         .in("student_id", studentIds)
         .gte("task_date", window.prevFrom)
         .lte("task_date", window.prevTo)

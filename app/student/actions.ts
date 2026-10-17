@@ -14,6 +14,7 @@ import { fetchMaarifGrade } from "@/lib/maarif-grade";
 import { GENERAL_EXAM_TRACKS, buildGeneralExamTitle, type GeneralExamTrack } from "@/lib/general-exam-track";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { isSoruCozumuLike } from "@/lib/task-types";
+import { studyStatusColumnAvailable } from "@/lib/task-study-status";
 import {
   EXAM_SCORES_REQUIRED,
   GENERAL_EXAM_SCORES_REQUIRED,
@@ -465,9 +466,12 @@ async function updateTaskProgressInternal(taskId: string, patch: TaskProgressPat
     await bankFocusSession(supabase, user.id, taskIdV, activeSession);
   }
 
+  // A dual task keeps the student's own pick for its study / video part next to the overall status (migration 0138), so the completion
+  // percentages can credit that part and the question part separately (lib/effort-weight.ts). Left out until the column exists.
+  const studyPick = isDual && dualManualStatus && (await studyStatusColumnAvailable(supabase)) ? { study_status: dualManualStatus } : {};
   const { data, error } = await supabase
     .from("student_tasks")
-    .update({ ...patchV, ...(evidenceHold ?? {}), updated_at: new Date().toISOString() })
+    .update({ ...patchV, ...(evidenceHold ?? {}), ...studyPick, updated_at: new Date().toISOString() })
     .eq("id", taskIdV)
     .select("*")
     .single();

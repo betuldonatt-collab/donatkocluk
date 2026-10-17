@@ -43,6 +43,9 @@ export type StudentTask = {
   resource_id: string | null;
   resource_names: string[];
   total_count: number | null;
+  // Konu Çalışması / Video with a question target: the student's own pick for the study / video part, kept apart from the overall
+  // status (migration 0138; absent / null on older rows and on every other type).
+  study_status?: "done" | "half_done" | "not_done" | null;
   correct_count: number | null;
   wrong_count: number | null;
   empty_count: number | null;

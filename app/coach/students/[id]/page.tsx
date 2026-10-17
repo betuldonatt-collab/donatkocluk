@@ -34,6 +34,7 @@ import { completionPercent, resolveCycles, tasksInCycle, type CycleWindow, type 
 import { TargetsCompletionCard } from "./_components/targets-completion-card";
 import { completionLayoutFor, groupStats, type CompletionLayout } from "@/lib/program-completion-bars";
 import { weightedCounts } from "@/lib/effort-weight";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import type { TopicQuestionTotals } from "./_components/topic-performance-map";
 import type {
   CompletionStats,
@@ -71,7 +72,7 @@ function getWeekDays(referenceIso: string) {
 type CompletionRow = Pick<
   DetailTask,
   "task_date" | "status" | "task_type" | "title" | "course_id" | "total_count" | "duration_minutes" | "correct_count" | "wrong_count" | "empty_count"
->;
+> & { study_status?: string | null };
 type HistoryTask = CompletionRow &
   Pick<DetailTask, "id" | "topic_id" | "is_coach_assigned" | "is_approved_by_coach"> & {
     tracked_duration_seconds: number | null;
@@ -188,6 +189,7 @@ async function fetchStudentDetail(studentId: string) {
   missingFrom.setUTCDate(missingFrom.getUTCDate() - MISSING_TASKS_WINDOW_DAYS);
   const missingFromIso = missingFrom.toISOString().slice(0, 10);
 
+  const historyStudyCol = await studyStatusSelect(supabase);
   const [
     { data: allTasks },
     { data: sessionRows },
@@ -211,14 +213,14 @@ async function fetchStudentDetail(studentId: string) {
   ] = await Promise.all([
       // The student's WHOLE task history, slim: only the columns the percentages / question totals need (HISTORY_COLUMNS),
       // read in pages so a long history is neither dragged over the wire as full rows nor cut at the API's row cap.
-      fetchAllPages((from, to, withCount) =>
+      fetchAllPages<HistoryTask>((from, to, withCount) =>
         supabase
           .from("student_tasks")
-          .select(HISTORY_COLUMNS, withCount ? { count: "exact" } : undefined)
+          .select(HISTORY_COLUMNS + historyStudyCol, withCount ? { count: "exact" } : undefined)
           .eq("student_id", studentId)
           .order("task_date", { ascending: false })
           .order("id", { ascending: true })
-          .range(from, to),
+          .range(from, to) as unknown as PromiseLike<{ data: HistoryTask[] | null; error: unknown; count?: number | null }>,
       ),
       supabase
         .from("coaching_sessions")

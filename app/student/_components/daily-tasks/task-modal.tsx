@@ -28,6 +28,7 @@ import { coursesForExamSection, generalExamSections, parseGeneralExamTrack } fro
 import { useMaarifGrade } from "@/components/maarif-grade-context";
 import { usesPhotoWorkflow } from "@/lib/photo-workflow";
 import { isSoruCozumuLike } from "@/lib/task-types";
+import { effectiveStudyStatus } from "@/lib/effort-weight";
 import { cn } from "@/lib/utils";
 import {
   getTaskTopicMistakes,
@@ -481,10 +482,14 @@ function TaskModalBody({
   // three single-part tasks' immediate-save buttons.
   const needsManualStatusSelector = isDual || isDurationOnlyTarget;
 
+  // A dual task re-opens on the student's own pick for the study / video part (study_status), not on the overall status that merged it
+  // with the question counts; a duration-only task has only its one status.
   const [manualStatus, setManualStatus] = useState<DualPartStatus | null>(() =>
-    needsManualStatusSelector && (task.status === "done" || task.status === "half_done" || task.status === "not_done")
-      ? task.status
-      : null,
+    isDual
+      ? effectiveStudyStatus(task)
+      : needsManualStatusSelector && (task.status === "done" || task.status === "half_done" || task.status === "not_done")
+        ? task.status
+        : null,
   );
 
   const branchCourse = task.task_type === "branch_exam" ? findCourseById(task.course_id) : null;

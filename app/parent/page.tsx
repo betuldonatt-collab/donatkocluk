@@ -8,6 +8,7 @@ import { mondayOf } from "@/lib/date";
 import { sessionBalance } from "@/lib/session-balance";
 import { completionPercent, resolveCycles, type ProgressLock } from "@/lib/completion";
 import { solvedCount, weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import { DailyProgressCard, type DailyProgressTask } from "@/components/daily-progress-card";
 import { isLgsParentView } from "@/lib/parent-lgs";
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -111,13 +112,14 @@ async function fetchDashboardData() {
   // memory below.
   const tasksFrom = [start, currentCycle.start, previousCycle.start].sort()[0];
   const tasksTo = [addDays(end, 1), currentCycle.end].sort().reverse()[0];
+  const studyCol = await studyStatusSelect(supabase);
   const { data: taskWindowRows } = await supabase
     // Security note: the rows below are sliced server-side. Only the slim
     // program fields ever cross into the client component (WeeklyProgramSheet);
     // the Doğru/Yanlış/Boş-style counts stay on the server, used only for the
     // effort-weighted percentages (a half-done task is credited for what was solved).
     .from("student_tasks")
-    .select("id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes, correct_count, wrong_count, empty_count")
+    .select(`id, title, task_type, course_id, task_date, status, order_index, total_count, duration_minutes, correct_count, wrong_count, empty_count${studyCol}`)
     .eq("student_id", studentId)
     .gte("task_date", tasksFrom)
     .lte("task_date", tasksTo)

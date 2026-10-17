@@ -3,6 +3,7 @@ import { getViewContext } from "@/lib/impersonation";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
 import { resolveCycles, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { fetchAllPages } from "@/lib/paged-select";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import { reconcileStaleFocusSessions } from "./actions";
 import { FocusReviewsCard, type StudentFocusReview } from "./_components/focus-timer/focus-reviews-card";
 import { NextSessionCard } from "./_components/next-session-card";
@@ -65,6 +66,7 @@ async function fetchHomeData(userId: string) {
   const ratingCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   // The latest lock and the soonest pending session fix the cycle windows the progress cards read; that dependent read
   // starts the moment those two answer, while everything else is still being fetched (it used to wait for ALL of them).
+  const studyCol = await studyStatusSelect(supabase);
   const lockQuery = supabase
     .from("progress_locks")
     .select("period_start, locked_at")
@@ -97,7 +99,7 @@ async function fetchHomeData(userId: string) {
     const { data: progressExtraRows } = await fetchAllPages((from, to, withCount) =>
       supabase
         .from("student_tasks")
-        .select("id, task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count", withCount ? { count: "exact" } : undefined)
+        .select(`id, task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count${studyCol}`, withCount ? { count: "exact" } : undefined)
         .eq("student_id", userId)
         .gte("task_date", progressTasksFrom)
         .lte("task_date", progressTasksTo)
@@ -131,7 +133,7 @@ async function fetchHomeData(userId: string) {
         .limit(1),
       supabase
         .from("student_tasks")
-        .select(STUDENT_TASK_COLUMNS)
+        .select(STUDENT_TASK_COLUMNS + studyCol)
         .eq("student_id", userId)
         // From YESTERDAY, not just today: the grid is a rolling 7 days that
         // starts today, but the Dün tab needs yesterday's tasks on the very
@@ -144,7 +146,7 @@ async function fetchHomeData(userId: string) {
       fetchAllPages((from, to, withCount) =>
         supabase
           .from("student_tasks")
-          .select(STUDENT_TASK_COLUMNS, withCount ? { count: "exact" } : undefined)
+          .select(STUDENT_TASK_COLUMNS + studyCol, withCount ? { count: "exact" } : undefined)
           .eq("student_id", userId)
           .eq("analysis_pending", true)
           .lt("task_date", yesterdayIso)
@@ -250,11 +252,13 @@ async function fetchHomeData(userId: string) {
 
   // Pending-analysis tasks from earlier weeks aren't in the week fetch,
   // so merge them in (dedup not needed — the date ranges don't overlap).
-  const tasks = [...(weekTaskRows ?? []), ...(pendingTaskRows ?? [])].map((t) => ({
+  // (The column list carries study_status only once migration 0138 is there, so the rows are typed here, not by the query builder.)
+  type TaskRow = { id: string; task_date: string } & Record<string, unknown>;
+  const tasks = [...((weekTaskRows ?? []) as unknown as TaskRow[]), ...((pendingTaskRows ?? []) as unknown as TaskRow[])].map((t) => ({
     ...t,
     week_locked: lockedThroughDate !== null && t.task_date < lockedThroughDate,
     resource_names: resourceNamesByTask.get(t.id) ?? [],
-  })) as StudentTask[];
+  })) as unknown as StudentTask[];
 
   const allTimeTrackedMinutes = Math.floor(
     (allTaskDurationRows ?? []).reduce((sum, r) => sum + (r.tracked_duration_seconds ?? 0), 0) / 60,
@@ -293,7 +297,7 @@ async function fetchHomeData(userId: string) {
     // previous cycle's fixed date ranges (lib/completion.ts) -- always real,
     // displayable ranges now, never null.
     currentCycle,
-    progressExtraTasks: (progressExtraRows ?? []) as ProgressTask[],
+    progressExtraTasks: (progressExtraRows ?? []) as unknown as ProgressTask[],
     previousCycle,
     routineRowHeights: profileRow?.schedule_routine_row_heights_px ?? [],
     taskRowHeights: profileRow?.schedule_task_row_heights_px ?? [],

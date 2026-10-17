@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { groupStudentsByCycleWindow } from "@/lib/cycle-query-groups";
 import { completionPercent, resolveCycles, type CycleWindow, type ProgressLock } from "@/lib/completion";
 import { weightedCycleCounts, type WeightableTask } from "@/lib/effort-weight";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import { formatPercentile } from "@/lib/profile-terms";
 import { createClient } from "@/lib/supabase/server";
 import { sessionBalance, type SessionBalanceRow } from "@/lib/session-balance";
@@ -74,15 +75,16 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
   // Only the tasks inside each student's CURRENT cycle window are read (that is all the percentage below counts) -- the
   // page used to pull every task of every student ever assigned, which grew with each month of coaching (and, past the
   // API's row cap, silently dropped rows). Students sharing a window share one query.
+  const studyCol = await studyStatusSelect(supabase);
   const taskGroups = await Promise.all(
     groupStudentsByCycleWindow(studentIds, (id) => currentCycleByStudent.get(id)!).map(async (group) => {
       const { data } = await supabase
         .from("student_tasks")
-        .select("student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count")
+        .select(`student_id, status, task_date, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count${studyCol}`)
         .in("student_id", group.studentIds)
         .gte("task_date", group.start)
         .lte("task_date", group.end);
-      return data ?? [];
+      return (data ?? []) as unknown as (WeightableTask & { student_id: string })[];
     }),
   );
 
@@ -101,6 +103,7 @@ async function fetchRoster(coachId: string): Promise<StudentRow[]> {
       correct_count: t.correct_count,
       wrong_count: t.wrong_count,
       empty_count: t.empty_count,
+      study_status: t.study_status,
     });
     tasksByStudent.set(t.student_id, list);
   }

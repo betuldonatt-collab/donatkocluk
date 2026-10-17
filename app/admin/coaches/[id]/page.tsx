@@ -6,6 +6,7 @@ import { weekDates } from "@/lib/date";
 import { completionPercent } from "@/lib/completion";
 import { weightedCounts, type WeightableTask } from "@/lib/effort-weight";
 import { fetchAllPages } from "@/lib/paged-select";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import { COACH_REVIEWS_PAGE_SIZE } from "./constants";
 import { DeactivateToggle } from "../../_components/deactivate-toggle";
 import { ResetPasswordButton } from "../../_components/reset-password-button";
@@ -122,6 +123,7 @@ async function fetchCoachDetail(coachId: string) {
   // got done", bounded so it doesn't scan a growing all-time task history.
   // On the same effort-weighted math as every other percentage in the app (lib/effort-weight.ts: a task's full weight is the denominator,
   // done earns all of it, half done solved / target of it), read page by page so a long history is never cut at the API's row limit.
+  const studyCol = rosterIds.length > 0 ? await studyStatusSelect(supabase) : "";
   const rosterTasks =
     rosterIds.length > 0
       ? (
@@ -129,7 +131,7 @@ async function fetchCoachDetail(coachId: string) {
             supabase
               .from("student_tasks")
               .select(
-                "task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count",
+                `task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count${studyCol}`,
                 withCount ? { count: "exact" } : undefined,
               )
               .in("student_id", rosterIds)

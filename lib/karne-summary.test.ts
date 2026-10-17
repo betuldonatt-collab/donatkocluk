@@ -370,7 +370,7 @@ describe("fetchKarneSummary (the data layer)", () => {
         const call = { table, filters: [] as [string, string, unknown][] };
         calls.push(call);
         const b: Record<string, unknown> = {};
-        for (const m of ["select", "eq", "in", "order", "range"]) b[m] = () => b;
+        for (const m of ["select", "eq", "in", "order", "range", "limit"]) b[m] = () => b;
         for (const m of ["gte", "lte", "or"]) {
           b[m] = (a: string, v?: unknown) => {
             call.filters.push([m, a, v]);
@@ -387,7 +387,8 @@ describe("fetchKarneSummary (the data layer)", () => {
   it("reads only coach-approved tasks, bounded to the data window, and returns the computed summary", async () => {
     const client = fakeClient({ student_tasks: tasks as unknown[], profiles: [{ academic_track: "sayisal" }] });
     const s = await fetchKarneSummary(client as never, "s1", RANGE.start, RANGE.end, { today: TODAY, now: NOW });
-    const taskCall = client.calls.find((c) => c.table === "student_tasks")!;
+    // (the first student_tasks call is the one-row probe for the study_status column, lib/task-study-status.ts)
+    const taskCall = client.calls.find((c) => c.table === "student_tasks" && c.filters.length > 0)!;
     expect(taskCall.filters).toContainEqual(["or", "is_coach_assigned.eq.true,is_approved_by_coach.eq.true", undefined]);
     expect(taskCall.filters).toContainEqual(["gte", "task_date", summaryDataStart(RANGE.start, RANGE.end, TODAY)]);
     expect(taskCall.filters).toContainEqual(["lte", "task_date", RANGE.end]);

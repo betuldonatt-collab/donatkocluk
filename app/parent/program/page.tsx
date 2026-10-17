@@ -9,6 +9,7 @@ import { isLgsParentView } from "@/lib/parent-lgs";
 import { mondayOf, weekDates } from "@/lib/date";
 import { EVIDENCE_BUCKET, isEvidencePathFor } from "@/lib/task-evidence";
 import { ParentProgramBoard, type ParentFixedTask, type ParentProgramTask } from "../_components/parent-program-board";
+import { studyStatusSelect } from "@/lib/task-study-status";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -56,11 +57,12 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
   const days = weekDates(start);
   const end = days[6];
 
+  const studyCol = await studyStatusSelect(supabase);
   const [{ data: taskRows }, { data: fixedRows }] = await Promise.all([
     supabase
       .from("student_tasks")
       .select(
-        "id, title, description, task_type, course_id, task_date, status, order_index, is_coach_assigned, total_count, correct_count, wrong_count, empty_count, subject_scores, duration_minutes, tracked_duration_seconds, evidence_image_paths, evidence_review_status, evidence_photo_status, rejected_at, rejection_reason",
+        `id, title, description, task_type, course_id, task_date, status, order_index, is_coach_assigned, total_count, correct_count, wrong_count, empty_count, subject_scores, duration_minutes, tracked_duration_seconds, evidence_image_paths, evidence_review_status, evidence_photo_status, rejected_at, rejection_reason${studyCol}`,
       )
       .eq("student_id", studentId)
       .gte("task_date", start)
@@ -74,7 +76,7 @@ export default async function ParentProgramPage({ searchParams }: PageProps<"/pa
       .order("start_time", { ascending: true }),
   ]);
 
-  const taskList = (taskRows ?? []) as (Omit<ParentProgramTask, "resource_names" | "photo_urls" | "evidence_review_note"> & { evidence_image_paths: string[] | null })[];
+  const taskList = (taskRows ?? []) as unknown as (Omit<ParentProgramTask, "resource_names" | "photo_urls" | "evidence_review_note"> & { evidence_image_paths: string[] | null })[];
   const taskIds = taskList.map((t) => t.id);
 
   // Only paths that really belong to this student's task folder are ever signed.

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { aytTrackOf } from "./curriculum";
 import { fetchMaarifGrade } from "./maarif-grade";
 import { fetchAllPages } from "./paged-select";
+import { studyStatusSelect } from "./task-study-status";
 import { fetchStudentEventAttendance } from "./student-event-attendance";
 import { computeKarneSummary, DEFAULT_TREND_WEEKS, summaryDataStart, type KarneSummary, type KarneSummaryTask } from "./karne-summary";
 
@@ -24,6 +25,7 @@ export async function fetchKarneSummary(
   const today = options.today ?? now.slice(0, 10);
   const trendWeeks = options.trendWeeks ?? DEFAULT_TREND_WEEKS;
   const from = summaryDataStart(rangeStart, rangeEnd, today, trendWeeks);
+  const studyCol = await studyStatusSelect(supabase);
 
   const [{ data: profile }, maarifGrade, tasks, events] = await Promise.all([
     supabase.from("profiles").select("academic_track").eq("id", studentId).maybeSingle(),
@@ -31,14 +33,14 @@ export async function fetchKarneSummary(
     fetchAllPages<KarneSummaryTask>((fromRow, toRow, withCount) =>
       supabase
         .from("student_tasks")
-        .select(TASK_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .select(TASK_COLUMNS + studyCol, withCount ? { count: "exact" } : undefined)
         .eq("student_id", studentId)
         .or("is_coach_assigned.eq.true,is_approved_by_coach.eq.true")
         .gte("task_date", from)
         .lte("task_date", rangeEnd)
         .order("task_date", { ascending: true })
         .order("id", { ascending: true })
-        .range(fromRow, toRow),
+        .range(fromRow, toRow) as unknown as PromiseLike<{ data: KarneSummaryTask[] | null; error: unknown; count?: number | null }>,
     ),
     fetchStudentEventAttendance(supabase, studentId, rangeStart, rangeEnd),
   ]);

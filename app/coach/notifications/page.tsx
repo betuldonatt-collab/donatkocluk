@@ -4,6 +4,7 @@ import { weekDates } from "@/lib/date";
 import { completionPercent } from "@/lib/completion";
 import { weightedCounts, type WeightableTask } from "@/lib/effort-weight";
 import { fetchAllPages } from "@/lib/paged-select";
+import { studyStatusSelect } from "@/lib/task-study-status";
 import type { RosterStudent } from "../dashboard/types";
 import { NotificationsClient } from "./_components/notifications-client";
 import type { CoachNotification, NotificationType } from "./types";
@@ -71,11 +72,12 @@ async function syncThresholdNotifications(
   // hasRecent() below, none of the student_tasks queries depend on it or
   // on one another. One Promise.all instead of recentRows running alone
   // as its own round trip before the other three.
+  const studyCol = await studyStatusSelect(supabase);
   const weekRows = (from: string, to: string) =>
     fetchAllPages<WeekTaskRow>((start, end, withCount) =>
       supabase
         .from("student_tasks")
-        .select(WEEK_TASK_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .select(WEEK_TASK_COLUMNS + studyCol, withCount ? { count: "exact" } : undefined)
         .in("student_id", studentIds)
         .gte("task_date", from)
         .lte("task_date", to)

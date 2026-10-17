@@ -10,6 +10,7 @@ import {
   type PrevWeekTaskRow,
 } from "./coach-dashboard-activity";
 import { completionPercent } from "./completion";
+import { resetStudyStatusProbe } from "./task-study-status";
 
 const window: ActivityWindow = { recentSince: "2026-10-05T00:00:00.000Z", prevFrom: "2026-09-28", prevTo: "2026-10-04" };
 
@@ -80,7 +81,7 @@ describe("fetchStudentActivity", () => {
     const rpc = vi.fn().mockResolvedValue(rpcAnswer);
     const from = vi.fn(() => {
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "in", "gte", "lte", "order", "range"]) b[m] = () => b;
+      for (const m of ["select", "in", "gte", "lte", "order", "range", "limit"]) b[m] = () => b;
       b.then = (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null, count: rows.length });
       return b;
     });
@@ -92,6 +93,7 @@ describe("fetchStudentActivity", () => {
       row("a", "done"),
       row("a", "pending"),
     ]);
+    resetStudyStatusProbe();
     const result = await fetchStudentActivity(client as never, ["a", "b"], window);
     expect(client.rpc).toHaveBeenCalledWith("coach_dashboard_activity", {
       p_student_ids: ["a", "b"],
@@ -99,7 +101,8 @@ describe("fetchStudentActivity", () => {
       p_prev_from: window.prevFrom,
       p_prev_to: window.prevTo,
     });
-    expect(client.from).toHaveBeenCalledTimes(1); // last week's rows only; the recent-activity rows are not read
+    // the probe for the study_status column, then last week's rows; the recent-activity rows are not read
+    expect(client.from).toHaveBeenCalledTimes(2);
     expect(result.activeIds.has("a")).toBe(true);
     expect(result.prevWeek.get("a")).toEqual({ done: 100, total: 200 });
   });
@@ -109,6 +112,7 @@ describe("fetchStudentActivity", () => {
     const client = fake({ data: null, error: { message: "function public.coach_dashboard_activity does not exist" } }, [
       { ...row("a", "done"), updated_at: "2026-10-06T10:00:00Z", created_at: "2026-10-01T10:00:00Z" },
     ]);
+    resetStudyStatusProbe();
     const result = await fetchStudentActivity(client as never, ["a"], window);
     expect([...result.activeIds]).toEqual(["a"]);
     expect(result.prevWeek.get("a")).toEqual({ done: 100, total: 100 });

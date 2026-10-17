@@ -28,6 +28,8 @@ export type ParentProgramTask = {
   correct_count: number | null;
   wrong_count: number | null;
   empty_count: number | null;
+  // the student's own pick for the study / video part of a Konu Çalışması / Video task (null / absent otherwise)
+  study_status?: string | null;
   subject_scores: Record<string, { correct?: number | null; wrong?: number | null; empty?: number | null }> | null;
   duration_minutes: number | null;
   tracked_duration_seconds: number | null;
