@@ -7,7 +7,7 @@ import { fetchAllPages } from "@/lib/paged-select";
 import { buildPhotoPool, type PoolFolder, type PoolTask } from "@/lib/photo-pool";
 import { PhotoPoolGallery } from "./photo-pool-gallery";
 
-type FolderRow = { id: string; name: string };
+type FolderRow = { id: string; name: string; course_key?: string | null };
 type ItemRow = { photo_path: string; folder_id: string };
 type AnnotationRow = { photo_path: string; annotated_path: string };
 type PagedResult<T> = PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>;
@@ -19,6 +19,17 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
   const supabase = await createClient();
   const view = await getViewContext("coach");
   const coachId = view?.effectiveUserId ?? null;
+
+  // The coach's folders with the course each belongs to (migration 0141); before that column exists they are read without it (all flat).
+  async function readFolders(coach: string): Promise<{ data: FolderRow[] | null; error: unknown; hasCourses: boolean }> {
+    const query = (columns: string) =>
+      supabase.from("student_photo_folders").select(columns).eq("coach_id", coach).eq("student_id", id).order("created_at", { ascending: true }).order("id", { ascending: true });
+    const withCourse = (await query("id, name, course_key")) as unknown as { data: FolderRow[] | null; error: { code?: string } | null };
+    if (!withCourse.error) return { data: withCourse.data, error: null, hasCourses: true };
+    if (withCourse.error.code !== "42703") return { data: null, error: withCourse.error, hasCourses: false };
+    const plain = (await query("id, name")) as unknown as { data: FolderRow[] | null; error: unknown };
+    return { data: plain.data, error: plain.error, hasCourses: false };
+  }
 
   const [{ data: profile }, tasksRead, foldersRead, itemsRead, annotationsRead] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", id).maybeSingle(),
@@ -33,9 +44,7 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
           .order("id", { ascending: true })
           .range(from, to) as unknown as PagedResult<PoolTask>,
     ),
-    coachId
-      ? supabase.from("student_photo_folders").select("id, name").eq("coach_id", coachId).eq("student_id", id).order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] as FolderRow[], error: null }),
+    coachId ? readFolders(coachId) : Promise.resolve({ data: [] as FolderRow[], error: null, hasCourses: false }),
     coachId
       ? fetchAllPages<ItemRow>(
           (from, to, withCount) =>
@@ -65,7 +74,7 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
 
   // Until migration 0139 is run the folder tables do not exist: the gallery still works, just without folders (and says so).
   const foldersAvailable = !foldersRead.error && !itemsRead.error;
-  const folders: PoolFolder[] = foldersAvailable ? ((foldersRead.data ?? []) as FolderRow[]).map((f) => ({ id: f.id, name: f.name })) : [];
+  const folders: PoolFolder[] = foldersAvailable ? (foldersRead.data ?? []).map((f) => ({ id: f.id, name: f.name, courseKey: f.course_key ?? null })) : [];
   const folderIds = new Set(folders.map((f) => f.id));
   const folderByPath = new Map<string, string>();
   if (foldersAvailable) for (const item of itemsRead.data ?? []) if (folderIds.has(item.folder_id)) folderByPath.set(item.photo_path, item.folder_id);
@@ -99,7 +108,7 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
       {tasksRead.error ? (
         <p className="text-destructive text-sm">Fotoğraflar yüklenemedi. Sayfayı yenileyip tekrar dene.</p>
       ) : (
-        <PhotoPoolGallery studentId={id} initialPhotos={photos} initialFolders={folders} foldersAvailable={foldersAvailable} annotationsAvailable={annotationsAvailable} />
+        <PhotoPoolGallery studentId={id} initialPhotos={photos} initialFolders={folders} foldersAvailable={foldersAvailable} courseFoldersAvailable={foldersRead.hasCourses} annotationsAvailable={annotationsAvailable} />
       )}
     </div>
   );

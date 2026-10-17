@@ -13,11 +13,12 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { GENERIC_DB_ERROR, dbError } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { EVIDENCE_BUCKET } from "@/lib/task-evidence";
-import { cleanFolderName, isPoolPathFor, type PoolFolder } from "@/lib/photo-pool";
+import { cleanFolderName, courseOfTask, isCourseKey, isPoolPathFor, type PoolFolder } from "@/lib/photo-pool";
 import { ANNOTATION_BUCKET, ANNOTATION_MAX_BYTES, annotationPath, isAnnotationPathFor } from "@/lib/photo-annotate";
 
 export type PhotoActionFailure = { ok: false; error: string };
 export type FolderResult = { ok: true; folder: PoolFolder } | PhotoActionFailure;
+export type RenameResult = { ok: true; folder: { id: string; name: string } } | PhotoActionFailure;
 export type OkResult = { ok: true } | PhotoActionFailure;
 export type UrlsResult = { ok: true; urls: Record<string, string> } | PhotoActionFailure;
 export type AnnotationResult = { ok: true; annotatedPath: string; url: string | null } | PhotoActionFailure;
@@ -31,8 +32,10 @@ type DbError = { code?: string; message?: string };
 function fail(error: unknown, feature: { what: string; migration: string } = { what: "Klasör özelliği", migration: "0139" }): PhotoActionFailure {
   const e = error as DbError | undefined;
   if (e?.code === "23505") return { ok: false, error: DUPLICATE_MESSAGE };
-  // 42P01 = relation does not exist, PGRST205 = not in the schema cache: migration 0139 has not been run yet.
+  // 42P01 = relation does not exist, PGRST205 = not in the schema cache: the migration has not been run yet.
+  // 42703 = column does not exist (migration 0141 added folders.course_key).
   if (e?.code === "42P01" || e?.code === "PGRST205") return { ok: false, error: missingTablesMessage(feature.what, feature.migration) };
+  if (e?.code === "42703") return { ok: false, error: missingTablesMessage("Derse bağlı klasörler", "0141") };
   if (error instanceof Error) return { ok: false, error: error.message };
   return { ok: false, error: dbError(error).message };
 }
@@ -54,25 +57,28 @@ const nameSchema = z.string().transform((raw, ctx) => {
   return name ?? "";
 });
 
-export async function createPhotoFolder(studentId: string, name: string): Promise<FolderResult> {
+const courseKeySchema = z.string().refine(isCourseKey, "Geçersiz ders.");
+
+// A folder is created UNDER a course (courseKey = the course's key in the Pool: a course id, 'genel-deneme', 'diger').
+export async function createPhotoFolder(studentId: string, name: string, courseKey: string): Promise<FolderResult> {
   try {
     await assertNotImpersonating();
-    const input = parseInput(z.object({ studentId: uuidSchema, name: nameSchema }), { studentId, name });
+    const input = parseInput(z.object({ studentId: uuidSchema, name: nameSchema, courseKey: courseKeySchema }), { studentId, name, courseKey });
     const supabase = await createClient();
     const coachId = await requireCoach(supabase, input.studentId);
     const { data, error } = await supabase
       .from("student_photo_folders")
-      .insert({ coach_id: coachId, student_id: input.studentId, name: input.name })
-      .select("id, name")
+      .insert({ coach_id: coachId, student_id: input.studentId, name: input.name, course_key: input.courseKey })
+      .select("id, name, course_key")
       .single();
     if (error) return fail(error);
-    return { ok: true, folder: { id: data.id as string, name: data.name as string } };
+    return { ok: true, folder: { id: data.id as string, name: data.name as string, courseKey: (data.course_key as string | null) ?? input.courseKey } };
   } catch (error) {
     return fail(error);
   }
 }
 
-export async function renamePhotoFolder(studentId: string, folderId: string, name: string): Promise<FolderResult> {
+export async function renamePhotoFolder(studentId: string, folderId: string, name: string): Promise<RenameResult> {
   try {
     await assertNotImpersonating();
     const input = parseInput(z.object({ studentId: uuidSchema, folderId: uuidSchema, name: nameSchema }), { studentId, folderId, name });
@@ -144,15 +150,31 @@ export async function movePhotosToFolder(studentId: string, paths: string[], fol
       return { ok: true };
     }
 
-    const { data: folder, error: folderError } = await supabase
-      .from("student_photo_folders")
-      .select("id")
-      .eq("id", input.folderId)
-      .eq("coach_id", coachId)
-      .eq("student_id", input.studentId)
-      .maybeSingle();
-    if (folderError) return fail(folderError);
-    if (!folder) return { ok: false, error: "Klasör bulunamadı." };
+    // The folder and its course. (Before migration 0141 there is no course column: every folder then takes any photo, as it always did.)
+    const folderQuery = (columns: string) =>
+      supabase.from("student_photo_folders").select(columns).eq("id", input.folderId).eq("coach_id", coachId).eq("student_id", input.studentId).maybeSingle();
+    let folderRead = (await folderQuery("id, course_key")) as unknown as { data: { id: string; course_key?: string | null } | null; error: DbError | null };
+    if (folderRead.error?.code === "42703") folderRead = (await folderQuery("id")) as unknown as typeof folderRead;
+    if (folderRead.error) return fail(folderRead.error);
+    if (!folderRead.data) return { ok: false, error: "Klasör bulunamadı." };
+    const folderCourse = folderRead.data.course_key ?? null;
+
+    // A course folder takes only that course's photos (the course of a photo is the one of its task).
+    if (folderCourse !== null) {
+      const { data: taskRows, error: tasksError } = await supabase
+        .from("student_tasks")
+        .select("task_type, course_id, evidence_image_paths")
+        .eq("student_id", input.studentId)
+        .overlaps("evidence_image_paths", paths_);
+      if (tasksError) return fail(tasksError);
+      const courseOfPath = new Map<string, string>();
+      for (const t of (taskRows ?? []) as { task_type: string; course_id: string | null; evidence_image_paths: string[] | null }[]) {
+        const key = courseOfTask(t).key;
+        for (const path of t.evidence_image_paths ?? []) courseOfPath.set(path, key);
+      }
+      if (paths_.some((path) => !courseOfPath.has(path))) return { ok: false, error: "Fotoğraf bulunamadı." };
+      if (paths_.some((path) => courseOfPath.get(path) !== folderCourse)) return { ok: false, error: "Bu klasör başka bir derse ait; fotoğraflar sadece kendi dersinin klasörüne taşınabilir." };
+    }
 
     const now = new Date().toISOString();
     const { error } = await supabase.from("student_photo_folder_items").upsert(

@@ -4,6 +4,9 @@ type Op = { table: string; op: string; payload?: unknown; filters: [string, unkn
 let ops: Op[] = [];
 let roster: string[] = [];
 let folderExists = true;
+// the course the (existing) folder belongs to (null = a folder from before folders had courses), and the student's tasks with photos
+let folderCourse: string | null = "tyt-matematik";
+let taskRows: { task_type: string; course_id: string | null; evidence_image_paths: string[] }[] = [];
 let failOn: { table: string; op: string; code?: string; message?: string } | null = null;
 let signed: { path: string; signedUrl: string }[] | null = null;
 let signedPaths: string[][] = [];
@@ -29,6 +32,7 @@ vi.mock("@/lib/supabase/server", () => ({
       b.update = (payload: unknown) => ((op.op = "update"), (op.payload = payload), b);
       b.upsert = (payload: unknown, options: unknown) => ((op.op = "upsert"), (op.payload = payload), (op.options = options), b);
       b.delete = () => ((op.op = "delete"), b);
+      b.overlaps = (col: string, value: unknown) => (op.filters.push([`overlaps:${col}`, value]), b);
       for (const m of ["eq", "in"]) b[m] = (col: string, value: unknown) => (op.filters.push([`${m}:${col}`, value]), b);
       const finish = () => {
         ops.push(op);
@@ -39,9 +43,10 @@ vi.mock("@/lib/supabase/server", () => ({
         }
         if (table === "student_photo_folders" && (op.op === "insert" || op.op === "update")) {
           const name = (op.payload as { name: string }).name;
-          return { data: { id: "f-new", name }, error: null };
+          return { data: { id: "f-new", name, course_key: (op.payload as { course_key?: string }).course_key ?? null }, error: null };
         }
-        if (table === "student_photo_folders" && op.op === "select") return { data: folderExists ? { id: "f1" } : null, error: null };
+        if (table === "student_photo_folders" && op.op === "select") return { data: folderExists ? { id: "f1", course_key: folderCourse } : null, error: null };
+        if (table === "student_tasks") return { data: taskRows, error: null };
         return { data: null, error: null };
       };
       b.single = async () => finish();
@@ -64,6 +69,8 @@ beforeEach(() => {
   ops = [];
   roster = [STUDENT];
   folderExists = true;
+  folderCourse = "tyt-matematik";
+  taskRows = [{ task_type: "question_bank", course_id: "tyt-matematik", evidence_image_paths: [photo("a"), photo("b")] }];
   failOn = null;
   signed = null;
   signedPaths = [];
@@ -72,30 +79,37 @@ beforeEach(() => {
 
 describe("createPhotoFolder", () => {
   it("creates a folder owned by the coach for the student, with the cleaned name", async () => {
-    const r = await createPhotoFolder(STUDENT, "  Soru   Bankası ");
-    expect(r).toEqual({ ok: true, folder: { id: "f-new", name: "Soru Bankası" } });
-    expect(writes()[0]).toMatchObject({ table: "student_photo_folders", op: "insert", payload: { coach_id: "coach1", student_id: STUDENT, name: "Soru Bankası" } });
+    const r = await createPhotoFolder(STUDENT, "  Soru   Bankası ", "tyt-matematik");
+    expect(r).toEqual({ ok: true, folder: { id: "f-new", name: "Soru Bankası", courseKey: "tyt-matematik" } });
+    expect(writes()[0]).toMatchObject({
+      table: "student_photo_folders",
+      op: "insert",
+      payload: { coach_id: "coach1", student_id: STUDENT, name: "Soru Bankası", course_key: "tyt-matematik" },
+    });
   });
   it("refuses an empty / over-long name and a student who is not on the roster, writing nothing", async () => {
-    expect(await createPhotoFolder(STUDENT, "   ")).toMatchObject({ ok: false });
-    expect(await createPhotoFolder(STUDENT, "x".repeat(61))).toMatchObject({ ok: false });
-    expect(await createPhotoFolder(OTHER, "Deneme")).toEqual({ ok: false, error: "Bu öğrenci sana atanmamış." });
-    expect(await createPhotoFolder("not-a-uuid", "Deneme")).toMatchObject({ ok: false });
+    expect(await createPhotoFolder(STUDENT, "   ", "tyt-matematik")).toMatchObject({ ok: false });
+    expect(await createPhotoFolder(STUDENT, "x".repeat(61), "tyt-matematik")).toMatchObject({ ok: false });
+    expect(await createPhotoFolder(OTHER, "Deneme", "tyt-matematik")).toEqual({ ok: false, error: "Bu öğrenci sana atanmamış." });
+    expect(await createPhotoFolder("not-a-uuid", "Deneme", "tyt-matematik")).toMatchObject({ ok: false });
+    // a folder is created under a course: none, or a malformed key, is refused
+    expect(await createPhotoFolder(STUDENT, "Deneme", "")).toMatchObject({ ok: false });
+    expect(await createPhotoFolder(STUDENT, "Deneme", "../x")).toMatchObject({ ok: false });
     expect(writes()).toEqual([]);
   });
   it("a duplicate name gets a clear message", async () => {
     failOn = { table: "student_photo_folders", op: "insert", code: "23505" };
-    expect(await createPhotoFolder(STUDENT, "Deneme")).toEqual({ ok: false, error: "Bu isimde bir klasör zaten var." });
+    expect(await createPhotoFolder(STUDENT, "Deneme", "tyt-matematik")).toEqual({ ok: false, error: "Bu isimde bir klasör zaten var." });
   });
   it("before migration 0139 it says so instead of failing opaquely", async () => {
     failOn = { table: "student_photo_folders", op: "insert", code: "PGRST205" };
-    const r = await createPhotoFolder(STUDENT, "Deneme");
+    const r = await createPhotoFolder(STUDENT, "Deneme", "tyt-matematik");
     expect(r).toMatchObject({ ok: false });
     expect((r as { error: string }).error).toContain("0139");
   });
   it("any other database error is masked, never thrown", async () => {
     failOn = { table: "student_photo_folders", op: "insert", message: "secret detail" };
-    const r = await createPhotoFolder(STUDENT, "Deneme");
+    const r = await createPhotoFolder(STUDENT, "Deneme", "tyt-matematik");
     expect(r).toMatchObject({ ok: false });
     expect(JSON.stringify(r)).not.toContain("secret detail");
   });
@@ -173,5 +187,65 @@ describe("getPhotoUrls", () => {
   it("a path that could not be signed is just absent", async () => {
     signed = [{ path: photo("a"), signedUrl: "" }];
     expect(await getPhotoUrls(STUDENT, [photo("a")])).toEqual({ ok: true, urls: {} });
+  });
+});
+
+describe("folders belong to a course", () => {
+  it("a missing course column (migration 0141 not run) says so instead of failing opaquely", async () => {
+    failOn = { table: "student_photo_folders", op: "insert", code: "42703" };
+    const r = await createPhotoFolder(STUDENT, "Deneme", "tyt-matematik");
+    expect(r).toMatchObject({ ok: false });
+    expect((r as { error: string }).error).toContain("0141");
+  });
+
+  it("the same folder name can exist in two courses (the unique rule is per course; a repeat in ONE course is the duplicate error)", async () => {
+    expect((await createPhotoFolder(STUDENT, "Soru Bankası", "tyt-matematik")).ok).toBe(true);
+    expect((await createPhotoFolder(STUDENT, "Soru Bankası", "lgs-fen")).ok).toBe(true);
+    failOn = { table: "student_photo_folders", op: "insert", code: "23505" };
+    expect(await createPhotoFolder(STUDENT, "Soru Bankası", "lgs-fen")).toEqual({ ok: false, error: "Bu isimde bir klasör zaten var." });
+  });
+
+  it("a course folder takes that course's photos", async () => {
+    expect(await movePhotosToFolder(STUDENT, [photo("a"), photo("b")], FOLDER)).toEqual({ ok: true });
+    expect(writes().some((w) => w.table === "student_photo_folder_items" && w.op === "upsert")).toBe(true);
+    // the photos are looked up among the student's own tasks
+    const lookup = ops.find((o) => o.table === "student_tasks");
+    expect(lookup?.filters).toContainEqual(["eq:student_id", STUDENT]);
+  });
+
+  it("a course folder refuses a photo of another course, writing nothing", async () => {
+    taskRows = [{ task_type: "question_bank", course_id: "lgs-fen", evidence_image_paths: [photo("a")] }];
+    const r = await movePhotosToFolder(STUDENT, [photo("a")], FOLDER);
+    expect(r).toMatchObject({ ok: false });
+    expect((r as { error: string }).error).toContain("başka bir derse");
+    expect(writes()).toEqual([]);
+  });
+
+  it("a Genel Deneme photo belongs to 'genel-deneme', a task without a course to 'diger', a routine to its own key", async () => {
+    folderCourse = "genel-deneme";
+    taskRows = [{ task_type: "general_exam", course_id: null, evidence_image_paths: [photo("a")] }];
+    expect((await movePhotosToFolder(STUDENT, [photo("a")], FOLDER)).ok).toBe(true);
+    folderCourse = "paragraf";
+    taskRows = [{ task_type: "question_bank", course_id: "paragraf", evidence_image_paths: [photo("a")] }];
+    expect((await movePhotosToFolder(STUDENT, [photo("a")], FOLDER)).ok).toBe(true);
+  });
+
+  it("a photo that is in none of the student's tasks cannot be filed in a course folder", async () => {
+    taskRows = [];
+    expect(await movePhotosToFolder(STUDENT, [photo("a")], FOLDER)).toEqual({ ok: false, error: "Fotoğraf bulunamadı." });
+    expect(writes()).toEqual([]);
+  });
+
+  it("a folder without a course (from before 0141) takes any photo, with no lookup", async () => {
+    folderCourse = null;
+    taskRows = [];
+    expect(await movePhotosToFolder(STUDENT, [photo("a")], FOLDER)).toEqual({ ok: true });
+    expect(ops.some((o) => o.table === "student_tasks")).toBe(false);
+  });
+
+  it("taking photos out of every folder needs no course check", async () => {
+    taskRows = [];
+    expect(await movePhotosToFolder(STUDENT, [photo("a")], null)).toEqual({ ok: true });
+    expect(ops.some((o) => o.table === "student_tasks")).toBe(false);
   });
 });

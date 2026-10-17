@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FolderInput, FolderPlus, Folders, ImageOff, Images, Inbox, Pencil, Trash2, Undo2, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, FolderInput, FolderPlus, Folders, ImageOff, Images, Inbox, Pencil, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,9 @@ import {
   FOLDER_NAME_MAX,
   NO_FILTER,
   applyMove,
-  courseOptions,
+  courseTree,
   filterPhotos,
-  folderCounts,
+  folderAcceptsPhoto,
   groupPhotos,
   pathsToMove,
   takeGroups,
@@ -95,12 +95,15 @@ export function PhotoPoolGallery({
   initialPhotos,
   initialFolders,
   foldersAvailable,
+  courseFoldersAvailable = true,
   annotationsAvailable = false,
 }: {
   studentId: string;
   initialPhotos: PoolPhoto[];
   initialFolders: PoolFolder[];
   foldersAvailable: boolean;
+  // Migration 0141 is in place: folders belong to a course (without it new folders cannot be created, old ones stay flat).
+  courseFoldersAvailable?: boolean;
   // Migration 0140 is in place: the lightbox can rotate / draw and keep the coach's private copy.
   annotationsAvailable?: boolean;
 }) {
@@ -110,8 +113,9 @@ export function PhotoPoolGallery({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState(PAGE);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [newName, setNewName] = useState("");
+  // The "Yeni Klasör" dialog: which course the folder is created under, and its name.
+  const [folderDialog, setFolderDialog] = useState<{ open: boolean; courseKey: string; name: string }>({ open: false, courseKey: "", name: "" });
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,8 +126,9 @@ export function PhotoPoolGallery({
   const [showOriginal, setShowOriginal] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const counts = useMemo(() => folderCounts(photos), [photos]);
-  const courses = useMemo(() => courseOptions(photos), [photos]);
+  // The sidebar: Course > its folders (and the folders from before they belonged to a course).
+  const tree = useMemo(() => courseTree(photos, folders), [photos, folders]);
+  const photoByPath = useMemo(() => new Map(photos.map((p) => [p.path, p])), [photos]);
   const visible = useMemo(() => filterPhotos(photos, filter), [photos, filter]);
   // Sections: Standard tasks by course, Rutin tasks by type. The gallery order (and the lightbox's previous / next) follows the sections.
   const groups = useMemo(() => groupPhotos(visible), [visible]);
@@ -139,6 +144,14 @@ export function PhotoPoolGallery({
   const editedKeys = [...page, ...(lightboxPhoto ? [lightboxPhoto] : [])].flatMap((p) => (p.annotatedPath ? [p.annotatedPath] : []));
   const { urls } = useLazyUrls(originalKeys, (batch) => getPhotoUrls(studentId, batch));
   const { urls: editedUrls, put: putEditedUrl } = useLazyUrls(editedKeys, (batch) => getAnnotationUrls(studentId, batch));
+
+  // What "Taşı" offers: the folders of the one course the selection belongs to (plus any folder without a course); a selection that
+  // spans several courses can only be taken out of its folders.
+  const selectionCourses = new Set([...selected].flatMap((path) => photoByPath.get(path)?.courseKey ?? []));
+  const moveTargets =
+    selectionCourses.size === 0
+      ? []
+      : folders.filter((f) => [...selected].every((path) => { const ph = photoByPath.get(path); return ph ? folderAcceptsPhoto(f, ph) : false; }));
 
   function changeFilter(next: Partial<PhotoFilter>) {
     setFilter((prev) => ({ ...prev, ...next }));
@@ -177,18 +190,27 @@ export function PhotoPoolGallery({
     }
   }
 
+  function openFolderDialog(courseKey?: string) {
+    const first = courseKey ?? (filter.course !== "all" ? filter.course : (tree.courses[0]?.key ?? ""));
+    setFolderDialog({ open: true, courseKey: first, name: "" });
+  }
+
   async function addFolder() {
-    if (busy) return;
+    if (busy || !folderDialog.courseKey) return;
     setBusy(true);
     try {
-      const result = await createPhotoFolder(studentId, newName);
+      const result = await createPhotoFolder(studentId, folderDialog.name, folderDialog.courseKey);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       setFolders((prev) => [...prev, result.folder]);
-      setNewName("");
-      setNewFolderOpen(false);
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        if (result.folder.courseKey) next.delete(result.folder.courseKey); // show the new folder under its course
+        return next;
+      });
+      setFolderDialog({ open: false, courseKey: "", name: "" });
     } catch (e) {
       toast.error(friendlyError(e, "Klasör oluşturulamadı."));
     } finally {
@@ -205,7 +227,7 @@ export function PhotoPoolGallery({
         toast.error(result.error);
         return;
       }
-      setFolders((prev) => prev.map((f) => (f.id === result.folder.id ? result.folder : f)));
+      setFolders((prev) => prev.map((f) => (f.id === result.folder.id ? { ...f, name: result.folder.name } : f)));
       setRenaming(null);
     } catch (e) {
       toast.error(friendlyError(e, "Klasör yeniden adlandırılamadı."));
@@ -216,7 +238,7 @@ export function PhotoPoolGallery({
 
   async function removeFolder(folder: PoolFolder) {
     if (busy) return;
-    if (!window.confirm(`"${folder.name}" klasörü silinsin mi? İçindeki fotoğraflar silinmez, "Klasörsüz" bölümüne döner.`)) return;
+    if (!window.confirm(`"${folder.name}" klasörü silinsin mi? İçindeki fotoğraflar silinmez, dersin "Klasörsüz" bölümüne döner.`)) return;
     setBusy(true);
     try {
       const result = await deletePhotoFolder(studentId, folder.id);
@@ -304,9 +326,13 @@ export function PhotoPoolGallery({
     void move(paths, target);
   }
 
-  const dropProps = (key: string, target: string | null) => ({
+  // A drop target takes the dragged photos only if `accepts` says so (a course folder takes only that course's photos); otherwise the
+  // browser shows "not allowed" and nothing happens.
+  const dropProps = (key: string, target: string | null, accepts: (photo: PoolPhoto) => boolean) => ({
     onDragOver: (e: React.DragEvent) => {
       if (dragPaths.length === 0) return;
+      const dragged = dragPaths.flatMap((path) => photoByPath.get(path) ?? []);
+      if (dragged.length === 0 || !dragged.every(accepts)) return;
       e.preventDefault();
       setDropTarget(key);
     },
@@ -321,6 +347,59 @@ export function PhotoPoolGallery({
       dropTarget === key && "ring-primary bg-primary/15 ring-2",
     );
 
+  // One folder in the sidebar (nested under its course, or in the "Dersi olmayan klasörler" list): click filters the gallery to it; it is a
+  // drop target for photos it accepts; rename / delete appear on hover.
+  function folderRow(folder: { id: string; name: string; count: number }, courseKey: string | null, accepts: (photo: PoolPhoto) => boolean) {
+    const full = folders.find((f) => f.id === folder.id);
+    if (renaming?.id === folder.id) {
+      return (
+        <form
+          key={folder.id}
+          className="flex items-center gap-1 px-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveRename();
+          }}
+        >
+          <Input
+            autoFocus
+            value={renaming.name}
+            maxLength={FOLDER_NAME_MAX}
+            onChange={(e) => setRenaming({ id: folder.id, name: e.target.value })}
+            onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
+            className="h-8"
+            aria-label="Klasör adı"
+          />
+          <Button type="submit" size="icon" variant="ghost" className="size-8" disabled={busy} aria-label="Kaydet">
+            <Check className="size-4" />
+          </Button>
+          <Button type="button" size="icon" variant="ghost" className="size-8" onClick={() => setRenaming(null)} aria-label="Vazgeç">
+            <X className="size-4" />
+          </Button>
+        </form>
+      );
+    }
+    return (
+      <div key={folder.id} className="group/row relative" {...(foldersAvailable ? dropProps(folder.id, folder.id, accepts) : {})}>
+        <button type="button" className={entryClass(filter.folder === folder.id, folder.id)} onClick={() => changeFilter({ course: courseKey ?? "all", folder: folder.id })}>
+          <Folders className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+          <span className="text-xs tabular-nums group-hover/row:opacity-0">{folder.count}</span>
+        </button>
+        {full && (
+          <div className="absolute inset-y-0 right-1 hidden items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex">
+            <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => setRenaming({ id: folder.id, name: folder.name })} aria-label={`${folder.name} klasörünü yeniden adlandır`}>
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => void removeFolder(full)} aria-label={`${folder.name} klasörünü sil`}>
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (photos.length === 0) {
     return (
       <EmptyState
@@ -333,125 +412,100 @@ export function PhotoPoolGallery({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      {/* Klasörler */}
-      <aside className="space-y-1 lg:sticky lg:top-4 lg:self-start">
-        <p className="text-muted-foreground mb-1 px-2.5 text-xs font-medium tracking-wide uppercase">Klasörler</p>
-        <button type="button" className={entryClass(filter.folder === "all", "all")} onClick={() => changeFilter({ folder: "all" })}>
+      {/* Dersler ve altındaki klasörler */}
+      <aside className="space-y-1 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start lg:overflow-y-auto">
+        <p className="text-muted-foreground mb-1 px-2.5 text-xs font-medium tracking-wide uppercase">Dersler</p>
+        <button type="button" className={entryClass(filter.course === "all" && filter.folder === "all", "all")} onClick={() => changeFilter({ course: "all", folder: "all" })}>
           <Images className="size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Tümü</span>
-          <span className="text-xs tabular-nums">{counts.all}</span>
-        </button>
-        <button
-          type="button"
-          className={entryClass(filter.folder === "none", "none")}
-          onClick={() => changeFilter({ folder: "none" })}
-          {...(foldersAvailable ? dropProps("none", null) : {})}
-        >
-          <Inbox className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">Klasörsüz</span>
-          <span className="text-xs tabular-nums">{counts.none}</span>
+          <span className="text-xs tabular-nums">{photos.length}</span>
         </button>
 
-        {folders.map((folder) =>
-          renaming?.id === folder.id ? (
-            <form
-              key={folder.id}
-              className="flex items-center gap-1 px-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void saveRename();
-              }}
-            >
-              <Input
-                autoFocus
-                value={renaming.name}
-                maxLength={FOLDER_NAME_MAX}
-                onChange={(e) => setRenaming({ id: folder.id, name: e.target.value })}
-                onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
-                className="h-8"
-                aria-label="Klasör adı"
-              />
-              <Button type="submit" size="icon" variant="ghost" className="size-8" disabled={busy} aria-label="Kaydet">
-                <Check className="size-4" />
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="size-8" onClick={() => setRenaming(null)} aria-label="Vazgeç">
-                <X className="size-4" />
-              </Button>
-            </form>
-          ) : (
-            <div key={folder.id} className="group/row relative" {...dropProps(folder.id, folder.id)}>
-              <button type="button" className={entryClass(filter.folder === folder.id, folder.id)} onClick={() => changeFilter({ folder: folder.id })}>
-                <Folders className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                <span className="text-xs tabular-nums group-hover/row:opacity-0">{counts.byFolder.get(folder.id) ?? 0}</span>
-              </button>
-              <div className="absolute inset-y-0 right-1 hidden items-center gap-0.5 group-hover/row:flex group-focus-within/row:flex">
-                <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => setRenaming({ id: folder.id, name: folder.name })} aria-label={`${folder.name} klasörünü yeniden adlandır`}>
-                  <Pencil className="size-3.5" />
-                </Button>
-                <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => void removeFolder(folder)} aria-label={`${folder.name} klasörünü sil`}>
-                  <Trash2 className="size-3.5" />
-                </Button>
+        {tree.courses.map((course) => {
+          const open = !collapsed.has(course.key);
+          const hasFolders = course.folders.length > 0;
+          const courseDrop = foldersAvailable ? dropProps(`course:${course.key}`, null, (p) => p.courseKey === course.key) : {};
+          return (
+            <div key={course.key}>
+              <div className="group/row relative flex items-center" {...courseDrop}>
+                {hasFolders ? (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded"
+                    aria-label={`${course.label} klasörlerini ${open ? "daralt" : "aç"}`}
+                    aria-expanded={open}
+                    onClick={() =>
+                      setCollapsed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(course.key)) next.delete(course.key);
+                        else next.add(course.key);
+                        return next;
+                      })
+                    }
+                  >
+                    <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
+                  </button>
+                ) : (
+                  <span className="size-6 shrink-0" />
+                )}
+                <button
+                  type="button"
+                  className={entryClass(filter.course === course.key && filter.folder === "all", `course:${course.key}`)}
+                  onClick={() => changeFilter({ course: course.key, folder: "all" })}
+                >
+                  <BookOpen className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{course.label}</span>
+                  <span className={cn("text-xs tabular-nums", foldersAvailable && courseFoldersAvailable && "group-hover/row:opacity-0")}>{course.count}</span>
+                </button>
+                {foldersAvailable && courseFoldersAvailable && (
+                  <div className="absolute inset-y-0 right-1 hidden items-center group-hover/row:flex group-focus-within/row:flex">
+                    <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => openFolderDialog(course.key)} aria-label={`${course.label} dersine klasör ekle`}>
+                      <FolderPlus className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
               </div>
+
+              {open && hasFolders && (
+                <div className="border-border ml-3 space-y-0.5 border-l pl-2">
+                  <button
+                    type="button"
+                    className={entryClass(filter.folder === "none" && filter.course === course.key, `none:${course.key}`)}
+                    onClick={() => changeFilter({ course: course.key, folder: "none" })}
+                  >
+                    <Inbox className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">Klasörsüz</span>
+                    <span className="text-xs tabular-nums">{course.unfiledCount}</span>
+                  </button>
+                  {course.folders.map((folder) => folderRow(folder, course.key, (p) => p.courseKey === course.key))}
+                </div>
+              )}
             </div>
-          ),
+          );
+        })}
+
+        {tree.legacy.length > 0 && (
+          <div className="pt-2">
+            <p className="text-muted-foreground mb-1 px-2.5 text-xs font-medium tracking-wide uppercase">Dersi olmayan klasörler</p>
+            <div className="space-y-0.5">{tree.legacy.map((folder) => folderRow(folder, null, () => true))}</div>
+          </div>
         )}
 
-        {foldersAvailable ? (
-          newFolderOpen ? (
-            <form
-              className="flex items-center gap-1 px-1 pt-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void addFolder();
-              }}
-            >
-              <Input
-                autoFocus
-                value={newName}
-                maxLength={FOLDER_NAME_MAX}
-                placeholder="Örn. Soru Bankası"
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && setNewFolderOpen(false)}
-                className="h-8"
-                aria-label="Yeni klasör adı"
-              />
-              <Button type="submit" size="icon" variant="ghost" className="size-8" disabled={busy || newName.trim() === ""} aria-label="Klasör oluştur">
-                <Check className="size-4" />
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="size-8" onClick={() => setNewFolderOpen(false)} aria-label="Vazgeç">
-                <X className="size-4" />
-              </Button>
-            </form>
-          ) : (
-            <Button type="button" variant="outline" size="sm" className="mt-2 w-full justify-start" onClick={() => setNewFolderOpen(true)}>
-              <FolderPlus className="size-4" />
-              Yeni Klasör / Filtre Ekle
-            </Button>
-          )
+        {foldersAvailable && courseFoldersAvailable ? (
+          <Button type="button" variant="outline" size="sm" className="mt-2 w-full justify-start" onClick={() => openFolderDialog()} disabled={tree.courses.length === 0}>
+            <FolderPlus className="size-4" />
+            Yeni Klasör Ekle
+          </Button>
+        ) : foldersAvailable ? (
+          <p className="text-muted-foreground px-2.5 pt-2 text-xs">Derse bağlı klasörler için veritabanı güncellemesi (0141) çalıştırılmalı.</p>
         ) : (
-          <p className="text-muted-foreground px-2.5 pt-2 text-xs">Klasörler için veritabanı güncellemesi (0139) çalıştırılmalı.</p>
+          <p className="text-muted-foreground px-2.5 pt-2 text-xs">Klasörler için veritabanı güncellemesi (0139 ve 0141) çalıştırılmalı.</p>
         )}
       </aside>
 
       {/* Galeri */}
       <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-muted-foreground flex flex-col gap-1 text-xs">
-            Ders
-            <select
-              value={filter.course}
-              onChange={(e) => changeFilter({ course: e.target.value })}
-              className="border-input bg-background text-foreground h-9 min-w-44 rounded-md border px-2 text-sm"
-            >
-              <option value="all">Tüm dersler ({counts.all})</option>
-              {courses.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label} ({c.count})
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="text-muted-foreground flex flex-col gap-1 text-xs">
             Başlangıç tarihi
             <Input type="date" value={filter.from} max={filter.to || undefined} onChange={(e) => changeFilter({ from: e.target.value })} className="h-9 w-40" />
@@ -460,10 +514,10 @@ export function PhotoPoolGallery({
             Bitiş tarihi
             <Input type="date" value={filter.to} min={filter.from || undefined} onChange={(e) => changeFilter({ to: e.target.value })} className="h-9 w-40" />
           </label>
-          {(filter.course !== "all" || filter.from || filter.to) && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => changeFilter({ course: "all", from: "", to: "" })}>
+          {(filter.from || filter.to) && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => changeFilter({ from: "", to: "" })}>
               <X className="size-4" />
-              Filtreleri temizle
+              Tarihi temizle
             </Button>
           )}
           <p className="text-muted-foreground ml-auto text-sm tabular-nums">{visible.length} fotoğraf</p>
@@ -484,17 +538,18 @@ export function PhotoPoolGallery({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
                     <DropdownMenuLabel>Şuraya taşı</DropdownMenuLabel>
-                    {folders.map((f) => (
+                    {moveTargets.map((f) => (
                       <DropdownMenuItem key={f.id} onSelect={() => void move([...selected], f.id)}>
                         <Folders className="size-4" />
                         {f.name}
                       </DropdownMenuItem>
                     ))}
-                    {folders.length > 0 && <DropdownMenuSeparator />}
+                    {moveTargets.length > 0 && <DropdownMenuSeparator />}
                     <DropdownMenuItem onSelect={() => void move([...selected], null)}>
                       <Inbox className="size-4" />
-                      Klasörsüz
+                      Klasörden çıkar
                     </DropdownMenuItem>
+                    {selectionCourses.size > 1 && <DropdownMenuLabel className="text-muted-foreground max-w-56 text-xs font-normal">Seçim birden fazla dersten; klasöre taşımak için tek bir dersin fotoğraflarını seç.</DropdownMenuLabel>}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -614,6 +669,57 @@ export function PhotoPoolGallery({
           </>
         )}
       </section>
+
+      {/* Yeni klasör: hangi dersin altında? */}
+      <Dialog open={folderDialog.open} onOpenChange={(open) => !busy && setFolderDialog((d) => ({ ...d, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Yeni klasör</DialogTitle>
+            <DialogDescription>Klasör, seçtiğin dersin altında oluşur ve sadece o dersin fotoğraflarını alır.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void addFolder();
+            }}
+          >
+            <label className="flex flex-col gap-1 text-sm">
+              Ders
+              <select
+                value={folderDialog.courseKey}
+                onChange={(e) => setFolderDialog((d) => ({ ...d, courseKey: e.target.value }))}
+                className="border-input bg-background text-foreground h-9 rounded-md border px-2 text-sm"
+                aria-label="Klasörün dersi"
+              >
+                {tree.courses.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Klasör adı
+              <Input
+                autoFocus
+                value={folderDialog.name}
+                maxLength={FOLDER_NAME_MAX}
+                placeholder="Örn. Soru Bankası, Ders Notu"
+                onChange={(e) => setFolderDialog((d) => ({ ...d, name: e.target.value }))}
+              />
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setFolderDialog((d) => ({ ...d, open: false }))} disabled={busy}>
+                Vazgeç
+              </Button>
+              <Button type="submit" disabled={busy || folderDialog.name.trim() === "" || folderDialog.courseKey === ""}>
+                Oluştur
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Büyütülmüş fotoğraf */}
       <Dialog open={lightbox !== null} onOpenChange={(open) => !open && !savingEdit && openPhoto(null)}>

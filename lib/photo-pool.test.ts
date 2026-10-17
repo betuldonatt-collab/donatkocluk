@@ -8,9 +8,13 @@ import {
   cleanFolderName,
   courseOfTask,
   courseOptions,
+  courseTree,
   filterPhotos,
+  folderAcceptsPhoto,
   folderCounts,
   groupPhotos,
+  groupMetaOfKey,
+  isCourseKey,
   isPoolPathFor,
   pathsToMove,
   takeGroups,
@@ -229,5 +233,111 @@ describe("migration 0139 and the page wiring", () => {
     expect(notes).toBeGreaterThan(-1);
     expect(button).toBeGreaterThan(notes);
     expect(page).toMatch(/href=\{`\/coach\/students\/\$\{id\}\/photos`\}/);
+  });
+});
+
+describe("the sidebar tree: Course > folders", () => {
+  const photos = buildPhotoPool(
+    [
+      { id: "m", task_date: "2026-10-03", task_type: "question_bank", title: "Mat", course_id: "tyt-matematik", evidence_image_paths: [`${S}/m/1.jpg`, `${S}/m/2.jpg`, `${S}/m/3.jpg`] },
+      { id: "f", task_date: "2026-10-02", task_type: "question_bank", title: "Fizik", course_id: "tyt-fizik", evidence_image_paths: [`${S}/f/1.jpg`] },
+      { id: "p", task_date: "2026-10-04", task_type: "question_bank", title: "Par", course_id: "paragraf", evidence_image_paths: [`${S}/p/1.jpg`] },
+    ],
+    new Map([
+      [`${S}/m/1.jpg`, "fm1"],
+      [`${S}/m/2.jpg`, "fm1"],
+      [`${S}/f/1.jpg`, "ff1"],
+    ]),
+  );
+  const folders = [
+    { id: "fm1", name: "Soru Bankası", courseKey: "tyt-matematik" },
+    { id: "fm2", name: "Ders Notu", courseKey: "tyt-matematik" },
+    { id: "ff1", name: "Soru Bankası", courseKey: "tyt-fizik" }, // the same name under another course
+    { id: "old", name: "Eski klasör", courseKey: null },
+  ];
+
+  it("lists the courses (in section order) with their photo counts", () => {
+    const { courses } = courseTree(photos, folders);
+    expect(courses.map((c) => c.key)).toEqual(expect.arrayContaining(["tyt-matematik", "tyt-fizik", "paragraf"]));
+    expect(courses.find((c) => c.key === "paragraf")?.kind).toBe("routine");
+    expect(courses[courses.length - 1].key).toBe("paragraf"); // routines after the courses
+    expect(courses.find((c) => c.key === "tyt-matematik")?.count).toBe(3);
+  });
+
+  it("nests each folder under ITS course, with its own count, in creation order", () => {
+    const { courses } = courseTree(photos, folders);
+    const math = courses.find((c) => c.key === "tyt-matematik")!;
+    expect(math.folders).toEqual([
+      { id: "fm1", name: "Soru Bankası", count: 2 },
+      { id: "fm2", name: "Ders Notu", count: 0 },
+    ]);
+    expect(courses.find((c) => c.key === "tyt-fizik")!.folders).toEqual([{ id: "ff1", name: "Soru Bankası", count: 1 }]);
+    expect(courses.find((c) => c.key === "paragraf")!.folders).toEqual([]);
+  });
+
+  it("counts a course's photos that are in none of its folders", () => {
+    const { courses } = courseTree(photos, folders);
+    expect(courses.find((c) => c.key === "tyt-matematik")!.unfiledCount).toBe(1);
+    expect(courses.find((c) => c.key === "tyt-fizik")!.unfiledCount).toBe(0);
+    expect(courses.find((c) => c.key === "paragraf")!.unfiledCount).toBe(1);
+  });
+
+  it("folders without a course come back apart (they predate courses)", () => {
+    const { courses, legacy } = courseTree(photos, folders);
+    expect(legacy).toEqual([{ id: "old", name: "Eski klasör", count: 0 }]);
+    expect(courses.some((c) => c.folders.some((f) => f.id === "old"))).toBe(false);
+  });
+
+  it("a course with a folder but no photos still appears, under its own name", () => {
+    const { courses } = courseTree([], [{ id: "x", name: "Boş", courseKey: "genel-deneme" }]);
+    expect(courses).toEqual([expect.objectContaining({ key: "genel-deneme", label: "Genel Deneme", count: 0, folders: [{ id: "x", name: "Boş", count: 0 }] })]);
+  });
+
+  it("a course folder accepts only that course's photos; a folder without a course accepts any", () => {
+    const math = photos.find((p) => p.courseKey === "tyt-matematik")!;
+    const physics = photos.find((p) => p.courseKey === "tyt-fizik")!;
+    expect(folderAcceptsPhoto({ courseKey: "tyt-matematik" }, math)).toBe(true);
+    expect(folderAcceptsPhoto({ courseKey: "tyt-matematik" }, physics)).toBe(false);
+    expect(folderAcceptsPhoto({ courseKey: null }, physics)).toBe(true);
+  });
+
+  it("clicking a course or a folder maps onto the existing filter: course filter, folder filter", () => {
+    const math = filterPhotos(photos, { ...NO_FILTER, course: "tyt-matematik" });
+    expect(math).toHaveLength(3);
+    const inFolder = filterPhotos(photos, { ...NO_FILTER, course: "tyt-matematik", folder: "fm1" });
+    expect(inFolder).toHaveLength(2);
+    const unfiled = filterPhotos(photos, { ...NO_FILTER, course: "tyt-matematik", folder: "none" });
+    expect(unfiled.map((p) => p.path)).toEqual([`${S}/m/3.jpg`]);
+  });
+
+  it("group keys: Genel Deneme and Diğer are fixed words, anything else is a course id", () => {
+    expect(groupMetaOfKey("genel-deneme")).toEqual({ label: "Genel Deneme", kind: "general" });
+    expect(groupMetaOfKey("diger")).toEqual({ label: "Diğer", kind: "other" });
+    expect(groupMetaOfKey("paragraf")).toEqual({ label: "Rutin - Paragraf", kind: "routine" });
+    expect(groupMetaOfKey("tyt-matematik").kind).toBe("course");
+  });
+
+  it("a course key the actions accept: ids, 'genel-deneme', 'diger' -- nothing with slashes or dots-dots", () => {
+    for (const key of ["tyt-matematik", "genel-deneme", "diger", "paragraf", "yeni-nesil-mat-dozu"]) expect(isCourseKey(key), key).toBe(true);
+    for (const key of ["", "../x", "a/b", " x", "x".repeat(81)]) expect(isCourseKey(key), JSON.stringify(key)).toBe(false);
+  });
+});
+
+describe("migration 0141: folders under courses", () => {
+  const sql = readFileSync("supabase/migrations/0141_photo_folder_courses.sql", "utf8");
+  it("adds the course column, idempotently", () => {
+    expect(sql).toMatch(/add column if not exists course_key text/);
+    expect(sql).toMatch(/notify pgrst, 'reload schema'/);
+  });
+  it("replaces the unique name rule with one per coach, student AND course", () => {
+    expect(sql).toMatch(/drop index if exists public\.student_photo_folders_unique_name;/);
+    expect(sql).toMatch(/unique index if not exists student_photo_folders_unique_name_per_course/);
+    expect(sql).toMatch(/\(coach_id, student_id, coalesce\(course_key, ''\), lower\(btrim\(name\)\)\)/);
+  });
+  it("moves existing folders under their course only when all their photos share one", () => {
+    expect(sql).toMatch(/x\.n = 1/);
+    expect(sql).toMatch(/f\.course_key is null/);
+    expect(sql).toMatch(/'genel-deneme'/);
+    expect(sql).toMatch(/'diger'/);
   });
 });

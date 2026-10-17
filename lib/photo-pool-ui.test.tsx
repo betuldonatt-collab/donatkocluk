@@ -25,8 +25,8 @@ const pool = buildPhotoPool(
   new Map([[`${S}/t1/a.jpg`, "f1"]]),
 );
 const folders = [
-  { id: "f1", name: "Soru Bankası" },
-  { id: "f2", name: "Deneme" },
+  { id: "f1", name: "Soru Bankası", courseKey: "tyt-matematik" },
+  { id: "f2", name: "Deneme", courseKey: "genel-deneme" },
 ];
 
 function render(over: Partial<Parameters<typeof PhotoPoolGallery>[0]> = {}) {
@@ -48,7 +48,8 @@ describe("PhotoPoolGallery", () => {
     expect(html).toContain("Ders");
     expect(html).toContain("Başlangıç tarihi");
     expect(html).toContain("Bitiş tarihi");
-    expect(html).toContain("Genel Deneme (1)");
+    expect(html).not.toContain("Tüm dersler"); // the sidebar courses are the Ders filter now
+    expect(html).toContain("Genel Deneme");
     expect(html).toContain("3 fotoğraf");
   });
 
@@ -103,5 +104,66 @@ describe("PhotoPoolGallery: sections", () => {
   it("marks a photo the coach has edited", () => {
     const html = renderToStaticMarkup(<PhotoPoolGallery studentId={S} initialPhotos={mixed} initialFolders={[]} foldersAvailable annotationsAvailable />);
     expect((html.match(/Düzenlendi/g) ?? []).length).toBe(1);
+  });
+});
+
+describe("PhotoPoolGallery: courses with nested folders", () => {
+  const S2 = S;
+  const photos = buildPhotoPool(
+    [
+      { id: "m", task_date: "2026-10-03", task_type: "question_bank", title: "Mat", course_id: "tyt-matematik", evidence_image_paths: [`${S2}/m/a.jpg`, `${S2}/m/b.jpg`] },
+      { id: "f", task_date: "2026-10-04", task_type: "question_bank", title: "Fizik", course_id: "tyt-fizik", evidence_image_paths: [`${S2}/f/a.jpg`] },
+    ],
+    new Map([[`${S2}/m/a.jpg`, "fm"]]),
+  );
+  const nested = [
+    { id: "fm", name: "Soru Bankası", courseKey: "tyt-matematik" },
+    { id: "ff", name: "Soru Bankası", courseKey: "tyt-fizik" },
+    { id: "legacy", name: "Eski Klasör", courseKey: null },
+  ];
+  const html = renderToStaticMarkup(<PhotoPoolGallery studentId={S2} initialPhotos={photos} initialFolders={nested} foldersAvailable />);
+  const aside = html.slice(html.indexOf("<aside"), html.indexOf("</aside>"));
+
+  it("the sidebar lists the courses, not a flat list of folders", () => {
+    expect(aside).toContain("Dersler");
+    expect((aside.match(/aria-label="[^"]*klasörlerini daralt"/g) ?? []).length).toBe(2); // one expandable course each for math and physics
+    expect(aside).not.toContain("Genel Deneme"); // a course with no photos or folders is not listed
+  });
+
+  it("each folder appears under its own course, even when two courses use the same name", () => {
+    // sections are in label order: Fizik, then Matematik
+    const physicsSection = aside.slice(aside.indexOf("TYT Fizik"), aside.indexOf("TYT Matematik"));
+    expect(physicsSection).toContain("Soru Bankası");
+    expect(aside.slice(aside.indexOf("TYT Matematik"))).toContain("Soru Bankası");
+    expect((aside.match(/Soru Bankası/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("a course with folders has a nested 'Klasörsüz' entry", () => {
+    expect((aside.match(/Klasörsüz/g) ?? []).length).toBe(2);
+  });
+
+  it("a folder from before courses is listed apart", () => {
+    expect(aside).toContain("Dersi olmayan klasörler");
+    expect(aside).toContain("Eski Klasör");
+  });
+
+  it("the toolbar has no separate Ders dropdown any more (the sidebar's courses filter the gallery)", () => {
+    const main = html.slice(html.indexOf("</aside>"));
+    expect(main).not.toContain("Tüm dersler");
+    expect(main).toContain("Başlangıç tarihi");
+  });
+
+  it("adding a folder is offered per course and globally", () => {
+    expect(aside).toContain("Yeni Klasör Ekle");
+    expect(aside).toMatch(/dersine klasör ekle/);
+  });
+
+  it("without migration 0141 the old folders stay and new ones are explained away", () => {
+    const old = renderToStaticMarkup(
+      <PhotoPoolGallery studentId={S2} initialPhotos={photos} initialFolders={[{ id: "legacy", name: "Eski Klasör", courseKey: null }]} foldersAvailable courseFoldersAvailable={false} />,
+    );
+    expect(old).toContain("0141");
+    expect(old).not.toContain("Yeni Klasör Ekle");
+    expect(old).toContain("Eski Klasör");
   });
 });

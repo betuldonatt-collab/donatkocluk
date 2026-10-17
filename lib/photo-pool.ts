@@ -38,17 +38,28 @@ export type PoolPhoto = {
   folderId: string | null;
 };
 
-export type PoolFolder = { id: string; name: string };
+// A folder lives under ONE course (courseKey = the key the photos are grouped by: a course id, 'genel-deneme', 'diger', a routine id); null =
+// a folder from before folders belonged to courses (mixed / empty), kept as it was (migration 0141).
+export type PoolFolder = { id: string; name: string; courseKey: string | null };
+
+export const GENERAL_EXAM_KEY = "genel-deneme";
+export const OTHER_KEY = "diger";
+
+// What a group key stands for: its label and kind. The key is the task's course id, or 'genel-deneme' / 'diger'.
+export function groupMetaOfKey(key: string): { label: string; kind: GroupKind } {
+  if (key === GENERAL_EXAM_KEY) return { label: "Genel Deneme", kind: "general" };
+  if (key === OTHER_KEY) return { label: "Diğer", kind: "other" };
+  const course = findCourseById(key);
+  if (isRoutineCourseId(key)) return { label: `Rutin - ${course?.name ?? key}`, kind: "routine" };
+  return { label: course ? courseDisplayName(key, course.name) : key, kind: "course" };
+}
 
 // The group a photo belongs to, derived from its task: a Standard task by its course (Ders), a Rutin task (Paragraf, Problem, Kitap Okuma,
 // Yeni Nesil Mat Dozu) by its type as "Rutin - Paragraf", a Genel Deneme (which has no course) as "Genel Deneme", anything else without a
 // course as "Diğer".
 export function courseOfTask(task: Pick<PoolTask, "task_type" | "course_id">): { key: string; label: string; kind: GroupKind } {
-  if (task.task_type === "general_exam") return { key: "genel-deneme", label: "Genel Deneme", kind: "general" };
-  if (!task.course_id) return { key: "diger", label: "Diğer", kind: "other" };
-  const course = findCourseById(task.course_id);
-  if (isRoutineCourseId(task.course_id)) return { key: task.course_id, label: `Rutin - ${course?.name ?? task.course_id}`, kind: "routine" };
-  return { key: task.course_id, label: course ? courseDisplayName(task.course_id, course.name) : task.course_id, kind: "course" };
+  const key = task.task_type === "general_exam" ? GENERAL_EXAM_KEY : (task.course_id ?? OTHER_KEY);
+  return { key, ...groupMetaOfKey(key) };
 }
 
 // Every photo of the given tasks, newest first (task date, then path so the order is stable). A path listed twice appears once.
@@ -87,6 +98,9 @@ export type PhotoGroup = { key: string; label: string; kind: GroupKind; photos: 
 
 const KIND_ORDER: Record<GroupKind, number> = { course: 0, general: 1, routine: 2, other: 3 };
 
+const compareGroupMeta = (a: { kind: GroupKind; label: string }, b: { kind: GroupKind; label: string }) =>
+  KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.label.localeCompare(b.label, "tr");
+
 // The photos as gallery sections: courses A-Z, then the Genel Deneme, then the Rutin groups A-Z, then "Diğer". Inside a section the
 // photos keep their order (newest task first).
 export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
@@ -96,7 +110,58 @@ export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
     group.photos.push(p);
     byKey.set(p.courseKey, group);
   }
-  return [...byKey.values()].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.label.localeCompare(b.label, "tr"));
+  return [...byKey.values()].sort(compareGroupMeta);
+}
+
+// --- The sidebar tree: Course > its folders ------------------------------------------------------------------------------------------
+
+export type CourseNode = {
+  key: string;
+  label: string;
+  kind: GroupKind;
+  // Photos of the course (folders or not) / those in none of its folders.
+  count: number;
+  unfiledCount: number;
+  folders: { id: string; name: string; count: number }[];
+};
+
+// The sidebar: every course that has photos or folders (in the section order), each with its folders (in creation order) and counts.
+// Folders that belong to no course (made before folders were per course) come back apart, in `legacy`.
+export function courseTree(photos: PoolPhoto[], folders: PoolFolder[]): { courses: CourseNode[]; legacy: { id: string; name: string; count: number }[] } {
+  const nodes = new Map<string, CourseNode>();
+  const node = (key: string): CourseNode => {
+    let n = nodes.get(key);
+    if (!n) {
+      n = { key, ...groupMetaOfKey(key), count: 0, unfiledCount: 0, folders: [] };
+      nodes.set(key, n);
+    }
+    return n;
+  };
+  const folderCount = new Map<string, number>();
+  for (const p of photos) {
+    const n = node(p.courseKey);
+    n.count += 1;
+    if (p.folderId === null) n.unfiledCount += 1;
+    else folderCount.set(p.folderId, (folderCount.get(p.folderId) ?? 0) + 1);
+  }
+  const legacy: { id: string; name: string; count: number }[] = [];
+  for (const f of folders) {
+    const entry = { id: f.id, name: f.name, count: folderCount.get(f.id) ?? 0 };
+    if (f.courseKey === null) legacy.push(entry);
+    else node(f.courseKey).folders.push(entry);
+  }
+  return { courses: [...nodes.values()].sort(compareGroupMeta), legacy };
+}
+
+// May this photo be filed in this folder? A course folder takes only that course's photos; a folder without a course takes any.
+export function folderAcceptsPhoto(folder: Pick<PoolFolder, "courseKey">, photo: Pick<PoolPhoto, "courseKey">): boolean {
+  return folder.courseKey === null || folder.courseKey === photo.courseKey;
+}
+
+// A course key as the database and the actions accept it (a course id, 'genel-deneme', 'diger').
+export const COURSE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/;
+export function isCourseKey(key: string): boolean {
+  return COURSE_KEY_PATTERN.test(key);
 }
 
 // The first `limit` photos of the sections in order (the "Daha fazla göster" window), still grouped; sections past the window are dropped.
