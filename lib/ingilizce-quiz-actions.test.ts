@@ -27,14 +27,15 @@ function builder(table: string) {
   const result = () => {
     if (table === "student_word_progress") return { data: state.existingProgress, error: null };
     if (table === "student_tasks") {
-      if (op === "update") return { error: state.taskUpdateError };
+      if (op === "update") return { data: state.taskUpdateError ? null : [{ id: "t" }], error: state.taskUpdateError };
       return { data: state.taskRow, error: null };
     }
     return { data: null, error: null };
   };
   const b: Record<string, unknown> = {};
   b.select = () => {
-    op = "select";
+    // .update(...).select("id") asks for the updated rows back: still the update.
+    if (op !== "update") op = "select";
     return b;
   };
   b.update = () => {
@@ -134,11 +135,13 @@ describe("submitVocabAnswer", () => {
     if (!result.ok) expect(result.error).toContain("42501");
   });
 
-  it("returns a diagnosable error when an assigned task's own update fails, even though the word's streak already saved", async () => {
+  it("an assigned task whose own update fails is reported with its real code, but the word's result is NOT discarded", async () => {
     state.taskRow = { student_id: "u1", total_count: 10, correct_count: 0, status: "pending" };
     state.taskUpdateError = { code: "42501", message: "permission denied" };
     const { submitVocabAnswer } = await import("../app/student/ingilizce-quiz/actions");
     const result = await submitVocabAnswer(WORD, true, TASK);
-    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ ok: true, nextCount: 1, taskCompleted: false });
+    if (result.ok) expect(result.taskError).toContain("42501");
+    expect(state.upsertPayloads).toHaveLength(1); // the word itself was saved
   });
 });

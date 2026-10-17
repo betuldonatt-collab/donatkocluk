@@ -101,6 +101,8 @@ export function VocabQuizDashboard({
         onExit={() => {
           setActiveUnit(null);
           setActiveTaskId(null);
+          // The card's link put ?unit=&task= in the address; once the quiz is closed a refresh must not reopen it.
+          if (typeof window !== "undefined" && window.location.search) window.history.replaceState(null, "", window.location.pathname);
         }}
         onWordCorrect={(previousCount, nextCount) => handleWordCorrect(activeUnit, previousCount, nextCount)}
       />

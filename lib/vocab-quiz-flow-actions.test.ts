@@ -18,7 +18,9 @@ const state: {
   progress: Row[];
   updates: { id: string; patch: Row }[];
   updateError: unknown;
-} = { tasks: [], words: [], progress: [], updates: [], updateError: null };
+  // false = the update matched no row (what RLS does for a locked week: no error, just nothing updated)
+  updateMatches: boolean;
+} = { tasks: [], words: [], progress: [], updates: [], updateError: null, updateMatches: true };
 
 function builder(table: string) {
   const filters: [string, string, unknown][] = [];
@@ -36,12 +38,13 @@ function builder(table: string) {
   };
   const finish = () => {
     if (op === "update" && table === "student_tasks") {
-      if (state.updateError) return { error: state.updateError };
+      if (state.updateError) return { data: null, error: state.updateError };
+      if (!state.updateMatches) return { data: [], error: null };
       const id = filters.find(([, c]) => c === "id")?.[2] as string;
       state.updates.push({ id, patch });
       const row = state.tasks.find((t) => t.id === id);
       if (row) Object.assign(row, patch);
-      return { error: null };
+      return { data: [{ id }], error: null };
     }
     return { data: rows(), error: null };
   };
@@ -86,6 +89,7 @@ beforeEach(() => {
   state.progress = [];
   state.updates = [];
   state.updateError = null;
+  state.updateMatches = true;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -141,11 +145,22 @@ describe("submitVocabAnswer: the quiz sets the task's status", () => {
     expect(r).toMatchObject({ ok: true, taskCompleted: false });
     expect(state.updates).toEqual([]);
   });
-  it("a failing status write comes back as an error result, not a throw", async () => {
+  it("a failing status write is reported with its real code -- and the word's own result still comes back", async () => {
     state.updateError = { code: "P0001", message: "An LGS task can only be completed with the coach's approval" };
     const r = await submitVocabAnswer(WORD, true, T_TODAY);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("P0001");
+    expect(r).toMatchObject({ ok: true, taskCompleted: false, nextCount: 1 });
+    if (r.ok) expect(r.taskError).toContain("P0001");
+  });
+  it("an update the database silently filtered out (a locked week) is NOT reported as completed", async () => {
+    state.tasks = [task(T_TODAY, { status: "half_done", correct_count: 29 })];
+    state.updateMatches = false;
+    const r = await submitVocabAnswer(WORD, true, T_TODAY);
+    expect(r).toMatchObject({ ok: true, taskCompleted: false });
+    if (r.ok) expect(r.taskError).toContain("kilitli");
+  });
+  it("a normal answer carries no task error", async () => {
+    const r = await submitVocabAnswer(WORD, true, T_TODAY);
+    if (r.ok) expect(r.taskError).toBeNull();
   });
 });
 
@@ -171,6 +186,18 @@ describe("completeVocabQuizRun: the end of a run", () => {
     state.tasks = [task(T_TODAY, { status: "half_done", correct_count: 12 })];
     expect(await completeVocabQuizRun(T_TODAY, 1)).toEqual({ ok: true, status: "unchanged" });
     expect(state.updates).toEqual([]);
+  });
+  it("a unit without any words does not complete the task", async () => {
+    state.tasks = [task(T_TODAY, { status: "half_done", correct_count: 12 })];
+    state.words = [];
+    expect(await completeVocabQuizRun(T_TODAY, 1)).toEqual({ ok: true, status: "unchanged" });
+    expect(state.updates).toEqual([]);
+  });
+  it("an update the database silently filtered out is an error, not a 'done'", async () => {
+    state.tasks = [task(T_TODAY, { status: "half_done", correct_count: 30 })];
+    state.updateMatches = false;
+    const r = await completeVocabQuizRun(T_TODAY, 1);
+    expect(r.ok).toBe(false);
   });
   it("never touches a task that is not the student's, not a vocab quiz, or already done", async () => {
     state.tasks = [task(T_TODAY, { student_id: "someone-else", correct_count: 30 })];
@@ -202,6 +229,12 @@ describe("markVocabQuizNotDone: the student's one manual choice", () => {
     state.tasks = [task(T_TODAY, { status: "done" })];
     expect(await markVocabQuizNotDone(T_TODAY)).toMatchObject({ ok: false });
     expect(state.updates).toEqual([]);
+  });
+  it("a week the coach locked (the update matches nothing) is an error, never a silent success", async () => {
+    state.updateMatches = false;
+    const r = await markVocabQuizNotDone(T_TODAY);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("kilitli");
   });
   it("refuses another student's task and a task of another type", async () => {
     state.tasks = [task(T_TODAY, { student_id: "someone-else" })];

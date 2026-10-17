@@ -321,6 +321,8 @@ export function VocabQuizSession({
           setSubmitError(outcome.error);
           return;
         }
+        // The word itself saved; only the assigned task could not be updated (a locked week, ...). Said once, the quiz carries on.
+        if (outcome.taskError) setSubmitError(outcome.taskError);
         setFeedback((prev) => (prev ? { ...prev, countAfter: outcome.nextCount } : prev));
         // every copy of this word still waiting in the queue starts from its saved level
         setBatch((prev) => prev.map((w) => (w.id === wordId ? { ...w, correctCount: outcome.nextCount } : w)));
@@ -329,7 +331,7 @@ export function VocabQuizSession({
         // a correct answer that actually counted toward the task (one
         // exists, and this answer wasn't just skipped/wrong) bumps it by
         // one, capped at the target the same way the server does.
-        if (result !== "INCORRECT") {
+        if (result !== "INCORRECT" && !outcome.taskError) {
           setActiveTask((prev) => (prev ? { ...prev, current: prev.target === null ? prev.current + 1 : Math.min(prev.current + 1, prev.target) } : prev));
         }
         // Immediately, the moment this answer crosses the assigned task's
@@ -509,6 +511,12 @@ export function VocabQuizSession({
           <AnswerFeedbackContent feedback={feedback} isSaving={isSaving} submitError={submitError} onAcknowledge={handleNext} />
         ) : (
           <>
+            {taskJustCompleted && (
+              <p className="flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-700">
+                <PartyPopper className="size-4 shrink-0" />
+                Görevin tamamlandı, tebrikler! İstersen çalışmaya devam edebilirsin.
+              </p>
+            )}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <p className="text-muted-foreground text-xs">{promptLabel}</p>
