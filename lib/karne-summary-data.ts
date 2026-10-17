@@ -5,7 +5,49 @@ import { fetchMaarifGrade } from "./maarif-grade";
 import { fetchAllPages } from "./paged-select";
 import { studyStatusSelect } from "./task-study-status";
 import { fetchStudentEventAttendance } from "./student-event-attendance";
-import { computeKarneSummary, DEFAULT_TREND_WEEKS, summaryDataStart, type KarneSummary, type KarneSummaryTask } from "./karne-summary";
+import {
+  computeKarneSummary,
+  DEFAULT_TREND_WEEKS,
+  KARNE_SUMMARY_VERSION,
+  summaryDataStart,
+  type KarneSummary,
+  type KarneSummaryTask,
+} from "./karne-summary";
+
+// A stored snapshot is only trusted when it has the shape (and version) the document renders.
+export function asKarneSnapshot(value: unknown): KarneSummary | null {
+  const s = value as Partial<KarneSummary> | null;
+  return s && typeof s === "object" && s.version === KARNE_SUMMARY_VERSION && s.period && s.completion && s.trend ? (s as KarneSummary) : null;
+}
+
+export type LoadedKarneSummary = { summary: KarneSummary; frozen: boolean };
+
+// THE way every panel gets a Karne's numbers (coach preview, student Karnelerim, parent Karneler). A period that is a coach-APPROVED report
+// card reads the snapshot its approval stored (migration 0136: immutable once set) -- so the coach, the student and the parent all see the
+// very same figures and they never move afterwards. Any other period (a preset, a custom range, a card approved before snapshots existed)
+// is computed live from the records, by the same function, for everyone.
+export async function loadKarneSummary(
+  supabase: SupabaseClient,
+  studentId: string,
+  rangeStart: string,
+  rangeEnd: string,
+  options: { today?: string; now?: string; trendWeeks?: number } = {},
+): Promise<LoadedKarneSummary> {
+  // (a failed read -- e.g. the column does not exist yet -- simply means "no snapshot")
+  const { data } = await supabase
+    .from("student_report_cards")
+    .select("executive_summary")
+    .eq("student_id", studentId)
+    .eq("status", "approved")
+    .eq("range_start", rangeStart)
+    .eq("range_end", rangeEnd)
+    .order("cycle_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const snapshot = asKarneSnapshot((data as { executive_summary?: unknown } | null)?.executive_summary);
+  if (snapshot) return { summary: snapshot, frozen: true };
+  return { summary: await fetchKarneSummary(supabase, studentId, rangeStart, rangeEnd, options), frozen: false };
+}
 
 const TASK_COLUMNS =
   "task_date, status, task_type, course_id, title, total_count, duration_minutes, correct_count, wrong_count, empty_count, tracked_duration_minutes, subject_scores";

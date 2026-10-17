@@ -123,7 +123,7 @@ describe("11th grade: the Gelişim Haritası is visible", () => {
       </MaarifGradeProvider>,
     );
 
-  it("student: the 11th grade's Deneme Analizleri has Gelişim Haritası and Karnelerim; 9th / 10th / 7th as before; YKS with all four", () => {
+  it("student: the 11th grade's Deneme Analizleri has Gelişim Haritası and Karnelerim; 9th / 10th / 7th have Karnelerim but not the map; YKS with all four", () => {
     const eleven = studentTabs(11);
     expect(eleven).toContain("Gelişim Haritası");
     expect(eleven).toContain("Branş Denemesi Analizi");
@@ -132,7 +132,8 @@ describe("11th grade: the Gelişim Haritası is visible", () => {
     for (const grade of [7, 9, 10] as const) {
       const out = studentTabs(grade);
       expect(out, String(grade)).not.toContain("Gelişim Haritası");
-      expect(out, String(grade)).not.toContain("Karnelerim");
+      // the unified Karne is every student's (the coach and the parent already see it for every grade)
+      expect(out, String(grade)).toContain("Karnelerim");
     }
     const yks = studentTabs(null);
     expect(yks).toContain("Gelişim Haritası");

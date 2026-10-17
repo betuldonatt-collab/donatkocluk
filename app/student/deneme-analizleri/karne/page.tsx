@@ -3,7 +3,8 @@ import { getViewContext } from "@/lib/impersonation";
 import { KarneDocument } from "@/components/karne-document";
 import { KarnePeriodPicker, type PeriodOption } from "@/components/karne-period-picker";
 import { PrintButton } from "@/components/print-button";
-import { fetchKarneSummary } from "@/lib/karne-summary-data";
+import { loadKarneSummary } from "@/lib/karne-summary-data";
+import { karneDocumentProps } from "@/lib/karne-view";
 import { formatPeriod, parsePeriod, presetPeriods, type KarnePeriod } from "@/lib/karne-periods";
 
 // "Karnelerim": the unified Karne. The student picks any period (presets, one of their approved report cards, or a custom range) and
@@ -56,7 +57,8 @@ export default async function KarnePage(props: PageProps<"/student/deneme-analiz
     ...presets.map((p) => ({ key: p.key, label: p.label, period: p.period })),
   ];
 
-  const summary = await fetchKarneSummary(supabase, studentId, period.from, period.to, { today });
+  // The same numbers and the same document props as the coach's preview and the parent's view (lib/karne-view.ts).
+  const loaded = await loadKarneSummary(supabase, studentId, period.from, period.to, { today });
   const matched = cycles.find((c) => c.range_start === period.from && c.range_end === period.to) ?? null;
 
   return (
@@ -72,11 +74,11 @@ export default async function KarnePage(props: PageProps<"/student/deneme-analiz
       <KarnePeriodPicker period={period} options={options} today={today} basePath="/student/deneme-analizleri/karne" />
 
       <KarneDocument
-        summary={summary}
-        studentName={profile?.full_name ?? null}
-        classLabel={profile?.sinif_sube ?? profile?.exam_type ?? null}
-        coachNote={matched?.coach_notes ?? null}
-        approval={matched ? { approvedAt: matched.approved_at, cycleNumber: matched.cycle_number } : null}
+        {...karneDocumentProps({
+          loaded,
+          student: { fullName: profile?.full_name ?? null, sinifSube: profile?.sinif_sube ?? null, examType: profile?.exam_type ?? null },
+          card: matched,
+        })}
       />
     </div>
   );

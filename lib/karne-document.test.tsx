@@ -269,14 +269,15 @@ describe("wiring on the three panels", () => {
     const src = read("../app/student/deneme-analizleri/karne/page.tsx");
     expect(src).toContain("<KarneDocument");
     expect(src).toContain("<KarnePeriodPicker");
-    expect(src).toContain("fetchKarneSummary");
+    expect(src).toContain("loadKarneSummary(");
   });
 
   it("the parent's Karne reads ONLY approved cards, from the frozen snapshot, with no free date picking", () => {
     const src = read("../app/parent/karne/page.tsx");
     expect(src).toContain('.eq("status", "approved")');
-    expect(src).toContain("executive_summary");
-    expect(src).toContain("frozen={snapshot !== null}");
+    // the frozen snapshot comes through the shared loader (lib/karne-summary-data.ts), the same one the coach and the student use
+    expect(src).toContain("loadKarneSummary(");
+    expect(src).toContain("karneDocumentProps(");
     expect(src).not.toContain("KarnePeriodPicker");
     expect(src).not.toContain('type="date"');
   });

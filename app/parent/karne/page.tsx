@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
-import { getActiveStudentId, getLinkedStudents } from "@/lib/parent-context";
+import { getActiveStudentId } from "@/lib/parent-context";
 import { KarneDocument } from "@/components/karne-document";
 import { PrintButton } from "@/components/print-button";
-import { fetchKarneSummary } from "@/lib/karne-summary-data";
-import { KARNE_SUMMARY_VERSION, type KarneSummary } from "@/lib/karne-summary";
+import { loadKarneSummary } from "@/lib/karne-summary-data";
+import { karneDocumentProps } from "@/lib/karne-view";
 import { formatPeriod } from "@/lib/karne-periods";
 import { cn } from "@/lib/utils";
 
@@ -20,15 +20,9 @@ type CardRow = {
   range_end: string;
   approved_at: string | null;
   coach_notes: string | null;
-  executive_summary: unknown;
 };
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-
-function asSnapshot(value: unknown): KarneSummary | null {
-  const s = value as Partial<KarneSummary> | null;
-  return s && typeof s === "object" && s.version === KARNE_SUMMARY_VERSION && s.period && s.completion && s.trend ? (s as KarneSummary) : null;
-}
 
 export default async function ParentKarnePage(props: PageProps<"/parent/karne">) {
   const sp = await props.searchParams;
@@ -38,13 +32,14 @@ export default async function ParentKarnePage(props: PageProps<"/parent/karne">)
   const supabase = await createClient();
   const { data } = await supabase
     .from("student_report_cards")
-    .select("id, cycle_number, range_start, range_end, approved_at, coach_notes, executive_summary")
+    .select("id, cycle_number, range_start, range_end, approved_at, coach_notes")
     .eq("student_id", studentId)
     .eq("status", "approved")
     .order("cycle_number", { ascending: false });
   const cards = (data ?? []) as CardRow[];
 
-  const student = (await getLinkedStudents()).find((s) => s.id === studentId) ?? null;
+  // The same profile fields the student's own page reads (a linked parent may read them, profiles_select_by_parent).
+  const { data: profile } = await supabase.from("profiles").select("full_name, sinif_sube, exam_type").eq("id", studentId).maybeSingle();
 
   if (cards.length === 0) {
     return (
@@ -56,8 +51,8 @@ export default async function ParentKarnePage(props: PageProps<"/parent/karne">)
   }
 
   const selected = cards.find((c) => c.id === first(sp.card)) ?? cards[0];
-  const snapshot = asSnapshot(selected.executive_summary);
-  const summary = snapshot ?? (await fetchKarneSummary(supabase, studentId, selected.range_start, selected.range_end));
+  // The snapshot the coach's approval stored -- the very figures the coach and the student see for this period (lib/karne-summary-data.ts).
+  const loaded = await loadKarneSummary(supabase, studentId, selected.range_start, selected.range_end);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -89,12 +84,11 @@ export default async function ParentKarnePage(props: PageProps<"/parent/karne">)
       </nav>
 
       <KarneDocument
-        summary={summary}
-        studentName={student?.full_name ?? null}
-        classLabel={student?.exam_type ?? null}
-        coachNote={selected.coach_notes}
-        approval={{ approvedAt: selected.approved_at, cycleNumber: selected.cycle_number }}
-        frozen={snapshot !== null}
+        {...karneDocumentProps({
+          loaded,
+          student: { fullName: profile?.full_name ?? null, sinifSube: profile?.sinif_sube ?? null, examType: profile?.exam_type ?? null },
+          card: { status: "approved", cycle_number: selected.cycle_number, approved_at: selected.approved_at, coach_notes: selected.coach_notes },
+        })}
       />
     </div>
   );

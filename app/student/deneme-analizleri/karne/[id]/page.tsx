@@ -1,58 +1,24 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getViewContext } from "@/lib/impersonation";
-import type { KarneTopicRow, NetSummary } from "@/lib/karne";
-import { fetchStudentEventAttendance } from "@/lib/student-event-attendance";
-import { KarneDetailClient } from "./karne-detail-client";
 
-async function fetchReportCard(studentId: string, id: string) {
-  const supabase = await createClient();
-  // RLS re-enforces ownership + approved-only for the student role, same as
-  // the list page -- this query is just narrowing to one row.
-  const { data } = await supabase
-    .from("student_report_cards")
-    .select("id, cycle_number, range_start, range_end, coach_notes, stats, topic_mistakes, approved_at")
-    .eq("student_id", studentId)
-    .eq("id", id)
-    .maybeSingle();
-  return data;
-}
-
+// The old detailed report-card page is retired: a report card now has ONE printable version -- the unified Karne the coach previews and
+// prints and the parent reads (components/karne-document.tsx). A link to an old card lands on that same document, for that card's period.
 export default async function KarneDetailPage(props: PageProps<"/student/deneme-analizleri/karne/[id]">) {
   const { id } = await props.params;
   const view = await getViewContext("student");
-  const cycle = view ? await fetchReportCard(view.effectiveUserId, id) : null;
-  // Event attendance (Yoklama) of this period, read live -- the same section the parent and the coach see.
-  const eventAttendance =
-    view && cycle ? await fetchStudentEventAttendance(await createClient(), view.effectiveUserId, cycle.range_start, cycle.range_end) : [];
-
-  if (!cycle) {
-    return (
-      <div className="space-y-4">
-        <Link
-          href="/student/deneme-analizleri/karne"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-        >
-          <ArrowLeft className="size-4" />
-          Karnelerim
-        </Link>
-        <p className="text-muted-foreground text-sm">Karne bulunamadı.</p>
-      </div>
-    );
+  if (view) {
+    const supabase = await createClient();
+    // RLS restricts the student role to approved rows.
+    const { data } = await supabase
+      .from("student_report_cards")
+      .select("range_start, range_end, status")
+      .eq("student_id", view.effectiveUserId)
+      .eq("id", id)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (data) redirect(`/student/deneme-analizleri/karne?from=${data.range_start}&to=${data.range_end}`);
   }
-
-  return (
-    <KarneDetailClient
-      cycleNumber={cycle.cycle_number}
-      rangeStart={cycle.range_start}
-      rangeEnd={cycle.range_end}
-      approvedAt={cycle.approved_at}
-      coachNotes={cycle.coach_notes}
-      stats={cycle.stats as NetSummary}
-      topicRows={cycle.topic_mistakes as KarneTopicRow[]}
-      eventAttendance={eventAttendance}
-    />
-  );
+  redirect("/student/deneme-analizleri/karne");
 }

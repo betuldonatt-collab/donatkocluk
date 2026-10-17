@@ -15,13 +15,14 @@ const TABS = [
 
 export default function DenemeAnalizleriLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Maarif students: Branş and Genel Deneme analysis only (Karnelerim is TYT/AYT-based) -- plus the Gelişim Haritası and Karnelerim
-  // for the 11th grade, whose own courses and Maarif TYT courses are wired into them.
+  // Maarif students: Branş and Genel Deneme analysis, plus the Gelişim Haritası for the 11th grade (its courses are wired into it).
+  // Karnelerim is for EVERY student: it is the unified Karne -- the very document the coach previews and prints and the parent reads
+  // (components/karne-document.tsx) -- built from the student's program, not from TYT / AYT nets, so no grade is left without it.
   const grade = useMaarifGrade();
   const tabs =
     grade === null
       ? TABS
-      : TABS.filter((t) => t.href.endsWith("/brans") || t.href.endsWith("/genel") || (grade === 11 && (t.href.endsWith("/gelisim-haritasi") || t.href.endsWith("/karne"))));
+      : TABS.filter((t) => t.href.endsWith("/brans") || t.href.endsWith("/genel") || t.href.endsWith("/karne") || (grade === 11 && t.href.endsWith("/gelisim-haritasi")));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">

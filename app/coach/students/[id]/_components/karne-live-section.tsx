@@ -5,11 +5,15 @@ import { Loader2 } from "lucide-react";
 
 import { KarneDocument } from "@/components/karne-document";
 import { KarnePeriodPicker, type PeriodOption } from "@/components/karne-period-picker";
+import { karneDocumentProps } from "@/lib/karne-view";
 import { PrintButton } from "@/components/print-button";
 import { formatPeriod, presetPeriods, samePeriod, type KarnePeriod } from "@/lib/karne-periods";
 import type { KarneSummary } from "@/lib/karne-summary";
 import type { CoachReportCardRow } from "../../../actions";
 import { getKarneSummary } from "../karne-summary-actions";
+
+// What the coach's action returned for the chosen period (see getKarneSummary).
+type LoadedKarne = { summary: KarneSummary; frozen: boolean; sinifSube: string | null; examType: string | null };
 
 // The unified Karne in the coach's "Karneler" tab: any period, live (report-card periods and presets are chips, a custom range is a
 // date pair). When the period is one of the student's report cards, that card's note and status show with it -- the note itself is
@@ -28,7 +32,7 @@ export function KarneLiveSection({
   const presets = presetPeriods(today);
   const latest = cycles[0];
   const [period, setPeriod] = useState<KarnePeriod>(latest ? { from: latest.range_start, to: latest.range_end } : presets[0].period);
-  const [summary, setSummary] = useState<KarneSummary | null>(null);
+  const [loaded, setLoaded] = useState<LoadedKarne | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,7 +40,7 @@ export function KarneLiveSection({
     startTransition(async () => {
       const result = await getKarneSummary(studentId, next.from, next.to);
       if (result.ok) {
-        setSummary(result.summary);
+        setLoaded({ summary: result.summary, frozen: result.frozen, sinifSube: result.sinifSube, examType: result.examType });
         setError(null);
       } else {
         setError(result.error);
@@ -85,19 +89,24 @@ export function KarneLiveSection({
         </p>
       )}
       {error && <p className="text-destructive text-sm print:hidden">{error}</p>}
-      {pending && !summary && (
+      {pending && !loaded && (
         <p className="text-muted-foreground flex items-center gap-2 text-sm print:hidden">
           <Loader2 className="size-4 animate-spin" /> Karne hazırlanıyor…
         </p>
       )}
 
-      {summary && (
+      {loaded && (
         <div className={pending ? "opacity-60 transition-opacity" : undefined} aria-busy={pending}>
+          {/* Exactly what the student and the parent are shown for this period: same numbers, header, note and badge (lib/karne-view.ts). */}
           <KarneDocument
-            summary={summary}
-            studentName={studentName}
-            coachNote={matched?.coach_notes ?? null}
-            approval={matched && matched.status === "approved" ? { approvedAt: matched.approved_at, cycleNumber: matched.cycle_number } : null}
+            {...karneDocumentProps({
+              loaded: { summary: loaded.summary, frozen: loaded.frozen },
+              student: { fullName: studentName, sinifSube: loaded.sinifSube, examType: loaded.examType },
+              card: matched
+                ? { status: matched.status, cycle_number: matched.cycle_number, approved_at: matched.approved_at, coach_notes: matched.coach_notes }
+                : null,
+              includeDraftNote: true,
+            })}
           />
         </div>
       )}

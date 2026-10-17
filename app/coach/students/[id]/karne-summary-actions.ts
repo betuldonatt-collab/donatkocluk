@@ -7,12 +7,16 @@
 import * as Sentry from "@sentry/nextjs";
 
 import { createClient } from "@/lib/supabase/server";
-import { fetchKarneSummary } from "@/lib/karne-summary-data";
+import { loadKarneSummary } from "@/lib/karne-summary-data";
 import type { KarneSummary } from "@/lib/karne-summary";
 import { parsePeriod } from "@/lib/karne-periods";
 import { uuidSchema } from "@/lib/validation";
 
-export type KarneSummaryResult = { ok: true; summary: KarneSummary } | { ok: false; error: string };
+// frozen = the numbers are the snapshot an approval stored (what the student and the parent see); sinifSube / examType feed the same header
+// line the student's and the parent's Karne show (lib/karne-view.ts).
+export type KarneSummaryResult =
+  | { ok: true; summary: KarneSummary; frozen: boolean; sinifSube: string | null; examType: string | null }
+  | { ok: false; error: string };
 
 // The live Karne numbers of one of the coach's students for a period (the report card preview of the Karneler tab). Reading only:
 // what comes back is whatever the coach's own row-level access lets them read (an admin previewing the panel reads everything).
@@ -36,8 +40,17 @@ export async function getKarneSummary(studentId: string, from: string, to: strin
     ]);
     if (!link && me?.role !== "admin") return { ok: false, error: "Bu öğrenci sana atanmamış." };
 
-    const summary = await fetchKarneSummary(supabase, id.data, period.from, period.to, { today });
-    return { ok: true, summary };
+    const [loaded, { data: profile }] = await Promise.all([
+      loadKarneSummary(supabase, id.data, period.from, period.to, { today }),
+      supabase.from("profiles").select("sinif_sube, exam_type").eq("id", id.data).maybeSingle(),
+    ]);
+    return {
+      ok: true,
+      summary: loaded.summary,
+      frozen: loaded.frozen,
+      sinifSube: (profile as { sinif_sube?: string | null } | null)?.sinif_sube ?? null,
+      examType: (profile as { exam_type?: string | null } | null)?.exam_type ?? null,
+    };
   } catch (e) {
     console.error("[karne summary]", e);
     Sentry.captureException(e);
