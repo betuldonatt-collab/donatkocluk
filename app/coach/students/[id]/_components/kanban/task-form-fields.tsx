@@ -33,6 +33,7 @@ import {
   type GeneralExamTrack,
 } from "@/lib/general-exam-track";
 import { useMaarifGrade } from "@/components/maarif-grade-context";
+import { resourcesAfterTaskTypeChange } from "@/lib/task-resource-pools";
 import { useAytTrack } from "@/components/ayt-track-context";
 import { TopicGroupSelect } from "@/components/topic-group-select";
 import { isSoruCozumuLike } from "@/lib/task-types";
@@ -498,12 +499,13 @@ export function TaskFormFields({
               const taskType = e.target.value as AssignableTaskType;
               set({
                 taskType,
-                // Branş Denemesi seeds one empty row up front -- it's now
-                // the only place the publisher gets typed (see the removed
-                // standalone Yayınevi field below), so the field the coach
-                // actually needs is visible immediately instead of behind
-                // an extra "Kaynak Ekle" click.
-                resources: taskType === "branch_exam" ? [emptyResourceRow()] : [],
+                // The chosen resources survive a change to another type that uses the same list (Soru Çözümü <-> Konu Çalışması /
+                // Video <-> Kaynak Taraması), like the course and the topic do; they are cleared only for a type that cannot use
+                // them (Genel Deneme, Kitap Okuma ...) or whose list is another one (Branş Denemesi). Branş Denemesi seeds one
+                // empty row up front -- it's now the only place the publisher gets typed (see the removed standalone Yayınevi
+                // field below), so the field the coach actually needs is visible immediately instead of behind an extra
+                // "Kaynak Ekle" click. (lib/task-resource-pools.ts)
+                resources: resourcesAfterTaskTypeChange(value.taskType, taskType, value.resources, emptyResourceRow),
                 totalCount: taskType === "branch_exam" && !value.totalCount.trim() ? "1" : value.totalCount,
                 // Ünite defaults to 1 the moment the select would otherwise
                 // show "1. Ünite" without topicId actually holding "1" --
