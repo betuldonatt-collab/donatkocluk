@@ -10,8 +10,10 @@ import {
   courseOptions,
   filterPhotos,
   folderCounts,
+  groupPhotos,
   isPoolPathFor,
   pathsToMove,
+  takeGroups,
   type PoolTask,
 } from "./photo-pool";
 
@@ -35,13 +37,21 @@ describe("courseOfTask: the course comes from the task", () => {
     expect(courseOfTask({ task_type: "question_solving", course_id: "tyt-matematik" }).label.length).toBeGreaterThan(0);
   });
   it("a Genel Deneme has no course and is its own group", () => {
-    expect(courseOfTask({ task_type: "general_exam", course_id: null })).toEqual({ key: "genel-deneme", label: "Genel Deneme" });
+    expect(courseOfTask({ task_type: "general_exam", course_id: null })).toEqual({ key: "genel-deneme", label: "Genel Deneme", kind: "general" });
   });
   it("a task without a course is 'Diğer'", () => {
-    expect(courseOfTask({ task_type: "free", course_id: null })).toEqual({ key: "diger", label: "Diğer" });
+    expect(courseOfTask({ task_type: "free", course_id: null })).toEqual({ key: "diger", label: "Diğer", kind: "other" });
   });
   it("an unknown course id still has a key and a label", () => {
-    expect(courseOfTask({ task_type: "x", course_id: "no-such-course" })).toEqual({ key: "no-such-course", label: "no-such-course" });
+    expect(courseOfTask({ task_type: "x", course_id: "no-such-course" })).toEqual({ key: "no-such-course", label: "no-such-course", kind: "course" });
+  });
+  it("a Rutin task is grouped by its type, as 'Rutin - Paragraf' / 'Rutin - Problem'", () => {
+    expect(courseOfTask({ task_type: "question_bank", course_id: "paragraf" })).toEqual({ key: "paragraf", label: "Rutin - Paragraf", kind: "routine" });
+    expect(courseOfTask({ task_type: "question_bank", course_id: "problem" })).toEqual({ key: "problem", label: "Rutin - Problem", kind: "routine" });
+    expect(courseOfTask({ task_type: "question_bank", course_id: "yeni-nesil-mat-dozu" }).label).toBe("Rutin - Yeni Nesil Mat Dozu");
+  });
+  it("a Standard task is grouped by its course, not as a Rutin", () => {
+    expect(courseOfTask({ task_type: "question_bank", course_id: "tyt-matematik" }).kind).toBe("course");
   });
 });
 
@@ -68,6 +78,54 @@ describe("buildPhotoPool", () => {
   it("ignores a mapping whose photo is gone (it is simply never listed) and a path listed twice appears once", () => {
     const dup = [task({ id: "a", evidence_image_paths: [`${S}/a/x.jpg`] }), task({ id: "b", evidence_image_paths: [`${S}/a/x.jpg`] })];
     expect(buildPhotoPool(dup, new Map([[`${S}/gone/y.jpg`, "f1"]]))).toHaveLength(1);
+  });
+});
+
+describe("sections (visual auto-grouping)", () => {
+  const S2 = S;
+  const pool = buildPhotoPool(
+    [
+      task({ id: "m", task_date: "2026-10-03", course_id: "tyt-matematik", evidence_image_paths: [`${S2}/m/1.jpg`, `${S2}/m/2.jpg`] }),
+      task({ id: "pa", task_date: "2026-10-09", task_type: "question_bank", course_id: "paragraf", evidence_image_paths: [`${S2}/pa/1.jpg`] }),
+      task({ id: "pr", task_date: "2026-10-08", task_type: "question_bank", course_id: "problem", evidence_image_paths: [`${S2}/pr/1.jpg`] }),
+      task({ id: "g", task_date: "2026-10-05", task_type: "general_exam", course_id: null, evidence_image_paths: [`${S2}/g/1.jpg`] }),
+      task({ id: "f", task_date: "2026-10-02", course_id: "tyt-fizik", evidence_image_paths: [`${S2}/f/1.jpg`] }),
+      task({ id: "o", task_date: "2026-10-01", task_type: "extra_custom", course_id: null, evidence_image_paths: [`${S2}/o/1.jpg`] }),
+    ],
+    new Map(),
+  );
+
+  it("sections: courses A-Z, then Genel Deneme, then the Rutin groups A-Z, then Diğer", () => {
+    const groups = groupPhotos(pool);
+    expect(groups.map((g) => g.kind)).toEqual(["course", "course", "general", "routine", "routine", "other"]);
+    expect(groups.filter((g) => g.kind === "routine").map((g) => g.label)).toEqual(["Rutin - Paragraf", "Rutin - Problem"]);
+    const courseLabels = groups.filter((g) => g.kind === "course").map((g) => g.label);
+    expect(courseLabels).toEqual([...courseLabels].sort((x, y) => x.localeCompare(y, "tr")));
+  });
+  it("each section holds only its own photos, newest task first", () => {
+    const groups = groupPhotos(pool);
+    const math = groups.find((g) => g.key === "tyt-matematik");
+    expect(math?.photos.map((p) => p.path)).toEqual([`${S2}/m/1.jpg`, `${S2}/m/2.jpg`]);
+    expect(groups.find((g) => g.key === "paragraf")?.photos).toHaveLength(1);
+    expect(groups.reduce((n, g) => n + g.photos.length, 0)).toBe(pool.length);
+  });
+  it("Rutin photos never land in a course section", () => {
+    const groups = groupPhotos(pool);
+    expect(groups.filter((g) => g.kind === "routine").map((g) => g.key).sort()).toEqual(["paragraf", "problem"]);
+    expect(groups.filter((g) => g.kind === "course").some((g) => g.key === "paragraf" || g.key === "problem")).toBe(false);
+  });
+  it("takeGroups keeps the first N photos in section order and drops the rest", () => {
+    const groups = groupPhotos(pool);
+    const first3 = takeGroups(groups, 3);
+    expect(first3.reduce((n, g) => n + g.photos.length, 0)).toBe(3);
+    expect(first3.map((g) => g.key)).toEqual(groups.slice(0, first3.length).map((g) => g.key));
+    expect(takeGroups(groups, 0)).toEqual([]);
+    expect(takeGroups(groups, 999)).toEqual(groups);
+  });
+  it("a photo carries the coach's edited copy when there is one, and none otherwise", () => {
+    const withEdit = buildPhotoPool([task({ id: "e", evidence_image_paths: [`${S2}/e/1.jpg`, `${S2}/e/2.jpg`] })], new Map(), new Map([[`${S2}/e/1.jpg`, "coach/student/x.jpg"]]));
+    expect(withEdit.find((p) => p.path === `${S2}/e/1.jpg`)?.annotatedPath).toBe("coach/student/x.jpg");
+    expect(withEdit.find((p) => p.path === `${S2}/e/2.jpg`)?.annotatedPath).toBeNull();
   });
 });
 

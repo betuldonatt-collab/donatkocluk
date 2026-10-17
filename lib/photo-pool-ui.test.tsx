@@ -2,6 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/coach/students/[id]/photos/actions", () => ({
+  getAnnotationUrls: vi.fn(),
+  saveAnnotatedPhoto: vi.fn(),
+  removePhotoAnnotation: vi.fn(),
   createPhotoFolder: vi.fn(),
   renamePhotoFolder: vi.fn(),
   deletePhotoFolder: vi.fn(),
@@ -72,5 +75,33 @@ describe("PhotoPoolGallery", () => {
   it("an empty pool is an empty state, not a blank page", () => {
     const html = render({ initialPhotos: [] });
     expect(html).toContain("Henüz fotoğraf yok");
+  });
+});
+
+describe("PhotoPoolGallery: sections", () => {
+  const mixed = buildPhotoPool(
+    [
+      { id: "m", task_date: "2026-10-03", task_type: "question_bank", title: "Matematik soruları", course_id: "tyt-matematik", evidence_image_paths: [`${S}/m/a.jpg`] },
+      { id: "p", task_date: "2026-10-04", task_type: "question_bank", title: "Paragraf rutini", course_id: "paragraf", evidence_image_paths: [`${S}/p/a.jpg`, `${S}/p/b.jpg`] },
+      { id: "q", task_date: "2026-10-05", task_type: "question_bank", title: "Problem rutini", course_id: "problem", evidence_image_paths: [`${S}/q/a.jpg`] },
+    ],
+    new Map(),
+    new Map([[`${S}/m/a.jpg`, "coach/student/m.jpg"]]),
+  );
+
+  it("groups the photos under headers: a course for Standard tasks, 'Rutin - <type>' for routines", () => {
+    const html = renderToStaticMarkup(<PhotoPoolGallery studentId={S} initialPhotos={mixed} initialFolders={[]} foldersAvailable annotationsAvailable />);
+    const headers = [...html.matchAll(/<h2[^>]*>([^<]*)</g)].map((m) => m[1]);
+    expect(headers).toHaveLength(3);
+    // the course section comes before the routine sections
+    expect(headers.slice(1)).toEqual(["Rutin - Paragraf", "Rutin - Problem"]);
+    expect(headers[0]).not.toMatch(/^Rutin/);
+    expect(html).toContain("2 fotoğraf"); // the Paragraf section
+    expect(html).toContain("Bölümü seç");
+  });
+
+  it("marks a photo the coach has edited", () => {
+    const html = renderToStaticMarkup(<PhotoPoolGallery studentId={S} initialPhotos={mixed} initialFolders={[]} foldersAvailable annotationsAvailable />);
+    expect((html.match(/Düzenlendi/g) ?? []).length).toBe(1);
   });
 });

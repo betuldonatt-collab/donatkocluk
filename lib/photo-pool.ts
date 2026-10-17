@@ -1,4 +1,4 @@
-import { courseDisplayName, findCourseById } from "./curriculum";
+import { courseDisplayName, findCourseById, isRoutineCourseId } from "./curriculum";
 
 // Fotoğraf Havuzu: every Kanıt Fotoğrafı a student ever attached to a task, gathered for the coach and organised into the coach's own folders.
 //
@@ -19,6 +19,9 @@ export type PoolTask = {
   evidence_photo_status?: Record<string, PhotoVerdict> | null;
 };
 
+// What a section of the gallery is made of: a course (Standard tasks), the Genel Deneme, a Rutin (Paragraf, Problem, ...) or the rest.
+export type GroupKind = "course" | "general" | "routine" | "other";
+
 export type PoolPhoto = {
   path: string;
   taskId: string;
@@ -26,6 +29,10 @@ export type PoolPhoto = {
   taskDate: string;
   courseKey: string;
   courseLabel: string;
+  groupKind: GroupKind;
+  // The coach's own edited copy (rotated / drawn on), in the private `coach_annotations` bucket -- null = never edited. The student's
+  // original (`path`) is never touched, and the student never sees this copy (migration 0140).
+  annotatedPath: string | null;
   verdict: PhotoVerdict | null;
   // The coach's folder it sits in; null = in no folder.
   folderId: string | null;
@@ -33,17 +40,23 @@ export type PoolPhoto = {
 
 export type PoolFolder = { id: string; name: string };
 
-// The course a photo belongs to, derived from its task: a course task by its course, a Genel Deneme (which has none) as "Genel Deneme",
-// anything else without a course as "Diğer".
-export function courseOfTask(task: Pick<PoolTask, "task_type" | "course_id">): { key: string; label: string } {
-  if (task.task_type === "general_exam") return { key: "genel-deneme", label: "Genel Deneme" };
-  if (!task.course_id) return { key: "diger", label: "Diğer" };
+// The group a photo belongs to, derived from its task: a Standard task by its course (Ders), a Rutin task (Paragraf, Problem, Kitap Okuma,
+// Yeni Nesil Mat Dozu) by its type as "Rutin - Paragraf", a Genel Deneme (which has no course) as "Genel Deneme", anything else without a
+// course as "Diğer".
+export function courseOfTask(task: Pick<PoolTask, "task_type" | "course_id">): { key: string; label: string; kind: GroupKind } {
+  if (task.task_type === "general_exam") return { key: "genel-deneme", label: "Genel Deneme", kind: "general" };
+  if (!task.course_id) return { key: "diger", label: "Diğer", kind: "other" };
   const course = findCourseById(task.course_id);
-  return { key: task.course_id, label: course ? courseDisplayName(task.course_id, course.name) : task.course_id };
+  if (isRoutineCourseId(task.course_id)) return { key: task.course_id, label: `Rutin - ${course?.name ?? task.course_id}`, kind: "routine" };
+  return { key: task.course_id, label: course ? courseDisplayName(task.course_id, course.name) : task.course_id, kind: "course" };
 }
 
 // Every photo of the given tasks, newest first (task date, then path so the order is stable). A path listed twice appears once.
-export function buildPhotoPool(tasks: PoolTask[], folderByPath: ReadonlyMap<string, string>): PoolPhoto[] {
+export function buildPhotoPool(
+  tasks: PoolTask[],
+  folderByPath: ReadonlyMap<string, string>,
+  annotationByPath: ReadonlyMap<string, string> = new Map(),
+): PoolPhoto[] {
   const seen = new Set<string>();
   const photos: PoolPhoto[] = [];
   for (const task of tasks) {
@@ -58,12 +71,44 @@ export function buildPhotoPool(tasks: PoolTask[], folderByPath: ReadonlyMap<stri
         taskDate: task.task_date,
         courseKey: course.key,
         courseLabel: course.label,
+        groupKind: course.kind,
+        annotatedPath: annotationByPath.get(path) ?? null,
         verdict: task.evidence_photo_status?.[path] ?? null,
         folderId: folderByPath.get(path) ?? null,
       });
     }
   }
   return photos.sort((a, b) => b.taskDate.localeCompare(a.taskDate) || a.path.localeCompare(b.path));
+}
+
+// --- Sections ---------------------------------------------------------------------------------------------------------------------
+
+export type PhotoGroup = { key: string; label: string; kind: GroupKind; photos: PoolPhoto[] };
+
+const KIND_ORDER: Record<GroupKind, number> = { course: 0, general: 1, routine: 2, other: 3 };
+
+// The photos as gallery sections: courses A-Z, then the Genel Deneme, then the Rutin groups A-Z, then "Diğer". Inside a section the
+// photos keep their order (newest task first).
+export function groupPhotos(photos: PoolPhoto[]): PhotoGroup[] {
+  const byKey = new Map<string, PhotoGroup>();
+  for (const p of photos) {
+    const group = byKey.get(p.courseKey) ?? { key: p.courseKey, label: p.courseLabel, kind: p.groupKind, photos: [] };
+    group.photos.push(p);
+    byKey.set(p.courseKey, group);
+  }
+  return [...byKey.values()].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.label.localeCompare(b.label, "tr"));
+}
+
+// The first `limit` photos of the sections in order (the "Daha fazla göster" window), still grouped; sections past the window are dropped.
+export function takeGroups(groups: PhotoGroup[], limit: number): PhotoGroup[] {
+  const out: PhotoGroup[] = [];
+  let left = limit;
+  for (const g of groups) {
+    if (left <= 0) break;
+    out.push(left >= g.photos.length ? g : { ...g, photos: g.photos.slice(0, left) });
+    left -= g.photos.length;
+  }
+  return out;
 }
 
 // "all" = every photo, "none" = photos in no folder, else a folder id.

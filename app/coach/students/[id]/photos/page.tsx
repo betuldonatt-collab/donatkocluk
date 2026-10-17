@@ -9,6 +9,7 @@ import { PhotoPoolGallery } from "./photo-pool-gallery";
 
 type FolderRow = { id: string; name: string };
 type ItemRow = { photo_path: string; folder_id: string };
+type AnnotationRow = { photo_path: string; annotated_path: string };
 type PagedResult<T> = PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>;
 
 // Fotoğraf Havuzu: every Kanıt Fotoğrafı the student attached to any task, with the coach's own folders. The photos stay where they are (the
@@ -19,7 +20,7 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
   const view = await getViewContext("coach");
   const coachId = view?.effectiveUserId ?? null;
 
-  const [{ data: profile }, tasksRead, foldersRead, itemsRead] = await Promise.all([
+  const [{ data: profile }, tasksRead, foldersRead, itemsRead, annotationsRead] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", id).maybeSingle(),
     fetchAllPages<PoolTask>(
       (from, to, withCount) =>
@@ -47,6 +48,19 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
               .range(from, to) as unknown as PagedResult<ItemRow>,
         )
       : Promise.resolve({ data: [] as ItemRow[], error: null }),
+    // The coach's own private edited copies (migration 0140); never the student's, parent's or another coach's.
+    coachId
+      ? fetchAllPages<AnnotationRow>(
+          (from, to, withCount) =>
+            supabase
+              .from("coach_photo_annotations")
+              .select("photo_path, annotated_path", withCount ? { count: "exact" } : undefined)
+              .eq("coach_id", coachId)
+              .eq("student_id", id)
+              .order("photo_path", { ascending: true })
+              .range(from, to) as unknown as PagedResult<AnnotationRow>,
+        )
+      : Promise.resolve({ data: [] as AnnotationRow[], error: null }),
   ]);
 
   // Until migration 0139 is run the folder tables do not exist: the gallery still works, just without folders (and says so).
@@ -56,9 +70,15 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
   const folderByPath = new Map<string, string>();
   if (foldersAvailable) for (const item of itemsRead.data ?? []) if (folderIds.has(item.folder_id)) folderByPath.set(item.photo_path, item.folder_id);
 
+  // Until migration 0140 is run the Pool simply has no editor.
+  const annotationsAvailable = !annotationsRead.error && coachId !== null;
+  const annotationByPath = new Map<string, string>();
+  if (annotationsAvailable) for (const a of annotationsRead.data ?? []) annotationByPath.set(a.photo_path, a.annotated_path);
+
   const photos = buildPhotoPool(
     tasksRead.data.filter((t) => (t.evidence_image_paths ?? []).length > 0),
     folderByPath,
+    annotationByPath,
   );
   const studentName = (profile as { full_name: string | null } | null)?.full_name ?? "Öğrenci";
 
@@ -79,7 +99,7 @@ export default async function PhotoPoolPage(props: PageProps<"/coach/students/[i
       {tasksRead.error ? (
         <p className="text-destructive text-sm">Fotoğraflar yüklenemedi. Sayfayı yenileyip tekrar dene.</p>
       ) : (
-        <PhotoPoolGallery studentId={id} initialPhotos={photos} initialFolders={folders} foldersAvailable={foldersAvailable} />
+        <PhotoPoolGallery studentId={id} initialPhotos={photos} initialFolders={folders} foldersAvailable={foldersAvailable} annotationsAvailable={annotationsAvailable} />
       )}
     </div>
   );

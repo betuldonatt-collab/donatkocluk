@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FolderInput, FolderPlus, Folders, ImageOff, Images, Inbox, Pencil, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FolderInput, FolderPlus, Folders, ImageOff, Images, Inbox, Pencil, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,25 @@ import {
   courseOptions,
   filterPhotos,
   folderCounts,
+  groupPhotos,
   pathsToMove,
+  takeGroups,
   type PhotoFilter,
   type PoolFolder,
   type PoolPhoto,
 } from "@/lib/photo-pool";
 import { cn } from "@/lib/utils";
-import { createPhotoFolder, deletePhotoFolder, getPhotoUrls, movePhotosToFolder, renamePhotoFolder } from "./actions";
+import {
+  createPhotoFolder,
+  deletePhotoFolder,
+  getAnnotationUrls,
+  getPhotoUrls,
+  movePhotosToFolder,
+  removePhotoAnnotation,
+  renamePhotoFolder,
+  saveAnnotatedPhoto,
+} from "./actions";
+import { PhotoEditor } from "./photo-editor";
 
 const PAGE = 60;
 
@@ -32,23 +44,71 @@ function formatDate(iso: string): string {
   return y && m && d ? `${d}.${m}.${y}` : iso;
 }
 
+// Signed links, fetched lazily and only for the keys asked for (the buckets are private), a batch at a time. `put` / `drop` let the caller
+// set or forget a link itself (a freshly saved edit, a removed one).
+function useLazyUrls(keys: string[], load: (batch: string[]) => Promise<{ ok: true; urls: Record<string, string> } | { ok: false }>) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const asked = useRef<Set<string>>(new Set());
+  const seen = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    const askedSet = asked.current;
+    const seenMap = seen.current;
+    const missing = keys.filter((k) => !askedSet.has(k));
+    if (missing.length === 0) return;
+    for (const k of missing) askedSet.add(k);
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < missing.length; i += 40) {
+        const batch = missing.slice(i, i + 40);
+        try {
+          const result = await load(batch);
+          if (cancelled) return;
+          if (result.ok) {
+            Object.assign(seenMap, result.urls);
+            setUrls((prev) => ({ ...prev, ...result.urls }));
+          } else for (const k of batch) askedSet.delete(k);
+        } catch {
+          for (const k of batch) askedSet.delete(k);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      // a cancelled run leaves its unfinished batches to be asked for again
+      for (const k of missing) if (!seenMap[k]) askedSet.delete(k);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys.join("|")]);
+
+  const put = useCallback((key: string, url: string) => {
+    asked.current.add(key);
+    seen.current[key] = url;
+    setUrls((prev) => ({ ...prev, [key]: url }));
+  }, []);
+
+  return { urls, put };
+}
+
 export function PhotoPoolGallery({
   studentId,
   initialPhotos,
   initialFolders,
   foldersAvailable,
+  annotationsAvailable = false,
 }: {
   studentId: string;
   initialPhotos: PoolPhoto[];
   initialFolders: PoolFolder[];
   foldersAvailable: boolean;
+  // Migration 0140 is in place: the lightbox can rotate / draw and keep the coach's private copy.
+  annotationsAvailable?: boolean;
 }) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [folders, setFolders] = useState(initialFolders);
   const [filter, setFilter] = useState<PhotoFilter>(NO_FILTER);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState(PAGE);
-  const [urls, setUrls] = useState<Record<string, string>>({});
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -57,49 +117,28 @@ export function PhotoPoolGallery({
   const [busy, setBusy] = useState(false);
   // The paths being dragged right now (empty = no drag in progress).
   const [dragPaths, setDragPaths] = useState<string[]>([]);
-  const requested = useRef<Set<string>>(new Set());
-  const urlsSeen = useRef<Record<string, string>>({});
+  // Lightbox: the editor is open / the student's original is shown instead of the coach's edited copy.
+  const [editing, setEditing] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const counts = useMemo(() => folderCounts(photos), [photos]);
   const courses = useMemo(() => courseOptions(photos), [photos]);
   const visible = useMemo(() => filterPhotos(photos, filter), [photos, filter]);
-  const page = visible.slice(0, shown);
-  const lightboxPhoto = lightbox !== null ? visible[lightbox] : undefined;
-  // The photos on screen, plus the one open in the lightbox (it can be past the loaded page when the coach steps through).
-  const wanted = lightboxPhoto && !page.includes(lightboxPhoto) ? [...page, lightboxPhoto] : page;
+  // Sections: Standard tasks by course, Rutin tasks by type. The gallery order (and the lightbox's previous / next) follows the sections.
+  const groups = useMemo(() => groupPhotos(visible), [visible]);
+  const ordered = useMemo(() => groups.flatMap((g) => g.photos), [groups]);
+  const orderedIndex = useMemo(() => new Map(ordered.map((p, i) => [p.path, i])), [ordered]);
+  const pageGroups = takeGroups(groups, shown);
+  const page = pageGroups.flatMap((g) => g.photos);
+  const lightboxPhoto = lightbox !== null ? ordered[lightbox] : undefined;
   const folderName = useCallback((id: string | null) => folders.find((f) => f.id === id)?.name ?? null, [folders]);
 
-  // Signed links are fetched only for the photos on screen (the bucket is private), a batch at a time.
-  useEffect(() => {
-    const asked = requested.current;
-    const seen = urlsSeen.current;
-    const missing = wanted.map((p) => p.path).filter((path) => !asked.has(path));
-    if (missing.length === 0) return;
-    for (const path of missing) asked.add(path);
-    let cancelled = false;
-    (async () => {
-      for (let i = 0; i < missing.length; i += 40) {
-        const batch = missing.slice(i, i + 40);
-        try {
-          const result = await getPhotoUrls(studentId, batch);
-          if (cancelled) return;
-          if (result.ok) {
-            Object.assign(seen, result.urls);
-            setUrls((prev) => ({ ...prev, ...result.urls }));
-          }
-          else for (const path of batch) asked.delete(path);
-        } catch {
-          for (const path of batch) asked.delete(path);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-      // a cancelled run leaves its unfinished batches to be asked for again
-      for (const path of missing) if (!seen[path]) asked.delete(path);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wanted.map((p) => p.path).join("|"), studentId]);
+  // An edited photo shows the coach's copy on its card; the student's original is fetched only when nothing is edited (or in the lightbox).
+  const originalKeys = [...page.filter((p) => !p.annotatedPath), ...(lightboxPhoto ? [lightboxPhoto] : [])].map((p) => p.path);
+  const editedKeys = [...page, ...(lightboxPhoto ? [lightboxPhoto] : [])].flatMap((p) => (p.annotatedPath ? [p.annotatedPath] : []));
+  const { urls } = useLazyUrls(originalKeys, (batch) => getPhotoUrls(studentId, batch));
+  const { urls: editedUrls, put: putEditedUrl } = useLazyUrls(editedKeys, (batch) => getAnnotationUrls(studentId, batch));
 
   function changeFilter(next: Partial<PhotoFilter>) {
     setFilter((prev) => ({ ...prev, ...next }));
@@ -193,6 +232,68 @@ export function PhotoPoolGallery({
     } finally {
       setBusy(false);
     }
+  }
+
+  function openPhoto(index: number | null) {
+    setLightbox(index);
+    setEditing(false);
+    setShowOriginal(false);
+  }
+
+  async function saveEdit(photo: PoolPhoto, blob: Blob) {
+    if (savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const form = new FormData();
+      form.set("studentId", studentId);
+      form.set("photoPath", photo.path);
+      form.set("file", new File([blob], "edit.jpg", { type: "image/jpeg" }));
+      const result = await saveAnnotatedPhoto(form);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      if (result.url) putEditedUrl(result.annotatedPath, result.url);
+      setPhotos((prev) => prev.map((p) => (p.path === photo.path ? { ...p, annotatedPath: result.annotatedPath } : p)));
+      setEditing(false);
+      setShowOriginal(false);
+      toast.success("Düzenlenmiş kopya kaydedildi. Sadece sen görürsün; öğrencinin fotoğrafı değişmedi.");
+    } catch (e) {
+      toast.error(friendlyError(e, "Düzenlenmiş fotoğraf kaydedilemedi."));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function resetEdit(photo: PoolPhoto) {
+    if (savingEdit) return;
+    if (!window.confirm("Düzenlenmiş kopya silinsin mi? Öğrencinin orijinal fotoğrafı zaten hiç değişmedi, o kalır.")) return;
+    setSavingEdit(true);
+    try {
+      const result = await removePhotoAnnotation(studentId, photo.path);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setPhotos((prev) => prev.map((p) => (p.path === photo.path ? { ...p, annotatedPath: null } : p)));
+      setShowOriginal(false);
+    } catch (e) {
+      toast.error(friendlyError(e, "Düzenlenmiş kopya silinemedi."));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function toggleGroup(group: { photos: PoolPhoto[] }) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allIn = group.photos.every((p) => next.has(p.path));
+      for (const p of group.photos) {
+        if (allIn) next.delete(p.path);
+        else next.add(p.path);
+      }
+      return next;
+    });
   }
 
   function dropOn(event: React.DragEvent, target: string | null) {
@@ -423,66 +524,86 @@ export function PhotoPoolGallery({
           <EmptyState icon={ImageOff} title="Bu filtreyle fotoğraf yok" description="Klasörü veya filtreleri değiştirmeyi dene." />
         ) : (
           <>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-              {page.map((photo, index) => {
-                const isSelected = selected.has(photo.path);
-                const url = urls[photo.path];
-                return (
-                  <li
-                    key={photo.path}
-                    draggable={foldersAvailable}
-                    onDragStart={(e) => {
-                      setDragPaths(pathsToMove(photo.path, selected));
-                      e.dataTransfer.effectAllowed = "move";
-                      e.dataTransfer.setData("text/plain", photo.path);
-                    }}
-                    onDragEnd={() => {
-                      setDragPaths([]);
-                      setDropTarget(null);
-                    }}
-                    className={cn("group/card bg-card relative overflow-hidden rounded-lg border", isSelected && "ring-primary ring-2")}
-                  >
-                    <button type="button" className="bg-muted relative block aspect-square w-full" onClick={() => setLightbox(index)} aria-label={`${photo.taskTitle} fotoğrafını büyüt`}>
-                      {url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={url} alt={photo.taskTitle} loading="lazy" draggable={false} className="size-full object-cover" />
-                      ) : (
-                        <span className="text-muted-foreground flex size-full items-center justify-center text-xs">Yükleniyor...</span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={isSelected}
-                      aria-label="Fotoğrafı seç"
-                      onClick={() => toggle(photo.path)}
-                      className={cn(
-                        "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border-2 border-white bg-black/40 text-white shadow transition-opacity",
-                        isSelected ? "bg-primary border-primary opacity-100" : "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100",
-                        selected.size > 0 && "opacity-100",
-                      )}
-                    >
-                      {isSelected && <Check className="size-4" />}
-                    </button>
-                    {photo.verdict === "rejected" && (
-                      <span className="absolute top-2 right-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Onaylanmadı</span>
-                    )}
-                    <div className="space-y-0.5 p-2 text-xs">
-                      <p className="truncate font-medium">{photo.courseLabel}</p>
-                      <p className="text-muted-foreground truncate">
-                        {formatDate(photo.taskDate)} · {photo.taskTitle}
-                      </p>
-                      {photo.folderId && filter.folder === "all" && (
-                        <p className="text-primary flex items-center gap-1 truncate">
-                          <Folders className="size-3 shrink-0" />
-                          {folderName(photo.folderId)}
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="space-y-6">
+              {pageGroups.map((group, gi) => (
+                <section key={group.key} aria-label={group.label}>
+                  <div className="mb-2 flex items-center gap-2 border-b pb-1.5">
+                    <h2 className="text-sm font-semibold">{group.label}</h2>
+                    <span className="text-muted-foreground text-xs tabular-nums">{groups[gi].photos.length} fotoğraf</span>
+                    <Button type="button" variant="ghost" size="sm" className="ml-auto h-7" onClick={() => toggleGroup(groups[gi])}>
+                      {groups[gi].photos.every((p) => selected.has(p.path)) ? "Bölüm seçimini kaldır" : "Bölümü seç"}
+                    </Button>
+                  </div>
+                  <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                    {group.photos.map((photo) => {
+                      const index = orderedIndex.get(photo.path) ?? 0;
+                      const isSelected = selected.has(photo.path);
+                      // A photo the coach has edited shows the edited copy (nothing, until its link arrives, rather than flashing the original).
+                      const url = photo.annotatedPath ? editedUrls[photo.annotatedPath] : urls[photo.path];
+                      return (
+                        <li
+                          key={photo.path}
+                          draggable={foldersAvailable}
+                          onDragStart={(e) => {
+                            setDragPaths(pathsToMove(photo.path, selected));
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", photo.path);
+                          }}
+                          onDragEnd={() => {
+                            setDragPaths([]);
+                            setDropTarget(null);
+                          }}
+                          className={cn("group/card bg-card relative overflow-hidden rounded-lg border", isSelected && "ring-primary ring-2")}
+                        >
+                          <button type="button" className="bg-muted relative block aspect-square w-full" onClick={() => openPhoto(index)} aria-label={`${photo.taskTitle} fotoğrafını büyüt`}>
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={url} alt={photo.taskTitle} loading="lazy" draggable={false} className="size-full object-cover" />
+                            ) : (
+                              <span className="text-muted-foreground flex size-full items-center justify-center text-xs">Yükleniyor...</span>
+                            )}
+                            {photo.annotatedPath && (
+                              <span className="bg-primary text-primary-foreground absolute bottom-2 left-2 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                                <Pencil className="size-3" />
+                                Düzenlendi
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={isSelected}
+                            aria-label="Fotoğrafı seç"
+                            onClick={() => toggle(photo.path)}
+                            className={cn(
+                              "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border-2 border-white bg-black/40 text-white shadow transition-opacity",
+                              isSelected ? "bg-primary border-primary opacity-100" : "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100",
+                              selected.size > 0 && "opacity-100",
+                            )}
+                          >
+                            {isSelected && <Check className="size-4" />}
+                          </button>
+                          {photo.verdict === "rejected" && (
+                            <span className="absolute top-2 right-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Onaylanmadı</span>
+                          )}
+                          <div className="space-y-0.5 p-2 text-xs">
+                            <p className="text-muted-foreground truncate">
+                              {formatDate(photo.taskDate)} · {photo.taskTitle}
+                            </p>
+                            {photo.folderId && filter.folder === "all" && (
+                              <p className="text-primary flex items-center gap-1 truncate">
+                                <Folders className="size-3 shrink-0" />
+                                {folderName(photo.folderId)}
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
             {shown < visible.length && (
               <div className="flex justify-center">
                 <Button type="button" variant="outline" onClick={() => setShown((n) => n + PAGE)}>
@@ -495,7 +616,7 @@ export function PhotoPoolGallery({
       </section>
 
       {/* Büyütülmüş fotoğraf */}
-      <Dialog open={lightbox !== null} onOpenChange={(open) => !open && setLightbox(null)}>
+      <Dialog open={lightbox !== null} onOpenChange={(open) => !open && !savingEdit && openPhoto(null)}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{lightboxPhoto?.taskTitle ?? "Fotoğraf"}</DialogTitle>
@@ -503,31 +624,63 @@ export function PhotoPoolGallery({
               {lightboxPhoto ? `${lightboxPhoto.courseLabel} · ${formatDate(lightboxPhoto.taskDate)}${lightboxPhoto.folderId ? ` · ${folderName(lightboxPhoto.folderId)}` : ""}` : ""}
             </DialogDescription>
           </DialogHeader>
-          {lightboxPhoto && (
-            <div className="flex items-center gap-2">
-              <Button type="button" size="icon" variant="ghost" disabled={lightbox === 0} onClick={() => setLightbox((i) => (i === null ? i : Math.max(0, i - 1)))} aria-label="Önceki fotoğraf">
-                <ChevronLeft className="size-5" />
-              </Button>
-              <div className="bg-muted flex min-h-60 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-md">
-                {urls[lightboxPhoto.path] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={urls[lightboxPhoto.path]} alt={lightboxPhoto.taskTitle} className="max-h-[70dvh] w-auto max-w-full object-contain" />
-                ) : (
-                  <span className="text-muted-foreground text-sm">Yükleniyor...</span>
-                )}
-              </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                disabled={lightbox === visible.length - 1}
-                onClick={() => setLightbox((i) => (i === null ? i : Math.min(visible.length - 1, i + 1)))}
-                aria-label="Sonraki fotoğraf"
-              >
-                <ChevronRight className="size-5" />
-              </Button>
-            </div>
-          )}
+          {lightboxPhoto &&
+            (() => {
+              const photo = lightboxPhoto;
+              const edited = photo.annotatedPath ? editedUrls[photo.annotatedPath] : undefined;
+              const original = urls[photo.path];
+              const shownUrl = photo.annotatedPath && !showOriginal ? edited : original;
+              if (editing && shownUrl) {
+                return <PhotoEditor imageUrl={shownUrl} busy={savingEdit} onSave={(blob) => void saveEdit(photo, blob)} onCancel={() => setEditing(false)} />;
+              }
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button type="button" size="icon" variant="ghost" disabled={lightbox === 0} onClick={() => openPhoto(lightbox === null ? null : Math.max(0, lightbox - 1))} aria-label="Önceki fotoğraf">
+                      <ChevronLeft className="size-5" />
+                    </Button>
+                    <div className="bg-muted flex min-h-60 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-md">
+                      {shownUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={shownUrl} alt={photo.taskTitle} className="max-h-[66dvh] w-auto max-w-full object-contain" />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Yükleniyor...</span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      disabled={lightbox === ordered.length - 1}
+                      onClick={() => openPhoto(lightbox === null ? null : Math.min(ordered.length - 1, lightbox + 1))}
+                      aria-label="Sonraki fotoğraf"
+                    >
+                      <ChevronRight className="size-5" />
+                    </Button>
+                  </div>
+                  {annotationsAvailable && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" size="sm" onClick={() => setEditing(true)} disabled={!shownUrl || savingEdit}>
+                        <Pencil className="size-4" />
+                        Düzenle (döndür / çiz)
+                      </Button>
+                      {photo.annotatedPath && (
+                        <>
+                          <Button type="button" size="sm" variant="outline" onClick={() => setShowOriginal((v) => !v)}>
+                            {showOriginal ? "Düzenlenmiş kopyayı göster" : "Orijinali göster"}
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => void resetEdit(photo)} disabled={savingEdit}>
+                            <Undo2 className="size-4" />
+                            Orijinale dön
+                          </Button>
+                          <span className="text-muted-foreground text-xs">{showOriginal ? "Öğrencinin yüklediği orijinal." : "Düzenlenmiş kopya — sadece sana görünür."}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
         </DialogContent>
       </Dialog>
     </div>
