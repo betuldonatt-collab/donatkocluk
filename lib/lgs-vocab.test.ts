@@ -486,3 +486,47 @@ describe("summarizeSession", () => {
     expect(summarizeSession([], 0)).toEqual({ uniqueWords: 0, attempts: 0 });
   });
 });
+
+describe("punctuation never matters", () => {
+  it("every mark is ignored in the student's answer: 'apple.' is 'apple'", () => {
+    for (const typed of ["apple.", "apple!", "apple?", "apple,", "apple;", "apple:", "\"apple\"", "(apple)", "apple...", "apple…", "'apple'", "’apple’", "¡apple!"]) {
+      expect(checkVocabAnswer(typed, "apple", "tr_to_en"), typed).toBe("EXACT_MATCH");
+    }
+  });
+
+  it("... and in the stored answer, on either side", () => {
+    expect(checkVocabAnswer("apple", "apple.", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("cant", "can't", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("can't", "cant", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("can’t", "can't", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("don't know", "dont know", "tr_to_en")).toBe("EXACT_MATCH");
+  });
+
+  it("inside a phrase too, and Turkish answers work the same", () => {
+    expect(checkVocabAnswer("Excuse me!", "excuse me", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("Merhaba!", "merhaba", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("İstanbul'a", "istanbula", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("kitap okumak.", "kitap okumak", "en_to_tr")).toBe("EXACT_MATCH");
+  });
+
+  it("the cleaned strings are what the Turkish ending removal and the one-letter typo check then see", () => {
+    expect(checkVocabAnswer("isteme!", "istemek", "en_to_tr")).toBe("ACCEPTED_TYPO"); // ending ignored after the mark is gone
+    expect(checkVocabAnswer("aparment.", "apartment", "tr_to_en")).toBe("ACCEPTED_TYPO"); // one letter off, mark ignored
+    expect(checkVocabAnswerDetailed("aparment?!", "apartment.", "tr_to_en")).toEqual({ result: "ACCEPTED_TYPO", accepted: "apartment." });
+    // punctuation does not use up the typo allowance: two real letters off is still wrong
+    expect(checkVocabAnswer("aprment.", "apartment", "tr_to_en")).toBe("INCORRECT");
+  });
+
+  it("the existing rules are intact: '&' still equals 'and', short words still exact, slash still separates meanings", () => {
+    expect(checkVocabAnswer("black and white", "Black & White", "tr_to_en")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("oven.", "over", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("büyüleyici!", "çekici/büyüleyici", "en_to_tr")).toBe("EXACT_MATCH");
+  });
+
+  it("an answer that is only punctuation (or empty) never matches, and a stored variant that is only punctuation is no variant", () => {
+    expect(checkVocabAnswer("...", "apple", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("", "apple", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("", "...", "tr_to_en")).toBe("INCORRECT");
+    expect(checkVocabAnswer("!!", "?!", "en_to_tr")).toBe("INCORRECT");
+  });
+});

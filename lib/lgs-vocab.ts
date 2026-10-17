@@ -130,13 +130,17 @@ export type QuizDirection = "en_to_tr" | "tr_to_en";
 // it on BOTH sides means a student typing it either way always matches.
 // An ampersand and the word "and" are the same thing: "&" (with or without spaces around it) and a standalone "and" both
 // become " and ", on both sides, so "Black & White", "Black and White" and "black&white" all match each other -- whichever
-// of them the database or the student happens to use. Runs of whitespace collapse to one space.
+// of them the database or the student happens to use. Then EVERY punctuation mark -- full stop, comma, exclamation / question mark,
+// apostrophe (straight or curly), quotes, colon, brackets, ellipsis, ... -- is removed outright on both sides ("apple." = "apple",
+// "can't" = "cant"), so a stray mark never makes a right answer wrong. This is the first step of the comparison: the Turkish ending
+// removal and the one-letter-typo check below only ever see the cleaned strings. Runs of whitespace collapse to one space.
 function normalizeForDirection(s: string, direction: QuizDirection): string {
   return s
     .trim()
     .toLocaleLowerCase(direction === "tr_to_en" ? "en-US" : "tr-TR")
     .replace(/-/g, "")
     .replace(/\s*&\s*/g, " and ")
+    .replace(/\p{P}/gu, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -185,11 +189,14 @@ export type AnswerCheck = {
 export function checkVocabAnswerDetailed(userAnswer: string, correctAnswer: string, direction: QuizDirection): AnswerCheck {
   const turkish = direction === "en_to_tr";
   const a = normalizeForDirection(userAnswer, direction);
-  const variants = acceptedVariants(correctAnswer).map((raw) => {
-    const v = normalizeForDirection(raw, direction);
-    return { raw, v, stem: turkish ? stripTurkishEnding(v) : v };
-  });
-  if (variants.length === 0) return { result: "INCORRECT", accepted: null };
+  // (an answer that is nothing but punctuation is nothing: it matches nothing, and a variant that is only punctuation is no variant)
+  const variants = acceptedVariants(correctAnswer)
+    .map((raw) => {
+      const v = normalizeForDirection(raw, direction);
+      return { raw, v, stem: turkish ? stripTurkishEnding(v) : v };
+    })
+    .filter((x) => x.v.length > 0);
+  if (variants.length === 0 || a.length === 0) return { result: "INCORRECT", accepted: null };
 
   if (variants.some((x) => x.v === a)) return { result: "EXACT_MATCH", accepted: null };
 
