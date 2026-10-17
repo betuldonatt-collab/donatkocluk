@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { checkQuestionBankSave, durationOnlyCountsRequired, hasWatchedVideo, zeroFillQuestionCounts } from "@/lib/question-bank-validation";
-import Link from "next/link";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Languages, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
+import { vocabStatusLabel } from "@/lib/vocab-quiz-task";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Lock, MinusCircle, PlayCircle, RotateCcw, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +40,7 @@ import {
 import { TASK_TYPE_LABELS, type StudentTask, type SubjectScore, type TopicMistake } from "./types";
 import { TopicMistakeSelector } from "./topic-mistake-selector";
 import { EvidenceUploader } from "./evidence-uploader";
+import { VocabQuizActions } from "./vocab-quiz-actions";
 import type { ExamType } from "@/lib/exam-type";
 
 type Step = "form" | "analysis";
@@ -862,7 +863,6 @@ function TaskModalBody({
   // read-only progress view plus a link to go actually work on it, always
   // (not just under a locked week).
   if (isVocabQuiz) {
-    const unit = Number(task.topic_id) || 1;
     return (
       <>
         <DialogHeader className="shrink-0">
@@ -877,21 +877,18 @@ function TaskModalBody({
           </div>
 
           <p className="text-foreground text-sm">
-            Görev Durumu:{" "}
-            <span className="font-medium">
-              {task.status === "done" ? "Yapıldı" : task.status === "half_done" ? "Yarım Yapıldı" : "Bekliyor"}
-            </span>
+            Görev Durumu: <span className="font-medium">{vocabStatusLabel(task.status)}</span>
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Yapıldı ve Yarım Yapıldı durumunu quiz kendisi belirler; sen sadece quizi başlatır veya Yapılmadı olarak işaretlersin.
           </p>
 
-          {task.status !== "done" && (
-            <Link
-              href="/student/ingilizce-quiz"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium transition-colors"
-            >
-              <Languages className="size-4" />
-              {unit}. Üniteye Git
-            </Link>
-          )}
+          <VocabQuizActions
+            task={task}
+            onStatusChange={(_, patch) => {
+              onSaved({ ...task, ...patch });
+            }}
+          />
         </div>
 
         <DialogFooter className="shrink-0 border-t pt-4">

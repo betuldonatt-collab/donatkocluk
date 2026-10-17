@@ -19,7 +19,7 @@ import {
   type QuizWord,
 } from "@/lib/lgs-vocab";
 import { masteryTierColor } from "@/lib/progress-colors";
-import { getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
+import { completeVocabQuizRun, getActiveVocabQuizTask, getVocabQuizBatch, submitVocabAnswer, type ActiveVocabQuizTask } from "./actions";
 
 type BatchWord = QuizWord & { direction: QuizDirection };
 
@@ -197,10 +197,13 @@ function Window({ children }: { children: React.ReactNode }) {
 // keeps the (still-mounted, now-blurred) unit grid behind it.
 export function VocabQuizSession({
   unitNumber,
+  taskId = null,
   onExit,
   onWordCorrect,
 }: {
   unitNumber: number;
+  // The assigned task this quiz was started for (its card's "Quize Başla"); null = the unit's open task is picked (due today first).
+  taskId?: string | null;
   onExit: () => void;
   // Called after each correct answer is saved, with the word's correct_count before and after -- the dashboard's tier counters.
   onWordCorrect: (previousCount: number, nextCount: number) => void;
@@ -215,6 +218,8 @@ export function VocabQuizSession({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<ActiveVocabQuizTask | null>(null);
   const [taskJustCompleted, setTaskJustCompleted] = useState(false);
+  // The end of the run made the assigned task Yapıldı (see completeVocabQuizRun) -- shown on the summary screen.
+  const [runCompleted, setRunCompleted] = useState(false);
   // Backs the background save that follows every answer (Kontrol Et/Pas
   // Geç already show feedback synchronously, before this even starts --
   // see recordAnswer) -- isSaving only ever drives a small, non-blocking
@@ -225,6 +230,7 @@ export function VocabQuizSession({
     setPhase("loading");
     setLoadError(null);
     setTaskJustCompleted(false);
+    setRunCompleted(false);
     // Both reads always resolve to a result object, never a thrown
     // rejection -- see the comment on GetVocabQuizBatchResult in
     // ./actions.ts for why that matters here specifically. The outer
@@ -232,7 +238,7 @@ export function VocabQuizSession({
     // failure (e.g. the network call itself never reaching the server),
     // and deliberately never shows that caught error's own raw message.
     try {
-      const [batchResult, taskResult] = await Promise.all([getVocabQuizBatch(unitNumber), getActiveVocabQuizTask(unitNumber)]);
+      const [batchResult, taskResult] = await Promise.all([getVocabQuizBatch(unitNumber), getActiveVocabQuizTask(unitNumber, taskId)]);
       if (!batchResult.ok) {
         setLoadError(batchResult.error);
         setPhase("empty");
@@ -267,6 +273,23 @@ export function VocabQuizSession({
     Promise.resolve().then(() => loadBatch());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unitNumber]);
+
+  // The END of a run -- the summary screen, or a unit with nothing left to learn -- is when the assigned task may become Yapıldı: its word
+  // target reached, no target at all, or no word left to reach it with (completeVocabQuizRun decides). Exiting earlier leaves it at Yarım
+  // Yapıldı, which the first answer already set.
+  useEffect(() => {
+    if (!activeTask || !(phase === "summary" || (phase === "empty" && !loadError))) return;
+    let cancelled = false;
+    completeVocabQuizRun(activeTask.id, unitNumber)
+      .then((result) => {
+        if (!cancelled && result.ok && result.status === "done") setRunCompleted(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   const current = batch[index];
 
@@ -307,7 +330,7 @@ export function VocabQuizSession({
         // exists, and this answer wasn't just skipped/wrong) bumps it by
         // one, capped at the target the same way the server does.
         if (result !== "INCORRECT") {
-          setActiveTask((prev) => (prev ? { ...prev, current: Math.min(prev.current + 1, prev.target) } : prev));
+          setActiveTask((prev) => (prev ? { ...prev, current: prev.target === null ? prev.current + 1 : Math.min(prev.current + 1, prev.target) } : prev));
         }
         // Immediately, the moment this answer crosses the assigned task's
         // own target -- overrides the window's own auto-advance/Anladım
@@ -414,6 +437,12 @@ export function VocabQuizSession({
         </CardHeader>
         <CardContent className="space-y-4">
           <SessionResultText uniqueWords={uniqueWords} attempts={attempts} />
+          {(runCompleted || taskJustCompleted) && (
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <PartyPopper className="size-4 shrink-0" />
+              Görevin tamamlandı olarak işaretlendi.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={loadBatch}>
               Çalışmaya Devam Et
@@ -467,7 +496,7 @@ export function VocabQuizSession({
         <div className="flex shrink-0 items-center gap-3 text-xs">
           {activeTask && (
             <span className="text-muted-foreground tabular-nums">
-              Görev: {activeTask.current}/{activeTask.target} kelime
+              Görev: {activeTask.target === null ? `${activeTask.current} kelime` : `${activeTask.current}/${activeTask.target} kelime`}
             </span>
           )}
           <span className="text-muted-foreground tabular-nums">

@@ -17,7 +17,9 @@ export function SortableTaskCard({
   trailing,
   showTimer = true,
   impactHint,
+  onStatusChange,
 }: {
+  onStatusChange?: (taskId: string, patch: Partial<StudentTask>) => void;
   task: StudentTask;
   impactHint?: { pct: number; text: string } | null;
   onClick: () => void;
@@ -52,7 +54,7 @@ export function SortableTaskCard({
         <GripVertical className="size-4" />
       </button>
       <div className="min-w-0 flex-1">
-        <TaskCard task={task} onClick={onClick} showTimer={showTimer} impactHint={impactHint} />
+        <TaskCard task={task} onClick={onClick} showTimer={showTimer} impactHint={impactHint} onStatusChange={onStatusChange} />
       </div>
       {trailing}
     </div>

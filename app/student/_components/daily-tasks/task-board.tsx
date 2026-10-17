@@ -301,6 +301,13 @@ export function TaskBoard({
     setExtraProgressTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
+  // A card changed a task's status on its own (İngilizce Kelime Quizi's "Yapılmadı"): mirrored everywhere the board keeps the task.
+  function handleStatusPatch(taskId: string, patch: Partial<StudentTask>) {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t)));
+    setProgressTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t)));
+    setExtraProgressTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t)));
+  }
+
   function handleCreated(task: StudentTask) {
     setTasks((prev) => [...prev, task]);
     setProgressTasks((prev) => [...prev, task]);
@@ -529,7 +536,7 @@ export function TaskBoard({
                       <SortableContext items={routineTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {routineTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} onStatusChange={handleStatusPatch} />
                           ))}
                         </div>
                       </SortableContext>
@@ -546,7 +553,7 @@ export function TaskBoard({
                       <SortableContext items={regularTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                           {regularTasks.map((task) => (
-                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} />
+                            <SortableTaskCard key={task.id} task={task} onClick={() => openTask(task)} showTimer={canUseTimer} impactHint={impactHintFor(task)} onStatusChange={handleStatusPatch} />
                           ))}
                         </div>
                       </SortableContext>
@@ -579,6 +586,7 @@ export function TaskBoard({
                         onClick={() => openTask(task)}
                         showTimer={canUseTimer}
                         impactHint={impactHintFor(task)}
+                        onStatusChange={handleStatusPatch}
                         trailing={
                           // Branch exams are coach/admin-delete-only, same
                           // as resource tracking -- RLS already rejects

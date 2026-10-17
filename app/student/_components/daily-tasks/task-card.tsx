@@ -19,7 +19,9 @@ import {
 
 import { TaskDescription } from "@/components/task-description";
 import { cn } from "@/lib/utils";
+import { vocabProgressText, vocabStatusLabel } from "@/lib/vocab-quiz-task";
 import { FocusTimerTrigger } from "../focus-timer/focus-timer-trigger";
+import { VocabQuizActions } from "./vocab-quiz-actions";
 import { statusBorderClass, subjectTintClass, TASK_TYPE_LABELS, type StudentTask } from "./types";
 
 const TASK_TYPE_ICONS = {
@@ -152,6 +154,9 @@ function taskSubtitle(task: StudentTask): string {
       }
       return `${manual}${durationSuffix(task)}`;
     }
+    case "vocab_quiz":
+      // The quiz sets this status itself (lib/vocab-quiz-task.ts): progress against the word target, and where it stands.
+      return `${vocabProgressText(task)} · ${vocabStatusLabel(task.status)}`;
     default:
       return `${TASK_TYPE_LABELS[task.task_type]}${durationSuffix(task)}`;
   }
@@ -162,9 +167,12 @@ export function TaskCard({
   onClick,
   showTimer = true,
   impactHint,
+  onStatusChange,
 }: {
   task: StudentTask;
   onClick: () => void;
+  // The card changed the task's status itself (İngilizce Kelime Quizi's "Yapılmadı"): the board mirrors it.
+  onStatusChange?: (taskId: string, patch: Partial<StudentTask>) => void;
   // e.g. "Bu görevi tamamladığında bugünkü ilerlemene yaklaşık %30 ekleyeceksin"
   // (see lib/effort-weight.ts). Null/absent hides it.
   impactHint?: { pct: number; text: string } | null;
@@ -327,6 +335,8 @@ export function TaskCard({
         <p className="text-muted-foreground text-xs break-words">
           {task.rejected_at ? (task.rejection_reason ?? "Koçun tarafından reddedildi.") : taskSubtitle(task)}
         </p>
+        {/* İngilizce Kelime Quizi: "Quize Başla" + "Yapılmadı" right on the card (nothing else to pick -- the quiz sets Yapıldı / Yarım). */}
+        <VocabQuizActions task={task} onStatusChange={onStatusChange} className="mt-2" />
         {task.video_links.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {task.video_links.map((link, i) => (

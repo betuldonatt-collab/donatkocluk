@@ -6,10 +6,10 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { assertNotImpersonating } from "@/lib/impersonation";
-import { computeAutoTaskStatus } from "@/lib/count-fields";
 import { GENERIC_DB_ERROR } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { nextWordProgress, selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
+import { pickVocabQuizTask, taskAfterAnswer, taskAfterRun } from "@/lib/vocab-quiz-task";
 
 // Logs the real error server-side (console + Sentry) and, when it carries a
 // Postgres/PostgREST error code (an RLS denial, a missing grant, a check
@@ -22,11 +22,11 @@ import { nextWordProgress, selectQuizBatch, type QuizWord, type WordProgressSumm
 // next word in under a second, wiping this message before anyone had a
 // chance to read it, and the generic text gave no reason to suspect
 // anything was actually broken.
-function vocabActionError(label: string, e: unknown): string {
+function vocabActionError(label: string, e: unknown, what = "Kelime ilerlemesi"): string {
   console.error(`[${label}] failed:`, e);
   Sentry.captureException(e);
   const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : null;
-  if (code) return `Kelime ilerlemesi kaydedilemedi (hata kodu: ${code}).`;
+  if (code) return `${what} kaydedilemedi (hata kodu: ${code}).`;
   return e instanceof Error ? e.message : GENERIC_DB_ERROR;
 }
 
@@ -44,6 +44,8 @@ function vocabActionError(label: string, e: unknown): string {
 // client exactly as written.
 type GetVocabQuizBatchResult = { ok: true; words: QuizWord[] } | { ok: false; error: string };
 type GetActiveVocabQuizTaskResult = { ok: true; task: ActiveVocabQuizTask | null } | { ok: false; error: string };
+type CompleteRunResult = { ok: true; status: "done" | "half_done" | "unchanged" } | { ok: false; error: string };
+type NotDoneResult = { ok: true } | { ok: false; error: string };
 // nextCount is this word's own correct_count AFTER this answer (unchanged on a miss/skip -- nothing already earned is taken
 // back) -- the quiz session's per-word level dots and the dashboard's tier counters render straight off it, authoritative over
 // whatever they optimistically guessed the instant the answer was given. isMastered / firstCorrect say whether THIS answer
@@ -113,33 +115,34 @@ export async function getVocabQuizBatch(unitNumber: number, limit = 10): Promise
   }
 }
 
-export type ActiveVocabQuizTask = { id: string; target: number; current: number };
+// target is null for a task assigned without a word count (the run itself is then the task).
+export type ActiveVocabQuizTask = { id: string; target: number | null; current: number };
 
-// The one coach-assigned "N. Ünite - M Kelime" task (if any) still open for
-// this unit -- Ders Atama (task-form-fields.tsx) stores it as task_type
-// 'vocab_quiz', course_id "ingilizce-quiz", topic_id the Ünite number as
-// plain text, total_count the word-count target. Not started/mastered by
-// the coach at all beyond that: correct_count climbs by one per correct
-// quiz answer (submitVocabAnswer below) until it reaches total_count, at
-// which point the task is marked done and stops showing up here.
-export async function getActiveVocabQuizTask(unitNumber: number): Promise<GetActiveVocabQuizTaskResult> {
+// The assigned "N. Ünite - M Kelime" task (if any) this quiz run belongs to -- Ders Atama (task-form-fields.tsx) stores it as task_type
+// 'vocab_quiz', course_id "ingilizce-quiz", topic_id the Ünite number as plain text, total_count the word-count target (or none).
+//   * Opened from a task's "Quize Başla" (taskId given): exactly THAT task, if it is this student's, still open and for this unit.
+//   * Opened from the sidebar / a unit card: the unit's open task due today, else the latest one already due, else the soonest upcoming
+//     (pickVocabQuizTask). Before, the LATEST date won -- a week of answers went to next Sunday's task and today's stayed untouched.
+// Correct answers climb its correct_count (submitVocabAnswer below) and the quiz sets its status (lib/vocab-quiz-task.ts).
+export async function getActiveVocabQuizTask(unitNumber: number, taskId?: string | null): Promise<GetActiveVocabQuizTaskResult> {
   try {
     const unitV = parseInput(unitNumberSchema, unitNumber);
+    const taskIdV = taskId ? parseInput(uuidSchema, taskId) : null;
     const { supabase, userId } = await requireUserIdReadOnly();
-    const { data, error } = await supabase
+    let query = supabase
       .from("student_tasks")
-      .select("id, total_count, correct_count")
+      .select("id, total_count, correct_count, task_date")
       .eq("student_id", userId)
       .eq("task_type", "vocab_quiz")
       .eq("topic_id", String(unitV))
-      .neq("status", "done")
-      .not("total_count", "is", null)
-      .order("task_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .neq("status", "done");
+    if (taskIdV) query = query.eq("id", taskIdV);
+    const { data, error } = await query.order("task_date", { ascending: false }).limit(60);
     if (error) throw error;
-    if (!data || data.total_count === null) return { ok: true, task: null };
-    return { ok: true, task: { id: data.id, target: data.total_count, current: data.correct_count ?? 0 } };
+    const rows = (data ?? []) as { id: string; total_count: number | null; correct_count: number | null; task_date: string }[];
+    const row = taskIdV ? (rows[0] ?? null) : pickVocabQuizTask(rows, new Date().toISOString().slice(0, 10));
+    if (!row) return { ok: true, task: null };
+    return { ok: true, task: { id: row.id, target: row.total_count, current: row.correct_count ?? 0 } };
   } catch (e) {
     return { ok: false, error: vocabActionError("getActiveVocabQuizTask", e) };
   }
@@ -195,7 +198,7 @@ export async function submitVocabAnswer(
     if (error) throw error;
 
     let taskCompleted = false;
-    if (isCorrectV && activeTaskId) {
+    if (activeTaskId) {
       const activeTaskIdV = parseInput(uuidSchema, activeTaskId);
       const { data: task, error: taskFetchError } = await supabase
         .from("student_tasks")
@@ -203,23 +206,20 @@ export async function submitVocabAnswer(
         .eq("id", activeTaskIdV)
         .maybeSingle();
       if (taskFetchError) throw taskFetchError;
-      // Silently skipped, not an error: the task may have been completed
-      // or removed by the coach between this batch loading and this
-      // answer -- the word's own streak above is already saved either way.
-      if (task && task.student_id === userId && task.total_count !== null && task.status !== "done") {
-        const nextCorrect = Math.min((task.correct_count ?? 0) + 1, task.total_count);
-        const status = computeAutoTaskStatus(task.total_count, nextCorrect, 0, 0);
-        taskCompleted = status === "done";
-        const { error: taskUpdateError } = await supabase
-          .from("student_tasks")
-          .update({
-            correct_count: nextCorrect,
-            status: status ?? task.status,
-            completed: taskCompleted,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", activeTaskIdV);
-        if (taskUpdateError) throw taskUpdateError;
+      // Silently skipped, not an error: the task may have been completed or removed by the coach between this batch loading and this
+      // answer -- the word's own progress above is already saved either way.
+      if (task && task.student_id === userId) {
+        // ANY answer makes the task at least Yarım Yapıldı, a correct one also counts toward the word target, and reaching the target
+        // makes it Yapıldı -- the student never sets these (lib/vocab-quiz-task.ts). A miss or a Pas Geç never takes progress back.
+        const update = taskAfterAnswer(task, isCorrectV);
+        if (update) {
+          taskCompleted = update.status === "done";
+          const { error: taskUpdateError } = await supabase
+            .from("student_tasks")
+            .update({ ...update, updated_at: new Date().toISOString() })
+            .eq("id", activeTaskIdV);
+          if (taskUpdateError) throw taskUpdateError;
+        }
       }
     }
 
@@ -228,5 +228,86 @@ export async function submitVocabAnswer(
     return { ok: true, isMastered: next.becameMastered, firstCorrect: next.firstCorrect, taskCompleted, nextCount: next.correctCount };
   } catch (e) {
     return { ok: false, error: vocabActionError("submitVocabAnswer", e) };
+  }
+}
+
+// The END of a quiz run (the summary screen, or a unit with nothing left to learn): the task becomes Yapıldı when its word target was reached,
+// when it has no target (the run itself is the task), or when every word of the unit is already learned so the target could never be reached.
+// Otherwise it stays Yarım Yapıldı. Never throws -- the quiz shows the outcome either way.
+export async function completeVocabQuizRun(taskId: string, unitNumber: number): Promise<CompleteRunResult> {
+  try {
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const unitV = parseInput(unitNumberSchema, unitNumber);
+    const { supabase, userId } = await requireUserId();
+    const { data: task, error: taskError } = await supabase
+      .from("student_tasks")
+      .select("student_id, total_count, correct_count, status, task_type")
+      .eq("id", taskIdV)
+      .maybeSingle();
+    if (taskError) throw taskError;
+    if (!task || task.student_id !== userId || task.task_type !== "vocab_quiz") return { ok: true, status: "unchanged" };
+    if (task.status === "done") return { ok: true, status: "unchanged" };
+
+    // Words of the unit the student has not learned yet (3 correct answers in total).
+    let remaining = 1;
+    if (task.total_count !== null) {
+      const { data: words, error: wordsError } = await supabase.from("lgs_words").select("id").eq("unit_number", unitV);
+      if (wordsError) throw wordsError;
+      const ids = (words ?? []).map((w) => w.id as string);
+      if (ids.length === 0) {
+        remaining = 0;
+      } else {
+        const { data: mastered, error: progressError } = await supabase
+          .from("student_word_progress")
+          .select("word_id")
+          .eq("student_id", userId)
+          .eq("is_mastered", true)
+          .in("word_id", ids);
+        if (progressError) throw progressError;
+        remaining = ids.length - (mastered ?? []).length;
+      }
+    }
+
+    const update = taskAfterRun(task, remaining);
+    if (!update) return { ok: true, status: "unchanged" };
+    const { error } = await supabase
+      .from("student_tasks")
+      .update({ ...update, updated_at: new Date().toISOString() })
+      .eq("id", taskIdV);
+    if (error) throw error;
+    revalidatePath("/student/ingilizce-quiz");
+    revalidatePath("/student");
+    return { ok: true, status: "done" };
+  } catch (e) {
+    return { ok: false, error: vocabActionError("completeVocabQuizRun", e) };
+  }
+}
+
+// "Yapılmadı": the student's one manual choice for this task type -- an explicit "not doing it", with or without ever starting the quiz.
+// (Yapıldı / Yarım Yapıldı are the quiz's to set, never the student's; a task that is already Yapıldı is not taken back.) Progress already made
+// stays; answering again later makes it Yarım Yapıldı again.
+export async function markVocabQuizNotDone(taskId: string): Promise<NotDoneResult> {
+  try {
+    const taskIdV = parseInput(uuidSchema, taskId);
+    const { supabase, userId } = await requireUserId();
+    const { data: task, error: taskError } = await supabase
+      .from("student_tasks")
+      .select("student_id, task_type, status")
+      .eq("id", taskIdV)
+      .maybeSingle();
+    if (taskError) throw taskError;
+    if (!task || task.student_id !== userId || task.task_type !== "vocab_quiz") return { ok: false, error: "Görev bulunamadı." };
+    if (task.status === "done") return { ok: false, error: "Tamamlanan bir görev Yapılmadı olarak işaretlenemez." };
+    if (task.status === "not_done") return { ok: true };
+    const { error } = await supabase
+      .from("student_tasks")
+      .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
+      .eq("id", taskIdV)
+      .eq("student_id", userId);
+    if (error) throw error;
+    revalidatePath("/student");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: vocabActionError("markVocabQuizNotDone", e, "Görev durumu") };
   }
 }

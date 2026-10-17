@@ -7,7 +7,8 @@ import { buildUnitStats } from "@/lib/lgs-vocab";
 import { fetchAllPages } from "@/lib/paged-select";
 import { VocabQuizDashboard } from "./vocab-quiz-dashboard";
 
-export default async function IngilizceQuizPage() {
+export default async function IngilizceQuizPage(props: PageProps<"/student/ingilizce-quiz">) {
+  const searchParams = await props.searchParams;
   const view = await requireViewContext("student");
   // LGS-only feature -- a YKS/Maarif student who lands here anyway (a
   // stale link, browser back/forward) is sent back to their own dashboard
@@ -44,5 +45,11 @@ export default async function IngilizceQuizPage() {
       });
   const unitStats = buildUnitStats(rows, progressRows);
 
-  return <VocabQuizDashboard initialUnitStats={unitStats} />;
+  // A task card's "Quize Başla" links here with the unit and the task: the quiz opens straight away, tied to that task.
+  const unitParam = typeof searchParams.unit === "string" ? Number(searchParams.unit) : NaN;
+  const initialUnit = Number.isInteger(unitParam) && unitParam >= 1 && unitParam <= 10 ? unitParam : null;
+  const taskParam = typeof searchParams.task === "string" ? searchParams.task : "";
+  const initialTaskId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskParam) ? taskParam : null;
+
+  return <VocabQuizDashboard initialUnitStats={unitStats} initialUnit={initialUnit} initialTaskId={initialTaskId} />;
 }

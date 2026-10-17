@@ -73,9 +73,19 @@ function UnitCard({ stat, onStart }: { stat: UnitStat; onStart: () => void }) {
 // Dashboard <-> active quiz session, all in one page (no route change) so
 // "Çalışmaya Devam Et" (VocabQuizSession's own continue button) can fetch
 // the next batch instantly instead of a full navigation.
-export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: UnitStat[] }) {
+export function VocabQuizDashboard({
+  initialUnitStats,
+  initialUnit = null,
+  initialTaskId = null,
+}: {
+  initialUnitStats: UnitStat[];
+  // Opened from a task card's "Quize Başla": straight into that unit's quiz, tied to that task.
+  initialUnit?: number | null;
+  initialTaskId?: string | null;
+}) {
   const [unitStats, setUnitStats] = useState(initialUnitStats);
-  const [activeUnit, setActiveUnit] = useState<number | null>(null);
+  const [activeUnit, setActiveUnit] = useState<number | null>(initialUnit);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(initialUnit !== null ? initialTaskId : null);
 
   // Called after every correct answer during a session, so the dashboard's own counters (words started, the three tiers) are
   // correct the moment the student exits back to it -- without needing a full server round-trip/page reload.
@@ -87,7 +97,11 @@ export function VocabQuizDashboard({ initialUnitStats }: { initialUnitStats: Uni
     return (
       <VocabQuizSession
         unitNumber={activeUnit}
-        onExit={() => setActiveUnit(null)}
+        taskId={activeTaskId}
+        onExit={() => {
+          setActiveUnit(null);
+          setActiveTaskId(null);
+        }}
         onWordCorrect={(previousCount, nextCount) => handleWordCorrect(activeUnit, previousCount, nextCount)}
       />
     );
