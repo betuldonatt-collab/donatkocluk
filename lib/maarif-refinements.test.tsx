@@ -12,8 +12,7 @@ import { routineOptionsFor } from "@/app/coach/students/[id]/_components/kanban/
 import { ChartsTab } from "@/app/coach/students/[id]/_components/charts-tab";
 import type { LgsDailyRoutine } from "@/app/coach/students/[id]/types";
 import { StudentSidebar } from "@/app/student/_components/sidebar";
-import { KarneDetailClient as StudentKarneDetail } from "@/app/student/deneme-analizleri/karne/[id]/karne-detail-client";
-import { KarneListClient as StudentKarneList } from "@/app/student/deneme-analizleri/karne/karne-client";
+import { KarnelerTab, ReportCardReview } from "@/app/coach/students/[id]/_components/karneler-tab";
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
 import {
   curriculumCourseIdsFor,
@@ -30,7 +29,7 @@ import type { NetSummary } from "./karne";
 const range = { type: "custom" as const, startDate: "2026-09-01", endDate: "2026-10-31" };
 
 // ----------------------------------------------------------------------------------------------------------------
-describe("1. the student's own Karne for a 7th grader", () => {
+describe("1. the coach's Karne review for a 7th grader", () => {
   const stats: NetSummary = {
     tyt: { current: null, previous: null },
     ayt: { current: null, previous: null },
@@ -42,7 +41,13 @@ describe("1. the student's own Karne for a 7th grader", () => {
   const lgsStats: NetSummary = { ...stats, examLabel: undefined, maarifGrade: undefined };
   const detail = (s: NetSummary) =>
     renderToStaticMarkup(
-      <StudentKarneDetail cycleNumber={1} rangeStart="2026-09-01" rangeEnd="2026-09-28" approvedAt={null} coachNotes={null} stats={s} topicRows={[]} />,
+      <MaarifGradeProvider value={s.maarifGrade === 7 ? 7 : null}>
+        <ReportCardReview
+          cycle={{ id: "c1", cycle_number: 1, range_start: "2026-09-01", range_end: "2026-09-28", status: "draft", coach_notes: null, stats: s, topic_mistakes: [], generated_at: "2026-09-29T10:00:00Z", approved_at: null }}
+          onApproved={() => {}}
+          onDeleted={() => {}}
+        />
+      </MaarifGradeProvider>,
     );
 
   it("titles the net card '7. Sınıf Genel Deneme Ortalama Net', not LGS", () => {
@@ -65,10 +70,22 @@ describe("1. the student's own Karne for a 7th grader", () => {
     expect(html).toContain("İnkılap");
   });
 
-  it("the student's Karne list labels the trend '7. Sınıf Net Gelişimi' for a 7th grader and 'LGS Net Gelişimi' otherwise", () => {
-    const item = (s: NetSummary) => ({ id: "c1", cycle_number: 1, range_start: "2026-09-01", range_end: "2026-09-28", approved_at: "2026-09-29T10:00:00Z", stats: s });
-    expect(renderToStaticMarkup(<StudentKarneList cycles={[item(stats)]} />)).toContain("7. Sınıf Net Gelişimi");
-    expect(renderToStaticMarkup(<StudentKarneList cycles={[item(lgsStats)]} />)).toContain("LGS Net Gelişimi");
+  it("the coach's Karne list labels the trend '7. Sınıf Net Gelişimi' for a 7th grader and 'LGS Net Gelişimi' otherwise", () => {
+    const item = (s: NetSummary) => ({
+      id: "c1",
+      cycle_number: 1,
+      range_start: "2026-09-01",
+      range_end: "2026-09-28",
+      approved_at: "2026-09-29T10:00:00Z",
+      stats: s,
+      status: "approved" as const,
+      coach_notes: null,
+      topic_mistakes: [],
+      generated_at: "2026-09-29T10:00:00Z",
+    });
+    const tab = (s: NetSummary) => renderToStaticMarkup(<KarnelerTab studentId="s1" cycles={[item(s)]} defaultRange={null} allTimeTrackedMinutes={0} />);
+    expect(tab(stats)).toContain("7. Sınıf Net Gelişimi");
+    expect(tab(lgsStats)).toContain("LGS Net Gelişimi");
   });
 });
 

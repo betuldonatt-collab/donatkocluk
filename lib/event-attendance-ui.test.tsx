@@ -12,8 +12,6 @@ import { Dialog } from "@/components/ui/dialog";
 import { RollCall, type RollCallStudent } from "@/app/coach/events/_components/attendance-dialog";
 import { SessionDots } from "@/app/coach/events/_components/event-attendance-section";
 import { EventAttendanceCard } from "@/components/event-attendance-card";
-import { KarneDetailClient as StudentKarneDetail } from "@/app/student/deneme-analizleri/karne/[id]/karne-detail-client";
-import { KarneDetailClient as ParentKarneDetail } from "@/app/parent/karne/[id]/karne-detail-client";
 import { ReportCardReview } from "@/app/coach/students/[id]/_components/karneler-tab";
 import { buildParentEventAttendance, eventsInRange } from "@/lib/event-attendance";
 
@@ -188,20 +186,6 @@ describe("the same Etkinlik Katılımı section on every report card view", () =
     topicRows: [],
   };
 
-  it("the parent's karne has it", () => {
-    const out = renderToStaticMarkup(<ParentKarneDetail {...detailProps} eventAttendance={events} />);
-    expect(out).toContain("Etkinlik Katılımı");
-    expect(out).toContain("Deneme Semineri");
-  });
-
-  it("the student's karne has it", () => {
-    const out = renderToStaticMarkup(<StudentKarneDetail {...detailProps} eventAttendance={events} />);
-    expect(out).toContain("Etkinlik Katılımı");
-    expect(out).toContain("Deneme Semineri");
-    expect(out).toContain("Etkinlik Tarihi:");
-    expect(out).toMatch(/1\. Oturum:[\s\S]*?Katıldı/);
-  });
-
   it("the coach's karne has it, and shows only the events of that card's period", () => {
     const cycle = {
       id: "c1",
@@ -222,9 +206,27 @@ describe("the same Etkinlik Katılımı section on every report card view", () =
     expect(otherPeriod).not.toContain("Etkinlik Katılımı");
   });
 
-  it("no event in the period: the section is not shown on any of them", () => {
-    expect(renderToStaticMarkup(<StudentKarneDetail {...detailProps} eventAttendance={[]} />)).not.toContain("Etkinlik Katılımı");
-    expect(renderToStaticMarkup(<ParentKarneDetail {...detailProps} />)).not.toContain("Etkinlik Katılımı");
+  it("the event card itself reads: title, date, and each session's Katıldı", () => {
+    const out = renderToStaticMarkup(<EventAttendanceCard events={events} />);
+    expect(out).toContain("Deneme Semineri");
+    expect(out).toContain("Etkinlik Tarihi:");
+    expect(out).toMatch(/1\. Oturum:[\s\S]*?Katıldı/);
+  });
+
+  it("no event in the period: the section is not shown", () => {
+    const cycle = {
+      id: "c1",
+      cycle_number: 1,
+      range_start: "2026-10-01",
+      range_end: "2026-10-31",
+      status: "approved",
+      approved_at: "2026-10-31T10:00:00Z",
+      coach_notes: null,
+      stats: detailProps.stats,
+      topic_mistakes: [],
+      generated_at: "2026-10-31T10:00:00Z",
+    } as never;
+    expect(renderToStaticMarkup(<ReportCardReview cycle={cycle} eventAttendance={[]} onApproved={() => {}} onDeleted={() => {}} />)).not.toContain("Etkinlik Katılımı");
   });
 });
 

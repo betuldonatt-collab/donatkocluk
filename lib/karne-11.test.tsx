@@ -7,10 +7,6 @@ vi.mock("@/app/coach/school-grade-actions", () => ({ saveSchoolGradeForStudent: 
 vi.mock("@/app/coach/events/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/student/deneme-analizleri/karne", useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
 
-import { KarneDetailClient as StudentKarneDetail } from "@/app/student/deneme-analizleri/karne/[id]/karne-detail-client";
-import { KarneListClient as StudentKarneList } from "@/app/student/deneme-analizleri/karne/karne-client";
-import { KarneDetailClient as ParentKarneDetail } from "@/app/parent/karne/[id]/karne-detail-client";
-import { KarneListClient as ParentKarneList } from "@/app/parent/karne/karne-client";
 import { KarnelerTab, ReportCardReview } from "@/app/coach/students/[id]/_components/karneler-tab";
 import { ChartsTab } from "@/app/coach/students/[id]/_components/charts-tab";
 import type { DetailTask } from "@/app/coach/students/[id]/types";
@@ -122,15 +118,6 @@ describe("11th grade: the Karne screens", () => {
     RANGE.start,
     RANGE.end,
   );
-  const detailProps = {
-    cycleNumber: 1,
-    rangeStart: RANGE.start,
-    rangeEnd: RANGE.end,
-    approvedAt: "2026-10-30T10:00:00Z",
-    coachNotes: null,
-    stats,
-    topicRows,
-  };
 
   function expectEleventhGradeDetail(out: string) {
     expect(out).toContain("11. Sınıf Genel Deneme Ortalama Net");
@@ -144,15 +131,7 @@ describe("11th grade: the Karne screens", () => {
     expect(out).not.toContain("Bu dönemde bu ders için deneme kaydı yok.");
   }
 
-  it("student: the detail shows the 11. Sınıf net and the Maarif TYT / 11. Sınıf course tabs", () => {
-    expectEleventhGradeDetail(renderToStaticMarkup(<StudentKarneDetail {...detailProps} />));
-  });
-
-  it("parent: the same detail, same labels", () => {
-    expectEleventhGradeDetail(renderToStaticMarkup(<ParentKarneDetail {...detailProps} />));
-  });
-
-  it("coach: the review card shows the same", () => {
+  it("coach: the review card shows the 11. Sınıf net and the Maarif TYT / 11. Sınıf course tabs", () => {
     const cycle = {
       id: "c1",
       cycle_number: 1,
@@ -174,23 +153,24 @@ describe("11th grade: the Karne screens", () => {
     );
   });
 
-  it("the list screens chart the 11th grade's net under one '11. Sınıf Net Gelişimi' heading, without an AYT chart", () => {
+  it("the coach's list charts the 11th grade's net under one '11. Sınıf Net Gelişimi' heading, without an AYT chart", () => {
     const item = { id: "c1", cycle_number: 1, range_start: RANGE.start, range_end: RANGE.end, approved_at: "2026-10-30T10:00:00Z", stats };
-    for (const out of [
-      renderToStaticMarkup(<StudentKarneList cycles={[item]} />),
-      renderToStaticMarkup(<ParentKarneList cycles={[item]} />),
-      renderToStaticMarkup(
-        <KarnelerTab studentId="s1" cycles={[{ ...item, status: "approved", coach_notes: null, topic_mistakes: [], generated_at: item.approved_at }]} defaultRange={null} allTimeTrackedMinutes={0} />,
-      ),
-    ]) {
-      expect(out).toContain("11. Sınıf Net Gelişimi");
-      expect(out).not.toContain("AYT Net Gelişimi");
-    }
+    const out = renderToStaticMarkup(
+      <KarnelerTab studentId="s1" cycles={[{ ...item, status: "approved", coach_notes: null, topic_mistakes: [], generated_at: item.approved_at }]} defaultRange={null} allTimeTrackedMinutes={0} />,
+    );
+    expect(out).toContain("11. Sınıf Net Gelişimi");
+    expect(out).not.toContain("AYT Net Gelişimi");
   });
 
   it("a plain YKS card is unchanged (TYT + AYT halves)", () => {
     const yks: NetSummary = { tyt: { current: 40, previous: null }, ayt: { current: 30, previous: null } };
-    const out = renderToStaticMarkup(<StudentKarneDetail {...detailProps} stats={yks} topicRows={[]} />);
+    const out = renderToStaticMarkup(
+      <ReportCardReview
+        cycle={{ id: "c2", cycle_number: 1, range_start: RANGE.start, range_end: RANGE.end, status: "draft", coach_notes: null, stats: yks, topic_mistakes: [], generated_at: "2026-10-29T10:00:00Z", approved_at: null }}
+        onApproved={() => {}}
+        onDeleted={() => {}}
+      />,
+    );
     expect(out).toContain("TYT Genel Deneme Ortalama Net");
     expect(out).toContain("AYT Genel Deneme Ortalama Net");
     expect(out).not.toContain("11. Sınıf Genel Deneme");

@@ -368,10 +368,9 @@ function ScorePill({ label, value, tone }: { label: string; value: number; tone:
 // Shared by both the TYT card (one instance, from stats.scoreBreakdown)
 // and each AYT track's own card (one instance per stats.aytScoreBreakdown
 // entry) -- same design either way, only the title and the subject rows
-// underneath differ. Kept pixel-identical across all three panels that
-// render Karne (this file, the student's and the parent's own
-// karne-detail-client.tsx) so a report card reads the same regardless of
-// who's looking at it.
+// underneath differ. (The student's and the parent's Karne is the
+// unified document, components/karne-document.tsx; this older breakdown
+// is the coach's own review of a report card cycle.)
 function ScoreBreakdownCard({
   title,
   total,
