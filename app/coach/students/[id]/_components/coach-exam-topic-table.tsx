@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import type { Course } from "@/lib/curriculum";
 import { flattenSelectionRows, isFlatRows, withGroupHeadings } from "@/lib/curriculum/rows";
 import { rowRecurrence } from "@/lib/exam-detail";
+import { splitExamsByAnalysis } from "@/lib/exam-solved";
+import { PendingAnalysisBox } from "@/components/pending-analysis-box";
 import { ReadOnlySubtopics } from "@/components/read-only-subtopics";
 import type { DetailTask } from "../types";
 
@@ -33,9 +35,12 @@ function parseExamPublisher(title: string): string {
 // Long topic lists and many exams: the table scrolls inside its own height-bounded frame, so the exam headings (sticky top row) and
 // the Ünite / Konu / Tekrar columns (sticky left) stay in view. "Tekrar" = in how many of the shown exams a topic was marked (shown
 // from two exams up) -- the same column and header the student's table and the Grafikler comparison have.
+//
+// Which exams are columns: only the SOLVED and ANALYSED ones (lib/exam-solved.ts). Unsolved exams are not listed here (they stay on the
+// weekly board); solved ones whose analysis is still pending sit apart in the yellow box on the right.
 export function CoachExamTopicTable({
   course,
-  exams,
+  exams: allExams,
   mistakesByExam,
   onOpenExam,
   onDelete,
@@ -55,6 +60,7 @@ export function CoachExamTopicTable({
   // row per bucket -- marked with an X when any of the bucket's hidden topics
   // was missed; its raw topics are never listed.
   const rows = flattenSelectionRows(course);
+  const { analyzed: exams, pending } = splitExamsByAnalysis(allExams);
   // A flat course (Türkçe) has no Ünite column.
   const flat = isFlatRows(rows);
   const showTekrar = exams.length >= 2;
@@ -69,7 +75,8 @@ export function CoachExamTopicTable({
         <CardTitle className="text-base">{course.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="max-h-[70dvh] overflow-auto rounded-md border" data-slot="exam-topic-frame">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="max-h-[70dvh] min-w-0 flex-1 overflow-auto rounded-md border" data-slot="exam-topic-frame">
           <table data-slot="table" className="w-full caption-bottom text-sm">
             <TableHeader>
               <TableRow>
@@ -112,14 +119,9 @@ export function CoachExamTopicTable({
                       <button
                         type="button"
                         onClick={() => onOpenExam(exam)}
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors",
-                          exam.analysis_pending
-                            ? "bg-amber-500/15 text-amber-600 hover:bg-amber-500/25"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
+                        className="text-muted-foreground hover:text-foreground rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors"
                       >
-                        {exam.analysis_pending ? "Analiz Bekliyor" : "Sonuçları Düzenle"}
+                        Sonuçları Düzenle
                       </button>
                     </div>
                   </TableHead>
@@ -194,10 +196,14 @@ export function CoachExamTopicTable({
             </TableBody>
           </table>
         </div>
+        <PendingAnalysisBox exams={pending} onOpen={onOpenExam} className="lg:w-64 lg:shrink-0" />
+        </div>
 
         {exams.length === 0 && (
           <p className="text-muted-foreground mt-3 text-sm">
-            Bu ders için henüz çözülmüş bir branş veya genel deneme yok.
+            {pending.length > 0
+              ? "Analizi tamamlanmış deneme yok; analizi bekleyen denemeler sağdaki kutuda."
+              : "Bu ders için henüz çözülmüş bir branş veya genel deneme yok."}
           </p>
         )}
       </CardContent>

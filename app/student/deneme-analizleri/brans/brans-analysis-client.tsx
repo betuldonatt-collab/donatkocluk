@@ -14,6 +14,7 @@ import {
 import { formatChartRangeLabel, isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
 import type { ExamType } from "@/lib/exam-type";
 import { computeLgsNet, computeNet } from "@/lib/scoring";
+import { examIsSolved } from "@/lib/exam-solved";
 import { ChartRangePicker } from "../../_components/charts/chart-range-picker";
 import { DualMetricChart } from "../../_components/charts/dual-metric-chart";
 import { getMoreBransExams, getTaskTopicMistakes } from "../../actions";
@@ -90,8 +91,10 @@ export function BransAnalysisClient({
     return map;
   }, [mistakes]);
 
-  const examsInRange = useMemo(() => exams.filter((e) => isDateInChartRange(e.task_date, range)), [exams, range]);
-  const outsideRange = exams.length - examsInRange.length;
+  // Exams nobody has solved yet are not part of the analysis at all (lib/exam-solved.ts): not listed and not counted.
+  const solvedExams = useMemo(() => exams.filter(examIsSolved), [exams]);
+  const examsInRange = useMemo(() => solvedExams.filter((e) => isDateInChartRange(e.task_date, range)), [solvedExams, range]);
+  const outsideRange = solvedExams.length - examsInRange.length;
   // Exams are loaded newest first, a page at a time: when the range reaches further back than what is loaded, say so.
   const oldestLoaded = exams.reduce<string | null>((min, e) => (min === null || e.task_date < min ? e.task_date : min), null);
   const rangeStart = range.type === "custom" ? range.startDate : null;

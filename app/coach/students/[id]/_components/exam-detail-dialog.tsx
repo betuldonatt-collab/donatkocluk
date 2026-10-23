@@ -4,6 +4,8 @@ import { Pencil } from "lucide-react";
 
 import { BranchExamComparisonView, ExamComparisonView } from "@/components/exam-comparison-view";
 import { comparableBranchExams, comparableGeneralExams, examTrackOf } from "@/lib/exam-detail";
+import { splitExamsByAnalysis } from "@/lib/exam-solved";
+import { PendingAnalysisBox } from "@/components/pending-analysis-box";
 import { GENERAL_EXAM_TRACK_LABELS } from "@/lib/general-exam-track";
 import { findCourseById } from "@/lib/curriculum";
 import { Button } from "@/components/ui/button";
@@ -45,7 +47,10 @@ export function ExamDetailDialog({
   onEdit: (exam: DetailTask) => void;
 }) {
   const isGeneral = exam.task_type === "general_exam";
-  const compared = isGeneral ? comparableGeneralExams(allGeneralExams, exam) : comparableBranchExams(allBranchExams, exam, isInRange);
+  const comparedAll = isGeneral ? comparableGeneralExams(allGeneralExams, exam) : comparableBranchExams(allBranchExams, exam, isInRange);
+  // Only solved-AND-analysed exams are columns; solved ones still waiting for their analysis sit in the yellow box on the right; unsolved ones
+  // are not listed (lib/exam-solved.ts).
+  const { analyzed: compared, pending } = splitExamsByAnalysis(comparedAll);
   const branchCourse = isGeneral ? null : findCourseById(exam.course_id);
   const trackLabel = GENERAL_EXAM_TRACK_LABELS[examTrackOf(exam.title, exam.subject_scores)];
 
@@ -61,7 +66,13 @@ export function ExamDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {isGeneral ? (
+        <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
+        {compared.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {pending.length > 0 ? "Analizi tamamlanmış deneme yok; analizi bekleyen denemeler sağdaki kutuda." : "Karşılaştırılacak deneme yok."}
+          </p>
+        ) : isGeneral ? (
           <ExamComparisonView
             key={exam.id}
             exams={compared}
@@ -86,6 +97,9 @@ export function ExamDetailDialog({
             }}
           />
         )}
+        </div>
+        <PendingAnalysisBox exams={pending} onOpen={onEdit} className="lg:w-64 lg:shrink-0" />
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onEdit(exam)}>
