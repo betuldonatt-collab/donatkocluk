@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
+import { lockButtonState } from "@/lib/progress-lock-ui";
 import {
   DndContext,
   DragOverlay,
@@ -310,23 +311,25 @@ export function ScheduleBoard({
   // cycle-wide action now (lib/completion.ts), not a per-week flag, so a
   // week straddling the boundary shows individual frozen task cards instead
   // of this banner.
-  const weekLocked = lockedThroughDate !== null && weekDays[6].date < lockedThroughDate;
+  const { weekFrozen: weekLocked, lockedToday, showUnlock } = lockButtonState({ lockedThroughDate, today, weekEnd: weekDays[6].date });
 
   // Locking is no longer per-week -- it's a single "lock the student's
   // current open cycle up to today" action, so this only needs to run once
   // per student, not per displayed week.
   useEffect(() => {
     let cancelled = false;
-    getProgressLockStatus(studentId).then(({ lockedThroughDate: locked }) => {
-      if (!cancelled) setLockedThroughDate(locked);
-    });
+    getProgressLockStatus(studentId)
+      .then(({ lockedThroughDate: locked }) => {
+        if (!cancelled) setLockedThroughDate(locked);
+      })
+      .catch((e) => console.error("[lock status]", e));
     return () => {
       cancelled = true;
     };
   }, [studentId]);
 
   async function handleToggleLock() {
-    const next = !weekLocked;
+    const next = !showUnlock;
     const message = next
       ? "Programı bugüne kadar kilitlemek istediğine emin misin? Öğrenci bu döneme ait görevleri artık düzenleyemez."
       : "Son kilitlemeyi geri almak istediğine emin misin? Öğrenci tekrar düzenleyebilecek.";
@@ -334,10 +337,17 @@ export function ScheduleBoard({
 
     setLockBusy(true);
     try {
-      if (next) await lockCurrentCycle(studentId);
-      else await unlockLatestCycle(studentId);
-      const { lockedThroughDate: locked } = await getProgressLockStatus(studentId);
-      setLockedThroughDate(locked);
+      const result = next ? await lockCurrentCycle(studentId) : await unlockLatestCycle(studentId);
+      if (!result.ok) {
+        // Never a silent refresh: say what went wrong (and leave the button as it was -- nothing changed).
+        toast.error(result.error);
+        return;
+      }
+      setLockedThroughDate(result.lockedThroughDate);
+      toast.success(next ? "Program kilitlendi." : "Kilit kaldırıldı.");
+      if (result.warning) toast.warning(result.warning);
+    } catch (e) {
+      toast.error(friendlyError(e, next ? "Program kilitlenemedi, tekrar dene." : "Kilit kaldırılamadı, tekrar dene."));
     } finally {
       setLockBusy(false);
     }
@@ -793,13 +803,13 @@ export function ScheduleBoard({
         {isPastOrCurrentWeek && (
           <Button
             type="button"
-            variant={weekLocked ? "destructive" : "outline"}
+            variant={showUnlock ? "destructive" : "outline"}
             size="sm"
             onClick={handleToggleLock}
             disabled={lockBusy}
           >
-            {weekLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
-            {lockBusy ? "İşleniyor..." : weekLocked ? "Kilidi Aç" : "Programı Kilitle / Değerlendir"}
+            {showUnlock ? <LockOpen className="size-4" /> : <Lock className="size-4" />}
+            {lockBusy ? "İşleniyor..." : showUnlock ? "Kilidi Aç" : "Programı Kilitle / Değerlendir"}
           </Button>
         )}
 
@@ -901,6 +911,12 @@ export function ScheduleBoard({
         <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
           <Lock className="size-4 shrink-0" />
           Bu hafta kilitli -- öğrenci artık bu haftanın görevlerini düzenleyemez. Tamamlanma oranı sabitlendi.
+        </div>
+      )}
+      {!weekLocked && lockedToday && (
+        <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+          <Lock className="size-4 shrink-0" />
+          Program bugüne kadar kilitlendi -- önceki günlerin görevleri artık düzenlenemez; bugün ve sonrası açık. Geri almak için “Kilidi Aç”.
         </div>
       )}
 

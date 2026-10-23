@@ -801,100 +801,164 @@ export async function getProgressLockStatus(studentId: string): Promise<{ locked
   return { lockedThroughDate: lastLock ? lastLock.locked_at.slice(0, 10) : null };
 }
 
-export async function lockCurrentCycle(studentId: string) {
-  await assertNotImpersonating();
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  await requireCoachAccess(supabase, user.id, studentIdV);
+// Both lock actions answer with a plain result and never throw: a Server Action's thrown error reaches the browser as an opaque React error
+// in production (the board then showed nothing at all -- the lock looked like it "refreshed and did nothing"). `lockedThroughDate` is the
+// authoritative state after the action, so the board shows it without another round trip that could fail on its own.
+export type ProgressLockResult =
+  | { ok: true; lockedThroughDate: string | null; warning?: string }
+  | { ok: false; error: string };
 
-  const { lastLock, firstCompletedSessionAt } = await fetchCycleInputs(supabase, studentIdV);
-  const today = new Date().toISOString().slice(0, 10);
-  // The lock day itself always belongs to the NEW cycle (lib/completion.ts),
-  // so a second lock the same day would close an empty/inverted range --
-  // block it explicitly rather than let it silently produce a meaningless
-  // previous-cycle row.
-  if (lastLock && lastLock.locked_at.slice(0, 10) === today) throw new Error("Program bugün zaten kilitlendi.");
-  // Locking requires a real cycle event to have already happened -- there's
-  // nothing to close before the student's first session. (Passing null for
-  // the upcoming-session input is safe: resolveCycles only consults it in
-  // the bootstrap branch, which this guard rules out.)
-  if (!lastLock && !firstCompletedSessionAt) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
+function progressLockFailure(label: string, e: unknown): { ok: false; error: string } {
+  console.error(`[${label}] failed:`, e);
+  Sentry.captureException(e);
+  // our own guards ("Program bugün zaten kilitlendi.", ...) and dbError() are already written for the coach
+  return { ok: false, error: e instanceof Error && e.message ? e.message : GENERIC_DB_ERROR };
+}
 
-  const { current } = resolveCycles(lastLock, null, today);
+// How many topic resyncs run at once after a lock: a long cycle touches many (course, topic) pairs, and one after another they used to
+// make the action slow enough to time out.
+const TOPIC_RESYNC_CONCURRENCY = 6;
 
-  const { error } = await supabase
-    .from("progress_locks")
-    .insert({ student_id: studentIdV, period_start: current.start, locked_by: user.id });
-  if (error) throw dbError(error);
+export async function lockCurrentCycle(studentId: string): Promise<ProgressLockResult> {
+  try {
+    await assertNotImpersonating();
+    const studentIdV = parseInput(uuidSchema, studentId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    await requireCoachAccess(supabase, user.id, studentIdV);
 
-  // "Kilitle / Değerlendir" also finalizes the cycle being closed: any task
-  // still sitting untouched ("pending", i.e. the student never checked it at
-  // all) STRICTLY BEFORE today gets force-resolved to "Yapılmadı" so nothing
-  // is left in limbo once it can no longer be edited. Today's own tasks are
-  // deliberately excluded -- they belong to the new, still-open cycle (a
-  // same-day session plus newly assigned same-day tasks must land there, not
-  // get swept into the cycle just closed). A task the student actually acted
-  // on (half_done/done) is left exactly as they left it either way.
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const { data: resolvedRows, error: resolveError } = await supabase
-    .from("student_tasks")
-    .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
-    .eq("student_id", studentIdV)
-    .eq("status", "pending")
-    .gte("task_date", current.start)
-    .lte("task_date", yesterday)
-    .select("course_id, topic_id");
-  if (resolveError) throw dbError(resolveError);
+    const { lastLock, firstCompletedSessionAt } = await fetchCycleInputs(supabase, studentIdV);
+    const today = new Date().toISOString().slice(0, 10);
+    // The lock day itself always belongs to the NEW cycle (lib/completion.ts),
+    // so a second lock the same day would close an empty/inverted range --
+    // block it explicitly rather than let it silently produce a meaningless
+    // previous-cycle row.
+    if (lastLock && lastLock.locked_at.slice(0, 10) === today) throw new Error("Program bugün zaten kilitlendi.");
+    // Locking requires a real cycle event to have already happened -- there's
+    // nothing to close before the student's first session. (Passing null for
+    // the upcoming-session input is safe: resolveCycles only consults it in
+    // the bootstrap branch, which this guard rules out.)
+    if (!lastLock && !firstCompletedSessionAt) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
 
-  // Mirrors updateTaskProgress's own rule (app/student/actions.ts): a
-  // status flip changes what a topic bucket sums even with the counts
-  // left untouched, so each distinct (course_id, topic_id) touched above
-  // needs the same resync a student's own status change would trigger.
-  // student_daily_stats needs no equivalent call -- it sums every task's
-  // counts for the day regardless of status, and this flip never touches
-  // counts.
-  const topicKeys = new Set(
-    resolvedRows?.filter((r) => r.course_id !== null).map((r) => `${r.course_id}::${r.topic_id ?? "karma"}`) ?? [],
-  );
-  for (const key of topicKeys) {
-    const [courseId, topicId] = key.split("::");
-    const { error: rpcError } = await supabase.rpc("recompute_student_topic_stats", {
-      p_student_id: studentIdV,
-      p_course_id: courseId,
-      p_topic_id: topicId,
-    });
-    if (rpcError) throw dbError(rpcError);
+    const { current } = resolveCycles(lastLock, null, today);
+
+    const { data: inserted, error } = await supabase
+      .from("progress_locks")
+      .insert({ student_id: studentIdV, period_start: current.start, locked_by: user.id })
+      .select("id")
+      .single();
+    if (error) throw dbError(error);
+
+    // "Kilitle / Değerlendir" also finalizes the cycle being closed: any task
+    // still sitting untouched ("pending", i.e. the student never checked it at
+    // all) STRICTLY BEFORE today gets force-resolved to "Yapılmadı" so nothing
+    // is left in limbo once it can no longer be edited. Today's own tasks are
+    // deliberately excluded -- they belong to the new, still-open cycle (a
+    // same-day session plus newly assigned same-day tasks must land there, not
+    // get swept into the cycle just closed). A task the student actually acted
+    // on (half_done/done) is left exactly as they left it either way.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const { data: resolvedRows, error: resolveError } = await supabase
+      .from("student_tasks")
+      .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
+      .eq("student_id", studentIdV)
+      .eq("status", "pending")
+      .gte("task_date", current.start)
+      .lte("task_date", yesterday)
+      .select("course_id, topic_id");
+    if (resolveError) {
+      // Nothing was finalized, so the lock must not stand either: a frozen cycle with its pending tasks left in limbo is the worst
+      // half-state. Undo it (best effort) and say so.
+      const { error: undoError } = await supabase.from("progress_locks").delete().eq("id", inserted.id);
+      if (undoError) {
+        console.error("[lockCurrentCycle] could not undo the lock after a failed finalize:", undoError);
+        Sentry.captureException(undoError);
+        return { ok: false, error: "Görevler güncellenemedi ve kilit geri alınamadı. Lütfen 'Kilidi Aç'a basıp tekrar dene." };
+      }
+      throw dbError(resolveError);
+    }
+
+    // Mirrors updateTaskProgress's own rule (app/student/actions.ts): a
+    // status flip changes what a topic bucket sums even with the counts
+    // left untouched, so each distinct (course_id, topic_id) touched above
+    // needs the same resync a student's own status change would trigger.
+    // student_daily_stats needs no equivalent call -- it sums every task's
+    // counts for the day regardless of status, and this flip never touches
+    // counts.
+    const topicKeys = [
+      ...new Set(resolvedRows?.filter((r) => r.course_id !== null).map((r) => `${r.course_id}::${r.topic_id ?? "karma"}`) ?? []),
+    ];
+    // The lock and the finalized statuses are already saved at this point, so a failed resync must not undo or hide them: it is retried once,
+    // then reported as a warning (the topic's numbers recompute from scratch on its next write anyway).
+    let failedResyncs = 0;
+    const resync = async (key: string) => {
+      const [courseId, topicId] = key.split("::");
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { error: rpcError } = await supabase.rpc("recompute_student_topic_stats", {
+          p_student_id: studentIdV,
+          p_course_id: courseId,
+          p_topic_id: topicId,
+        });
+        if (!rpcError) return;
+        if (attempt === 1) {
+          console.error("[lockCurrentCycle] topic resync failed:", key, rpcError);
+          Sentry.captureException(rpcError);
+          failedResyncs += 1;
+        }
+      }
+    };
+    for (let i = 0; i < topicKeys.length; i += TOPIC_RESYNC_CONCURRENCY) {
+      await Promise.all(topicKeys.slice(i, i + TOPIC_RESYNC_CONCURRENCY).map(resync));
+    }
+
+    revalidatePath(`/coach/students/${studentIdV}`);
+    revalidatePath("/student");
+    return {
+      ok: true,
+      lockedThroughDate: today,
+      ...(failedResyncs > 0
+        ? { warning: `Program kilitlendi, ancak ${failedResyncs} konunun istatistiği güncellenemedi; bir sonraki kayıtta kendiliğinden düzelir.` }
+        : {}),
+    };
+  } catch (e) {
+    return progressLockFailure("lockCurrentCycle", e);
   }
-
-  revalidatePath(`/coach/students/${studentIdV}`);
-  revalidatePath("/student");
 }
 
 // Undoes the most recent lock only -- there is no "unlock an arbitrary past
 // cycle" concept anymore (see the file header comment); this mirrors how the
 // toggle in the UI is only ever used right after locking by mistake.
-export async function unlockLatestCycle(studentId: string) {
-  await assertNotImpersonating();
-  const studentIdV = parseInput(uuidSchema, studentId);
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  await requireCoachAccess(supabase, user.id, studentIdV);
+export async function unlockLatestCycle(studentId: string): Promise<ProgressLockResult> {
+  try {
+    await assertNotImpersonating();
+    const studentIdV = parseInput(uuidSchema, studentId);
+    const supabase = await createClient();
+    const user = await requireUser(supabase);
+    await requireCoachAccess(supabase, user.id, studentIdV);
 
-  const { data: lastLockRow, error: fetchError } = await supabase
-    .from("progress_locks")
-    .select("id")
-    .eq("student_id", studentIdV)
-    .order("locked_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (fetchError) throw dbError(fetchError);
-  if (!lastLockRow) return;
+    const { data: lastLockRow, error: fetchError } = await supabase
+      .from("progress_locks")
+      .select("id")
+      .eq("student_id", studentIdV)
+      .order("locked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fetchError) throw dbError(fetchError);
 
-  const { error } = await supabase.from("progress_locks").delete().eq("id", lastLockRow.id);
-  if (error) throw dbError(error);
+    if (lastLockRow) {
+      // .select() so a delete that matched nothing (a policy filtered it out) is an error, not a silent "success"
+      const { data: deleted, error } = await supabase.from("progress_locks").delete().eq("id", lastLockRow.id).select("id");
+      if (error) throw dbError(error);
+      if (!deleted || deleted.length === 0) throw new Error("Kilit kaldırılamadı (izin verilmedi). Sayfayı yenileyip tekrar dene.");
+    }
 
-  revalidatePath(`/coach/students/${studentIdV}`);
+    const { lastLock } = await fetchCycleInputs(supabase, studentIdV);
+    revalidatePath(`/coach/students/${studentIdV}`);
+    revalidatePath("/student");
+    return { ok: true, lockedThroughDate: lastLock ? lastLock.locked_at.slice(0, 10) : null };
+  } catch (e) {
+    return progressLockFailure("unlockLatestCycle", e);
+  }
 }
 
 // Coach events / attendance (Yoklama): moved to their own app/coach/events/
