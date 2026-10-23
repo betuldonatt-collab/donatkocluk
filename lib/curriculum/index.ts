@@ -210,18 +210,30 @@ export function branchExamCourses(field: "tyt" | "ayt", aytTrack: Track = "sayis
     : [...AYT_BRANCH_EXAM_MACRO_COURSES_BY_TRACK[aytTrack], ...AYT_COURSES_BY_TRACK[aytTrack]];
 }
 
-// --- TYT Matematik in the Branş analysis views (decided with the user, 2026-10-23) ---------------------------------------------
+// --- TYT / AYT Matematik in the Branş analysis views (decided with the user, 2026-10-23) ---------------------------------------
 // The task form offers a combined "TYT Matematik (Matematik + Geometri)" Branş course (tyt-matematik-macro) next to the single-subject
-// "TYT Matematik" (tyt-matematik) -- two courses, because an exam is saved under whichever the coach picked. In the ANALYSIS views they
-// are ONE entry: the combined course's exams and the single-subject Matematik exams are listed together under the dropdown's label
-// "TYT Matematik (Matematik + Geometri)" (their topics share ids, so the table reads both). Geometri keeps its own entry. Only the
-// Branş analysis pickers / tables / popup use these helpers; the task form, Kaynak Takibi and every stored course_id are untouched.
+// "TYT Matematik" (tyt-matematik) -- two courses, because an exam is saved under whichever the coach picked; AYT has the same pair
+// (ayt-matematik-macro / ayt-matematik). In the ANALYSIS views each pair is ONE entry: the combined course's exams and the
+// single-subject Matematik exams are listed together under the dropdown's label (their topics share ids, so the table reads both).
+// Geometri keeps its own entry. Only the Branş analysis pickers / tables / popup use these helpers; the task form, Kaynak Takibi and
+// every stored course_id are untouched.
 export const TYT_MATH_ANALYSIS_ID = "tyt-matematik-macro";
 export const TYT_MATH_ANALYSIS_LABEL = "TYT Matematik (Matematik + Geometri)";
-const ANALYSIS_FOLDED_COURSE_IDS: Record<string, string> = { "tyt-matematik": TYT_MATH_ANALYSIS_ID };
+export const AYT_MATH_ANALYSIS_ID = "ayt-matematik-macro";
+export const AYT_MATH_ANALYSIS_LABEL = "AYT Matematik (Matematik + Geometri)";
+// the combined course -> the label its analysis entry carries (the same text the task dropdown shows)
+const ANALYSIS_LABELS: Record<string, string> = {
+  [TYT_MATH_ANALYSIS_ID]: TYT_MATH_ANALYSIS_LABEL,
+  [AYT_MATH_ANALYSIS_ID]: AYT_MATH_ANALYSIS_LABEL,
+};
+// the single-subject Matematik -> the combined course it is folded onto
+const ANALYSIS_FOLDED_COURSE_IDS: Record<string, string> = {
+  "tyt-matematik": TYT_MATH_ANALYSIS_ID,
+  "ayt-matematik": AYT_MATH_ANALYSIS_ID,
+};
 
-// The key under which a Branş exam of this course is analysed: the single-subject TYT Matematik folds onto the combined course; every
-// other course is its own key.
+// The key under which a Branş exam of this course is analysed: the single-subject Matematik (TYT or AYT) folds onto its combined
+// course; every other course is its own key.
 export function analysisCourseKey(courseId: string | null | undefined): string | null {
   if (!courseId) return null;
   return ANALYSIS_FOLDED_COURSE_IDS[courseId] ?? courseId;
@@ -234,22 +246,23 @@ export function sameAnalysisCourse(examCourseId: string | null | undefined, sele
 }
 
 function relabelForAnalysis(course: Course): Course {
-  return course.id === TYT_MATH_ANALYSIS_ID ? { ...course, name: TYT_MATH_ANALYSIS_LABEL } : course;
+  const label = ANALYSIS_LABELS[course.id];
+  return label ? { ...course, name: label } : course;
 }
 
-// A course as the analysis views show it: the combined TYT Matematik under its dropdown label, anything folded onto it as that same entry.
+// A course as the analysis views show it: the combined Matematik under its dropdown label, anything folded onto it as that same entry.
 export function findAnalysisCourse(courseId: string | null | undefined): Course | null {
   const key = analysisCourseKey(courseId);
   const course = key ? findCourseById(key) : null;
   return course ? relabelForAnalysis(course) : null;
 }
 
-// branchExamCourses() for the ANALYSIS views: TYT Matematik is one entry (the combined course, labelled like the dropdown) instead of the
-// combined course AND a separate bare "Matematik". AYT lists are unchanged.
+// branchExamCourses() for the ANALYSIS views: Matematik is one entry per field (the combined course, labelled like the dropdown) instead
+// of the combined course AND a separate single-subject Matematik. Geometri and every other course are as they were.
 export function branchExamAnalysisCourses(field: "tyt" | "ayt", aytTrack: Track = "sayisal"): Course[] {
-  const courses = branchExamCourses(field, aytTrack);
-  if (field !== "tyt") return courses;
-  return courses.filter((c) => !(c.id in ANALYSIS_FOLDED_COURSE_IDS)).map(relabelForAnalysis);
+  return branchExamCourses(field, aytTrack)
+    .filter((c) => !(c.id in ANALYSIS_FOLDED_COURSE_IDS))
+    .map(relabelForAnalysis);
 }
 
 // profiles.academic_track ("yks_sayisal" ...) as an AYT track; null for anything else (LGS, Maarif, YDT, unset).

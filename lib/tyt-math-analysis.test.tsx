@@ -15,6 +15,7 @@ import { courseOptionsFor } from "@/app/coach/students/[id]/_components/kanban/t
 import { BransAnalysisClient } from "@/app/student/deneme-analizleri/brans/brans-analysis-client";
 import { ExamDetailDialog } from "@/app/coach/students/[id]/_components/exam-detail-dialog";
 import {
+  AYT_MATH_ANALYSIS_LABEL,
   TYT_MATH_ANALYSIS_LABEL,
   analysisCourseKey,
   branchExamAnalysisCourses,
@@ -27,8 +28,9 @@ import {
 import { comparableBranchExams } from "./exam-detail";
 import { computeNet } from "./scoring";
 
-// TYT Matematik in the Branş analysis views: the combined course and the single-subject Matematik are ONE entry, labelled like the task
-// dropdown ("TYT Matematik (Matematik + Geometri)"); Geometri stays its own entry. Only the analysis views -- never the task form or storage.
+// TYT and AYT Matematik in the Branş analysis views: the combined course and the single-subject Matematik are ONE entry per field, labelled
+// like the task dropdown ("TYT / AYT Matematik (Matematik + Geometri)"); Geometri stays its own entry. Only the analysis views -- never
+// the task form or storage.
 
 describe("the label", () => {
   it("is exactly what the task dropdown shows for the combined course", () => {
@@ -67,10 +69,35 @@ describe("branchExamAnalysisCourses('tyt')", () => {
     for (const topic of atomic.units.flatMap((u) => u.topics)) expect(mergedTopicIds.has(topic.id), topic.id).toBe(true);
   });
 
-  it("AYT lists are unchanged", () => {
-    for (const track of ["sayisal", "ea", "sozel"] as const) {
-      expect(branchExamAnalysisCourses("ayt", track)).toEqual(branchExamCourses("ayt", track));
+  it("AYT: the Sayısal and EA lists hold AYT Matematik once, as the combined course under the dropdown label", () => {
+    for (const track of ["sayisal", "ea"] as const) {
+      const ayt = branchExamAnalysisCourses("ayt", track);
+      expect(ayt.filter((c) => c.id === "ayt-matematik-macro"), track).toHaveLength(1);
+      expect(ayt.find((c) => c.id === "ayt-matematik-macro")?.name, track).toBe("AYT Matematik (Matematik + Geometri)");
+      expect(ayt.some((c) => c.id === "ayt-matematik"), track).toBe(false);
+      expect(ayt.map((c) => c.name), track).not.toContain("Matematik");
+      expect(ayt.map((c) => c.name), track).not.toContain("AYT Matematik");
+      // Geometri keeps its own entry
+      expect(ayt.some((c) => c.id === "ayt-geometri"), track).toBe(true);
+      expect(ayt).toHaveLength(branchExamCourses("ayt", track).length - 1);
     }
+  });
+
+  it("AYT Sözel has no Matematik at all: its list is exactly as it was", () => {
+    expect(branchExamAnalysisCourses("ayt", "sozel")).toEqual(branchExamCourses("ayt", "sozel"));
+  });
+
+  it("AYT: the merged entry carries the Matematik AND Geometri topics", () => {
+    const merged = branchExamAnalysisCourses("ayt", "sayisal").find((c) => c.id === "ayt-matematik-macro")!;
+    expect(merged.units.map((u) => u.unit)).toEqual(["Matematik", "Geometri"]);
+    const mergedTopicIds = new Set(merged.units.flatMap((u) => u.topics.map((t) => t.id)));
+    for (const topic of findCourseById("ayt-matematik")!.units.flatMap((u) => u.topics)) expect(mergedTopicIds.has(topic.id), topic.id).toBe(true);
+  });
+
+  it("the AYT label is exactly the dropdown's", () => {
+    const dropdown = courseOptionsFor("YKS", true, null, "sayisal");
+    expect(dropdown.find((o) => o.id === "ayt-matematik-macro")?.label).toBe("AYT Matematik (Matematik + Geometri)");
+    expect(AYT_MATH_ANALYSIS_LABEL).toBe("AYT Matematik (Matematik + Geometri)");
   });
 
   it("nothing else changed: the stored courses and their display names are as they were", () => {
@@ -86,18 +113,34 @@ describe("which exams belong to the entry", () => {
     expect(sameAnalysisCourse("tyt-matematik", "tyt-matematik-macro")).toBe(true);
     expect(sameAnalysisCourse("tyt-matematik-macro", "tyt-matematik")).toBe(true);
   });
+  it("AYT: the combined and the single-subject Matematik are one entry; AYT and TYT never mix", () => {
+    expect(analysisCourseKey("ayt-matematik")).toBe("ayt-matematik-macro");
+    expect(sameAnalysisCourse("ayt-matematik", "ayt-matematik-macro")).toBe(true);
+    expect(sameAnalysisCourse("ayt-matematik-macro", "ayt-matematik")).toBe(true);
+    expect(sameAnalysisCourse("ayt-matematik", "tyt-matematik-macro")).toBe(false);
+    expect(sameAnalysisCourse("tyt-matematik", "ayt-matematik-macro")).toBe(false);
+    expect(sameAnalysisCourse("ayt-geometri", "ayt-matematik-macro")).toBe(false);
+  });
   it("Geometri and every other course stay apart", () => {
     expect(sameAnalysisCourse("tyt-geometri", "tyt-matematik-macro")).toBe(false);
     expect(sameAnalysisCourse("tyt-fizik", "tyt-fen-macro")).toBe(false);
-    expect(sameAnalysisCourse("ayt-matematik", "tyt-matematik-macro")).toBe(false);
     expect(sameAnalysisCourse(null, "tyt-matematik-macro")).toBe(false);
     expect(sameAnalysisCourse("tyt-fizik", "tyt-fizik")).toBe(true);
   });
   it("findAnalysisCourse gives the merged, relabelled course for either id", () => {
     expect(findAnalysisCourse("tyt-matematik")?.name).toBe("TYT Matematik (Matematik + Geometri)");
     expect(findAnalysisCourse("tyt-matematik-macro")?.id).toBe("tyt-matematik-macro");
+    expect(findAnalysisCourse("ayt-matematik")?.name).toBe("AYT Matematik (Matematik + Geometri)");
+    expect(findAnalysisCourse("ayt-matematik-macro")?.id).toBe("ayt-matematik-macro");
     expect(findAnalysisCourse("tyt-fizik")?.name).toBe("Fizik");
     expect(findAnalysisCourse("nope")).toBeNull();
+  });
+  it("the popup compares AYT's two kinds of Matematik exam side by side too (Geometri apart)", () => {
+    const e = (id: string, course: string, date: string) => ({ id, task_type: "branch_exam", course_id: course, task_date: date });
+    const all = [e("m1", "ayt-matematik", "2026-10-03"), e("c1", "ayt-matematik-macro", "2026-10-10"), e("g1", "ayt-geometri", "2026-10-05"), e("t1", "tyt-matematik", "2026-10-06")];
+    expect(comparableBranchExams(all, all[0], () => true).map((x) => x.id)).toEqual(["c1", "m1"]);
+    expect(comparableBranchExams(all, all[1], () => true).map((x) => x.id)).toEqual(["c1", "m1"]);
+    expect(comparableBranchExams(all, all[2], () => true).map((x) => x.id)).toEqual(["g1"]);
   });
   it("the popup's comparison puts both kinds of Matematik exam side by side (Geometri apart)", () => {
     const e = (id: string, course: string, date: string) => ({ id, task_type: "branch_exam", course_id: course, task_date: date });
@@ -137,6 +180,45 @@ describe("the student's Branş page", () => {
   it("shows ONE TYT Matematik chip with the dropdown's label -- no bare 'Matematik' chip", () => {
     expect(html).toContain("TYT Matematik (Matematik + Geometri)");
     expect(html).not.toMatch(/>Matematik<\/button>/);
+  });
+});
+
+describe("the coach's comparison popup: AYT", () => {
+  it("is titled with the merged AYT label whichever kind of Matematik exam was clicked", () => {
+    const e = (id: string, course: string, date: string) =>
+      ({
+        id,
+        task_type: "branch_exam",
+        course_id: course,
+        task_date: date,
+        title: `AYT Matematik Branş Denemesi - Yayın ${id}`,
+        total_count: 40,
+        correct_count: 30,
+        wrong_count: 6,
+        empty_count: 4,
+        subject_scores: null,
+        analysis_pending: false,
+      }) as never;
+    const comb = e("COMB", "ayt-matematik-macro", "2026-10-10");
+    const sing = e("SING", "ayt-matematik", "2026-10-03");
+    for (const focus of [sing, comb]) {
+      const html = renderToStaticMarkup(
+        <ExamDetailDialog
+          exam={focus}
+          allGeneralExams={[]}
+          allBranchExams={[comb, sing]}
+          isInRange={() => true}
+          rangeLabel="Son 30 gün"
+          markedByExam={new Map()}
+          netOf={computeNet}
+          onClose={() => {}}
+          onEdit={() => {}}
+        />,
+      );
+      expect(html).toContain("AYT Matematik (Matematik + Geometri) Branş Denemesi Karşılaştırması");
+      expect(html).toContain("Yayın COMB");
+      expect(html).toContain("Yayın SING");
+    }
   });
 });
 
