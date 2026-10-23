@@ -530,3 +530,30 @@ describe("punctuation never matters", () => {
     expect(checkVocabAnswer("!!", "?!", "en_to_tr")).toBe("INCORRECT");
   });
 });
+
+describe("Turkish infinitive suffixes: koş / koşma / koşmak are one answer (-mak / -mek / -ma / -me, case and spacing ignored)", () => {
+  const same = (typed: string, expected: string) => expect(checkVocabAnswer(typed, expected, "en_to_tr"), `${typed} <- ${expected}`).not.toBe("INCORRECT");
+
+  it("every form is accepted for every other, in both directions of the pair", () => {
+    for (const a of ["koşmak", "koşma", "koş"]) for (const b of ["koşmak", "koşma", "koş"]) same(a, b);
+    for (const a of ["gelmek", "gelme", "gel"]) for (const b of ["gelmek", "gelme", "gel"]) same(a, b);
+    for (const a of ["okumak", "okuma", "oku"]) for (const b of ["okumak", "okuma", "oku"]) same(a, b);
+  });
+
+  it("case and stray spaces do not matter", () => {
+    same("  KOŞMAK ", "koşma");
+    same("Koş", "KOŞMAK");
+  });
+
+  it("an exactly typed answer is still the only EXACT_MATCH; a stem or suffix variant is accepted with the exact spelling shown", () => {
+    expect(checkVocabAnswer("koşmak", "koşmak", "en_to_tr")).toBe("EXACT_MATCH");
+    expect(checkVocabAnswer("koşma", "koşmak", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswer("koş", "koşmak", "en_to_tr")).toBe("ACCEPTED_TYPO");
+    expect(checkVocabAnswerDetailed("koş", "koşmak", "en_to_tr")).toEqual({ result: "ACCEPTED_TYPO", accepted: "koşmak" });
+  });
+
+  it("a different word is still wrong", () => {
+    expect(checkVocabAnswer("kaç", "koşmak", "en_to_tr")).toBe("INCORRECT");
+    expect(checkVocabAnswer("ko", "koşmak", "en_to_tr")).toBe("INCORRECT");
+  });
+});

@@ -316,7 +316,8 @@ export function VocabQuizSession({
     const taskId = activeTask?.id;
     startSaveTransition(async () => {
       try {
-        const outcome = await submitVocabAnswer(wordId, isCorrect, taskId);
+        // Nothing bound yet (a sidebar start with no open task): the server records this unit's practice as today's "Ek Çalışma".
+        const outcome = await submitVocabAnswer(wordId, isCorrect, taskId, taskId ? null : unitNumber);
         if (!outcome.ok) {
           setSubmitError(outcome.error);
           return;
@@ -331,7 +332,10 @@ export function VocabQuizSession({
         // a correct answer that actually counted toward the task (one
         // exists, and this answer wasn't just skipped/wrong) bumps it by
         // one, capped at the target the same way the server does.
-        if (result !== "INCORRECT" && !outcome.taskError) {
+        if (outcome.boundTask) {
+          // this answer just bound the quiz to a task (today's Ek Çalışma): its counters already include the answer
+          setActiveTask(outcome.boundTask);
+        } else if (result !== "INCORRECT" && !outcome.taskError) {
           setActiveTask((prev) => (prev ? { ...prev, current: prev.target === null ? prev.current + 1 : Math.min(prev.current + 1, prev.target) } : prev));
         }
         // Immediately, the moment this answer crosses the assigned task's

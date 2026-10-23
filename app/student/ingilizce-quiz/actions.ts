@@ -9,7 +9,7 @@ import { assertNotImpersonating } from "@/lib/impersonation";
 import { GENERIC_DB_ERROR } from "@/lib/errors";
 import { parseInput, uuidSchema } from "@/lib/validation";
 import { nextWordProgress, selectQuizBatch, type QuizWord, type WordProgressSummary } from "@/lib/lgs-vocab";
-import { pickVocabQuizTask, taskAfterAnswer, taskAfterRun } from "@/lib/vocab-quiz-task";
+import { EXTRA_STUDY_TITLE, isOpenEndedExtra, pickVocabQuizTask, taskAfterAnswer, taskAfterRun } from "@/lib/vocab-quiz-task";
 
 // Logs the real error server-side (console + Sentry) and, when it carries a
 // Postgres/PostgREST error code (an RLS denial, a missing grant, a check
@@ -69,7 +69,16 @@ type NotDoneResult = { ok: true } | { ok: false; error: string };
 // crossed the 3rd correct answer / was the word's very first correct one. taskCompleted is the same idea for an assigned
 // vocab_quiz task's own word-count target (see activeTaskId below).
 type SubmitAnswerResult =
-  | { ok: true; isMastered: boolean; firstCorrect: boolean; taskCompleted: boolean; nextCount: number; taskError?: string | null }
+  | {
+      ok: true;
+      isMastered: boolean;
+      firstCorrect: boolean;
+      taskCompleted: boolean;
+      nextCount: number;
+      taskError?: string | null;
+      // Set when THIS answer bound the quiz to a task it just found or created (today's "Ek Çalışma"); the counters already include the answer.
+      boundTask?: ActiveVocabQuizTask | null;
+    }
   | { ok: false; error: string };
 
 async function requireUserId() {
@@ -138,8 +147,9 @@ export type ActiveVocabQuizTask = { id: string; target: number | null; current: 
 // The assigned "N. Ünite - M Kelime" task (if any) this quiz run belongs to -- Ders Atama (task-form-fields.tsx) stores it as task_type
 // 'vocab_quiz', course_id "ingilizce-quiz", topic_id the Ünite number as plain text, total_count the word-count target (or none).
 //   * Opened from a task's "Quize Başla" (taskId given): exactly THAT task, if it is this student's, still open and for this unit.
-//   * Opened from the sidebar / a unit card: the unit's open task due today, else the latest one already due, else the soonest upcoming
-//     (pickVocabQuizTask). Before, the LATEST date won -- a week of answers went to next Sunday's task and today's stayed untouched.
+//   * Opened from the sidebar / a unit card: the unit's open task due today; else the most recent unlocked open one from before today
+//     (pickVocabQuizTask). Neither: null here, and the first answer then records the practice as today's "Ek Çalışma" (ensureExtraTask).
+//     Before, the LATEST date won -- a week of answers went to next Sunday's task and today's stayed untouched.
 // Correct answers climb its correct_count (submitVocabAnswer below) and the quiz sets its status (lib/vocab-quiz-task.ts).
 export async function getActiveVocabQuizTask(unitNumber: number, taskId?: string | null): Promise<GetActiveVocabQuizTaskResult> {
   try {
@@ -157,12 +167,64 @@ export async function getActiveVocabQuizTask(unitNumber: number, taskId?: string
     const { data, error } = await query.order("task_date", { ascending: false }).limit(60);
     if (error) throw error;
     const rows = (data ?? []) as { id: string; total_count: number | null; correct_count: number | null; task_date: string }[];
-    const row = taskIdV ? (rows[0] ?? null) : pickVocabQuizTask(rows, new Date().toISOString().slice(0, 10));
+    let row: (typeof rows)[number] | null;
+    if (taskIdV) {
+      row = rows[0] ?? null;
+    } else {
+      // A task dated before the latest week lock is frozen (same boundary as the board's week_locked and the database rules).
+      const { data: lock } = await supabase.from("progress_locks").select("locked_at").eq("student_id", userId).order("locked_at", { ascending: false }).limit(1).maybeSingle();
+      const lockedBefore = (lock as { locked_at?: string } | null)?.locked_at?.slice(0, 10) ?? null;
+      row = pickVocabQuizTask(rows, new Date().toISOString().slice(0, 10), lockedBefore);
+    }
     if (!row) return { ok: true, task: null };
     return { ok: true, task: { id: row.id, target: row.total_count, current: row.correct_count ?? 0 } };
   } catch (e) {
     return { ok: false, error: vocabActionError("getActiveVocabQuizTask", e) };
   }
+}
+
+type TaskRow = { id: string; student_id: string; total_count: number | null; correct_count: number | null; status: string; is_coach_assigned: boolean | null };
+
+// Today's "Ek Çalışma" for this unit: the student's own extra practice, created the first time they answer with nothing assigned to bind to
+// (every assigned task is done, locked or none exists). One per day and unit -- a later run the same day finds it again (and re-opens it,
+// see isOpenEndedExtra) instead of piling up cards. It is the student's own task like any they add themselves, so it waits for the coach's
+// approval before it counts toward the program percentages (a deliberate rule, migration 0063: a student cannot approve their own work).
+async function ensureExtraTask(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, unit: number): Promise<TaskRow> {
+  const today = new Date().toISOString().slice(0, 10);
+  const columns = "id, student_id, total_count, correct_count, status, is_coach_assigned";
+  const { data: existing, error: readError } = await supabase
+    .from("student_tasks")
+    .select(columns)
+    .eq("student_id", userId)
+    .eq("task_type", "vocab_quiz")
+    .eq("topic_id", String(unit))
+    .eq("task_date", today)
+    .eq("is_coach_assigned", false)
+    .is("total_count", null)
+    .eq("title", EXTRA_STUDY_TITLE)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (existing) return existing as TaskRow;
+  const { data: created, error } = await supabase
+    .from("student_tasks")
+    .insert({
+      student_id: userId,
+      task_date: today,
+      task_type: "vocab_quiz",
+      title: EXTRA_STUDY_TITLE,
+      course_id: "ingilizce-quiz",
+      topic_id: String(unit),
+      total_count: null,
+      is_coach_assigned: false,
+      status: "pending",
+      completed: false,
+    })
+    .select(columns)
+    .single();
+  if (error) throw error;
+  return created as TaskRow;
 }
 
 // Upserts this student's progress for one word (nextWordProgress, lib/lgs-vocab.ts): correct adds one to correct_count
@@ -185,6 +247,9 @@ export async function submitVocabAnswer(
   wordId: string,
   isCorrect: boolean,
   activeTaskId?: string | null,
+  // The quiz is not bound to any task yet (the sidebar start, nothing open to bind to): this unit's answers are recorded as today's
+  // "Ek Çalışma", created on the first answer (never just by opening the quiz).
+  extraUnit?: number | null,
 ): Promise<SubmitAnswerResult> {
   try {
     const wordIdV = parseInput(uuidSchema, wordId);
@@ -218,30 +283,41 @@ export async function submitVocabAnswer(
 
     let taskCompleted = false;
     let taskError: string | null = null;
-    if (activeTaskId) {
+    let boundTask: ActiveVocabQuizTask | null = null;
+    if (activeTaskId || extraUnit) {
       try {
-        const activeTaskIdV = parseInput(uuidSchema, activeTaskId);
-        const { data: task, error: taskFetchError } = await supabase
-          .from("student_tasks")
-          .select("student_id, total_count, correct_count, status")
-          .eq("id", activeTaskIdV)
-          .maybeSingle();
-        if (taskFetchError) throw taskFetchError;
+        let task: TaskRow | null = null;
+        const justBound = !activeTaskId;
+        if (activeTaskId) {
+          const activeTaskIdV = parseInput(uuidSchema, activeTaskId);
+          const { data, error: taskFetchError } = await supabase
+            .from("student_tasks")
+            .select("id, student_id, total_count, correct_count, status, is_coach_assigned")
+            .eq("id", activeTaskIdV)
+            .maybeSingle();
+          if (taskFetchError) throw taskFetchError;
+          task = (data as TaskRow | null) ?? null;
+        } else {
+          task = await ensureExtraTask(supabase, userId, parseInput(unitNumberSchema, extraUnit));
+        }
         // Silently skipped, not an error: the task may have been completed or removed by the coach between this batch loading and this
         // answer -- the word's own progress above is already saved either way.
         if (task && task.student_id === userId) {
           // ANY answer makes the task at least Yarım Yapıldı, a correct one also counts toward the word target, and reaching the target
           // makes it Yapıldı -- the student never sets these (lib/vocab-quiz-task.ts). A miss or a Pas Geç never takes progress back.
-          const update = taskAfterAnswer(task, isCorrectV);
+          const update = taskAfterAnswer(task, isCorrectV, { reopenDone: isOpenEndedExtra(task) });
           if (update) {
             const { data: updated, error: taskUpdateError } = await supabase
               .from("student_tasks")
               .update({ ...update, updated_at: new Date().toISOString() })
-              .eq("id", activeTaskIdV)
+              .eq("id", task.id)
               .select("id");
             if (taskUpdateError) throw taskUpdateError;
             if (!updated || updated.length === 0) throw new TaskNotUpdatedError();
             taskCompleted = update.status === "done";
+          }
+          if (justBound) {
+            boundTask = { id: task.id, target: task.total_count, current: update ? update.correct_count : (task.correct_count ?? 0) };
           }
         }
       } catch (e) {
@@ -251,7 +327,7 @@ export async function submitVocabAnswer(
 
     revalidatePath("/student/ingilizce-quiz");
     revalidatePath("/student");
-    return { ok: true, isMastered: next.becameMastered, firstCorrect: next.firstCorrect, taskCompleted, nextCount: next.correctCount, taskError };
+    return { ok: true, isMastered: next.becameMastered, firstCorrect: next.firstCorrect, taskCompleted, nextCount: next.correctCount, taskError, boundTask };
   } catch (e) {
     return { ok: false, error: vocabActionError("submitVocabAnswer", e) };
   }

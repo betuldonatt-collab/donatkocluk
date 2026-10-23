@@ -7,6 +7,7 @@ const STUDENT = "u1";
 const WORD = "11111111-1111-4111-8111-111111111111";
 const T_TODAY = "22222222-2222-4222-8222-222222222222";
 const T_SUNDAY = "33333333-3333-4333-8333-333333333333";
+const EXTRA_ID = "44444444-4444-4444-8444-444444444444";
 
 type Row = Record<string, unknown>;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -20,23 +21,37 @@ const state: {
   updateError: unknown;
   // false = the update matched no row (what RLS does for a locked week: no error, just nothing updated)
   updateMatches: boolean;
-} = { tasks: [], words: [], progress: [], updates: [], updateError: null, updateMatches: true };
+  // week locks (latest first) and the rows the quiz inserted
+  locks: Row[];
+  inserts: Row[];
+  insertError: unknown;
+} = { tasks: [], words: [], progress: [], updates: [], updateError: null, updateMatches: true, locks: [], inserts: [], insertError: null };
 
 function builder(table: string) {
   const filters: [string, string, unknown][] = [];
-  let op: "select" | "update" = "select";
+  let op: "select" | "update" | "insert" = "select";
   let patch: Row = {};
   const rows = (): Row[] => {
     if (table === "student_tasks") {
       return state.tasks.filter((t) =>
-        filters.every(([kind, col, val]) => (kind === "eq" ? t[col] === val : kind === "neq" ? t[col] !== val : true)),
+        filters.every(([kind, col, val]) =>
+          kind === "eq" ? t[col] === val : kind === "neq" ? t[col] !== val : kind === "is" ? (t[col] ?? null) === val : true,
+        ),
       );
     }
+    if (table === "progress_locks") return state.locks;
     if (table === "lgs_words") return state.words.filter((w) => filters.every(([k, c, v]) => (k === "eq" ? w[c] === v : true)));
     if (table === "student_word_progress") return state.progress.filter((p) => filters.every(([k, c, v]) => (k === "eq" ? p[c] === v : true)));
     return [];
   };
   const finish = () => {
+    if (op === "insert" && table === "student_tasks") {
+      if (state.insertError) return { data: null, error: state.insertError };
+      const row = { id: EXTRA_ID, correct_count: null, ...patch };
+      state.inserts.push(patch);
+      state.tasks.push(row);
+      return { data: row, error: null };
+    }
     if (op === "update" && table === "student_tasks") {
       if (state.updateError) return { data: null, error: state.updateError };
       if (!state.updateMatches) return { data: [], error: null };
@@ -51,8 +66,10 @@ function builder(table: string) {
   const b: Record<string, unknown> = {};
   b.select = () => b;
   b.update = (p: Row) => ((op = "update"), (patch = p), b);
+  b.insert = (p: Row) => ((op = "insert"), (patch = p), b);
+  b.single = async () => finish();
   b.upsert = () => Promise.resolve({ error: null });
-  for (const k of ["eq", "neq"]) b[k] = (col: string, val: unknown) => (filters.push([k, col, val]), b);
+  for (const k of ["eq", "neq", "is"]) b[k] = (col: string, val: unknown) => (filters.push([k, col, val]), b);
   for (const k of ["in", "not", "order", "limit"]) b[k] = () => b;
   b.maybeSingle = async () => ({ data: rows()[0] ?? null, error: null });
   b.then = (resolve: (v: unknown) => unknown) => resolve(finish());
@@ -90,6 +107,9 @@ beforeEach(() => {
   state.updates = [];
   state.updateError = null;
   state.updateMatches = true;
+  state.locks = [];
+  state.inserts = [];
+  state.insertError = null;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -248,5 +268,127 @@ describe("markVocabQuizNotDone: the student's one manual choice", () => {
     const r = await markVocabQuizNotDone(T_TODAY);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("42501");
+  });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------------------
+describe("a quiz started from the sidebar: bound by priority", () => {
+  const YESTERDAY = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const LAST_MONTH = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const extra = (over: Row = {}): Row => ({ ...task(EXTRA_ID, { total_count: null, is_coach_assigned: false, title: "Ek Çalışma", task_date: TODAY }), ...over });
+
+  it("1) today's open task of the unit", async () => {
+    state.tasks = [task("past", { task_date: YESTERDAY }), task(T_TODAY, { task_date: TODAY })];
+    expect(await getActiveVocabQuizTask(1)).toMatchObject({ ok: true, task: { id: T_TODAY } });
+  });
+  it("2) no task today: the most recent unlocked open one from the past", async () => {
+    state.tasks = [task("old", { task_date: LAST_MONTH }), task("recent", { task_date: YESTERDAY })];
+    expect(await getActiveVocabQuizTask(1)).toMatchObject({ ok: true, task: { id: "recent" } });
+  });
+  it("2) a past task before the latest week lock is skipped (frozen)", async () => {
+    state.tasks = [task("recent", { task_date: YESTERDAY })];
+    state.locks = [{ locked_at: `${TODAY}T08:00:00Z` }];
+    expect(await getActiveVocabQuizTask(1)).toEqual({ ok: true, task: null });
+    state.locks = [{ locked_at: `${YESTERDAY}T08:00:00Z` }]; // the lock day itself is still open
+    expect(await getActiveVocabQuizTask(1)).toMatchObject({ ok: true, task: { id: "recent" } });
+  });
+  it("3) every assigned task done (or none): nothing to bind, and merely opening the quiz creates nothing", async () => {
+    state.tasks = [task(T_TODAY, { status: "done" })];
+    expect(await getActiveVocabQuizTask(1)).toEqual({ ok: true, task: null });
+    expect(state.inserts).toEqual([]);
+  });
+  it("an upcoming task is not due yet: not bound", async () => {
+    state.tasks = [task(T_SUNDAY, { task_date: FUTURE })];
+    expect(await getActiveVocabQuizTask(1)).toEqual({ ok: true, task: null });
+  });
+
+  it("3) the first answer with nothing to bind to creates today's 'Ek Çalışma' for the unit, and counts into it", async () => {
+    state.tasks = [];
+    const r = await submitVocabAnswer(WORD, true, null, 3);
+    expect(state.inserts).toHaveLength(1);
+    expect(state.inserts[0]).toMatchObject({
+      student_id: STUDENT,
+      task_date: TODAY,
+      task_type: "vocab_quiz",
+      title: "Ek Çalışma",
+      course_id: "ingilizce-quiz",
+      topic_id: "3",
+      total_count: null,
+      is_coach_assigned: false,
+      status: "pending",
+    });
+    // the student's own task: never self-approved (migration 0063)
+    expect(state.inserts[0]).not.toHaveProperty("is_approved_by_coach");
+    expect(r).toMatchObject({ ok: true, taskCompleted: false });
+    if (r.ok) {
+      expect(r.boundTask).toEqual({ id: EXTRA_ID, target: null, current: 1 });
+      expect(r.taskError).toBeNull();
+    }
+    expect(state.updates[0].patch).toMatchObject({ status: "half_done", correct_count: 1 });
+  });
+
+  it("a wrong first answer still records the practice (Yarım Yapıldı, 0 words)", async () => {
+    state.tasks = [];
+    const r = await submitVocabAnswer(WORD, false, null, 1);
+    expect(r.ok && r.boundTask).toEqual({ id: EXTRA_ID, target: null, current: 0 });
+    expect(state.updates[0].patch).toMatchObject({ status: "half_done", correct_count: 0 });
+  });
+
+  it("later answers of the same quiz use the bound task: no second Ek Çalışma", async () => {
+    state.tasks = [];
+    await submitVocabAnswer(WORD, true, null, 1);
+    const r = await submitVocabAnswer(WORD, true, EXTRA_ID, null);
+    expect(state.inserts).toHaveLength(1);
+    expect(r.ok && r.boundTask).toBeFalsy();
+    expect(state.updates.at(-1)?.patch).toMatchObject({ correct_count: 2 });
+  });
+
+  it("another run the same day finds today's Ek Çalışma again (open or finished) instead of creating more", async () => {
+    state.tasks = [extra({ status: "half_done", correct_count: 4 })];
+    await submitVocabAnswer(WORD, true, null, 1);
+    expect(state.inserts).toEqual([]);
+    expect(state.updates[0].patch).toMatchObject({ correct_count: 5 });
+  });
+
+  it("a finished Ek Çalışma is re-opened by practising again: every run of extra effort is recorded", async () => {
+    state.tasks = [extra({ status: "done", correct_count: 8 })];
+    const r = await submitVocabAnswer(WORD, true, null, 1);
+    expect(state.inserts).toEqual([]);
+    expect(state.updates[0].patch).toMatchObject({ status: "half_done", correct_count: 9, completed: false });
+    expect(r.ok && r.boundTask?.current).toBe(9);
+  });
+
+  it("the end of the run finishes the Ek Çalışma (it has no target: the run is the task)", async () => {
+    state.tasks = [extra({ status: "half_done", correct_count: 6 })];
+    expect(await completeVocabQuizRun(EXTRA_ID, 1)).toEqual({ ok: true, status: "done" });
+  });
+
+  it("an Ek Çalışma of another unit or another day is not reused", async () => {
+    state.tasks = [extra({ topic_id: "2", status: "half_done" }), extra({ id: "yday", task_date: YESTERDAY, status: "half_done" })];
+    await submitVocabAnswer(WORD, true, null, 1);
+    expect(state.inserts).toHaveLength(1);
+  });
+
+  it("a coach-assigned task without a word count is NOT re-opened once finished", async () => {
+    state.tasks = [task(T_TODAY, { total_count: null, is_coach_assigned: true, status: "done", correct_count: 5 })];
+    await submitVocabAnswer(WORD, true, T_TODAY);
+    expect(state.updates).toEqual([]);
+  });
+
+  it("when the Ek Çalışma cannot be created (today is locked, ...) the word's result still comes back, with the reason", async () => {
+    state.tasks = [];
+    state.insertError = { code: "42501", message: "new row violates row-level security policy" };
+    const r = await submitVocabAnswer(WORD, true, null, 1);
+    expect(r).toMatchObject({ ok: true, nextCount: 1 });
+    if (r.ok) {
+      expect(r.taskError).toContain("42501");
+      expect(r.boundTask).toBeNull();
+    }
+  });
+
+  it("an explicit task still wins over the extra: answers for a bound task never create an Ek Çalışma", async () => {
+    state.tasks = [task(T_TODAY)];
+    await submitVocabAnswer(WORD, true, T_TODAY, 1);
+    expect(state.inserts).toEqual([]);
   });
 });

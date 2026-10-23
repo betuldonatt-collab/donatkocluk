@@ -18,18 +18,33 @@ export type VocabTaskState = {
   correct_count: number | null;
 };
 
+// A task with no word target that the STUDENT made (the "Ek Çalışma" the quiz creates): open-ended practice, not a goal that can be
+// finished once -- practising again later the same day re-opens it, so every run of extra effort is recorded.
+export function isOpenEndedExtra(task: { total_count: number | null; is_coach_assigned?: boolean | null }): boolean {
+  return task.total_count === null && task.is_coach_assigned === false;
+}
+
 export type VocabTaskUpdate = { status: "done" | "half_done"; correct_count: number; completed: boolean };
 
-// Where the student's answers go when the quiz is opened without naming a task (the sidebar, a unit card): the open task of that unit that is
-// due TODAY first; otherwise the most recent one already due; otherwise the soonest upcoming one. (Picking simply the latest date, as before,
-// sent a whole week of answers to next Sunday's task and left today's untouched.)
-export function pickVocabQuizTask<T extends { task_date: string }>(rows: T[], today: string): T | null {
+// The title of the task the quiz creates for a student's own extra practice.
+export const EXTRA_STUDY_TITLE = "Ek Çalışma";
+
+// Where the student's answers go when the quiz is opened WITHOUT naming a task (the sidebar, a unit card) -- among the unit's still-open
+// vocabulary tasks:
+//   1. the one due TODAY;
+//   2. else the most recent one from before today that is still UNLOCKED (a task dated before the latest week lock is frozen: the database
+//      would refuse the write, so it is never offered);
+//   3. else none -- the quiz then records the practice as today's "Ek Çalışma" (ensure in the actions; never an upcoming task, which is not
+//      due yet).
+// (Picking simply the latest date, as it once did, sent a whole week of answers to next Sunday's task and left today's untouched.)
+// `lockedBefore`: tasks dated BEFORE this day are locked (the day of the latest lock itself belongs to the new, open cycle); null = no lock.
+export function pickVocabQuizTask<T extends { task_date: string }>(rows: T[], today: string, lockedBefore: string | null = null): T | null {
   const todays = rows.filter((r) => r.task_date === today);
   if (todays.length > 0) return todays[0];
-  const past = rows.filter((r) => r.task_date < today).sort((a, b) => b.task_date.localeCompare(a.task_date));
-  if (past.length > 0) return past[0];
-  const future = rows.filter((r) => r.task_date > today).sort((a, b) => a.task_date.localeCompare(b.task_date));
-  return future[0] ?? null;
+  const past = rows
+    .filter((r) => r.task_date < today && (lockedBefore === null || r.task_date >= lockedBefore))
+    .sort((a, b) => b.task_date.localeCompare(a.task_date));
+  return past[0] ?? null;
 }
 
 // The Ünite (1-10) a task stands for (its topic_id holds the number as text).
@@ -46,13 +61,14 @@ export function vocabQuizHref(unit: number, taskId?: string | null): string {
 // What one answer does to the task. null = nothing to write (the task is already Yapıldı, or a miss on a task that is already Yarım Yapıldı).
 // A correct answer adds one to the word count (never past the target); ANY answer makes the task at least Yarım Yapıldı; reaching the
 // target makes it Yapıldı. A miss or a "Pas Geç" never takes progress back.
-export function taskAfterAnswer(task: VocabTaskState, isCorrect: boolean): VocabTaskUpdate | null {
-  if (task.status === "done") return null;
+export function taskAfterAnswer(task: VocabTaskState, isCorrect: boolean, options: { reopenDone?: boolean } = {}): VocabTaskUpdate | null {
+  if (task.status === "done" && !options.reopenDone) return null;
   const before = task.correct_count ?? 0;
   const raw = before + (isCorrect ? 1 : 0);
   const next = task.total_count !== null ? Math.min(raw, task.total_count) : raw;
   const reached = task.total_count !== null && next >= task.total_count;
   if (!isCorrect && task.status === "half_done") return null;
+  // (a re-opened "done" extra restarts as Yarım Yapıldı, even on a miss: the student is practising again)
   return { status: reached ? "done" : "half_done", correct_count: next, completed: reached };
 }
 
