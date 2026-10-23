@@ -319,8 +319,13 @@ export function TrialResultsSection({
       {error && <p className="text-destructive text-xs">{error}</p>}
 
       <Button type="button" size="sm" onClick={handleSave} disabled={saving || trackNotChosen || (totalMismatch && !isGridGeneral)}>
-        {saving ? "Kaydediliyor..." : "Sonuçları Kaydet"}
+        {saving ? "Kaydediliyor..." : "Sonuçları ve Analizi Kaydet"}
       </Button>
+      {/* This button and the drawer's footer button save DIFFERENT things -- say which does what, right here. */}
+      <p className="text-muted-foreground text-xs" data-slot="results-save-hint">
+        Doğru / Yanlış / Boş ve işaretlediğin konuları kaydeder, denemeyi “Yapıldı” yapar ve analizi tamamlanmış sayar. Görev bilgileri (ders, konu,
+        hedef, kaynak) bundan ayrı, alttaki düğmeyle kaydedilir.
+      </p>
     </div>
   );
 }

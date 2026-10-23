@@ -301,6 +301,9 @@ export function TaskDrawer({
     }
   }
 
+  // Editing a Branş / Genel exam: the "Sonuçları Gir" box has its own save button (results + analysis), so this footer button is named for
+  // what it alone saves -- the task's details.
+  const isExamEdit = state.mode === "edit" && (state.task.task_type === "branch_exam" || state.task.task_type === "general_exam");
   const showRoutineForm = state.mode === "create-multi" && tab === "routine";
   const isRoutineCoursePicked = isCourseRoutine(routineType);
 
@@ -413,7 +416,9 @@ export function TaskDrawer({
               ? "Kaydediliyor..."
               : state.mode === "create-multi" && taskDates.length > 0
                 ? `${taskDates.length} Gün İçin Kaydet`
-                : "Kaydet"}
+                : isExamEdit
+                  ? "Görev Bilgilerini Kaydet"
+                  : "Kaydet"}
           </Button>
         </div>
     </div>
