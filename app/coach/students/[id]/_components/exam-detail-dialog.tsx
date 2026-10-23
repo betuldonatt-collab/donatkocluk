@@ -7,7 +7,7 @@ import { comparableBranchExams, comparableGeneralExams, examTrackOf } from "@/li
 import { splitExamsByAnalysis } from "@/lib/exam-solved";
 import { PendingAnalysisBox } from "@/components/pending-analysis-box";
 import { GENERAL_EXAM_TRACK_LABELS } from "@/lib/general-exam-track";
-import { findCourseById } from "@/lib/curriculum";
+import { findAnalysisCourse } from "@/lib/curriculum";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { DetailTask } from "../types";
@@ -51,7 +51,7 @@ export function ExamDetailDialog({
   // Only solved-AND-analysed exams are columns; solved ones still waiting for their analysis sit in the yellow box on the right; unsolved ones
   // are not listed (lib/exam-solved.ts).
   const { analyzed: compared, pending } = splitExamsByAnalysis(comparedAll);
-  const branchCourse = isGeneral ? null : findCourseById(exam.course_id);
+  const branchCourse = isGeneral ? null : findAnalysisCourse(exam.course_id);
   const trackLabel = GENERAL_EXAM_TRACK_LABELS[examTrackOf(exam.title, exam.subject_scores)];
 
   return (

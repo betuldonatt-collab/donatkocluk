@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatChartRangeLabel, isDateInChartRange, type ChartRange } from "@/lib/chart-range";
 import { aggregateParagrafProblemByDate, practiceChartSeries } from "@/lib/paragraf-problem-chart";
 import { cn } from "@/lib/utils";
-import { branchExamCourses, LGS_COURSES, TRACK_LABELS, findCourseById, type Track } from "@/lib/curriculum";
+import { branchExamAnalysisCourses, findAnalysisCourse, LGS_COURSES, TRACK_LABELS, sameAnalysisCourse, type Track } from "@/lib/curriculum";
 import type { ExamType } from "@/lib/exam-type";
 import { LGS_EXAM_SUBJECTS, inferAytTrackFromScores } from "@/lib/curriculum/subject-groups";
 import {
@@ -175,21 +175,21 @@ export function ChartsTab({
   // the list entirely.
   const [mainTrack, setMainTrack] = useState<MainTrack>(defaultMainTrack);
   const [aytSubTrack, setAytSubTrack] = useState<Track>("sayisal");
-  const [branchCourseId, setBranchCourseId] = useState<string>(gradeCourses?.[0]?.id ?? (isLgs ? LGS_COURSES[0].id : branchExamCourses("tyt")[0].id));
+  const [branchCourseId, setBranchCourseId] = useState<string>(gradeCourses?.[0]?.id ?? (isLgs ? LGS_COURSES[0].id : branchExamAnalysisCourses("tyt")[0].id));
 
   function handleMainTrackChange(next: MainTrack) {
     setMainTrack(next);
-    setBranchCourseId(branchExamCourses(next === "tyt" ? "tyt" : "ayt", "sayisal")[0].id);
+    setBranchCourseId(branchExamAnalysisCourses(next === "tyt" ? "tyt" : "ayt", "sayisal")[0].id);
     setAytSubTrack("sayisal");
   }
 
   function handleAytSubTrackChange(next: Track) {
     setAytSubTrack(next);
-    setBranchCourseId(branchExamCourses("ayt", next)[0].id);
+    setBranchCourseId(branchExamAnalysisCourses("ayt", next)[0].id);
   }
 
   // The combined branch-exam courses (TYT Fen, TYT Sosyal, ...) lead the list -- see branchExamCourses.
-  const branchCourses = gradeCourses ?? (isLgs ? LGS_COURSES : branchExamCourses(mainTrack === "tyt" ? "tyt" : "ayt", aytSubTrack));
+  const branchCourses = gradeCourses ?? (isLgs ? LGS_COURSES : branchExamAnalysisCourses(mainTrack === "tyt" ? "tyt" : "ayt", aytSubTrack));
 
   // One point per DAY, not per row: a day can hold several entries for the
   // same date now -- the student's own manual entries plus a Paragraf/Problem
@@ -286,7 +286,7 @@ export function ChartsTab({
     .filter(
       (e) =>
         isDateInChartRange(e.task_date, chartRange) &&
-        e.course_id === branchCourseId &&
+        sameAnalysisCourse(e.course_id, branchCourseId) &&
         (e.correct_count !== null || e.wrong_count !== null),
     )
     .slice()
@@ -299,7 +299,7 @@ export function ChartsTab({
     }));
 
   const selectedBranchCourseName =
-    m11Options?.find((o) => o.id === branchCourseId)?.label ?? findCourseById(branchCourseId)?.name ?? branchCourseId;
+    m11Options?.find((o) => o.id === branchCourseId)?.label ?? findAnalysisCourse(branchCourseId)?.name ?? branchCourseId;
 
   return (
     <div className="space-y-6">

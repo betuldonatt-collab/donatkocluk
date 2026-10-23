@@ -4,7 +4,7 @@
 // Everything is derived from the exam itself -- its title (the track lives in the title text, there is no course_id on
 // a Genel Deneme) and its subject_scores keys -- so the popup needs no student context and shows an exam the same way
 // whoever opens it.
-import type { Course } from "./curriculum";
+import { sameAnalysisCourse, type Course } from "./curriculum";
 import { coursesForExamSection, generalExamSections, parseGeneralExamTrack, usesLgsNet, type GeneralExamTrack } from "./general-exam-track";
 import { inferAytTrackFromScores } from "./curriculum/subject-groups";
 import { computeLgsNet, computeNet } from "./scoring";
@@ -98,7 +98,8 @@ export function comparableBranchExams<T extends { id: string; task_type: string;
   focus: T,
   inRange: (dateIso: string) => boolean,
 ): T[] {
-  const picked = all.filter((e) => e.task_type === "branch_exam" && e.course_id === focus.course_id && (e.id === focus.id || inRange(e.task_date)));
+  // (the single-subject TYT Matematik and the combined TYT Matematik are one analysis entry: see sameAnalysisCourse)
+  const picked = all.filter((e) => e.task_type === "branch_exam" && sameAnalysisCourse(e.course_id, focus.course_id) && (e.id === focus.id || inRange(e.task_date)));
   if (!picked.some((e) => e.id === focus.id)) picked.push(focus);
   return picked.slice().sort((a, b) => b.task_date.localeCompare(a.task_date) || a.id.localeCompare(b.id));
 }

@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { Track } from "@/lib/curriculum";
 import { CourseTabs } from "@/components/course-tabs";
 import {
-  branchExamCourses,
+  branchExamAnalysisCourses,
   isLgsCourseId,
+  sameAnalysisCourse,
   type Course,
 } from "@/lib/curriculum";
 import { formatChartRangeLabel, isDateInChartRange, LAST_30_DAYS_RANGE, type ChartRange } from "@/lib/chart-range";
@@ -79,8 +80,9 @@ export function BransAnalysisClient({
   // follow -- never replacing or nesting them, a coach/student can pick
   // either "Fizik" or "TYT Fen" as fully independent, side-by-side options.
   // (LGS has no macro subjects -- its branş denemeleri are per-course.)
-  const tytBranchCourses = branchExamCourses("tyt");
-  const aytBranchCoursesFor = (t: Track) => branchExamCourses("ayt", t);
+  // (TYT Matematik is one entry here -- the combined course and the single-subject Matematik together, labelled like the task dropdown.)
+  const tytBranchCourses = branchExamAnalysisCourses("tyt");
+  const aytBranchCoursesFor = (t: Track) => branchExamAnalysisCourses("ayt", t);
 
   const mistakesByExam = useMemo(() => {
     const map: Record<string, Set<string>> = {};
@@ -102,7 +104,7 @@ export function BransAnalysisClient({
 
   function examsForCourse(course: Course): StudentTask[] {
     return examsInRange
-      .filter((e) => e.course_id === course.id)
+      .filter((e) => sameAnalysisCourse(e.course_id, course.id))
       .sort((a, b) => a.task_date.localeCompare(b.task_date));
   }
 

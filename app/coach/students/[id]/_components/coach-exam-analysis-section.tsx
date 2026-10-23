@@ -16,7 +16,8 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import {
-  branchExamCourses,
+  branchExamAnalysisCourses,
+  sameAnalysisCourse,
   AYT_COURSES_BY_TRACK,
   LGS_COURSES,
   TRACK_LABELS,
@@ -154,8 +155,8 @@ export function CoachExamAnalysisSection({
     : isLgs
     ? LGS_COURSES
     : mainTrack === "tyt"
-      ? branchExamCourses("tyt")
-      : branchExamCourses("ayt", aytSubTrack);
+      ? branchExamAnalysisCourses("tyt")
+      : branchExamAnalysisCourses("ayt", aytSubTrack);
   // The Maarif Genel Denemeler (Maarif TYT, 11., 10., 9. Sınıf) go through the shared track definitions (lib/general-exam-track.ts).
   const genelGroups = maarifOwn
     ? generalExamSections(maarifTrack, null)
@@ -187,7 +188,7 @@ export function CoachExamAnalysisSection({
   }, [mistakes]);
 
   const currentBranchExams = exams
-    .filter((e) => e.task_type === "branch_exam" && e.course_id === branchCourseId)
+    .filter((e) => e.task_type === "branch_exam" && sameAnalysisCourse(e.course_id, branchCourseId))
     .slice()
     .sort((a, b) => b.task_date.localeCompare(a.task_date));
 

@@ -90,12 +90,14 @@ describe("coach Grafikler: the Branş Denemesi picker", () => {
     const options = [...select.matchAll(/<option value="([^"]+)"[^>]*>([^<]*)<\/option>/g)].map((m) => [m[1], m[2]]);
     expect(options.slice(0, 3)).toEqual([
       ["tyt-sosyal-macro", "TYT Sosyal"],
-      ["tyt-matematik-macro", "TYT Matematik"],
+      ["tyt-matematik-macro", "TYT Matematik (Matematik + Geometri)"],
       ["tyt-fen-macro", "TYT Fen"],
     ]);
-    // the single-subject ones are still there
+    // the single-subject ones are still there -- except the plain Matematik, which is part of the combined entry above (analysis views
+    // list TYT Matematik once; lib/curriculum branchExamAnalysisCourses)
     const values = options.map((o) => o[0]);
-    for (const id of ids(TYT_COURSES)) expect(values).toContain(id);
+    for (const id of ids(TYT_COURSES).filter((id) => id !== "tyt-matematik")) expect(values).toContain(id);
+    expect(values).not.toContain("tyt-matematik");
   });
 
   it("plots an exam saved under a combined course (the first listed one is selected by default)", () => {
@@ -139,13 +141,13 @@ describe("guard: no picker is assembled by hand any more", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("the Branş pickers of both panels go through branchExamCourses", () => {
+  it("the Branş pickers of both panels go through branchExamAnalysisCourses (branchExamCourses with TYT Matematik listed once)", () => {
     for (const file of [
       "app/coach/students/[id]/_components/charts-tab.tsx",
       "app/coach/students/[id]/_components/coach-exam-analysis-section.tsx",
       "app/student/deneme-analizleri/brans/brans-analysis-client.tsx",
     ]) {
-      expect(readFileSync(join(root, file), "utf8"), file).toContain("branchExamCourses(");
+      expect(readFileSync(join(root, file), "utf8"), file).toContain("branchExamAnalysisCourses(");
     }
   });
 
