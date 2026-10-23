@@ -7,7 +7,7 @@ vi.mock("@/app/coach/school-grade-actions", () => ({ saveSchoolGradeForStudent: 
 vi.mock("@/app/coach/events/actions", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : vi.fn()) }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/student/deneme-analizleri/karne", useRouter: () => ({ refresh: () => {}, push: () => {} }) }));
 
-import { KarnelerTab, ReportCardReview } from "@/app/coach/students/[id]/_components/karneler-tab";
+import { KarnelerTab } from "@/app/coach/students/[id]/_components/karneler-tab";
 import { ChartsTab } from "@/app/coach/students/[id]/_components/charts-tab";
 import type { DetailTask } from "@/app/coach/students/[id]/types";
 import { MaarifGradeProvider } from "@/components/maarif-grade-context";
@@ -111,48 +111,6 @@ describe("11th grade: the Karne screens", () => {
     maarifGrade: 11,
     totalDurationMinutes: 600,
   };
-  const topicRows = computeAylikKarne(
-    MAARIF11_CURRICULUM_COURSE_IDS,
-    [{ id: "g1", task_date: "2026-10-03", task_type: "general_exam", course_id: null }],
-    [],
-    RANGE.start,
-    RANGE.end,
-  );
-
-  function expectEleventhGradeDetail(out: string) {
-    expect(out).toContain("11. Sınıf Genel Deneme Ortalama Net");
-    expect(out).toContain(">52<");
-    expect(out).not.toContain("AYT Genel Deneme");
-    expect(out).not.toContain("TYT Genel Deneme Ortalama Net");
-    // Maarif TYT + 11. Sınıf course tabs, with a populated Maarif TYT topic grid (the Genel Deneme counted for it)
-    expect(out).toContain("Maarif TYT");
-    expect(out).toContain("11. Sınıf");
-    expect(out).toMatch(/0\/1(<\/p>| bu dönemki deneme)/);
-    expect(out).not.toContain("Bu dönemde bu ders için deneme kaydı yok.");
-  }
-
-  it("coach: the review card shows the 11. Sınıf net and the Maarif TYT / 11. Sınıf course tabs", () => {
-    const cycle = {
-      id: "c1",
-      cycle_number: 1,
-      range_start: RANGE.start,
-      range_end: RANGE.end,
-      status: "draft" as const,
-      coach_notes: null,
-      stats,
-      topic_mistakes: topicRows,
-      generated_at: "2026-10-29T10:00:00Z",
-      approved_at: null,
-    };
-    expectEleventhGradeDetail(
-      renderToStaticMarkup(
-        <MaarifGradeProvider value={11}>
-          <ReportCardReview cycle={cycle} onApproved={() => {}} onDeleted={() => {}} />
-        </MaarifGradeProvider>,
-      ),
-    );
-  });
-
   it("the coach's list charts the 11th grade's net under one '11. Sınıf Net Gelişimi' heading, without an AYT chart", () => {
     const item = { id: "c1", cycle_number: 1, range_start: RANGE.start, range_end: RANGE.end, approved_at: "2026-10-30T10:00:00Z", stats };
     const out = renderToStaticMarkup(
@@ -162,19 +120,7 @@ describe("11th grade: the Karne screens", () => {
     expect(out).not.toContain("AYT Net Gelişimi");
   });
 
-  it("a plain YKS card is unchanged (TYT + AYT halves)", () => {
-    const yks: NetSummary = { tyt: { current: 40, previous: null }, ayt: { current: 30, previous: null } };
-    const out = renderToStaticMarkup(
-      <ReportCardReview
-        cycle={{ id: "c2", cycle_number: 1, range_start: RANGE.start, range_end: RANGE.end, status: "draft", coach_notes: null, stats: yks, topic_mistakes: [], generated_at: "2026-10-29T10:00:00Z", approved_at: null }}
-        onApproved={() => {}}
-        onDeleted={() => {}}
-      />,
-    );
-    expect(out).toContain("TYT Genel Deneme Ortalama Net");
-    expect(out).toContain("AYT Genel Deneme Ortalama Net");
-    expect(out).not.toContain("11. Sınıf Genel Deneme");
-  });
+
 });
 
 describe("11th grade: Grafikler", () => {

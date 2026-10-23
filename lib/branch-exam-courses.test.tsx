@@ -143,7 +143,6 @@ describe("guard: no picker is assembled by hand any more", () => {
     for (const file of [
       "app/coach/students/[id]/_components/charts-tab.tsx",
       "app/coach/students/[id]/_components/coach-exam-analysis-section.tsx",
-      "app/coach/students/[id]/_components/karneler-tab.tsx",
       "app/student/deneme-analizleri/brans/brans-analysis-client.tsx",
     ]) {
       expect(readFileSync(join(root, file), "utf8"), file).toContain("branchExamCourses(");

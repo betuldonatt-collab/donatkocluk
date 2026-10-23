@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
-import { AlertTriangle, CalendarIcon, CheckCircle2, ChevronDown, ChevronUp, Clock, Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarIcon, CheckCircle2, ChevronDown, ChevronUp, Clock, Plus, Trash2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
@@ -10,20 +10,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { CourseTabs } from "@/components/course-tabs";
 import { dateToISO, isoToDate, isValidISODateOnly } from "@/lib/chart-range";
-import {
-  branchExamCourses,
-  AYT_COURSES_BY_TRACK,
-  TRACK_LABELS,
-  TYT_COURSES,
-  type Course,
-  type Track,
-} from "@/lib/curriculum";
-import { HEAT_TIER_STYLES, heatTier } from "@/lib/gelisim-haritasi";
-import { CYCLE_DAYS, inclusiveDaySpan, karneTopicRowsForCourse, type KarneSubjectScoreRow, type KarneTopicRow, type NetSummary } from "@/lib/karne";
-import { eventsInRange, type ParentEventAttendance } from "@/lib/event-attendance";
-import { EventAttendanceCard } from "@/components/event-attendance-card";
+import { CYCLE_DAYS, inclusiveDaySpan } from "@/lib/karne";
 import { KarneLiveSection } from "./karne-live-section";
 import { cn } from "@/lib/utils";
 import { approveReportCard, deleteReportCard, generateCycleReportCard, type CoachReportCardRow } from "../../../actions";
@@ -50,7 +38,6 @@ const STATUS_CLASSES: Record<CoachReportCardRow["status"], string> = {
 export function KarnelerTab({
   studentId,
   cycles: initialCycles,
-  eventAttendance = [],
   studentName = null,
   today,
   defaultRange,
@@ -58,16 +45,12 @@ export function KarnelerTab({
 }: {
   studentId: string;
   cycles: CoachReportCardRow[];
-  // The student's event attendance over their whole history; every report card shows the events of its own period.
-  eventAttendance?: ParentEventAttendance[];
   // For the unified Karne preview at the top of the tab (omitted: the preview is not shown).
   studentName?: string | null;
   today?: string;
   defaultRange: KarneRange | null;
   // All-time sum of tracked_duration_seconds across every task this
-  // student has ever had, regardless of cycle -- a genuinely different
-  // number from TotalDurationCard's own totalDurationMinutes below, which
-  // is scoped to one karne cycle (typically ~a month).
+  // student has ever had, regardless of cycle (not scoped to one karne period).
   allTimeTrackedMinutes: number;
 }) {
   const [cycles, setCycles] = useState(initialCycles);
@@ -138,8 +121,7 @@ export function KarnelerTab({
       {/* Cross-cycle progress -- combines "how is the exam net changing"
           (from every approved cycle's already-fetched stats, no extra
           query) with "how much time has actually been invested overall"
-          (allTimeTrackedMinutes, unlike TotalDurationCard below which is
-          scoped to one cycle) -- deliberately placed together per product
+          (allTimeTrackedMinutes, across every cycle) -- deliberately placed together per product
           decision, since time invested is the context for reading the
           net trend next to it. */}
       {approvedCyclesAsc.length > 0 && (
@@ -221,12 +203,7 @@ export function KarnelerTab({
 
                 {isExpanded && (
                   <div className="border-border border-t p-4">
-                    <ReportCardReview
-                      cycle={cycle}
-                      eventAttendance={eventsInRange(eventAttendance, cycle.range_start, cycle.range_end)}
-                      onApproved={handleApproved}
-                      onDeleted={handleDeleted}
-                    />
+                    <ReportCardReview cycle={cycle} onApproved={handleApproved} onDeleted={handleDeleted} />
                   </div>
                 )}
               </div>
@@ -307,198 +284,24 @@ function formatDuration(totalMinutes: number): string {
   return `${hours} saat ${minutes} dakika`;
 }
 
-// Every minute logged in the system this cycle (NetSummary.totalDurationMinutes,
-// app/coach/actions.ts's generateCycleReportCard) -- across every task
-// type, not just the 4 exam-shaped ones ScoreBreakdownCard covers. One
-// instance per cycle (not per TYT/AYT card, unlike ScoreBreakdownCard),
-// shown near the top of the cycle's own content since it's a single
-// cycle-wide figure. Undefined (not 0) for a cycle generated before this
-// field existed -- the caller only renders this when it's actually present.
-function TotalDurationCard({ totalDurationMinutes }: { totalDurationMinutes: number }) {
-  return (
-    <div className="border-border bg-card rounded-lg border p-3">
-      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Toplam Çalışma Süresi</p>
-      <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">{formatDuration(totalDurationMinutes)}</p>
-      <p className="text-muted-foreground mt-1 text-xs">Bu sistemde tutulan toplam süre</p>
-    </div>
-  );
-}
-
-function NetCard({ label, current, previous }: { label: string; current: number | null; previous: number | null }) {
-  const delta = current !== null && previous !== null ? Math.round((current - previous) * 100) / 100 : null;
-  return (
-    <div className="border-border bg-card rounded-lg border p-3">
-      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{label}</p>
-      <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">{current !== null ? current : "—"}</p>
-      {delta !== null ? (
-        <p className={cn("mt-1 flex items-center gap-1 text-xs font-medium", delta >= 0 ? "text-emerald-600" : "text-rose-600")}>
-          {delta >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-          Önceki döneme göre {delta >= 0 ? "+" : ""}
-          {delta}
-        </p>
-      ) : (
-        <p className="text-muted-foreground mt-1 text-xs">Önceki dönem verisi yok</p>
-      )}
-    </div>
-  );
-}
-
-function ScorePill({ label, value, tone }: { label: string; value: number; tone: "total" | "correct" | "wrong" | "empty" }) {
-  const toneClass =
-    tone === "correct"
-      ? "text-emerald-600"
-      : tone === "wrong"
-        ? "text-rose-600"
-        : tone === "total"
-          ? "text-foreground"
-          : "text-muted-foreground";
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className={cn("text-xl font-bold tabular-nums", toneClass)}>{value}</span>
-      <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">{label}</span>
-    </div>
-  );
-}
-
-// Replaces the old TYT-only Soru Çözüm Hızı (questions/hour) card with the
-// cycle's actual Doğru/Yanlış/Boş totals -- a grand total row (now led by
-// an explicit Toplam Soru pill, not just the D/Y/B split) plus a
-// per-subject/course breakdown underneath, each row also stating its own
-// Toplam Soru rather than leaving the reader to add D+Y+B up themselves.
-// Shared by both the TYT card (one instance, from stats.scoreBreakdown)
-// and each AYT track's own card (one instance per stats.aytScoreBreakdown
-// entry) -- same design either way, only the title and the subject rows
-// underneath differ. (The student's and the parent's Karne is the
-// unified document, components/karne-document.tsx; this older breakdown
-// is the coach's own review of a report card cycle.)
-function ScoreBreakdownCard({
-  title,
-  total,
-  bySubject,
-}: {
-  title: string;
-  total: { correct: number; wrong: number; empty: number };
-  bySubject: KarneSubjectScoreRow[];
-}) {
-  const grandTotal = total.correct + total.wrong + total.empty;
-  const hasAnyData = grandTotal > 0;
-  return (
-    <div className="border-border bg-card rounded-lg border p-3">
-      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{title}</p>
-      <div className="mt-2 flex items-center gap-6">
-        <ScorePill label="Toplam Soru" value={grandTotal} tone="total" />
-        <ScorePill label="Doğru" value={total.correct} tone="correct" />
-        <ScorePill label="Yanlış" value={total.wrong} tone="wrong" />
-        <ScorePill label="Boş" value={total.empty} tone="empty" />
-      </div>
-
-      {hasAnyData ? (
-        <div className="border-border/60 mt-3 space-y-1.5 border-t pt-3">
-          <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Ders Bazlı Kırılım</p>
-          {bySubject.map((row) => (
-            <div key={row.key} className="flex items-center justify-between gap-2 text-xs">
-              <span className="text-foreground font-medium">{row.label}</span>
-              <span className="tabular-nums">
-                <span className="text-foreground font-semibold">Toplam {row.correct + row.wrong + row.empty}</span>
-                {" · "}
-                <span className="text-emerald-600">{row.correct} D</span>
-                {" · "}
-                <span className="text-rose-600">{row.wrong} Y</span>
-                {" · "}
-                <span className="text-muted-foreground">{row.empty} B</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-muted-foreground mt-2 text-xs">Bu dönemde kayıtlı sonuç yok</p>
-      )}
-    </div>
-  );
-}
-
-function CourseChips({ courses, selectedId, onSelect }: { courses: Course[]; selectedId: string; onSelect: (id: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {courses.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-            selectedId === c.id ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {c.name}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function TopicGrid({ courseId, rows }: { courseId: string; rows: KarneTopicRow[] }) {
-  const courseRows = karneTopicRowsForCourse(rows, courseId);
-  if (courseRows.length === 0 || courseRows[0].windowSize === 0) {
-    return <p className="text-muted-foreground text-sm">Bu dönemde bu ders için deneme kaydı yok.</p>;
-  }
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-      {courseRows.map((row) => {
-        const tier = heatTier(row.count, row.windowSize);
-        return (
-          <div key={row.topicId} className={cn("space-y-1 rounded-lg border px-3 py-2", HEAT_TIER_STYLES[tier].tile)}>
-            <p className="truncate text-sm font-medium">{row.topicName}</p>
-            <p className="text-xs tabular-nums opacity-80">
-              {row.count}/{row.windowSize}
-            </p>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
+// The expanded report card in the coach's list is only what the coach DOES with it: write the note, approve (and send) it, or delete it.
+// What the Karne says -- the numbers, exams, attendance -- is the document above the list (KarneLiveSection), the very one the student
+// and the parent receive; it is not repeated here.
 export function ReportCardReview({
   cycle,
-  eventAttendance = [],
   onApproved,
   onDeleted,
 }: {
   cycle: CoachReportCardRow;
-  // The events of this card's period (Etkinlik Katılımı), session by session.
-  eventAttendance?: ParentEventAttendance[];
   onApproved: (updated: CoachReportCardRow) => void;
   onDeleted: (id: string) => void;
 }) {
-  const stats = cycle.stats as NetSummary;
-  const topicRows = cycle.topic_mistakes as KarneTopicRow[];
-  const isLgs = stats.lgs !== undefined;
-  // A 7th grader's card has the LGS shape but its own label and courses (stats.examLabel / maarifGrade).
-  const isMaarif7Card = stats.maarifGrade === 7;
-  // An 11th grader's card is YKS-shaped but has no AYT half: one "11. Sınıf" net block, and its own courses
-  // (Maarif TYT + 11. Sınıf, via the page's Maarif grade) in the topic grid.
-  const isMaarif11Card = stats.maarifGrade === 11;
-  const [tytCourseId, setTytCourseId] = useState(TYT_COURSES[0].id);
-  const [track, setTrack] = useState<Track>("sayisal");
-  const [aytCourseId, setAytCourseId] = useState(AYT_COURSES_BY_TRACK.sayisal[0].id);
   const [note, setNote] = useState(cycle.coach_notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  function handleTrackChange(nextTrack: Track) {
-    setTrack(nextTrack);
-    setAytCourseId(AYT_COURSES_BY_TRACK[nextTrack][0].id);
-  }
-  // Macro ("whole fruit") branch-exam subjects sit alongside the atomic
-  // ("sliced") ones here too, so a mistake logged under a combined "TYT
-  // Fen" exam shows up in its own chip, independent of "Fizik"/"Kimya"/
-  // "Biyoloji"'s own chips.
-  const tytCourses = branchExamCourses("tyt");
-  const aytCourses = branchExamCourses("ayt", track);
 
   // Warning Mode (product decision): a cycle shorter than CYCLE_DAYS used
   // to hard-block approval. Short cycles are now legitimate (intensive
@@ -536,117 +339,6 @@ export function ReportCardReview({
 
   return (
     <div className="space-y-4">
-      {stats.totalDurationMinutes !== undefined && <TotalDurationCard totalDurationMinutes={stats.totalDurationMinutes} />}
-
-      <EventAttendanceCard events={eventAttendance} />
-
-      {isMaarif11Card ? (
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">11. Sınıf</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NetCard label={(stats.examLabel ?? "11. Sınıf Genel Deneme") + " Ortalama Net"} current={stats.tyt.current} previous={stats.tyt.previous} />
-            {stats.scoreBreakdown && (
-              <ScoreBreakdownCard
-                title="Toplam Doğru / Yanlış / Boş"
-                total={stats.scoreBreakdown.total}
-                bySubject={stats.scoreBreakdown.bySubject}
-              />
-            )}
-          </div>
-        </div>
-      ) : isLgs ? (
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{isMaarif7Card ? "7. Sınıf" : "LGS"}</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NetCard label={(stats.examLabel ?? "LGS Genel Deneme") + " Ortalama Net"} current={stats.lgs!.current} previous={stats.lgs!.previous} />
-            {stats.lgsScoreBreakdown && (
-              <ScoreBreakdownCard
-                title="Toplam Doğru / Yanlış / Boş"
-                total={stats.lgsScoreBreakdown.total}
-                bySubject={stats.lgsScoreBreakdown.bySubject}
-              />
-            )}
-          </div>
-        </div>
-      ) : (
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">TYT</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NetCard label="TYT Genel Deneme Ortalama Net" current={stats.tyt.current} previous={stats.tyt.previous} />
-            {stats.scoreBreakdown && (
-              <ScoreBreakdownCard
-                title="Toplam Doğru / Yanlış / Boş"
-                total={stats.scoreBreakdown.total}
-                bySubject={stats.scoreBreakdown.bySubject}
-              />
-            )}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">AYT</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NetCard label="AYT Genel Deneme Ortalama Net" current={stats.ayt.current} previous={stats.ayt.previous} />
-            {stats.aytScoreBreakdown?.map((trackBreakdown) => (
-              <ScoreBreakdownCard
-                key={trackBreakdown.track}
-                title={`AYT ${trackBreakdown.trackLabel} — Toplam Doğru / Yanlış / Boş`}
-                total={trackBreakdown.total}
-                bySubject={trackBreakdown.bySubject}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-      )}
-
-      <div className="space-y-3">
-        <h4 className="text-foreground text-sm font-semibold">Konu Bazlı Hata Sıklığı</h4>
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          {(["hot", "warm", "cool"] as const).map((t) => (
-            <span key={t} className="flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-full border", HEAT_TIER_STYLES[t].tile)} />
-              <span className="text-muted-foreground">{HEAT_TIER_STYLES[t].label}</span>
-            </span>
-          ))}
-        </div>
-
-        {isMaarif11Card ? (
-          <CourseTabs render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
-        ) : isLgs ? (
-          // A 7th-grade card lists its own courses (SÖZEL / SAYISAL, via the page's Maarif grade); LGS its own.
-          <CourseTabs examType={isMaarif7Card ? "YKS" : "LGS"} render={(course) => <TopicGrid courseId={course.id} rows={topicRows} />} />
-        ) : (
-        <>
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">TYT</p>
-          <CourseChips courses={tytCourses} selectedId={tytCourseId} onSelect={setTytCourseId} />
-          <TopicGrid courseId={tytCourseId} rows={topicRows} />
-        </div>
-
-        <div className="space-y-2">
-          <div className="bg-secondary inline-flex rounded-lg p-1">
-            {(Object.keys(TRACK_LABELS) as Track[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => handleTrackChange(t)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  track === t ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {TRACK_LABELS[t]}
-              </button>
-            ))}
-          </div>
-          <CourseChips courses={aytCourses} selectedId={aytCourseId} onSelect={setAytCourseId} />
-          <TopicGrid courseId={aytCourseId} rows={topicRows} />
-        </div>
-        </>
-        )}
-      </div>
-
       <div className="space-y-2">
         <label htmlFor={`note-${cycle.id}`} className="text-foreground text-sm font-semibold">
           Öğrenciye Not
@@ -659,6 +351,9 @@ export function ReportCardReview({
           placeholder="Bu dönem için kişisel bir değerlendirme yaz..."
           disabled={cycle.status === "approved"}
         />
+        {cycle.status === "draft" && (
+          <p className="text-muted-foreground text-xs">Onayladığında öğrenci ve veli bu dönemin karnesini notunla birlikte görür.</p>
+        )}
       </div>
 
       {isShortCycle && (
