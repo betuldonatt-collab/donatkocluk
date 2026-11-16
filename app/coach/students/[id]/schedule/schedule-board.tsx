@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { friendlyError } from "@/lib/friendly-error";
 import { lockButtonState } from "@/lib/progress-lock-ui";
+import { lockScopeEnd } from "@/lib/progress-lock-scope";
 import {
   DndContext,
   DragOverlay,
@@ -330,14 +331,17 @@ export function ScheduleBoard({
 
   async function handleToggleLock() {
     const next = !showUnlock;
+    // The lock follows the week on screen: it freezes that week and the ones before it, never the weeks after (lib/progress-lock-scope.ts).
+    const scopeEnd = lockScopeEnd(weekDays[6].date, today);
+    const [sy, sm, sd] = scopeEnd.split("-");
     const message = next
-      ? "Programı bugüne kadar kilitlemek istediğine emin misin? Öğrenci bu döneme ait görevleri artık düzenleyemez."
+      ? `Programı ${sd}.${sm}.${sy} tarihine kadar (o gün dahil) kilitlemek istediğine emin misin? Öğrenci bu tarihe kadarki görevleri artık düzenleyemez. Sonraki günler ve haftalar açık kalır.`
       : "Son kilitlemeyi geri almak istediğine emin misin? Öğrenci tekrar düzenleyebilecek.";
     if (!confirm(message)) return;
 
     setLockBusy(true);
     try {
-      const result = next ? await lockCurrentCycle(studentId) : await unlockLatestCycle(studentId);
+      const result = next ? await lockCurrentCycle(studentId, weekDays[6].date) : await unlockLatestCycle(studentId);
       if (!result.ok) {
         // Never a silent refresh: say what went wrong (and leave the button as it was -- nothing changed).
         toast.error(result.error);

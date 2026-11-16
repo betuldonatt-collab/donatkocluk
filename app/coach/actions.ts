@@ -30,7 +30,8 @@ import { nonEmptyText, parseInput, uuidSchema } from "@/lib/validation";
 import { mondayOf, stopwatchLogicalDateIso } from "@/lib/date";
 import { fetchAllPages } from "@/lib/paged-select";
 import { fetchKarneSummary } from "@/lib/karne-summary-data";
-import { resolveCycles, type ProgressLock } from "@/lib/completion";
+import { type ProgressLock } from "@/lib/completion";
+import { planLock } from "@/lib/progress-lock-scope";
 import { STUDENT_EVENT_TYPE_LABELS, type StudentEventType } from "@/lib/student-events";
 import {
   computeAylikKarne,
@@ -819,7 +820,9 @@ function progressLockFailure(label: string, e: unknown): { ok: false; error: str
 // make the action slow enough to time out.
 const TOPIC_RESYNC_CONCURRENCY = 6;
 
-export async function lockCurrentCycle(studentId: string): Promise<ProgressLockResult> {
+// `throughDate` = the last day of the week the coach is looking at: the lock freezes that week and everything before it, and nothing after
+// (lib/progress-lock-scope.ts). Omitted, it freezes everything before today, as it always did.
+export async function lockCurrentCycle(studentId: string, throughDate?: string): Promise<ProgressLockResult> {
   try {
     await assertNotImpersonating();
     const studentIdV = parseInput(uuidSchema, studentId);
@@ -829,42 +832,45 @@ export async function lockCurrentCycle(studentId: string): Promise<ProgressLockR
 
     const { lastLock, firstCompletedSessionAt } = await fetchCycleInputs(supabase, studentIdV);
     const today = new Date().toISOString().slice(0, 10);
-    // The lock day itself always belongs to the NEW cycle (lib/completion.ts),
-    // so a second lock the same day would close an empty/inverted range --
-    // block it explicitly rather than let it silently produce a meaningless
-    // previous-cycle row.
-    if (lastLock && lastLock.locked_at.slice(0, 10) === today) throw new Error("Program bugün zaten kilitlendi.");
     // Locking requires a real cycle event to have already happened -- there's
-    // nothing to close before the student's first session. (Passing null for
-    // the upcoming-session input is safe: resolveCycles only consults it in
-    // the bootstrap branch, which this guard rules out.)
+    // nothing to close before the student's first session.
     if (!lastLock && !firstCompletedSessionAt) throw new Error("İlk görüşme tamamlanmadan program kilitlenemez.");
 
-    const { current } = resolveCycles(lastLock, null, today);
+    // Where the lock stands: the day AFTER the viewed week (never later than today), so a week of the past freezes that week and the ones
+    // before it only -- the weeks after it, and every future day, stay open. The lock day itself always belongs to the NEW cycle
+    // (lib/completion.ts), so a lock that would not move the boundary forward (same day twice, or a week already frozen) is refused.
+    const planned = planLock({ today, throughDate: throughDate ?? null, lastLockDay: lastLock ? lastLock.locked_at.slice(0, 10) : null });
+    if (!planned.ok) throw new Error(planned.error);
+    const { plan } = planned;
 
     const { data: inserted, error } = await supabase
       .from("progress_locks")
-      .insert({ student_id: studentIdV, period_start: current.start, locked_by: user.id })
+      .insert({
+        student_id: studentIdV,
+        period_start: plan.periodStart,
+        locked_by: user.id,
+        // an earlier boundary than today is written as that day (otherwise the database stamps "now")
+        ...(plan.backdated ? { locked_at: `${plan.boundary}T00:00:00.000Z` } : {}),
+      })
       .select("id")
       .single();
     if (error) throw dbError(error);
 
     // "Kilitle / Değerlendir" also finalizes the cycle being closed: any task
     // still sitting untouched ("pending", i.e. the student never checked it at
-    // all) STRICTLY BEFORE today gets force-resolved to "Yapılmadı" so nothing
-    // is left in limbo once it can no longer be edited. Today's own tasks are
+    // all) STRICTLY BEFORE the lock day gets force-resolved to "Yapılmadı" so nothing
+    // is left in limbo once it can no longer be edited. The lock day's own tasks (and every later day's) are
     // deliberately excluded -- they belong to the new, still-open cycle (a
     // same-day session plus newly assigned same-day tasks must land there, not
     // get swept into the cycle just closed). A task the student actually acted
     // on (half_done/done) is left exactly as they left it either way.
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
     const { data: resolvedRows, error: resolveError } = await supabase
       .from("student_tasks")
       .update({ status: "not_done", completed: false, updated_at: new Date().toISOString() })
       .eq("student_id", studentIdV)
       .eq("status", "pending")
-      .gte("task_date", current.start)
-      .lte("task_date", yesterday)
+      .gte("task_date", plan.finalizeFrom)
+      .lte("task_date", plan.finalizeTo)
       .select("course_id, topic_id");
     if (resolveError) {
       // Nothing was finalized, so the lock must not stand either: a frozen cycle with its pending tasks left in limbo is the worst
@@ -915,7 +921,7 @@ export async function lockCurrentCycle(studentId: string): Promise<ProgressLockR
     revalidatePath("/student");
     return {
       ok: true,
-      lockedThroughDate: today,
+      lockedThroughDate: plan.boundary,
       ...(failedResyncs > 0
         ? { warning: `Program kilitlendi, ancak ${failedResyncs} konunun istatistiği güncellenemedi; bir sonraki kayıtta kendiliğinden düzelir.` }
         : {}),

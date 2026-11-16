@@ -56,6 +56,8 @@ const db: {
   deletes: string[];
   inFlight: number;
   maxInFlight: number;
+  inserted: Row[]; // payloads of progress_locks inserts
+  finalizeRanges: { from?: unknown; to?: unknown }[]; // gte/lte of the "pending -> not_done" update
 } = {
   roster: [],
   locks: [],
@@ -70,6 +72,8 @@ const db: {
   deletes: [],
   inFlight: 0,
   maxInFlight: 0,
+  inserted: [],
+  finalizeRanges: [],
 };
 
 function builder(table: string) {
@@ -77,7 +81,7 @@ function builder(table: string) {
   const filters: [string, unknown][] = [];
   const b: Record<string, unknown> = {};
   b.select = () => b;
-  b.insert = () => ((op = "insert"), b);
+  b.insert = (payload: Row) => ((op = "insert"), db.inserted.push(payload), b);
   b.update = () => ((op = "update"), b);
   b.delete = () => ((op = "delete"), b);
   for (const m of ["eq", "gte", "lte", "order", "limit"]) b[m] = (col: string, val: unknown) => (filters.push([`${m}:${col}`, val]), b);
@@ -87,7 +91,8 @@ function builder(table: string) {
     if (table === "progress_locks") {
       if (op === "insert") {
         if (db.insertError) return { data: null, error: db.insertError };
-        const row = { id: `lock-${db.locks.length + 1}`, locked_at: new Date().toISOString() };
+        const stamped = (db.inserted[db.inserted.length - 1] as { locked_at?: string } | undefined)?.locked_at;
+        const row = { id: `lock-${db.locks.length + 1}`, locked_at: stamped ?? new Date().toISOString() };
         db.locks.unshift(row);
         return { data: row, error: null };
       }
@@ -100,6 +105,9 @@ function builder(table: string) {
         return { data: [{ id }], error: null };
       }
       return { data: db.locks[0] ?? null, error: null };
+    }
+    if (table === "student_tasks" && op === "update") {
+      db.finalizeRanges.push({ from: filters.find(([k]) => k === "gte:task_date")?.[1], to: filters.find(([k]) => k === "lte:task_date")?.[1] });
     }
     if (table === "student_tasks" && op === "update") return db.resolveError ? { data: null, error: db.resolveError } : { data: db.resolved, error: null };
     return { data: null, error: null };
@@ -150,6 +158,8 @@ beforeEach(() => {
   db.deletes = [];
   db.inFlight = 0;
   db.maxInFlight = 0;
+  db.inserted = [];
+  db.finalizeRanges = [];
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -268,5 +278,93 @@ describe("the board's handler never fails silently", () => {
     // the old rule (a window entirely before the lock day) is no longer what decides the button
     expect(src).not.toMatch(/const weekLocked = lockedThroughDate !== null/);
     expect(src).toContain("showUnlock ?");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The lock follows the week on screen
+// ---------------------------------------------------------------------------------------------------------------------------------
+const PLUS = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+describe("lockCurrentCycle(studentId, throughDate): the lock reaches the viewed week and the weeks before it, never later", () => {
+  it("locking an older week freezes THAT week and what is before it -- the lock day is the day after it, not today", async () => {
+    const weekEnd = DAYS_AGO(10);
+    const boundary = PLUS(-9);
+    const r = await lockCurrentCycle(STUDENT, weekEnd);
+    expect(r).toEqual({ ok: true, lockedThroughDate: boundary });
+    expect(db.inserted[0]).toMatchObject({ student_id: STUDENT, locked_at: `${boundary}T00:00:00.000Z` });
+    // the days after the viewed week up to today stay OPEN (their dates are not before the lock day)
+    expect(db.locks[0].locked_at).toBe(`${boundary}T00:00:00.000Z`);
+    expect(boundary < TODAY).toBe(true);
+  });
+
+  it("only the pending tasks BEFORE that lock day are finalized as not done: the range ends the day before the boundary, not yesterday", async () => {
+    const weekEnd = DAYS_AGO(10);
+    await lockCurrentCycle(STUDENT, weekEnd);
+    expect(db.finalizeRanges[0].to).toBe(weekEnd);
+    expect(String(db.finalizeRanges[0].to) < DAYS_AGO(1)).toBe(true);
+  });
+
+  it("the first lock's cycle starts 7 days before its boundary (always before it, as the database requires)", async () => {
+    await lockCurrentCycle(STUDENT, DAYS_AGO(10));
+    const { period_start, locked_at } = db.inserted[0] as { period_start: string; locked_at: string };
+    expect(period_start).toBe(PLUS(-16));
+    expect(period_start < locked_at.slice(0, 10)).toBe(true);
+  });
+
+  it("locking from the current week (or any window reaching today) freezes everything before today and not a day more", async () => {
+    for (const weekEnd of [PLUS(3), TODAY, DAYS_AGO(1), PLUS(40)]) {
+      db.locks = [];
+      db.inserted = [];
+      const r = await lockCurrentCycle(STUDENT, weekEnd);
+      expect(r, weekEnd).toEqual({ ok: true, lockedThroughDate: TODAY });
+      expect(db.inserted[0], weekEnd).not.toHaveProperty("locked_at"); // stamped "now" by the database
+    }
+  });
+
+  it("no throughDate = as before: everything before today", async () => {
+    expect(await lockCurrentCycle(STUDENT)).toEqual({ ok: true, lockedThroughDate: TODAY });
+  });
+
+  it("a lock NEVER reaches a later day than today, however far ahead the viewed week is", async () => {
+    for (const weekEnd of [PLUS(7), PLUS(30), PLUS(400)]) {
+      db.locks = [];
+      const r = await lockCurrentCycle(STUDENT, weekEnd);
+      expect(r.ok && r.lockedThroughDate !== null && r.lockedThroughDate <= TODAY, weekEnd).toBe(true);
+    }
+  });
+
+  it("with an earlier lock, the new cycle starts at that lock's day", async () => {
+    db.locks = [{ id: "old", locked_at: `${DAYS_AGO(30)}T08:00:00Z` }];
+    const r = await lockCurrentCycle(STUDENT, DAYS_AGO(10));
+    expect(r).toEqual({ ok: true, lockedThroughDate: PLUS(-9) });
+    expect((db.inserted[0] as { period_start: string }).period_start).toBe(DAYS_AGO(30));
+  });
+
+  it("a week that is already frozen cannot be locked again (it would not move the boundary)", async () => {
+    db.locks = [{ id: "old", locked_at: `${DAYS_AGO(5)}T08:00:00Z` }];
+    const r = await lockCurrentCycle(STUDENT, DAYS_AGO(10));
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toContain("zaten kilitli");
+    expect(db.inserted).toEqual([]);
+  });
+
+  it("today twice is still refused with the old message", async () => {
+    db.locks = [{ id: "l0", locked_at: `${TODAY}T07:00:00Z` }];
+    expect(await lockCurrentCycle(STUDENT, PLUS(3))).toEqual({ ok: false, error: "Program bugün zaten kilitlendi." });
+  });
+
+  it("a malformed date is refused and nothing is written", async () => {
+    const r = await lockCurrentCycle(STUDENT, "yarın");
+    expect(r.ok).toBe(false);
+    expect(db.inserted).toEqual([]);
+  });
+
+  it("the board asks for the lock through the LAST DAY OF THE WEEK ON SCREEN", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/coach/students/[id]/schedule/schedule-board.tsx", "utf8");
+    expect(src).toContain("lockCurrentCycle(studentId, weekDays[6].date)");
+    expect(src).toContain("lockScopeEnd(weekDays[6].date, today)");
+    expect(src).toContain("Sonraki günler ve haftalar açık kalır");
   });
 });
